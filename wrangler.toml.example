@@ -1,0 +1,11 @@
+name = "your-project-name"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "your-hyperdrive-id"
+
+# 本地开发时使用 (部署时删除或注释掉)
+# localConnectionString = "mysql://user:password@host:3306/database"
