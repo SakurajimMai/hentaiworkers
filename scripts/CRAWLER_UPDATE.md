@@ -36,16 +36,56 @@ cd scripts
 cp production_config.yml.example production_config.yml
 ```
 
-### 2. 启用 D1 同步
+### 2. 编辑配置文件
 
-编辑 `production_config.yml`:
+编辑 `production_config.yml`,配置以下关键部分:
+
+#### 2.1 爬取目标配置
 
 ```yaml
-# D1 同步配置
+crawl:
+  date_filter:
+    year: [2025, 2026]  # 要爬取的年份
+    month: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]  # 要爬取的月份
+
+  skip_keywords:  # 过滤关键词
+    - "中字後補"
+    - "简中补字"
+    - "Chinese Sub"
+    - "中文字幕後補"
+```
+
+#### 2.2 数据库配置
+
+```yaml
+database:
+  host: "your-mysql-host:3306"
+  user: "your-mysql-user"
+  password: "your-mysql-password"
+  database: "your-database-name"
+```
+
+#### 2.3 启用 D1 同步
+
+```yaml
 d1_sync:
   enabled: true  # 启用 D1 同步
-  api_url: https://anime.ixacg.top
-  batch_size: 1  # 实时同步,每次 1 条
+  api_url: "https://anime.ixacg.top"  # API 地址
+  batch_size: 1  # 实时同步 (1=实时, 50=批量)
+  retry_on_failure: true
+  max_retries: 3
+```
+
+#### 2.4 下载路径配置
+
+```yaml
+download:
+  download_dir: "downloads"  # 下载根目录
+  temp_dir: "temp"  # 临时目录
+  organize_by_date: true  # 按年/月组织
+
+web_access:
+  domain_prefix: "https://static.hxsl.org"  # 静态文件域名
 ```
 
 ### 3. 设置 API Key
@@ -53,29 +93,20 @@ d1_sync:
 **方法 1: 环境变量 (推荐)**
 
 ```bash
+# Windows
+set ADMIN_API_KEY=your-secret-key
+python production_crawler.py production_config.yml
+
+# Linux/Mac
 export ADMIN_API_KEY="your-secret-key"
-python production_crawler.py
+python production_crawler.py production_config.yml
 ```
 
-**方法 2: 配置文件**
+**方法 2: 临时禁用 D1 同步**
 
 ```yaml
 d1_sync:
-  enabled: true
-  api_url: https://anime.ixacg.top
-  api_key: your-secret-key  # 不推荐,容易泄露
-```
-
-### 4. 配置过滤规则
-
-确保配置文件中包含:
-
-```yaml
-filter:
-  skip_keywords:
-    - 中字後補  # 过滤中字後補
-    - 無修正    # 其他需要过滤的关键词
-    - 测试
+  enabled: false  # 只同步到 MySQL
 ```
 
 ## 🚀 运行爬虫
@@ -83,15 +114,15 @@ filter:
 ```bash
 cd scripts
 
-# 使用默认配置
+# 方法 1: 使用环境变量 (推荐)
+set ADMIN_API_KEY=your-secret-key
+python production_crawler.py production_config.yml
+
+# 方法 2: 使用默认配置文件
 python production_crawler.py
 
-# 使用指定配置
-python production_crawler.py my_config.yml
-
-# 设置 API Key 后运行
-export ADMIN_API_KEY="sk_live_abc123"
-python production_crawler.py
+# 方法 3: 指定自定义配置文件
+python production_crawler.py my_custom_config.yml
 ```
 
 ## 📊 日志输出示例
@@ -160,8 +191,10 @@ curl https://anime.ixacg.top/api/health
 ```yaml
 d1_sync:
   enabled: true
-  api_url: https://anime.ixacg.top
+  api_url: "https://anime.ixacg.top"
   batch_size: 50  # 每 50 条同步一次
+  retry_on_failure: true
+  max_retries: 3
 ```
 
 ### 禁用 D1 同步
@@ -173,15 +206,15 @@ d1_sync:
   enabled: false
 ```
 
-### 同时使用 D1 和 Hyperdrive
+### Web 访问路径配置
 
-在 Cloudflare Dashboard 配置环境变量:
+配置静态文件的访问域名:
 
+```yaml
+web_access:
+  domain_prefix: "https://static.hxsl.org"  # 你的静态文件域名
+  base_path: ""  # 可选的基础路径
 ```
-DB_TYPE = "d1"  # 或 "hyperdrive"
-```
-
-爬虫会根据配置自动选择数据库。
 
 ## 🐛 故障排查
 
