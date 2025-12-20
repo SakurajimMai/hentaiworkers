@@ -1,7 +1,7 @@
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
 import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2/promise';
-import { animes, tags, animeTags } from './schema';
+import { animes, tags, animeTags } from '../schema';
 
 export async function onRequest(context) {
   // 验证 API Key
