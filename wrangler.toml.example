@@ -22,6 +22,7 @@ id = "your-hyperdrive-id"
 # 环境变量配置
 [vars]
 DB_TYPE = "d1"  # 可选: "d1" 或 "hyperdrive"
+# ADMIN_API_KEY = "your-secret-key-change-in-production"  # 管理 API 密钥
 
 # 本地开发时的 MySQL 连接 (仅当 DB_TYPE = "hyperdrive")
 # localConnectionString = "mysql://user:password@host:3306/database"
