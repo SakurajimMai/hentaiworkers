@@ -1,6 +1,6 @@
 # AnimeStream 🎬
 
-一个现代化的在线动漫视频播放平台，基于 React + Cloudflare Pages + MySQL 构建。
+一个现代化的在线动漫视频播放平台，基于 React + Cloudflare Pages 构建，支持 D1 (SQLite) 和 MySQL 双数据库。
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -12,7 +12,7 @@
 - 🏷️ **标签筛选** - 多标签分类浏览，智能推荐
 - 📱 **响应式设计** - 完美适配桌面端和移动端
 - ⚡ **高性能** - Cloudflare Pages 全球 CDN 加速
-- 🗄️ **数据库加速** - Cloudflare Hyperdrive 连接池
+- 🗄️ **双数据库支持** - D1 (SQLite) 或 MySQL + Hyperdrive，可配置切换
 - 🎬 **相似推荐** - 基于标签的智能推荐算法
 - 🖼️ **图片画廊** - 支持 lightbox 全屏查看
 - 📄 **SEO 优化** - 动态 meta 标签 + sitemap
@@ -29,9 +29,11 @@
 
 ### 后端
 - **框架**: Hono (Cloudflare Functions)
-- **数据库**: MySQL + Drizzle ORM
+- **数据库**:
+  - **D1** (SQLite) - 默认推荐，完全免费
+  - **MySQL** + Hyperdrive - 可选，适合现有 MySQL 数据
+- **ORM**: Drizzle ORM (支持 D1 和 MySQL)
 - **部署**: Cloudflare Pages + Functions
-- **数据库加速**: Cloudflare Hyperdrive
 
 ## 📁 项目结构
 
@@ -73,9 +75,32 @@ cd anime-web
 npm install
 ```
 
-### 3. 配置环境
+### 3. 配置数据库
 
-编辑 `wrangler.toml`:
+项目支持两种数据库配置，在 `wrangler.toml` 中通过 `DB_TYPE` 切换:
+
+#### 选项 1: D1 (SQLite) - 推荐 ✅
+
+完全免费，与 Cloudflare 深度集成。
+
+```toml
+name = "your-project-name"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "your-d1-database-name"
+database_id = "your-d1-database-id"
+
+[vars]
+DB_TYPE = "d1"
+```
+
+#### 选项 2: MySQL + Hyperdrive
+
+适合已有 MySQL 数据库的场景。
 
 ```toml
 name = "your-project-name"
@@ -87,8 +112,11 @@ pages_build_output_dir = "dist"
 binding = "HYPERDRIVE"
 id = "your-hyperdrive-id"
 
+[vars]
+DB_TYPE = "hyperdrive"
+
 # 本地开发使用
-localConnectionString = "mysql://user:password@host:3306/database"
+# localConnectionString = "mysql://user:password@host:3306/database"
 ```
 
 ### 4. 数据库 Schema
@@ -121,8 +149,14 @@ npm run deploy
 ```
 
 部署后需要在 Cloudflare Dashboard 中:
-1. 绑定 Hyperdrive 数据库连接
-2. 设置环境变量 `HYPERDRIVE`
+
+**使用 D1:**
+1. 创建 D1 数据库并绑定 (binding: `DB`)
+2. 设置环境变量 `DB_TYPE = "d1"`
+
+**使用 Hyperdrive:**
+1. 创建 Hyperdrive 配置并绑定 (binding: `HYPERDRIVE`)
+2. 设置环境变量 `DB_TYPE = "hyperdrive"`
 
 ## 📖 API 端点
 
@@ -183,13 +217,16 @@ npm run deploy
 
 在 Cloudflare Dashboard 中配置:
 
-- `HYPERDRIVE` - Hyperdrive 数据库绑定
+- `DB_TYPE` - 数据库类型: `d1` (默认) 或 `hyperdrive`
+- `DB` - D1 数据库绑定 (仅当 DB_TYPE = "d1")
+- `HYPERDRIVE` - Hyperdrive 绑定 (仅当 DB_TYPE = "hyperdrive")
 
 ### 本地开发环境变量
 
 在 `wrangler.toml` 中配置:
 
-- `localConnectionString` - 本地 MySQL 连接字符串
+- `DB_TYPE` - 数据库类型
+- `localConnectionString` - 本地 MySQL 连接字符串 (仅 Hyperdrive)
 
 ## 🔐 安全注意事项
 

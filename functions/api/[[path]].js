@@ -1,40 +1,71 @@
 import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-pages';
-import { drizzle } from 'drizzle-orm/mysql2';
+import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
+import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2/promise';
 import { animes, tags, animeTags } from '../schema';
 import { eq, desc, and, ne, inArray, sql } from 'drizzle-orm';
 
 const app = new Hono();
 
-// Middleware to inject DB
+// Database connection middleware
 app.use('*', async (c, next) => {
-  const connection = await createConnection({
-    host: c.env.HYPERDRIVE.host,
-    user: c.env.HYPERDRIVE.user,
-    password: c.env.HYPERDRIVE.password,
-    database: c.env.HYPERDRIVE.database,
-    port: c.env.HYPERDRIVE.port,
-    socketPath: c.env.HYPERDRIVE.socketPath,
-    disableEval: true
-  });
+  const dbType = c.env.DB_TYPE || 'd1'; // 默认使用 D1
 
-  const db = drizzle(connection);
-  c.set('db', db);
-  c.set('conn', connection);
+  if (dbType === 'd1') {
+    // Use D1
+    const db = drizzleD1(c.env.DB);
+    c.set('db', db);
+    c.set('dbType', 'd1');
+    c.set('rawDb', c.env.DB); // 原始 D1 实例
+  } else {
+    // Use Hyperdrive (MySQL)
+    const connection = await createConnection({
+      host: c.env.HYPERDRIVE.host,
+      user: c.env.HYPERDRIVE.user,
+      password: c.env.HYPERDRIVE.password,
+      database: c.env.HYPERDRIVE.database,
+      port: c.env.HYPERDRIVE.port,
+      socketPath: c.env.HYPERDRIVE.socketPath,
+      disableEval: true
+    });
+
+    const db = drizzleMySQL(connection);
+    c.set('db', db);
+    c.set('dbType', 'hyperdrive');
+    c.set('conn', connection);
+  }
 
   try {
     await next();
   } finally {
-    await connection.end();
+    // Close MySQL connection if using Hyperdrive
+    if (dbType === 'hyperdrive') {
+      const conn = c.get('conn');
+      if (conn) await conn.end();
+    }
   }
 });
 
 app.get('/api/health', async (c) => {
-  const conn = c.get('conn');
+  const dbType = c.get('dbType');
+
   try {
-    const [rows] = await conn.query('SHOW TABLES');
-    return c.json({ tables: rows });
+    if (dbType === 'd1') {
+      const rawDb = c.get('rawDb');
+      const result = await rawDb.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+      return c.json({
+        database: 'd1',
+        tables: result.results
+      });
+    } else {
+      const conn = c.get('conn');
+      const [rows] = await conn.query('SHOW TABLES');
+      return c.json({
+        database: 'hyperdrive',
+        tables: rows
+      });
+    }
   } catch (e) {
     console.error('Health Check Failed:', e);
     return c.json({ error: e.message, stack: e.stack }, 500);
@@ -45,7 +76,7 @@ app.get('/api/animes', async (c) => {
   const db = c.get('db');
 
   const page = parseInt(c.req.query('page') || '1');
-  const limit = parseInt(c.req.query('limit') || '50');
+  const limit = parseInt(c.req.query('limit') || '48');
   const tagId = c.req.query('tag') ? parseInt(c.req.query('tag')) : null;
   const search = c.req.query('search');
 
@@ -97,8 +128,8 @@ app.get('/api/animes', async (c) => {
         pagination: {
           page,
           limit,
-          total: totalResult.count,
-          totalPages: Math.ceil(totalResult.count / limit)
+          total: Number(totalResult.count),
+          totalPages: Math.ceil(Number(totalResult.count) / limit)
         }
       });
   } catch(e) {

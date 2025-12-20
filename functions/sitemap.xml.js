@@ -1,34 +1,52 @@
+import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
+import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2/promise';
-import { drizzle } from 'drizzle-orm/mysql2';
 import { animes, tags } from './schema';
 
 export async function onRequest(context) {
   try {
-    const connection = await createConnection({
-      host: context.env.HYPERDRIVE.host,
-      user: context.env.HYPERDRIVE.user,
-      password: context.env.HYPERDRIVE.password,
-      database: context.env.HYPERDRIVE.database,
-      port: context.env.HYPERDRIVE.port,
-      socketPath: context.env.HYPERDRIVE.socketPath,
-      disableEval: true
-    });
+    const dbType = context.env.DB_TYPE || 'd1';
+    let db, allAnimes, allTags;
 
-    const db = drizzle(connection);
+    if (dbType === 'd1') {
+      // Use D1
+      db = drizzleD1(context.env.DB);
 
-    // Fetch all animes
-    const allAnimes = await db.select({
-      id: animes.id,
-      createdAt: animes.createdAt
-    }).from(animes);
+      allAnimes = await db.select({
+        id: animes.id,
+        createdAt: animes.createdAt
+      }).from(animes);
 
-    // Fetch all tags
-    const allTags = await db.select({
-      id: tags.id,
-      name: tags.name
-    }).from(tags);
+      allTags = await db.select({
+        id: tags.id,
+        name: tags.name
+      }).from(tags);
+    } else {
+      // Use Hyperdrive (MySQL)
+      const connection = await createConnection({
+        host: context.env.HYPERDRIVE.host,
+        user: context.env.HYPERDRIVE.user,
+        password: context.env.HYPERDRIVE.password,
+        database: context.env.HYPERDRIVE.database,
+        port: context.env.HYPERDRIVE.port,
+        socketPath: context.env.HYPERDRIVE.socketPath,
+        disableEval: true
+      });
 
-    await connection.end();
+      db = drizzleMySQL(connection);
+
+      allAnimes = await db.select({
+        id: animes.id,
+        createdAt: animes.createdAt
+      }).from(animes);
+
+      allTags = await db.select({
+        id: tags.id,
+        name: tags.name
+      }).from(tags);
+
+      await connection.end();
+    }
 
     // Generate XML sitemap
     const baseUrl = 'https://anime.ixacg.top';
