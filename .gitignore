@@ -36,4 +36,5 @@ wrangler.toml
 # Database
 *.db
 *.sqlite
+*.yml
 
