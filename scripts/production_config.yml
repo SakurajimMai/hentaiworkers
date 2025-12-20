@@ -93,7 +93,7 @@ network:
 
   # 请求配置
   timeout: 30 # 请求超时时间(秒)
-  max_retries: 3 # 最大重试次数
+  max_retries: 5 # 最大重试次数
   retry_delay: 2 # 重试延迟(秒)
 
   # 用户代理
