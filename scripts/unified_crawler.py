@@ -4,8 +4,6 @@
 1. craw.py - 主要获取海报和视频
 2. getchuscraw.py - 主要爬取剧照
 3. hanimecraw.py - 获取视频的各种信息
-
-数据存储：MySQL (pymysql://root:123456@192.168.1.7:3306/hentai?charset=utf8mb4)
 """
 
 import os
