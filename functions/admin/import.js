@@ -39,14 +39,29 @@ export async function onRequest(context) {
       db = drizzleMySQL(connection);
     }
 
-    // 批量插入 animes
-    if (animesData && animesData.length > 0) {
-      await db.insert(animes).values(animesData);
+    let insertedAnimes = 0;
+    let insertedTags = 0;
+
+    // 批量插入 tags - 使用 onConflictDoNothing 忽略已存在的标签
+    if (tagsData && tagsData.length > 0) {
+      try {
+        await db.insert(tags).values(tagsData).onConflictDoNothing();
+        insertedTags = tagsData.length;
+      } catch (tagError) {
+        console.error('Tags insert error:', tagError);
+        // 继续处理，不中断
+      }
     }
 
-    // 批量插入 tags
-    if (tagsData && tagsData.length > 0) {
-      await db.insert(tags).values(tagsData);
+    // 批量插入 animes - 使用 onConflictDoNothing 忽略已存在的动漫
+    if (animesData && animesData.length > 0) {
+      try {
+        await db.insert(animes).values(animesData).onConflictDoNothing();
+        insertedAnimes = animesData.length;
+      } catch (animeError) {
+        console.error('Animes insert error:', animeError);
+        // 继续处理，不中断
+      }
     }
 
     if (dbType === 'hyperdrive') {
@@ -57,8 +72,8 @@ export async function onRequest(context) {
     return new Response(JSON.stringify({
       success: true,
       inserted: {
-        animes: animesData?.length || 0,
-        tags: tagsData?.length || 0
+        animes: insertedAnimes,
+        tags: insertedTags
       }
     }), {
       headers: { 'Content-Type': 'application/json' }
@@ -74,3 +89,4 @@ export async function onRequest(context) {
     });
   }
 }
+

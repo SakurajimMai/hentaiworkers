@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(npx create-expo-app@latest:*)",
+      "Bash(npx eas-cli@latest build:configure:*)",
+      "Bash(npm install)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm install --legacy-peer-deps)",
+      "Bash(rm -rf node_modules package-lock.json .expo)",
+      "Bash(npm install @react-navigation/native @react-navigation/native-stack)",
+      "Bash(npm install expo-video)",
+      "Bash(npx expo install --fix)",
+      "Bash(if [ -d \"mobile\" ])",
+      "Bash(then ls -la mobile)",
+      "Bash(else echo \"mobile 目录不存在\")",
+      "Bash(fi)",
+      "Bash(npx expo install expo-router react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar)",
+      "Bash(npx expo install react-native-webview)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

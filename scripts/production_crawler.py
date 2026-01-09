@@ -669,14 +669,19 @@ class ProductionCrawler:
                 self.d1_client.sync_tags(tags_data)
 
             # 同步动漫
-            success = self.d1_client.sync_animes([anime_data])
+            try:
+                success = self.d1_client.sync_animes([anime_data])
 
-            if success:
-                self.stats['d1_synced'] += 1
-                self.logger.info("✅ D1 同步成功")
-            else:
+                if success:
+                    self.stats['d1_synced'] += 1
+                    self.logger.info("✅ D1 同步成功")
+                else:
+                    self.stats['d1_failed'] += 1
+                    self.logger.error(f"❌ D1 同步失败 - 标题: {anime_data.get('title', 'Unknown')}")
+                    self.logger.error(f"   API URL: {self.d1_client.api_url}/admin/import")
+            except Exception as sync_error:
                 self.stats['d1_failed'] += 1
-                self.logger.error("❌ D1 同步失败")
+                self.logger.error(f"❌ D1 同步异常: {sync_error}")
 
         except Exception as e:
             self.logger.error(f"D1 同步异常: {e}")

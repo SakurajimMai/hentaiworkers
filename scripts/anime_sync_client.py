@@ -145,7 +145,8 @@ class AnimeSyncClient:
                 inserted = result.get('inserted', {}).get('animes', 0)
                 logger.info(f"✅ 批次 {batch_num} 成功导入 {inserted} 条动漫")
             else:
-                logger.error(f"❌ 批次 {batch_num} 导入失败")
+                error_msg = result.get('error', '未知错误') if result else '无响应'
+                logger.error(f"❌ 批次 {batch_num} 导入失败: {error_msg}")
                 return False
 
             # 避免请求过快
