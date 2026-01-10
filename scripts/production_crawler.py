@@ -28,7 +28,7 @@ from datetime import datetime
 import logging
 import logging.handlers
 from unified_crawler import UnifiedCrawler
-from anime_sync_client import AnimeSyncClient  # 添加D1同步客户端
+from d1_direct_client import D1DirectClient  # D1 直接写入客户端
 
 
 class ProductionCrawler:
@@ -138,21 +138,22 @@ class ProductionCrawler:
             self.logger.info(f"总组合数: {len(self.crawler.TARGET_YEARS)} × {len(self.crawler.TARGET_MONTHS)} = {len(self.crawler.TARGET_YEARS) * len(self.crawler.TARGET_MONTHS)}")
             self.logger.info(f"下载目录: {self.crawler.DOWNLOAD_DIR}")
 
-            # 初始化 D1 同步客户端
+            # 初始化 D1 直接写入客户端 (使用 Cloudflare REST API)
             d1_config = self.crawler.config.get('d1_sync', {})
             if d1_config.get('enabled', False):
-                api_url = d1_config.get('api_url', 'https://anime.ixacg.top')
-                api_key = d1_config.get('api_key') or os.getenv('ADMIN_API_KEY')
-
-                if api_key:
-                    self.d1_client = AnimeSyncClient(
-                        api_url=api_url,
-                        api_key=api_key,
-                        batch_size=d1_config.get('batch_size', 50)
+                account_id = d1_config.get('account_id') or os.getenv('CF_ACCOUNT_ID')
+                database_id = d1_config.get('database_id') or os.getenv('CF_D1_DATABASE_ID')
+                api_token = d1_config.get('api_token') or os.getenv('CF_API_TOKEN')
+                
+                if all([account_id, database_id, api_token]):
+                    self.d1_client = D1DirectClient(
+                        account_id=account_id,
+                        database_id=database_id,
+                        api_token=api_token
                     )
-                    self.logger.info(f"✅ D1 同步已启用: {api_url}")
+                    self.logger.info(f"✅ D1 REST API 已启用")
                 else:
-                    self.logger.warning("⚠️ D1 同步已启用但未提供 API Key")
+                    self.logger.warning("⚠️ D1 同步已启用但缺少配置 (account_id/database_id/api_token)")
             else:
                 self.logger.info("ℹ️ D1 同步未启用")
 
@@ -634,59 +635,85 @@ class ProductionCrawler:
             return 0
 
     def sync_to_d1(self, video_info, video_path, cover_path):
-        """同步数据到 D1"""
+        """直接写入数据到 D1（使用 wrangler CLI）"""
         try:
-            self.logger.info("🔄 开始同步到 D1...")
+            self.logger.info("🔄 开始写入 D1...")
 
-            # 准备动漫数据
-            anime_data = {
-                "title": video_info.get('title', ''),
-                "titleJapanese": video_info.get('title_japanese', ''),
-                "titleEnglish": video_info.get('title_english', ''),
-                "description": video_info.get('description', ''),
-                "cover": cover_path if cover_path else video_info.get('cover', ''),
-                "videoUrl": video_path,
-                "viewCount": 0
-            }
+            # 1. 先同步标签
+            tags = video_info.get('tag', []) or video_info.get('genre', [])
+            if tags:
+                tag_count = self.d1_client.sync_tags(tags)
+                self.logger.debug(f"   写入 {tag_count} 个标签")
 
-            # 处理 fanart (如果有)
+            # 2. 准备动漫数据（使用与 MySQL 相同的格式）
+            # 获取域名前缀配置
+            web_config = self.crawler.config.get('web_access', {})
+            domain_prefix = web_config.get('domain_prefix', '')
+            base_path = web_config.get('base_path', '')
+
+            # 处理封面路径
+            cover_url = ''
+            if cover_path:
+                cover_relative = os.path.relpath(cover_path, start=self.crawler.DOWNLOAD_DIR).replace('\\', '/')
+                cover_url = f"{domain_prefix}{base_path}/{cover_relative}" if domain_prefix else cover_relative
+                cover_url = cover_url.replace('#', '%23')
+
+            # 处理视频路径
+            video_relative = os.path.relpath(video_path, start=self.crawler.DOWNLOAD_DIR).replace('\\', '/')
+            video_url = f"{domain_prefix}{base_path}/{video_relative}" if domain_prefix else video_relative
+            video_url = video_url.replace('#', '%23')
+
+            # 处理剧照路径
+            fanart_string = ''
             video_dir = os.path.dirname(video_path)
             extrafanart_dir = os.path.join(video_dir, "extrafanart")
             if os.path.exists(extrafanart_dir):
                 fanart_files = sorted([f for f in os.listdir(extrafanart_dir) if f.endswith('.jpg')])
-                if fanart_files:
-                    fanart_urls = [os.path.join(extrafanart_dir, f) for f in fanart_files]
-                    anime_data["fanart"] = ",".join(fanart_urls)
+                fanart_urls = []
+                for f in fanart_files:
+                    fanart_rel = os.path.relpath(os.path.join(extrafanart_dir, f), start=self.crawler.DOWNLOAD_DIR).replace('\\', '/')
+                    fanart_url = f"{domain_prefix}{base_path}/{fanart_rel}" if domain_prefix else fanart_rel
+                    fanart_urls.append(fanart_url.replace('#', '%23'))
+                fanart_string = ','.join(fanart_urls)
 
-            # 准备标签数据
-            tags = video_info.get('tag', []) or video_info.get('genre', [])
-            tags_data = []
-            if tags:
-                tags_data = [{"name": tag, "description": f"{tag}类动漫"} for tag in tags]
+            # 获取标题
+            chinese_title = video_info.get('tagline', '') or video_info.get('title', '')
+            japanese_title = video_info.get('title', '') or video_info.get('originaltitle', '')
+            
+            # 处理简介
+            description = video_info.get('plot', '')
+            if description:
+                description = description.replace('<![CDATA[', '').replace(']]>', '').replace('<br>', ' ')
 
-            # 同步标签 (如果有新标签)
-            if tags_data:
-                self.d1_client.sync_tags(tags_data)
+            import random
+            anime_data = {
+                "title": chinese_title,
+                "title_english": '',
+                "title_japanese": japanese_title,
+                "description": description,
+                "cover": cover_url,
+                "fanart": fanart_string,
+                "video_url": video_url,
+                "release_year": int(video_info.get('year', 2025)) if video_info.get('year') else None,
+                "release_date": video_info.get('premiered', ''),
+                "view_count": random.randint(1000, 10000),
+                "favorite_count": 0,
+                "category_id": 1  # 里番
+            }
 
-            # 同步动漫
-            try:
-                success = self.d1_client.sync_animes([anime_data])
+            # 3. 写入动漫数据
+            success = self.d1_client.sync_anime(anime_data)
 
-                if success:
-                    self.stats['d1_synced'] += 1
-                    self.logger.info("✅ D1 同步成功")
-                else:
-                    self.stats['d1_failed'] += 1
-                    self.logger.error(f"❌ D1 同步失败 - 标题: {anime_data.get('title', 'Unknown')}")
-                    self.logger.error(f"   API URL: {self.d1_client.api_url}/admin/import")
-            except Exception as sync_error:
+            if success:
+                self.stats['d1_synced'] += 1
+                self.logger.info("✅ D1 写入成功")
+            else:
                 self.stats['d1_failed'] += 1
-                self.logger.error(f"❌ D1 同步异常: {sync_error}")
+                self.logger.error(f"❌ D1 写入失败 - 标题: {chinese_title}")
 
         except Exception as e:
-            self.logger.error(f"D1 同步异常: {e}")
+            self.logger.error(f"D1 写入异常: {e}")
             self.stats['d1_failed'] += 1
-            raise
     
     def print_final_statistics(self):
         """打印最终统计信息"""

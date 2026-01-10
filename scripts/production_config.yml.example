@@ -98,13 +98,14 @@ database:
   charset: "utf8mb4"
 
 # ========== D1 同步配置 ==========
+# 使用 Cloudflare D1 REST API 直接写入数据库
+# 需要在 Cloudflare Dashboard 创建 API Token (权限: D1 Edit)
 d1_sync:
-  enabled: true  # 是否启用 D1 同步
-  api_url: "https://anime.ixacg.top"  # AnimeStream API 地址
-  # api_key: 从环境变量 ADMIN_API_KEY 读取，不要写在配置文件中
-  batch_size: 1  # 批量同步大小 (1=实时同步, 50=批量同步)
-  retry_on_failure: true  # 失败时是否重试
-  max_retries: 3  # 最大重试次数
+  enabled: true  # 是否启用 D1 直接写入
+  # 以下参数可以写在配置文件或设置环境变量
+  # account_id: "your-cloudflare-account-id"  # 或 CF_ACCOUNT_ID 环境变量
+  # database_id: "your-d1-database-id"        # 或 CF_D1_DATABASE_ID 环境变量  
+  # api_token: "your-cloudflare-api-token"    # 或 CF_API_TOKEN 环境变量
 
 # ========== Selenium配置 ==========
 selenium:
