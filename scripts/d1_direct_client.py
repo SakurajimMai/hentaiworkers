@@ -128,8 +128,69 @@ class D1DirectClient:
             logger.error(f"获取下一个 ID 失败: {e}")
             return 1
 
-    def sync_anime(self, anime_data: Dict) -> bool:
-        """同步单条动漫记录到 D1"""
+    def get_tag_id(self, tag_name: str) -> Optional[int]:
+        """获取标签 ID（如果不存在则创建）"""
+        try:
+            # 先尝试获取现有标签
+            url = f"{self.base_url}/query"
+            sql = f"SELECT id FROM tags WHERE name = {self._escape_sql_string(tag_name)}"
+            payload = {"sql": sql}
+            
+            response = requests.post(url, headers=self.headers, json=payload, timeout=30)
+            result = response.json()
+            
+            if result.get("success") and result.get("result"):
+                results = result["result"][0].get("results", [])
+                if results:
+                    return results[0].get("id")
+            
+            # 如果不存在，创建标签
+            self.sync_tag(tag_name)
+            
+            # 再次查询获取 ID
+            response = requests.post(url, headers=self.headers, json=payload, timeout=30)
+            result = response.json()
+            
+            if result.get("success") and result.get("result"):
+                results = result["result"][0].get("results", [])
+                if results:
+                    return results[0].get("id")
+            
+            return None
+        except Exception as e:
+            logger.error(f"获取标签 ID 失败: {e}")
+            return None
+
+    def sync_anime_tag(self, anime_id: int, tag_id: int) -> bool:
+        """关联动漫和标签"""
+        try:
+            next_id = self._get_next_id("anime_tags")
+            sql = f"INSERT OR IGNORE INTO anime_tags (id, anime_id, tag_id, created_at) VALUES ({next_id}, {anime_id}, {tag_id}, datetime('now'))"
+            return self._execute_sql(sql)
+        except Exception as e:
+            logger.error(f"关联动漫标签失败: {e}")
+            return False
+
+    def sync_anime_with_tags(self, anime_data: Dict, tags: List[str]) -> bool:
+        """同步动漫及其标签到 D1"""
+        # 1. 先插入动漫
+        anime_id = self.sync_anime(anime_data)
+        if not anime_id:
+            return False
+        
+        # 2. 关联标签
+        if tags:
+            for tag in tags:
+                tag_name = tag.get('name', '') if isinstance(tag, dict) else str(tag)
+                if tag_name:
+                    tag_id = self.get_tag_id(tag_name)
+                    if tag_id:
+                        self.sync_anime_tag(anime_id, tag_id)
+        
+        return True
+
+    def sync_anime(self, anime_data: Dict) -> Optional[int]:
+        """同步单条动漫记录到 D1，返回插入的 anime_id"""
         try:
             # 获取下一个 ID
             next_id = self._get_next_id("animes")
@@ -154,11 +215,13 @@ class D1DirectClient:
             
             sql = f"INSERT INTO animes (id, title, title_english, title_japanese, description, cover, fanart, video_url, release_year, release_date, view_count, favorite_count, is_active, category_id, created_at) VALUES ({next_id}, {self._escape_sql_string(title)}, {self._escape_sql_string(title_english)}, {self._escape_sql_string(title_japanese)}, {self._escape_sql_string(description)}, {self._escape_sql_string(cover)}, {self._escape_sql_string(fanart)}, {self._escape_sql_string(video_url)}, {release_year_val}, {self._escape_sql_string(release_date)}, {view_count or 0}, {favorite_count or 0}, 1, {category_id_val}, datetime('now'))"
 
-            return self._execute_sql(sql)
+            if self._execute_sql(sql):
+                return next_id
+            return None
 
         except Exception as e:
             logger.error(f"同步动漫失败: {e}")
-            return False
+            return None
 
     def sync_animes(self, animes: List[Dict]) -> bool:
         """批量同步动漫到 D1"""

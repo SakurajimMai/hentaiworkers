@@ -639,13 +639,10 @@ class ProductionCrawler:
         try:
             self.logger.info("🔄 开始写入 D1...")
 
-            # 1. 先同步标签
+            # 获取标签列表
             tags = video_info.get('tag', []) or video_info.get('genre', [])
-            if tags:
-                tag_count = self.d1_client.sync_tags(tags)
-                self.logger.debug(f"   写入 {tag_count} 个标签")
 
-            # 2. 准备动漫数据（使用与 MySQL 相同的格式）
+            # 准备动漫数据（使用与 MySQL 相同的格式）
             # 获取域名前缀配置
             web_config = self.crawler.config.get('web_access', {})
             domain_prefix = web_config.get('domain_prefix', '')
@@ -701,12 +698,12 @@ class ProductionCrawler:
                 "category_id": 1  # 里番
             }
 
-            # 3. 写入动漫数据
-            success = self.d1_client.sync_anime(anime_data)
+            # 写入动漫数据和标签关联
+            success = self.d1_client.sync_anime_with_tags(anime_data, tags)
 
             if success:
                 self.stats['d1_synced'] += 1
-                self.logger.info("✅ D1 写入成功")
+                self.logger.info(f"✅ D1 写入成功 (包含 {len(tags)} 个标签关联)")
             else:
                 self.stats['d1_failed'] += 1
                 self.logger.error(f"❌ D1 写入失败 - 标题: {chinese_title}")
