@@ -1,31 +1,112 @@
-import { Anime, PaginatedResponse, ApiResponse } from './types';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import { Anime, AnimeListParams, AnimeListResponse } from './types';
 
-const API_BASE_URL = 'https://anime.ixacg.top';
+const DEFAULT_API_BASE_URL = 'https://anime.ixacg.top';
+
+const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
+const configured = (extra?.apiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+export const API_BASE_URL = Platform.OS === 'web' ? '' : configured;
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+function buildAnimeListQuery(params: AnimeListParams = {}) {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    limit: String(params.limit ?? 24),
+  });
+
+  if (params.tagId) {
+    query.set('tag', String(params.tagId));
+  }
+
+  const search = params.search?.trim();
+  if (search) {
+    query.set('search', search);
+  }
+
+  return query.toString();
+}
 
 class AnimeApiService {
-  private async fetchApi<T>(endpoint: string): Promise<T> {
+  private async fetchJson<T>(endpoint: string): Promise<T> {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    const responseText = await response.text();
+    let payload: any = null;
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`);
+      payload = responseText ? JSON.parse(responseText) : null;
+    } catch {
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new ApiError(`请求失败：${response.status}`, response.status);
       }
-      return await response.json();
-    } catch (error) {
-      console.error('API fetch error:', error);
-      throw error;
+      throw new ApiError('响应不是合法 JSON', response.status);
+    }
+
+    if (!response.ok) {
+      const message = payload?.error || `请求失败：${response.status}`;
+      throw new ApiError(message, response.status);
+    }
+
+    return payload as T;
+  }
+
+  async getAnimeList(params: AnimeListParams = {}): Promise<AnimeListResponse> {
+    return this.fetchJson<AnimeListResponse>(`/api/animes?${buildAnimeListQuery(params)}`);
+  }
+
+  async getAnimeDetail(id: number): Promise<Anime> {
+    return this.fetchJson<Anime>(`/api/animes/${id}`);
+  }
+
+  async getSimilarAnimes(id: number): Promise<Anime[]> {
+    return this.fetchJson<Anime[]>(`/api/animes/${id}/similar`);
+  }
+
+  async getPopularTags(limit = 20): Promise<{ id: number; name: string; count?: number }[]> {
+    try {
+      return await this.fetchJson(`/api/tags?limit=${limit}`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        return this.aggregateTagsFromAnimes(limit);
+      }
+      throw e;
     }
   }
 
-  async getAnimeList(page: number = 1, limit: number = 20): Promise<PaginatedResponse<Anime>> {
-    return this.fetchApi<PaginatedResponse<Anime>>(`/api/animes?page=${page}&limit=${limit}`);
-  }
-
-  async getAnimeDetail(id: number): Promise<ApiResponse<Anime>> {
-    return this.fetchApi<ApiResponse<Anime>>(`/api/animes/${id}`);
-  }
-
-  async searchAnime(query: string, page: number = 1): Promise<PaginatedResponse<Anime>> {
-    return this.fetchApi<PaginatedResponse<Anime>>(`/api/animes/search?q=${encodeURIComponent(query)}&page=${page}`);
+  private async aggregateTagsFromAnimes(
+    limit: number,
+  ): Promise<{ id: number; name: string; count: number }[]> {
+    const list = await this.getAnimeList({ page: 1, limit: 60 });
+    const sample = list.data.slice(0, 24);
+    const details = await Promise.all(
+      sample.map((a) => this.getAnimeDetail(a.id).catch(() => null)),
+    );
+    const counter = new Map<number, { id: number; name: string; count: number }>();
+    for (const detail of details) {
+      if (!detail?.tags) continue;
+      for (const tag of detail.tags) {
+        const existing = counter.get(tag.id);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          counter.set(tag.id, { id: tag.id, name: tag.name, count: 1 });
+        }
+      }
+    }
+    return [...counter.values()].sort((a, b) => b.count - a.count).slice(0, limit);
   }
 }
 

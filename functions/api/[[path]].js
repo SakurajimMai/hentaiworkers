@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { handle } from 'hono/cloudflare-pages';
+import { cors } from 'hono/cors';
 import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
 import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2/promise';
@@ -7,6 +8,13 @@ import { animes, tags, animeTags } from '../schema';
 import { eq, desc, and, ne, inArray, sql } from 'drizzle-orm';
 
 const app = new Hono();
+
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Accept', 'Authorization'],
+  maxAge: 86400,
+}));
 
 // Database connection middleware
 app.use('*', async (c, next) => {
@@ -135,6 +143,24 @@ app.get('/api/animes', async (c) => {
   } catch(e) {
       console.error('Fetch Animes Failed:', e);
       return c.json({ error: e.message, code: e.code }, 500);
+  }
+});
+
+app.get('/api/tags', async (c) => {
+  const db = c.get('db');
+
+  try {
+    const allTags = await db.select({
+        id: tags.id,
+        name: tags.name,
+    })
+    .from(tags)
+    .orderBy(tags.name);
+
+    return c.json(allTags);
+  } catch (e) {
+    console.error('Tags Failed:', e);
+    return c.json({ error: e.message }, 500);
   }
 });
 
