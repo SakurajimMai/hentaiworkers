@@ -37,4 +37,5 @@ wrangler.toml
 *.db
 *.sqlite
 *.yml
+!.github/workflows/*.yml
 

@@ -33,6 +33,10 @@ function buildAnimeListQuery(params: AnimeListParams = {}) {
     query.set('search', search);
   }
 
+  if (params.sort) {
+    query.set('sort', params.sort);
+  }
+
   return query.toString();
 }
 

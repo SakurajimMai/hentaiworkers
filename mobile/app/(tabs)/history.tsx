@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
 import { colors, radius, spacing } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
@@ -124,9 +125,9 @@ export default function HistoryScreen() {
                     accessibilityLabel={`移除 ${item.title}`}
                     onPress={() => remove(item.id)}
                     style={styles.removeBtn}
-                    hitSlop={6}
+                    hitSlop={10}
                   >
-                    <Text style={styles.removeText}>×</Text>
+                    <Ionicons name="close" size={16} color={colors.text} />
                   </Pressable>
                 ) : null}
               </Pressable>
@@ -209,15 +210,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.surfaceMuted,
     borderRadius: 999,
-    height: 28,
+    height: 32,
     justifyContent: 'center',
-    width: 28,
-  },
-  removeText: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
-    lineHeight: 20,
+    width: 32,
   },
   clearBtn: {
     alignItems: 'center',

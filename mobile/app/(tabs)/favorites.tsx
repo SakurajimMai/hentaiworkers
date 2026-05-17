@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
 import { colors, radius, spacing } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
@@ -108,9 +109,9 @@ export default function FavoritesScreen() {
                       accessibilityLabel={`移除 ${item.title}`}
                       onPress={() => remove(item.id)}
                       style={styles.removeBtn}
-                      hitSlop={6}
+                      hitSlop={10}
                     >
-                      <Text style={styles.removeText}>×</Text>
+                      <Ionicons name="close" size={14} color={colors.white} />
                     </Pressable>
                   ) : null}
                 </Pressable>
@@ -175,18 +176,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.danger,
     borderRadius: 999,
-    height: 22,
+    height: 24,
     justifyContent: 'center',
     position: 'absolute',
     right: 6,
     top: 6,
-    width: 22,
-  },
-  removeText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '900',
-    lineHeight: 18,
+    width: 24,
   },
   cardTitle: {
     color: colors.text,

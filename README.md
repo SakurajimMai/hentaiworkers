@@ -1,63 +1,64 @@
 # AnimeStream 🎬
 
-一个现代化的在线动漫视频播放平台，基于 React + Cloudflare Pages 构建，支持 D1 (SQLite) 和 MySQL 双数据库。
+一个现代化的在线动漫视频播放平台。Web 端基于 React + Cloudflare Pages，移动端基于 Expo/React Native。后端 API 由 Cloudflare Functions + D1 (SQLite) 提供。
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ## ✨ 特性
 
-- 🎨 **现代化 UI** - 基于 React 19 + Tailwind CSS + shadcn/ui
-- 🔍 **智能搜索** - 支持标题和日文标题的模糊搜索
-- 🏷️ **标签筛选** - 多标签分类浏览，智能推荐
-- 📱 **响应式设计** - 完美适配桌面端和移动端
-- ⚡ **高性能** - Cloudflare Pages 全球 CDN 加速
-- 🗄️ **双数据库支持** - D1 (SQLite) 或 MySQL + Hyperdrive，可配置切换
-- 🎬 **相似推荐** - 基于标签的智能推荐算法
-- 🖼️ **图片画廊** - 支持 lightbox 全屏查看
-- 📄 **SEO 优化** - 动态 meta 标签 + sitemap
-- 🔄 **动态分页** - 响应式分页组件
+- 🎨 **现代化 UI** - Web 端 React 19 + shadcn/ui，移动端 Expo 54 紫色暗色主题
+- 🔥 **热门推荐** - 按真实播放量降序的热门排序 (`sort=popular`)
+- 🔍 **智能搜索** - 支持中文标题和日文标题的模糊搜索
+- 🏷️ **标签系统** - 全部标签浏览页 + 标签筛选 + 基于标签的相似推荐
+- 📱 **跨平台** - Web 响应式 + iOS/Android 原生 (Expo)
+- 🎬 **Artplayer 内嵌** - WebView + 本地打包 Artplayer/hls.js，无 CDN 依赖
+- ⚡ **CORS + Hono** - Cloudflare Functions 全局 CORS，移动端可直连
+- 📚 **本地存储** - 收藏与历史仅存于设备本地，无云同步
+- 🖼️ **剧照画廊** - 滑动浏览 + lightbox 全屏
+- 📄 **SEO 优化** - 动态 meta + sitemap
 
 ## 🛠️ 技术栈
 
-### 前端
-- **框架**: React 19.2.0 + TypeScript
-- **构建工具**: Vite 7.2.4
-- **路由**: React Router DOM 7.10.1
-- **样式**: Tailwind CSS + shadcn/ui
-- **图标**: Lucide React
+### Web 前端 (`src/`)
+- React 19.2 + TypeScript + Vite 7
+- React Router 7 + Tailwind CSS + shadcn/ui
+- Lucide React 图标
 
-### 后端
-- **框架**: Hono (Cloudflare Functions)
-- **数据库**:
-  - **D1** (SQLite) - 默认推荐，完全免费
-  - **MySQL** + Hyperdrive - 可选，适合现有 MySQL 数据
-- **ORM**: Drizzle ORM (支持 D1 和 MySQL)
-- **部署**: Cloudflare Pages + Functions
+### 移动端 (`mobile/`)
+- Expo SDK 54 + React Native 0.81 + expo-router 6
+- @expo/vector-icons (Ionicons)
+- AsyncStorage 本地持久化
+- expo-screen-orientation 横屏播放
+- WebView + Artplayer 5 + hls.js 1.5 (本地打包，零 CDN)
+
+### 后端 (`functions/`)
+- Hono (Cloudflare Functions) + 全局 CORS 中间件
+- Drizzle ORM (D1 SQLite / MySQL Hyperdrive 双驱动)
+- 部署: Cloudflare Pages + Functions
 
 ## 📁 项目结构
 
 ```
 anime-web/
-├── src/
-│   ├── components/      # UI 组件 (shadcn/ui)
-│   ├── lib/            # API 客户端和工具函数
-│   ├── pages/          # 页面组件
-│   │   ├── Home.tsx    # 首页 (列表 + 搜索 + 标签)
-│   │   └── Watch.tsx   # 播放页
-│   ├── App.tsx         # 主应用组件 + Header
-│   └── main.tsx        # 入口文件
-├── functions/          # Cloudflare Functions (后端 API)
-│   ├── api/
-│   │   └── [[path]].js # API 路由处理器
-│   ├── schema.js       # 数据库 Schema
-│   └── sitemap.xml.js  # 动态 sitemap 生成
-├── public/             # 静态资源
-│   ├── dm.svg          # 网站图标
-│   └── robots.txt      # SEO robots
-├── index.html          # HTML 模板 (包含 SEO meta 标签)
-├── wrangler.toml       # Cloudflare 配置
-└── package.json        # 依赖配置
+├── src/                  # Web 前端
+│   ├── components/       # shadcn/ui 组件
+│   ├── pages/Home.tsx    # 首页 (列表 + 搜索 + 标签)
+│   └── pages/Watch.tsx   # 播放页
+├── mobile/               # 移动端 (Expo)
+│   ├── app/(tabs)/       # 底部 5 个 Tab: 热门 / 发现 / 标签 / 历史 / 收藏
+│   ├── app/detail/[id]   # 详情页 (海报 + 简介 + 剧照 + 推荐)
+│   ├── app/player/[id]   # 强制横屏播放页 (Artplayer)
+│   ├── components/       # AnimeCard / VideoPlayer / SplashScreen / AppState
+│   ├── services/         # api / storage / media (URL 归一化)
+│   └── constants/theme   # 紫色暗色主题 token
+├── functions/            # Cloudflare Functions
+│   ├── api/[[path]].js   # API 路由 (animes / tags / similar / health)
+│   ├── schema.js         # Drizzle Schema
+│   └── sitemap.xml.js    # 动态 sitemap
+├── public/               # 静态资源
+├── wrangler.toml         # Cloudflare 配置 (D1 + Hyperdrive)
+└── package.json
 ```
 
 ## 🚀 快速开始
@@ -160,29 +161,33 @@ npm run deploy
 
 ## 📖 API 端点
 
-所有 API 都通过 Cloudflare Functions 提供:
+所有 API 通过 Cloudflare Functions 提供，全局 CORS 已开启:
 
-- `GET /api/health` - 健康检查
-- `GET /api/animes?page=1&limit=48&tag=1&search=keyword` - 获取动漫列表
-- `GET /api/animes/:id` - 获取动漫详情
-- `GET /api/animes/:id/similar` - 获取相似动漫
-- `GET /sitemap.xml` - 动态生成 sitemap
+- `GET /api/health` - 健康检查 (列出表名)
+- `GET /api/animes?page=1&limit=48&tag=1&search=keyword&sort=popular|latest` - 动漫列表
+  - `sort=popular` 按 `viewCount` 降序 (热门)
+  - 默认/其它值 按 `createdAt` 降序 (最新)
+- `GET /api/animes/:id` - 动漫详情 (含 tags)
+- `GET /api/animes/:id/similar` - 基于共同标签的相似推荐
+- `GET /api/tags` - 全部有效标签 (按名称排序)
+- `GET /sitemap.xml` - 动态 sitemap
 
 ## 🎨 主要功能
 
-### 首页
-- 6x8 网格布局 (48 个/页)
-- 响应式卡片动画
-- 搜索功能 (支持中文 + 日文标题)
-- 标签筛选
-- 智能分页 (移动端优化)
+### Web 首页
+- 网格布局 + 搜索 + 标签筛选 + 智能分页
 
-### 播放页
-- 视频播放器 (HTML5 video)
-- 动漫详情 (标题、描述、标签)
-- 图片画廊 (点击放大)
-- 相似推荐 (基于标签匹配)
-- 动态 SEO meta 标签
+### 移动端 (Expo)
+- **热门** - 按播放量排序的真实热门 (`sort=popular`)
+- **发现** - 搜索 + 标签筛选 + 紧凑分页 (`< 1 2 3 ... end >`)
+- **标签** - 全部有效标签的 2 列网格 (无关联标签已清理)
+- **历史/收藏** - AsyncStorage 本地持久化，支持编辑/移除/清空
+- **详情** - 海报 + 简介 (自动转换 `\n`) + 剧照画廊 (滑动 lightbox) + 相似推荐
+- **播放** - 独立横屏路由，Artplayer + hls.js 内嵌 WebView
+- **启动页** - 品牌 splash 动画 (`SplashScreen` 组件)
+
+### 播放页 (Web)
+- HTML5 video + 详情 + 图片画廊 + 相似推荐 + 动态 SEO
 
 ### SEO 优化
 - 动态页面标题和描述

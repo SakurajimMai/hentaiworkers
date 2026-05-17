@@ -3,7 +3,7 @@ export function normalizeMediaUrl(url?: string | null) {
   if (!value) return null;
 
   try {
-    return encodeURI(decodeURI(value));
+    return new URL(value).toString();
   } catch {
     try {
       return encodeURI(value);

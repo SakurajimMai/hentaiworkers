@@ -12,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { AnimeCard } from '../../components/AnimeCard';
 import { AppState } from '../../components/AppState';
+import { SplashScreen } from '../../components/SplashScreen';
 import { colors, spacing } from '../../constants/theme';
 import { animeApi } from '../../services/api';
 import { Anime } from '../../services/types';
@@ -40,7 +41,7 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       setError(null);
-      const response = await animeApi.getAnimeList({ page: 1, limit: PAGE_SIZE });
+      const response = await animeApi.getAnimeList({ page: 1, limit: PAGE_SIZE, sort: 'popular' });
       setAnimes(response.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
@@ -69,11 +70,7 @@ export default function HomeScreen() {
   };
 
   if (loading && animes.length === 0) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
-        <AppState loading title="正在加载片库" description="正在连接 anime.ixacg.top。" />
-      </SafeAreaView>
-    );
+    return <SplashScreen />;
   }
 
   if (error && animes.length === 0) {

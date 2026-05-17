@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
 import { colors, radius, shadow, spacing } from '../../constants/theme';
 import { normalizeMediaUrl, splitMediaList } from '../../services/media';
@@ -57,7 +58,6 @@ export default function DetailScreen() {
       return true;
     });
   }, [cover, fanartImages]);
-  const heroImage = stillImages[0] || cover;
   const videoUrl = normalizeMediaUrl(anime?.videoUrl);
 
   const stillColumns = width >= 600 ? 3 : 2;
@@ -150,50 +150,34 @@ export default function DetailScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          onPress={goBack}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={favorited ? '取消收藏' : '收藏'}
+          onPress={toggleFavorite}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
+        >
+          <Ionicons
+            name={favorited ? 'heart' : 'heart-outline'}
+            size={20}
+            color={favorited ? colors.primary : colors.text}
+          />
+        </Pressable>
+      </View>
       <ScrollView
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.xxl }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroWrap}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={videoUrl ? '播放视频' : '查看封面'}
-            onPress={playVideo}
-            style={styles.heroImageWrap}
-          >
-            {heroImage ? (
-              <Image source={{ uri: heroImage }} style={styles.heroImage} resizeMode="cover" />
-            ) : (
-              <View style={[styles.heroImage, styles.heroFallback]} />
-            )}
-            <View style={styles.heroGradient} />
-            {videoUrl ? (
-              <View style={styles.heroPlayDot}>
-                <View style={styles.heroPlayTriangle} />
-              </View>
-            ) : null}
-          </Pressable>
-
-          <View style={[styles.heroTopBar, { paddingTop: insets.top + spacing.sm }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="返回"
-              onPress={goBack}
-              style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
-            >
-              <Text style={styles.iconBack}>‹</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={favorited ? '取消收藏' : '收藏'}
-              onPress={toggleFavorite}
-              style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
-            >
-              <Text style={[styles.iconHeart, favorited && styles.iconHeartActive]}>♥</Text>
-            </Pressable>
-          </View>
-        </View>
-
         <View style={styles.infoBlock}>
           <View style={styles.infoRow}>
             <View style={styles.posterShadow}>
@@ -224,7 +208,7 @@ export default function DetailScreen() {
                 pressed && styles.playButtonPressed,
               ]}
             >
-              <Text style={styles.playTriangleSmall}>▶</Text>
+              <Ionicons name="play" size={14} color={colors.white} />
               <Text style={styles.playButtonText}>播放</Text>
             </Pressable>
             <Pressable
@@ -237,7 +221,11 @@ export default function DetailScreen() {
                 pressed && styles.favButtonPressed,
               ]}
             >
-              <Text style={[styles.favHeart, favorited && styles.favHeartActive]}>♥</Text>
+              <Ionicons
+                name={favorited ? 'heart' : 'heart-outline'}
+                size={16}
+                color={favorited ? colors.primary : colors.textMuted}
+              />
               <Text style={[styles.favText, favorited && styles.favTextActive]}>
                 {favorited ? '已收藏' : '收藏'}
               </Text>
@@ -248,7 +236,9 @@ export default function DetailScreen() {
         {anime.description ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>简介</Text>
-            <Text style={styles.description}>{anime.description}</Text>
+            <Text style={styles.description}>
+              {anime.description.replace(/\\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()}
+            </Text>
           </View>
         ) : null}
 
@@ -354,7 +344,7 @@ export default function DetailScreen() {
             )}
           />
           {stillImages.length > 1 && lightboxIndex !== null ? (
-            <View pointerEvents="none" style={styles.lightboxCounter}>
+            <View style={[styles.lightboxCounter, { pointerEvents: 'none' }]}>
               <Text style={styles.lightboxCounterText}>
                 {lightboxIndex + 1} / {stillImages.length}
               </Text>
@@ -364,9 +354,10 @@ export default function DetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="关闭剧照"
             onPress={() => setLightboxIndex(null)}
+            hitSlop={8}
             style={({ pressed }) => [styles.lightboxCloseBtn, { top: insets.top + spacing.md }, pressed && styles.lightboxClosePressed]}
           >
-            <Text style={styles.lightboxCloseText}>关闭</Text>
+            <Ionicons name="close" size={20} color={colors.text} />
           </Pressable>
         </View>
       </Modal>
@@ -379,67 +370,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     flex: 1,
   },
-  heroWrap: {
-    aspectRatio: 16 / 10,
-    backgroundColor: colors.surface,
-    position: 'relative',
-    width: '100%',
-  },
-  heroImageWrap: {
-    flex: 1,
-  },
-  heroImage: {
-    height: '100%',
-    width: '100%',
-  },
-  heroFallback: {
-    backgroundColor: colors.surfaceMuted,
-  },
-  heroGradient: {
-    backgroundColor: 'rgba(10,10,15,0.45)',
-    bottom: 0,
-    height: '50%',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-  },
-  heroPlayDot: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 999,
-    height: 64,
-    justifyContent: 'center',
-    left: '50%',
-    marginLeft: -32,
-    marginTop: -32,
-    position: 'absolute',
-    top: '50%',
-    width: 64,
-  },
-  heroPlayTriangle: {
-    borderBottomColor: 'transparent',
-    borderBottomWidth: 11,
-    borderLeftColor: colors.white,
-    borderLeftWidth: 18,
-    borderTopColor: 'transparent',
-    borderTopWidth: 11,
-    height: 0,
-    marginLeft: 4,
-    width: 0,
-  },
-  heroTopBar: {
+  topBar: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    left: 0,
+    paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    position: 'absolute',
-    right: 0,
-    top: 0,
   },
   iconButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.42)',
+    backgroundColor: colors.surface,
     borderRadius: 999,
     height: 36,
     justifyContent: 'center',
@@ -447,20 +387,6 @@ const styles = StyleSheet.create({
   },
   iconButtonPressed: {
     opacity: 0.74,
-  },
-  iconBack: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 22,
-    marginTop: -2,
-  },
-  iconHeart: {
-    color: colors.white,
-    fontSize: 16,
-  },
-  iconHeartActive: {
-    color: colors.primary,
   },
   infoBlock: {
     paddingHorizontal: spacing.lg,
@@ -524,10 +450,6 @@ const styles = StyleSheet.create({
   playButtonPressed: {
     opacity: 0.86,
   },
-  playTriangleSmall: {
-    color: colors.white,
-    fontSize: 12,
-  },
   playButtonText: {
     color: colors.white,
     fontSize: 14,
@@ -551,13 +473,6 @@ const styles = StyleSheet.create({
   },
   favButtonPressed: {
     opacity: 0.82,
-  },
-  favHeart: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  favHeartActive: {
-    color: colors.primary,
   },
   favText: {
     color: colors.text,
@@ -686,19 +601,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(8,10,15,0.72)',
     borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: radius.pill,
+    borderRadius: 999,
     borderWidth: 1,
-    minHeight: 36,
-    paddingHorizontal: spacing.lg,
+    height: 40,
+    justifyContent: 'center',
     position: 'absolute',
     right: spacing.lg,
+    width: 40,
   },
   lightboxClosePressed: {
     opacity: 0.82,
-  },
-  lightboxCloseText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
   },
 });

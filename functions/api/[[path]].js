@@ -87,8 +87,10 @@ app.get('/api/animes', async (c) => {
   const limit = parseInt(c.req.query('limit') || '48');
   const tagId = c.req.query('tag') ? parseInt(c.req.query('tag')) : null;
   const search = c.req.query('search');
+  const sort = c.req.query('sort');
 
   const offset = (page - 1) * limit;
+  const orderColumn = sort === 'popular' ? animes.viewCount : animes.createdAt;
 
   try {
       let query = db.select({
@@ -128,7 +130,7 @@ app.get('/api/animes', async (c) => {
             .where(eq(animeTags.tagId, tagId));
       }
 
-      const results = await query.orderBy(desc(animes.createdAt)).limit(limit).offset(offset);
+      const results = await query.orderBy(desc(orderColumn)).limit(limit).offset(offset);
       const [totalResult] = await countQuery;
 
       return c.json({

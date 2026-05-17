@@ -43,4 +43,5 @@ export interface AnimeListParams {
   limit?: number;
   tagId?: number;
   search?: string;
+  sort?: 'latest' | 'popular';
 }

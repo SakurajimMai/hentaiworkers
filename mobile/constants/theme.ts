@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export const colors = {
   background: '#0A0A0F',
   surface: '#13131C',
@@ -38,10 +40,15 @@ export const radius = {
   pill: 999,
 };
 
-export const shadow = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 12 },
-  shadowOpacity: 0.32,
-  shadowRadius: 24,
-  elevation: 10,
-};
+export const shadow = Platform.select({
+  web: {
+    boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.32)',
+  },
+  default: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.32,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+}) as object;

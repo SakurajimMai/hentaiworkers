@@ -37,7 +37,7 @@ export function AnimeCard({ anime, width, onPress }: AnimeCardProps) {
             <Text style={styles.coverFallbackText}>无封面</Text>
           </View>
         )}
-        <View style={styles.coverOverlay} pointerEvents="none" />
+        <View style={styles.coverOverlay} />
       </View>
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>

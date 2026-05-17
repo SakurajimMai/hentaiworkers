@@ -220,7 +220,9 @@ export function Watch() {
                <div className="bg-card/50 backdrop-blur rounded-lg p-6 border text-sm text-card-foreground shadow-sm">
                  <h3 className="font-semibold mb-2 text-lg">Description</h3>
                  <p className="leading-relaxed text-muted-foreground whitespace-pre-line">
-                   {anime.description || 'No description available for this anime.'}
+                   {anime.description
+                     ? anime.description.replace(/\\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+                     : 'No description available for this anime.'}
                  </p>
                </div>
              </div>

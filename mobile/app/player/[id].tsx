@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import VideoPlayer from '../../components/VideoPlayer';
 import { AppState } from '../../components/AppState';
 import { animeApi } from '../../services/api';
@@ -83,7 +84,7 @@ export default function PlayerScreen() {
         style={({ pressed }) => [styles.backBtn, pressed && styles.backPressed]}
         hitSlop={12}
       >
-        <Text style={styles.backText}>‹ 返回</Text>
+        <Ionicons name="chevron-back" size={22} color={colors.white} />
       </Pressable>
     </View>
   );
@@ -95,22 +96,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backBtn: {
+    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: radius.pill,
+    borderRadius: 999,
+    height: 44,
+    justifyContent: 'center',
     left: spacing.lg,
-    minHeight: 36,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
     position: 'absolute',
     top: spacing.md,
+    width: 44,
     zIndex: 10,
   },
   backPressed: {
     opacity: 0.78,
-  },
-  backText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '800',
   },
 });
