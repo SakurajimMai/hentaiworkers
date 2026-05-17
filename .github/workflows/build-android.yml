@@ -8,6 +8,9 @@ on:
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build APK
@@ -57,9 +60,9 @@ jobs:
 
       - name: Rename APK
         run: |
-          mkdir -p ../artifacts
+          mkdir -p artifacts
           cp android/app/build/outputs/apk/release/app-release.apk \
-             ../artifacts/AnimeStream-${{ github.run_number }}.apk
+             artifacts/AnimeStream-${{ github.run_number }}.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
