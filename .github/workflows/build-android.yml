@@ -37,7 +37,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Expo prebuild (Android)
         run: npx expo prebuild --platform android --no-install --clean
