@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - 'mobile/**'
       - '.github/workflows/build-android.yml'
@@ -37,7 +37,13 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          for i in 1 2 3; do
+            npm install --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 && break
+            echo "npm install attempt $i failed, retrying..."
+            rm -rf node_modules
+            sleep 10
+          done
 
       - name: Expo prebuild (Android)
         run: npx expo prebuild --platform android --no-install --clean
