@@ -1,0 +1,79 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build IPA (unsigned)
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Expo prebuild (iOS)
+        run: npx expo prebuild --platform ios --no-install --clean
+
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install
+
+      - name: Build iOS .app (unsigned, Release)
+        working-directory: mobile/ios
+        run: |
+          xcodebuild -workspace AnimeStream.xcworkspace \
+            -scheme AnimeStream \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            archive -archivePath build/AnimeStream.xcarchive
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p artifacts
+          cd ios/build/AnimeStream.xcarchive/Products/Applications
+          mkdir -p Payload
+          cp -r AnimeStream.app Payload/
+          zip -qr "$GITHUB_WORKSPACE/mobile/artifacts/AnimeStream-${{ github.run_number }}-unsigned.ipa" Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeStream-ipa-${{ github.run_number }}
+          path: mobile/artifacts/AnimeStream-*.ipa
+          retention-days: 30
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: AnimeStream Build ${{ github.run_number }}
+          files: mobile/artifacts/AnimeStream-*.ipa
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

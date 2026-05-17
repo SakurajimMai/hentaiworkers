@@ -59,17 +59,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AnimeStream-apk-${{ github.run_number }}
-          path: artifacts/AnimeStream-*.apk
+          path: mobile/artifacts/AnimeStream-*.apk
           retention-days: 30
 
       - name: Create GitHub Release
-        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: AnimeStream Build ${{ github.run_number }}
-          files: artifacts/AnimeStream-*.apk
+          files: mobile/artifacts/AnimeStream-*.apk
           draft: false
           prerelease: true
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
