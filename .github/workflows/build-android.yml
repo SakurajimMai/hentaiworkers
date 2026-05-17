@@ -51,6 +51,22 @@ jobs:
       - name: Expo prebuild (Android)
         run: npx expo prebuild --platform android --no-install --clean
 
+      - name: Enable ABI splits
+        run: |
+          cat >> android/app/build.gradle <<'EOF'
+
+          android {
+              splits {
+                  abi {
+                      reset()
+                      enable true
+                      universalApk true
+                      include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                  }
+              }
+          }
+          EOF
+
       - name: Grant gradlew execute permission
         run: chmod +x android/gradlew
 
@@ -58,11 +74,50 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Rename APK
+      - name: Rename APKs
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/release/app-release.apk \
-             artifacts/AnimeStream-${{ github.run_number }}.apk
+          BUILD=${{ github.run_number }}
+          declare -A MAP=(
+            [app-armeabi-v7a-release.apk]="AnimeStream-${BUILD}-armeabi-v7a.apk"
+            [app-arm64-v8a-release.apk]="AnimeStream-${BUILD}-arm64-v8a.apk"
+            [app-x86-release.apk]="AnimeStream-${BUILD}-x86.apk"
+            [app-x86_64-release.apk]="AnimeStream-${BUILD}-x86_64.apk"
+            [app-universal-release.apk]="AnimeStream-${BUILD}-universal.apk"
+          )
+          for src in "${!MAP[@]}"; do
+            if [ -f "android/app/build/outputs/apk/release/$src" ]; then
+              cp "android/app/build/outputs/apk/release/$src" "artifacts/${MAP[$src]}"
+            fi
+          done
+          ls -lh artifacts/
+
+      - name: Generate release notes from commits
+        working-directory: ${{ github.workspace }}
+        run: |
+          PREV_TAG=$(git tag --sort=-creatordate | grep '^build-' | grep -v "^build-${{ github.run_number }}$" | head -1 || true)
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$PREV_TAG" ]; then
+              echo "Since \`$PREV_TAG\`:"
+              echo
+              git log --no-merges --pretty=format:"- %s (%h)" "$PREV_TAG..HEAD"
+            else
+              git log --no-merges --pretty=format:"- %s (%h)" -20
+            fi
+            echo
+            echo
+            echo "## APK Variants"
+            echo
+            echo "Pick the APK matching your device CPU. \`universal\` works on all devices but is larger."
+            echo
+            echo "- \`arm64-v8a\` — most modern Android phones (recommended)"
+            echo "- \`armeabi-v7a\` — older 32-bit phones"
+            echo "- \`x86_64\` / \`x86\` — emulators and rare Intel devices"
+            echo "- \`universal\` — fallback that runs anywhere"
+          } > release-notes.md
+          cat release-notes.md
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -77,8 +132,8 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: AnimeStream Build ${{ github.run_number }}
           files: mobile/artifacts/AnimeStream-*.apk
+          body_path: release-notes.md
           draft: false
           prerelease: true
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

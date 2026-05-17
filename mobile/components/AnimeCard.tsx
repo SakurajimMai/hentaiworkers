@@ -91,7 +91,8 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: 2,
-    height: 58,
+    minHeight: 64,
+    paddingBottom: 2,
     paddingHorizontal: 2,
     paddingTop: spacing.sm,
   },
@@ -99,13 +100,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '700',
-    height: 36,
     lineHeight: 18,
+    minHeight: 40,
   },
   subtitle: {
     color: colors.textSubtle,
     fontSize: 11,
-    height: 14,
     lineHeight: 14,
+    minHeight: 14,
   },
 });
