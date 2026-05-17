@@ -27,6 +27,15 @@ from pathlib import Path
 from datetime import datetime
 import logging
 import logging.handlers
+
+# Windows 控制台默认 cp936/gbk 无法显示 CJK，统一切到 UTF-8
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 from unified_crawler import UnifiedCrawler
 from d1_direct_client import D1DirectClient  # D1 直接写入客户端
 
