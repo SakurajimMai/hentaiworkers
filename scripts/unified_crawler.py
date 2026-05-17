@@ -548,21 +548,25 @@ class UnifiedCrawler:
                 if collection:
                     info['set'] = collection
             
-            # 获取剧情简介
-            plot_text = tree.xpath('//*[@id="player-div-wrapper"]//div[contains(@class, "video-caption-text")]/text()')
-            if plot_text:
-                plot_content = plot_text[0].strip()
-                plot = plot_content.replace('\r\n', '<br>')
+            # 从 og:description 解析中文标题和简介，格式: "中文标题 - 简介内容"
+            og_desc = tree.xpath('//meta[@property="og:description"]/@content')
+            if og_desc:
+                og_desc_text = og_desc[0].strip()
+                if ' - ' in og_desc_text:
+                    cn_title_part, plot_part = og_desc_text.split(' - ', 1)
+                    cn_title = re.sub(r'\s*\[.*\]$', '', cn_title_part.strip())
+                    plot_content = plot_part.strip()
+                else:
+                    cn_title = ''
+                    plot_content = og_desc_text
+
+                if cn_title:
+                    info['outline'] = f"<![CDATA[{cn_title}]]>"
+                    info['tagline'] = cn_title
+
                 if plot_content:
+                    plot = plot_content.replace('\r\n', '<br>')
                     info['plot'] = f"<![CDATA[{plot}]]>"
-            
-            # 获取中文标题
-            cn_title_text = tree.xpath('//meta[@name="description"]/@content')
-            if cn_title_text and plot_text:
-                cn_title = cn_title_text[0].strip().split(plot_text[0][:50], 1)[0]
-                cn_title = re.sub(r'\s*\[.*\]$', '', cn_title)
-                info['outline'] = f"<![CDATA[{cn_title}]]>"
-                info['tagline'] = cn_title
             
             # 获取年份
             year_text = tree.xpath('//*[@id="player-div-wrapper"]/div[@class="video-details-wrapper hidden-sm hidden-md hidden-lg hidden-xl"]/text()')
