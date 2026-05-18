@@ -5,7 +5,7 @@ import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
 import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2/promise';
 import { animes, tags, animeTags } from '../schema';
-import { eq, desc, and, or, ne, inArray, notInArray, sql } from 'drizzle-orm';
+import { eq, desc, and, or, ne, inArray, notInArray, sql, like } from 'drizzle-orm';
 
 const app = new Hono();
 
@@ -203,19 +203,16 @@ app.get('/api/animes/:id/similar', async (c) => {
     if (!currentAnime || currentAnime.length === 0) return c.json([]);
 
     const { title, titleJapanese } = currentAnime[0];
-    const prefixes = [extractSeriesPrefix(title), extractSeriesPrefix(titleJapanese)]
-      .filter((p) => p && p.length >= 3);
+    const prefixCandidates = [extractSeriesPrefix(title), extractSeriesPrefix(titleJapanese)]
+      .filter((p) => p && p.length >= 2)
+      .map((p) => p.slice(0, 15));
 
     let seriesMatches = [];
-    if (prefixes.length > 0) {
-      const conds = prefixes.map((p) => {
-        const pattern = `${escapeLike(p)}%`;
-        return or(
-          sql`${animes.title} LIKE ${pattern}`,
-          sql`${animes.titleJapanese} LIKE ${pattern}`,
-        );
-      });
-      seriesMatches = await db
+    for (const prefix of prefixCandidates) {
+      if (seriesMatches.length >= LIMIT) break;
+      const pattern = `${escapeLike(prefix)}%`;
+      const excludeIds = [id, ...seriesMatches.map((m) => m.id)];
+      const rows = await db
         .select({
           id: animes.id,
           title: animes.title,
@@ -224,9 +221,15 @@ app.get('/api/animes/:id/similar', async (c) => {
           viewCount: animes.viewCount,
         })
         .from(animes)
-        .where(and(ne(animes.id, id), conds.length === 1 ? conds[0] : or(...conds)))
+        .where(
+          and(
+            notInArray(animes.id, excludeIds),
+            or(like(animes.title, pattern), like(animes.titleJapanese, pattern)),
+          ),
+        )
         .orderBy(desc(animes.createdAt))
-        .limit(LIMIT);
+        .limit(LIMIT - seriesMatches.length);
+      seriesMatches.push(...rows);
     }
 
     const remaining = LIMIT - seriesMatches.length;
