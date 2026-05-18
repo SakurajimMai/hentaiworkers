@@ -5,7 +5,7 @@ import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
 import { drizzle as drizzleMySQL } from 'drizzle-orm/mysql2';
 import { createConnection } from 'mysql2/promise';
 import { animes, tags, animeTags } from '../schema';
-import { eq, desc, and, ne, inArray, sql } from 'drizzle-orm';
+import { eq, desc, and, or, ne, inArray, notInArray, sql } from 'drizzle-orm';
 
 const app = new Hono();
 
@@ -166,59 +166,115 @@ app.get('/api/tags', async (c) => {
   }
 });
 
+function extractSeriesPrefix(title) {
+  if (!title) return null;
+  const patterns = [
+    /\s*[#＃]\s*\d+\s*$/,
+    /\s+\d+\s*$/,
+    /\s*第\s*\d+\s*[話巻卷部章集]?\s*$/,
+    /\s*[Vv]ol\.?\s*\d+\s*$/,
+    /\s*[Ee]pisode\s*\d+\s*$/,
+    /\s*Part\s*\d+\s*$/i,
+    /\s*(前編|後編|上|中|下|前篇|後篇)\s*$/,
+  ];
+  for (const p of patterns) {
+    if (p.test(title)) {
+      const stripped = title.replace(p, '').trim();
+      if (stripped.length >= 2) return stripped;
+    }
+  }
+  return null;
+}
+
+function escapeLike(str) {
+  return str.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 app.get('/api/animes/:id/similar', async (c) => {
   const db = c.get('db');
   const id = parseInt(c.req.param('id'));
+  const LIMIT = 12;
 
   try {
-    const currentAnime = await db.select({ title: animes.title }).from(animes).where(eq(animes.id, id));
+    const currentAnime = await db
+      .select({ title: animes.title, titleJapanese: animes.titleJapanese })
+      .from(animes)
+      .where(eq(animes.id, id));
     if (!currentAnime || currentAnime.length === 0) return c.json([]);
 
-    const currentTags = await db.select({ id: animeTags.tagId })
-      .from(animeTags)
-      .where(eq(animeTags.animeId, id));
+    const { title, titleJapanese } = currentAnime[0];
+    const prefixes = [extractSeriesPrefix(title), extractSeriesPrefix(titleJapanese)]
+      .filter((p) => p && p.length >= 3);
 
-    const tagIds = currentTags.map(t => t.id);
-
-    if (tagIds.length === 0) {
-      const randoms = await db.select({
-             id: animes.id,
-             title: animes.title,
-             cover: animes.cover,
-             fanart: animes.fanart,
-             viewCount: animes.viewCount,
-      })
-      .from(animes)
-      .where(ne(animes.id, id))
-      .orderBy(desc(animes.viewCount))
-      .limit(12);
-      return c.json(randoms);
+    let seriesMatches = [];
+    if (prefixes.length > 0) {
+      const conds = prefixes.map((p) => {
+        const pattern = `${escapeLike(p)}%`;
+        return or(
+          sql`${animes.title} LIKE ${pattern}`,
+          sql`${animes.titleJapanese} LIKE ${pattern}`,
+        );
+      });
+      seriesMatches = await db
+        .select({
+          id: animes.id,
+          title: animes.title,
+          cover: animes.cover,
+          fanart: animes.fanart,
+          viewCount: animes.viewCount,
+        })
+        .from(animes)
+        .where(and(ne(animes.id, id), conds.length === 1 ? conds[0] : or(...conds)))
+        .orderBy(desc(animes.createdAt))
+        .limit(LIMIT);
     }
 
-    const similarAnimes = await db.select({
+    const remaining = LIMIT - seriesMatches.length;
+    if (remaining <= 0) return c.json(seriesMatches);
+
+    const currentTags = await db
+      .select({ id: animeTags.tagId })
+      .from(animeTags)
+      .where(eq(animeTags.animeId, id));
+    const tagIds = currentTags.map((t) => t.id);
+    const excludeIds = [id, ...seriesMatches.map((m) => m.id)];
+
+    if (tagIds.length === 0) {
+      const fallback = await db
+        .select({
+          id: animes.id,
+          title: animes.title,
+          cover: animes.cover,
+          fanart: animes.fanart,
+          viewCount: animes.viewCount,
+        })
+        .from(animes)
+        .where(notInArray(animes.id, excludeIds))
+        .orderBy(desc(animes.viewCount))
+        .limit(remaining);
+      return c.json([...seriesMatches, ...fallback]);
+    }
+
+    const tagMatches = await db
+      .select({
         id: animes.id,
         title: animes.title,
         cover: animes.cover,
         fanart: animes.fanart,
         viewCount: animes.viewCount,
-        matches: sql`count(${animeTags.tagId})`.as('match_count')
-    })
-    .from(animes)
-    .innerJoin(animeTags, eq(animes.id, animeTags.animeId))
-    .where(
-      and(
-         inArray(animeTags.tagId, tagIds),
-         ne(animes.id, id)
-      )
-    )
-    .groupBy(animes.id)
-    .orderBy(desc(sql`match_count`), desc(animes.viewCount))
-    .limit(12);
+        matches: sql`count(${animeTags.tagId})`.as('match_count'),
+      })
+      .from(animes)
+      .innerJoin(animeTags, eq(animes.id, animeTags.animeId))
+      .where(and(inArray(animeTags.tagId, tagIds), notInArray(animes.id, excludeIds)))
+      .groupBy(animes.id)
+      .orderBy(desc(sql`match_count`), desc(animes.viewCount))
+      .limit(remaining);
 
-    return c.json(similarAnimes);
+    return c.json([...seriesMatches, ...tagMatches]);
   } catch (e) {
-     console.error('Similar Failed:', e);
-     return c.json({ error: e.message }, 500);
+    console.error('Similar Failed:', e);
+    return c.json({ error: e.message }, 500);
   }
 });
 
