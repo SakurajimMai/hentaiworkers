@@ -761,12 +761,17 @@ class UnifiedCrawler:
             if best_match:
                 if best_match.startswith('../'):
                     best_match = best_match[3:]
-                
+
                 if not best_match.startswith('http'):
                     final_url = f"https://www.getchu.com/{best_match}"
                 else:
                     final_url = best_match
-                
+
+                # 2026 起 getchu 把详情页从 soft.phtml?id=X 迁到 /item/X/
+                m = re.search(r'(?:soft\.phtml\?id=|/item/)(\d+)', final_url)
+                if m:
+                    final_url = f"https://www.getchu.com/item/{m.group(1)}/"
+
                 self.logger.info(f"选择最佳匹配: {final_url}")
                 return final_url
             else:
@@ -780,59 +785,63 @@ class UnifiedCrawler:
     def get_getchu_info(self, result_url):
         """获取getchu.com的详细信息，特别是样本图片链接"""
         try:
-            # 检查URL是否包含gc=gc参数，如果没有则添加（绕过年龄认证）
-            if '&gc=gc' not in result_url and '?gc=gc' not in result_url:
-                if '?' in result_url:
-                    result_url = result_url + '&gc=gc'
-                else:
-                    result_url = result_url + '?gc=gc'
-            
+            # 2026 起 getchu 把详情页迁到 /item/X/，统一规范
+            m = re.search(r'(?:soft\.phtml\?id=|/item/)(\d+)', result_url)
+            if m:
+                result_url = f"https://www.getchu.com/item/{m.group(1)}/"
+
+            # gc=gc 仍然有效，会同时设置 getchu_adalt_flag cookie 绕过年龄认证
+            if '?gc=gc' not in result_url and '&gc=gc' not in result_url:
+                result_url = result_url + ('&gc=gc' if '?' in result_url else '?gc=gc')
+
             response = requests.get(result_url, headers=self.headers, timeout=30)
             if response.status_code != 200:
                 self.logger.error(f"请求失败，状态码: {response.status_code}")
                 return None
-            
+
             tree = html.fromstring(response.content)
-            
-            # 检查是否仍然是年龄认证页面
-            age_verification = tree.xpath('//h1[contains(text(), "年齢認証")]')
+
+            age_verification = tree.xpath('//h1[contains(text(), "年齢認証")]') or \
+                               tree.xpath('//title[contains(text(), "年齢認証")]')
             if age_verification:
                 self.logger.warning("仍然是年龄认证页面，无法获取图片")
                 return None
-            
-            # 获取图片链接
+
+            # /item/{id}/ 页面的剧照都在 /brandnew/{id}/c{id}sample{N}.jpg
+            # 旧选择器保留作为兜底
             selectors = [
+                '//a[contains(@href, "sample") and contains(@href, ".jpg")]/@href',
+                '//a[contains(@href, "package") and contains(@href, ".jpg")]/@href',
                 '//*[@id="soft_table"]//td/a[contains(@href, ".jpg")]/@href',
-                '//div[@align="center"]//a[contains(@href, ".jpg")]/@href'
+                '//div[@align="center"]//a[contains(@href, ".jpg")]/@href',
             ]
-            
+
             all_image_links = []
             for selector in selectors:
                 try:
-                    image_links = tree.xpath(selector)
-                    all_image_links.extend(image_links)
+                    all_image_links.extend(tree.xpath(selector))
                 except Exception as e:
                     self.logger.error(f"执行选择器失败: {e}")
-            
-            # 去重并处理链接格式
-            unique_links = list(set(all_image_links))
+
+            # 去重 + 过滤掉缩略图 (_s.jpg / _100.jpg)，保留原图
+            seen = set()
             full_image_urls = []
             base_url = "https://www.getchu.com/"
-            
-            for link in unique_links:
+            for link in all_image_links:
+                if link in seen:
+                    continue
+                seen.add(link)
+                if re.search(r'_(?:s|\d+)\.jpg$', link):
+                    continue
                 if link.startswith('./'):
                     link = link[2:]
-                
                 if not link.startswith('http'):
-                    full_url = base_url + link
-                else:
-                    full_url = link
-                
-                full_image_urls.append(full_url)
-            
+                    link = base_url + link.lstrip('/')
+                full_image_urls.append(link)
+
             self.logger.info(f"找到 {len(full_image_urls)} 个图片链接")
             return full_image_urls
-            
+
         except Exception as e:
             self.logger.error(f"获取getchu页面信息时发生错误: {e}")
             return None
