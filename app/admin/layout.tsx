@@ -27,6 +27,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin/users" className="hover:text-[#111]">
                 用户
               </Link>
+              <Link href="/admin/settings" className="hover:text-[#111]">
+                系统
+              </Link>
               <Link href="/admin/crawler" className="hover:text-[#111]">
                 爬虫
               </Link>

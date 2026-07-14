@@ -23,8 +23,26 @@
 | 标签 | `/admin/tags` | 增删改标签 |
 | 导入 | `/admin/import` | JSON 批量导入 |
 | 用户 | `/admin/users` | 创建用户、改角色、启停、重置密码 |
+| 系统 | `/admin/settings` | 邮箱白名单、SMTP、Trust、Turnstile |
 | 账户 | `/admin/account` | 修改当前登录管理员密码 |
 | 前台 | `/` | 回到公网站点 |
+
+## 2.1 系统设置（注册 / SMTP / Trust / Turnstile）
+
+路径：`/admin/settings`。配置存入表 `system_settings`（迁移 `0004`），SMTP 密码与 Turnstile Secret **加密**存放。
+
+| 区块 | 说明 |
+|------|------|
+| 注册与邮箱白名单 | 是否开放注册；是否强制邮箱验证；白名单（域名或完整邮箱，空=不限） |
+| SMTP | 主机/端口/TLS/账号/发件人；可发测试邮件 |
+| Trust | 注册/登录是否强制 Turnstile；验证链接有效期 |
+| Turnstile | Cloudflare Site Key + Secret；须同时在 Trust 中打开对应开关才生效 |
+
+**注意：**
+
+1. 开启「注册后须邮箱验证」前必须启用 SMTP。
+2. 前台用户邮箱存为 `users.username`；未验证用户 `is_active=0`，无法登录。
+3. 部署后执行：`CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler`（会应用 `0004-system-settings`）。
 
 ## 3. 作品管理
 

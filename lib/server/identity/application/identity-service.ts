@@ -28,17 +28,34 @@ export class IdentityService {
 
   async login(username: string, password: string): Promise<UserRecord | null> {
     const user = await this.users.findByUsername(username.trim());
-    if (!user || !user.isActive) return null;
+    if (!user) return null;
     const ok = await this.passwords.verify(password, user.passwordHash);
     if (!ok) return null;
+    if (!user.isActive) {
+      throw new AppError('RESULT_INVALID', '账号未激活或未完成邮箱验证', 403, false, {
+        field: 'verify',
+      });
+    }
 
+    await this.establishSession(user);
+    return user;
+  }
+
+  async establishSession(user: UserRecord): Promise<void> {
     await this.sessions.save({
       userId: user.id,
       username: user.username,
       role: user.role,
       isLoggedIn: true,
     });
-    return user;
+  }
+
+  async getUserById(id: number): Promise<UserRecord | null> {
+    return this.users.findById(id);
+  }
+
+  async activateUser(userId: number): Promise<void> {
+    await this.users.update(userId, { isActive: 1 });
   }
 
   async logout(): Promise<void> {
@@ -129,6 +146,8 @@ export class IdentityService {
     email: string;
     password: string;
     displayName?: string | null;
+    isActive?: number;
+    autoLogin?: boolean;
   }): Promise<UserRecord> {
     const email = normalizeEmail(input.email);
     if (!isValidEmail(email)) {
@@ -141,19 +160,17 @@ export class IdentityService {
     if (existing) {
       throw new AppError('RESULT_CONFLICT', '该邮箱已注册', 409, false, { field: 'email' });
     }
+    const isActive = input.isActive ?? 1;
     const user = await this.users.create({
       username: email,
       passwordHash: await this.passwords.hash(input.password),
       role: 'user',
       displayName: input.displayName?.trim() || email.split('@')[0] || null,
-      isActive: 1,
+      isActive,
     });
-    await this.sessions.save({
-      userId: user.id,
-      username: user.username,
-      role: user.role,
-      isLoggedIn: true,
-    });
+    if (input.autoLogin !== false && isActive === 1) {
+      await this.establishSession(user);
+    }
     return user;
   }
 

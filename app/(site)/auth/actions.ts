@@ -1,23 +1,46 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { AppError } from '@/lib/server/shared/errors';
-import { getFavoritesService, getIdentityService } from '@/lib/server/identity';
+import { getFavoritesService } from '@/lib/server/identity';
+import { getSystemSettingsService } from '@/lib/server/system';
+
+async function clientIp(): Promise<string | null> {
+  const h = await headers();
+  const xf = h.get('x-forwarded-for');
+  if (xf) return xf.split(',')[0]?.trim() || null;
+  return h.get('x-real-ip');
+}
 
 export async function actionPublicRegister(formData: FormData): Promise<void> {
   const email = String(formData.get('email') || '');
   const password = String(formData.get('password') || '');
   const displayName = String(formData.get('displayName') || '').trim() || null;
   const next = String(formData.get('next') || '/favorites');
+  const turnstileToken = String(formData.get('turnstileToken') || '');
 
   try {
-    await getIdentityService().registerWithEmail({ email, password, displayName });
+    const result = await getSystemSettingsService().registerPublic({
+      email,
+      password,
+      displayName,
+      turnstileToken,
+      remoteIp: await clientIp(),
+    });
+    if (result.needsVerification) {
+      redirect('/login?ok=verify');
+    }
   } catch (error) {
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof AppError) {
       if (error.code === 'RESULT_CONFLICT') redirect('/register?error=exists');
       if (error.details?.field === 'email') redirect('/register?error=email');
       if (error.details?.field === 'password') redirect('/register?error=password');
+      if (error.details?.field === 'whitelist') redirect('/register?error=whitelist');
+      if (error.details?.field === 'registration') redirect('/register?error=closed');
+      if (error.details?.field === 'turnstile') redirect('/register?error=turnstile');
     }
     redirect('/register?error=1');
   }
@@ -29,20 +52,34 @@ export async function actionPublicLogin(formData: FormData): Promise<void> {
   const email = String(formData.get('email') || '');
   const password = String(formData.get('password') || '');
   const next = String(formData.get('next') || '/favorites');
+  const turnstileToken = String(formData.get('turnstileToken') || '');
 
-  const user = await getIdentityService().loginPublic(email, password);
-  if (!user) {
+  try {
+    const user = await getSystemSettingsService().loginPublic({
+      emailOrUsername: email,
+      password,
+      turnstileToken,
+      remoteIp: await clientIp(),
+    });
+    if (!user) {
+      redirect('/login?error=1');
+    }
+    if (user.role === 'admin') {
+      redirect('/admin');
+    }
+    redirect(safeNext(next, '/favorites'));
+  } catch (error) {
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
+    if (error instanceof AppError) {
+      if (error.details?.field === 'verify') redirect('/login?error=verify');
+      if (error.details?.field === 'turnstile') redirect('/login?error=turnstile');
+    }
     redirect('/login?error=1');
   }
-
-  // Admins logging in on public form go to admin home
-  if (user.role === 'admin') {
-    redirect('/admin');
-  }
-  redirect(safeNext(next, '/favorites'));
 }
 
 export async function actionPublicLogout(): Promise<void> {
+  const { getIdentityService } = await import('@/lib/server/identity');
   await getIdentityService().logout();
   redirect('/');
 }

@@ -1,20 +1,30 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { TurnstileField } from '@/components/turnstile-field';
 import { getIdentityService } from '@/lib/server/identity';
+import { getSystemSettingsService } from '@/lib/server/system';
 import { actionPublicLogin } from '../auth/actions';
 
 export const dynamic = 'force-dynamic';
 
+const ERRORS: Record<string, string> = {
+  '1': '邮箱或密码不正确，请重试。',
+  verify: '账号未完成邮箱验证，请查收邮件中的链接。',
+  turnstile: '人机验证失败，请重试。',
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; ok?: string }>;
 }) {
   const sp = await searchParams;
   const user = await getIdentityService().getCurrentUser();
   if (user) {
     redirect(user.role === 'admin' ? '/admin' : (sp.next?.startsWith('/') ? sp.next : '/favorites'));
   }
+
+  const auth = await getSystemSettingsService().getPublicAuthConfig();
 
   return (
     <div className="mx-auto max-w-sm px-4 sm:px-6 py-12 sm:py-16">
@@ -24,9 +34,17 @@ export default async function LoginPage({
         使用注册邮箱登录，收藏会同步到云端。
       </p>
 
+      {sp.ok === 'verify' && (
+        <p className="mb-4 font-ui text-sm text-[#137333]">
+          注册成功。请查收验证邮件，完成验证后再登录。
+        </p>
+      )}
+      {sp.ok === 'verified' && (
+        <p className="mb-4 font-ui text-sm text-[#137333]">邮箱已验证，你已登录。</p>
+      )}
       {sp.error && (
         <p className="mb-4 font-ui text-sm text-[#C5221F]">
-          邮箱或密码不正确，请重试。
+          {ERRORS[sp.error] ?? ERRORS['1']}
         </p>
       )}
 
@@ -60,6 +78,9 @@ export default async function LoginPage({
             className="admin-input"
           />
         </div>
+        {auth.turnstile.onLogin && auth.turnstile.siteKey ? (
+          <TurnstileField siteKey={auth.turnstile.siteKey} />
+        ) : null}
         <button type="submit" className="btn-ink w-full">
           登录
         </button>

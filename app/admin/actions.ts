@@ -20,11 +20,15 @@ function mapAuthRedirect(error: unknown, fallback: string): never {
 export async function actionLogin(formData: FormData): Promise<void> {
   const username = String(formData.get('username') || '').trim();
   const password = String(formData.get('password') || '');
-  const user = await getIdentityService().login(username, password);
-  if (!user || user.role !== 'admin') {
+  try {
+    const user = await getIdentityService().login(username, password);
+    if (!user || user.role !== 'admin') {
+      redirect('/admin/login?error=1');
+    }
+    redirect('/admin');
+  } catch {
     redirect('/admin/login?error=1');
   }
-  redirect('/admin');
 }
 
 export async function actionLogout(): Promise<void> {
@@ -236,4 +240,73 @@ export async function searchAnimesAdmin(q: string, page: number) {
 
 export async function getSessionInfo() {
   return getIdentityService().getSessionInfo();
+}
+
+export async function actionSaveSystemSettings(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().requireAdmin();
+    const { getSystemSettingsService } = await import('@/lib/server/system');
+    const whitelistRaw = String(formData.get('emailWhitelist') || '');
+    const emailWhitelist = whitelistRaw
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    await getSystemSettingsService().update({
+      registration: {
+        open: formData.get('registrationOpen') === '1',
+        requireEmailVerification: formData.get('requireEmailVerification') === '1',
+        emailWhitelist,
+      },
+      smtp: {
+        enabled: formData.get('smtpEnabled') === '1',
+        host: String(formData.get('smtpHost') || ''),
+        port: parseInt(String(formData.get('smtpPort') || '587'), 10) || 587,
+        secure: formData.get('smtpSecure') === '1',
+        username: String(formData.get('smtpUsername') || ''),
+        fromEmail: String(formData.get('smtpFromEmail') || ''),
+        fromName: String(formData.get('smtpFromName') || 'AnimeStream'),
+        password: String(formData.get('smtpPassword') || '') || undefined,
+      },
+      turnstile: {
+        enabled: formData.get('turnstileEnabled') === '1',
+        siteKey: String(formData.get('turnstileSiteKey') || ''),
+        secretKey: String(formData.get('turnstileSecretKey') || '') || undefined,
+      },
+      trust: {
+        turnstileOnRegister: formData.get('turnstileOnRegister') === '1',
+        turnstileOnLogin: formData.get('turnstileOnLogin') === '1',
+        verificationTokenTtlMinutes:
+          parseInt(String(formData.get('verificationTokenTtlMinutes') || '60'), 10) || 60,
+      },
+    });
+    revalidatePath('/admin/settings');
+    revalidatePath('/login');
+    revalidatePath('/register');
+    redirect('/admin/settings?ok=1');
+  } catch (error) {
+    if (error instanceof AppError) {
+      if (error.code === 'WORKER_FORBIDDEN') redirect('/admin/login?error=1');
+      if (error.message.includes('SMTP')) redirect('/admin/settings?error=verify_smtp');
+    }
+    // Next.js redirect throws; rethrow
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
+    redirect('/admin/settings?error=1');
+  }
+}
+
+export async function actionSendSmtpTest(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().requireAdmin();
+    const { getSystemSettingsService } = await import('@/lib/server/system');
+    const to = String(formData.get('to') || '').trim();
+    await getSystemSettingsService().sendTestEmail(to);
+    redirect('/admin/settings?ok=smtp');
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'WORKER_FORBIDDEN') {
+      redirect('/admin/login?error=1');
+    }
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
+    redirect('/admin/settings?error=smtp');
+  }
 }
