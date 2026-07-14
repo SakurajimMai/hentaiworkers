@@ -24,6 +24,26 @@ export async function loginUser(username: string, password: string) {
   return getIdentityService().login(username, password);
 }
 
+export async function loginPublicUser(emailOrUsername: string, password: string) {
+  return getIdentityService().loginPublic(emailOrUsername, password);
+}
+
+export async function registerPublicUser(input: {
+  email: string;
+  password: string;
+  displayName?: string | null;
+}) {
+  return getIdentityService().registerWithEmail(input);
+}
+
+export async function requireUser(): Promise<UserRecord> {
+  return getIdentityService().requireUser();
+}
+
+export async function getCurrentUser(): Promise<UserRecord | null> {
+  return getIdentityService().getCurrentUser();
+}
+
 export async function logoutUser() {
   return getIdentityService().logout();
 }

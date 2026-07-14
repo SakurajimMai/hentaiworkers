@@ -38,8 +38,8 @@ export function assertSitemapEntryLimit(animeCount: number, tagCount: number) {
 export function buildSitemap(input: {
   baseUrl: string;
   now: Date;
-  animes: SitemapAnime[];
-  tags: SitemapTag[];
+  animes: readonly SitemapAnime[];
+  tags: readonly SitemapTag[];
 }): MetadataRoute.Sitemap {
   const baseUrl = normalizeBaseUrl(input.baseUrl);
   assertSitemapEntryLimit(input.animes.length, input.tags.length);

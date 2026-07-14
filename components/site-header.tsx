@@ -1,70 +1,48 @@
-'use client';
-
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { IconPlay, IconSearch } from '@/components/icons';
+import { SiteHeaderClient } from '@/components/site-header-client';
+import { getIdentityService } from '@/lib/server/identity';
+import { actionPublicLogout } from '@/app/(site)/auth/actions';
 
-export function SiteHeader() {
-  const [q, setQ] = useState('');
-  const [focused, setFocused] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (q.trim()) router.push(`/browse?search=${encodeURIComponent(q.trim())}`);
-  };
-
-  const linkClass = (active: boolean) =>
-    `text-[13px] transition-colors duration-200 ${
-      active ? 'text-[#111] font-medium' : 'text-[#787774] hover:text-[#111]'
-    }`;
+export async function SiteHeader() {
+  const user = await getIdentityService().getCurrentUser();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#EAEAEA] bg-[#F7F6F3]/90 backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-5 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
-          <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-[#111] text-white">
-            <IconPlay size={12} className="ml-px" />
-          </span>
-          <span className="hidden sm:inline font-ui text-[14px] font-medium tracking-tight text-[#111]">
-            AnimeStream
-          </span>
-        </Link>
-
-        <nav className="hidden md:flex items-center gap-6 font-ui" aria-label="主导航">
-          <Link href="/" className={linkClass(pathname === '/')}>
-            首页
-          </Link>
-          <Link href="/browse" className={linkClass(pathname.startsWith('/browse'))}>
-            片库
-          </Link>
-          <Link href="/browse?sort=popular" className={linkClass(false)}>
-            热门
-          </Link>
-        </nav>
-
-        <form onSubmit={onSubmit} className="flex-1 max-w-sm ml-auto">
-          <div className="relative flex items-center">
-            <IconSearch
-              size={15}
-              className={`absolute left-3 ${focused ? 'text-[#111]' : 'text-[#787774]'}`}
-            />
-            <input
-              type="search"
-              placeholder="搜索片名或标签"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              className={`h-9 w-full rounded-sm border bg-white pl-9 pr-3 font-ui text-[13px] outline-none ${
-                focused ? 'border-[#111]/30' : 'border-[#EAEAEA]'
-              }`}
-            />
+    <SiteHeaderClient
+      accountSlot={
+        user ? (
+          <div className="flex items-center gap-3 shrink-0">
+            <Link
+              href="/favorites"
+              className="hidden sm:inline font-ui text-[13px] text-[#787774] hover:text-[#111]"
+            >
+              收藏
+            </Link>
+            <span className="hidden md:inline font-ui text-[12px] text-[#787774] max-w-[10rem] truncate">
+              {user.displayName || user.username}
+            </span>
+            <form action={actionPublicLogout}>
+              <button
+                type="submit"
+                className="font-ui text-[13px] text-[#787774] hover:text-[#111]"
+              >
+                退出
+              </button>
+            </form>
           </div>
-        </form>
-      </div>
-    </header>
+        ) : (
+          <div className="flex items-center gap-3 shrink-0">
+            <Link
+              href="/login"
+              className="font-ui text-[13px] text-[#787774] hover:text-[#111]"
+            >
+              登录
+            </Link>
+            <Link href="/register" className="btn-ink !py-1.5 !px-3 !text-[12px]">
+              注册
+            </Link>
+          </div>
+        )
+      }
+    />
   );
 }

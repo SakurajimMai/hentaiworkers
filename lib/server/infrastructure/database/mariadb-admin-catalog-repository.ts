@@ -24,10 +24,8 @@ async function insertAnimeReturningId(
   if (insertId > 0) return insertId;
 
   // Fallback for drivers that omit insertId on the drizzle wrapper.
-  const [rows] = await pool.query<{ id: number }[]>(
-    'SELECT LAST_INSERT_ID() AS id',
-  );
-  const id = Number((rows as unknown as Array<{ id: number }>)[0]?.id ?? 0);
+  const [rows] = await pool.query('SELECT LAST_INSERT_ID() AS id');
+  const id = Number((rows as Array<{ id: number }>)[0]?.id ?? 0);
   if (!id) throw new Error('Failed to resolve insert id');
   return id;
 }

@@ -41,3 +41,8 @@ export function createSessionOptions(env: SessionEnv = process.env): SessionOpti
 export function isAdminSessionCookie(data: SessionData | undefined | null): boolean {
   return !!data?.isLoggedIn && data.role === 'admin' && typeof data.userId === 'number';
 }
+
+/** Any logged-in user (admin or public). */
+export function isLoggedInSessionCookie(data: SessionData | undefined | null): boolean {
+  return !!data?.isLoggedIn && typeof data.userId === 'number';
+}

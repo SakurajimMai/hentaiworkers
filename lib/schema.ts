@@ -76,7 +76,25 @@ export const users = mysqlTable(
   (t) => [uniqueIndex('users_username_uidx').on(t.username)]
 );
 
+export const userFavorites = mysqlTable(
+  'user_favorites',
+  {
+    id: serial('id').primaryKey(),
+    userId: int('user_id').notNull(),
+    animeId: int('anime_id').notNull(),
+    createdAt: datetime('created_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    uniqueIndex('user_favorites_user_anime_uidx').on(t.userId, t.animeId),
+    index('user_favorites_user_id_idx').on(t.userId),
+    index('user_favorites_anime_id_idx').on(t.animeId),
+  ],
+);
+
 export type Anime = typeof animes.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type UserRole = User['role'];
+export type UserFavorite = typeof userFavorites.$inferSelect;

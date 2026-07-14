@@ -2,192 +2,268 @@
 
 ## 1. 架构前提
 
-- 应用：Next.js standalone（Docker 镜像）
-- 数据库：**远程 MySQL**（Compose 不启动 db）
-- 端口：容器内 `3000`，可映射到宿主机
+| 组件 | 说明 |
+|------|------|
+| 应用 | Next.js standalone（Docker 镜像 `hentaiworkers-app`） |
+| 数据库 | **远程 MySQL / MariaDB**（Compose **不**启动 db） |
+| 爬虫 Worker | 可选镜像 `hentaiworkers-worker`（无 DB，只调控制面 API） |
+| 端口 | 容器内 `3000`，默认映射 `127.0.0.1:3000` |
+
+```
+Internet → 反向代理 (TLS) → 127.0.0.1:3000 → app 容器
+                                              ↓
+                                         远程 MySQL
+app ←—— 内网 ——→ crawler-worker（可选，Compose profile）
+```
 
 ## 2. 环境变量
 
-复制模板：
-
 ```bash
 cp .env.example .env
+# 编辑 .env，chmod 600 .env
 ```
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `DATABASE_URL` | 是 | `mysql://USER:PASSWORD@HOST:3306/DATABASE`；密码中 `@` 写成 `%40` |
-| `SESSION_SECRET` | 是 | ≥ 32 字符随机串，用于会话加密 |
-| `SITE_URL` | 建议 | 站点规范 URL，用于 sitemap / canonical（如 `https://anime.ixacg.top`） |
-| `ADMIN_BOOTSTRAP_USER` | 首次 | `npm run seed:admin` 引导管理员用户名 |
-| `ADMIN_BOOTSTRAP_PASSWORD` | 首次 | 引导管理员密码（≥ 8） |
-| `CRAWLER_WORKER_ID` | Worker | Compose `crawler-worker` 身份 |
+| `DATABASE_TLS_MODE` | 生产建议 | 远程库用 `required`；仅本机回环可 `disabled` |
+| `SESSION_SECRET` | 是 | ≥ 32 字符随机串（会话 Cookie 加密） |
+| `SITE_URL` | 建议 | 规范 URL，sitemap / canonical（如 `https://anime.example.com`） |
+| `ADMIN_BOOTSTRAP_USER` | 首次 | `npm run seed:admin` 管理员用户名 |
+| `ADMIN_BOOTSTRAP_PASSWORD` | 首次 | 引导密码（≥ 8） |
+| `DOCKERHUB_USERNAME` | 拉镜像 | Compose `image:` 前缀，如 `myuser` |
+| `APP_IMAGE_TAG` | 可选 | 默认 `latest` |
+| `APP_HOST_BIND` | 可选 | 默认 `127.0.0.1`（勿对公网裸暴露） |
+| `APP_PORT` | 可选 | 宿主机端口，默认 `3000` |
+| `CRAWLER_WORKER_ID` | Worker | 默认 `1` |
 | `CRAWLER_WORKER_TOKEN` | Worker | 机器令牌明文（服务端只存哈希） |
+
+**切勿**把含真实密码的 `.env` 提交到 Git。
 
 ### 健康检查
 
 | 路径 | 语义 |
 |------|------|
-| `/api/live` | 进程存活，无依赖 |
-| `/api/ready` | 依赖就绪（含 DB `SELECT 1`，需 `DATABASE_URL`） |
+| `/api/live` | 进程存活，无依赖（Compose healthcheck 用这个） |
+| `/api/ready` | 含 DB `SELECT 1` |
 | `/api/health` | 兼容旧探针 |
 
-Compose 默认探测 `/api/live`。生产反向代理**必须**拒绝公网访问 `/api/internal/crawler/**`。
+生产反向代理**必须**拒绝公网访问 `/api/internal/crawler/**`。
 
-### Worker 服务
+---
 
-```bash
-# .env 中设置 CRAWLER_WORKER_TOKEN 后
-docker compose up -d --build app crawler-worker
-```
+## 3. Docker Compose 部署（推荐）
 
-Worker 仅收到控制面 URL / ID / token，**不得**注入 `DATABASE_URL`。镜像见 `Dockerfile.worker`。
+根目录 `docker-compose.yml` 定义：
 
-### 控制面迁移（MariaDB）
+- **`app`**：主站 + 管理后台 + Worker 控制面 API  
+- **`crawler-worker`**：可选，使用 Compose **profile `worker`**，默认不启动  
 
-加法迁移（不修改 animes/tags/users 等业务表）：
+### 3.1 首次上线（本地构建）
 
 ```bash
-# 预览
-node scripts/apply-crawler-migration.mjs --dry-run
+# 1) 准备密钥
+cp .env.example .env
+# 填写 DATABASE_URL、SESSION_SECRET、SITE_URL 等
 
-# 远程库需确认
-CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
-```
+# 2) MySQL 白名单放行本机出口 IP
 
-会创建 18 张控制表 + `schema_migrations` 记录。可重复执行（`CREATE IF NOT EXISTS` + checksum）。
-
-DDL 使用 `CURRENT_TIMESTAMP`，并在会话中 `SET time_zone = '+00:00'`（兼容不支持 `DEFAULT UTC_TIMESTAMP()` 的 MariaDB）。
-
-### 遗留爬虫切流
-
-1. 确认新控制面与 `crawler_worker` 可用。
-2. 若历史上有**独立**爬虫 MySQL 账号（与 `DATABASE_URL` 用户不同）：
-
-```bash
-CRAWLER_DB_USER=legacy_crawler_user CRAWLER_DB_HOST=% node scripts/revoke-legacy-crawler-db.mjs
-```
-
-3. 若爬虫与应用共用同一用户（本仓库默认情况）：**不要** DROP 该用户；直写脚本已删除，`scripts/production_config.yml` 中 database 凭据应为空。
-4. `npm run check:legacy` 会阻止 `production_crawler.py` / `unified_crawler.py` / `crawler_config.py` 回流。
-
-### DATABASE_URL 示例
-
-```env
-# 密码为 507877550@lihao 时：
-DATABASE_URL=mysql://user:507877550%40lihao@db.example.com:3306/dbname
-```
-
-**切勿**将含真实密码的 `.env` 提交到 Git。
-
-## 3. 首次上线步骤
-
-### 3.1 网络
-
-确认 MySQL 白名单放行**部署服务器出口 IP**。
-
-### 3.2 初始化管理员
-
-在能访问 MySQL 的机器上（通常即部署机源码目录）：
-
-```bash
+# 3)（可选）本机有 Node 时先灌管理员；也可进容器执行
 npm ci
-# 确保 .env 已配置
 npm run seed:admin
-```
 
-若库中已有 `role=admin` 用户，脚本会跳过创建。
+# 4) 控制面 + 收藏表迁移（加法，可重复执行）
+# 预览：
+node scripts/apply-crawler-migration.mjs --dry-run
+# 应用到远程库：
+CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
+# 会创建 crawler_* 控制表 + user_favorites 等，并写入 schema_migrations
 
-### 3.3 启动容器
+# 5) 构建并启动 app
+docker compose up -d --build app
 
-```bash
-docker compose up -d --build
-```
-
-检查：
-
-```bash
+# 6) 检查
 docker compose ps
-curl -s http://127.0.0.1:3000/api/health
+curl -sS http://127.0.0.1:3000/api/live
+curl -sS http://127.0.0.1:3000/api/ready
+curl -sS http://127.0.0.1:3000/api/health
 ```
 
-期望 `{"ok":true,"database":"mysql",...}`。
+期望：`live` 返回 ok；`ready`/`health` 在 DB 可达时 `ok: true`。
 
-### 3.4 反向代理（可选）
+### 3.2 使用 Docker Hub 预构建镜像
 
-将 `https://你的域名` 反代到 `127.0.0.1:3000`，并配置：
+CI（`.github/workflows/docker-publish.yml`）在 `main` 推送后推送：
 
-- TLS 证书
-- WebSocket 非必须（本站 API 为普通 HTTP）
-- 建议限制 `/admin` 来源 IP 或增加额外鉴权层
-- 建议对 `/api` 做基础速率限制
+- `{DOCKERHUB_USERNAME}/hentaiworkers-app:latest`（及 `main` / commit sha）
+- `{DOCKERHUB_USERNAME}/hentaiworkers-worker:latest`
 
-## 4. Docker 说明
+部署机：
 
-### 服务定义
+```bash
+# .env 中设置与 Hub 一致的用户名
+echo 'DOCKERHUB_USERNAME=yourhubuser' >> .env
+# 可选：APP_IMAGE_TAG=main 或某次 commit sha
 
-见根目录 `docker-compose.yml`：
+docker login   # 私有库需要
+docker compose pull app
+docker compose up -d app
+```
 
-- `build: .`
-- `ports: "3000:3000"`
-- `env_file: .env`
-- healthcheck：`GET /api/health`
+仍会读本地 `Dockerfile` 作为 `build:` 回退；只 pull 时用：
 
-### 镜像构建
+```bash
+docker compose up -d --no-build app
+```
+
+### 3.3 可选：启动爬虫 Worker
+
+```bash
+# .env
+CRAWLER_WORKER_TOKEN=换成足够长的随机串
+# 并在后台「爬虫 → Workers」登记同 ID + 令牌哈希后的 worker
+
+docker compose --profile worker up -d --build
+# 或仅 worker：
+docker compose --profile worker up -d crawler-worker
+```
+
+Worker **不会**注入 `DATABASE_URL`，只访问 `http://app:3000/api/internal/crawler/v1`。
+
+### 3.4 常用运维命令
+
+```bash
+docker compose logs -f app
+docker compose logs -f crawler-worker   # 若启用
+docker compose restart app
+docker compose down                     # 停服务，不删远程库数据
+docker compose up -d --build app        # 升级：拉代码后重建
+```
+
+### 3.5 反向代理（必须做 TLS）
+
+将 `https://你的域名` 反代到 `127.0.0.1:3000`：
+
+- 开启 HTTPS（Cookie `secure` 在 `NODE_ENV=production` 时生效）
+- 禁止外网访问 `/api/internal/crawler/`
+- 建议对 `/admin`、`/api` 做来源限制或限流
+- WebSocket 非必须
+
+Nginx 片段示例：
+
+```nginx
+location /api/internal/ {
+  return 403;
+}
+location / {
+  proxy_pass http://127.0.0.1:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+---
+
+## 4. 镜像与构建说明
 
 `Dockerfile` 多阶段：
 
 1. `deps` — `npm ci`
-2. `builder` — `next build`（`output: 'standalone'`）
-3. `runner` — 仅运行 `node server.js`
+2. `builder` — `next build`（`output: 'standalone'`），构建期占位 `DATABASE_URL` / `SESSION_SECRET`
+3. `runner` — 非 root 用户运行 `node server.js`
 
-构建时会注入占位 `DATABASE_URL` / `SESSION_SECRET` 以满足编译；**运行时以 `env_file` 为准**。
+**运行时**以 `env_file: .env` 为准，与构建占位无关。
 
-## 5. 无 Docker 的生产启动
+`Dockerfile.worker`：Python + Chromium，无数据库客户端。
+
+GitHub Actions 使用 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`。
+
+---
+
+## 5. 数据库迁移
+
+| 迁移 | 内容 |
+|------|------|
+| `0001` / `0002` | 爬虫控制面表 |
+| `0003` | `user_favorites`（前台收藏云同步） |
+
+```bash
+CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
+```
+
+脚本拒绝 `DROP` / 对业务表 `ALTER`，可重复执行。
+
+---
+
+## 6. 无 Docker 的生产启动
 
 ```bash
 npm ci
 npm run build
-npm run start
-# 默认 3000；可用 PORT=3000
+NODE_ENV=production npm run start
+# PORT=3000
 ```
 
-建议用 systemd 或 process manager 保活。
+建议用 systemd 保活。
 
-## 6. 升级与回滚
+---
+
+## 7. 升级与回滚
 
 ```bash
 git pull
-docker compose up -d --build
+# 如有新迁移
+CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
+docker compose up -d --build app
+# 或 pull 新镜像
+docker compose pull app && docker compose up -d --no-build app
 ```
 
-回滚：切换到上一 Git 标签/提交后重新 `docker compose up -d --build`。
+回滚：切换到上一 Git 标签/镜像 tag 后重新 `up`。  
+数据在远程 MySQL，回滚应用**不会**自动回滚 schema。
 
-数据在远程 MySQL，回滚应用**不会**自动回滚数据库 schema。若执行过 `db:push` 等破坏性变更，需另行备份恢复。
+---
 
-## 7. 运维检查清单
+## 8. 运维检查清单
 
-- [ ] `.env` 权限仅部署用户可读
+- [ ] `.env` 权限仅部署用户可读（`chmod 600`）
 - [ ] `SESSION_SECRET` 与开发环境不同
-- [ ] 默认引导密码已修改（后台「账户」或用户管理）
-- [ ] `/api/health` 返回 `ok: true`
-- [ ] 前台首页可加载列表
+- [ ] 已执行迁移（含 `user_favorites`）
+- [ ] `seed:admin` 或已有管理员；默认密码已改
+- [ ] `/api/live`、`/api/ready` 正常
+- [ ] 前台首页可加载；`/login` 可注册登录；收藏可写入
 - [ ] `/admin/login` 可登录
-- [ ] MySQL 连接空闲断开时，应用重试后可恢复（见架构文档可靠性章节）
-- [ ] `robots.txt` 已禁止抓取 `/admin`（`app/robots.ts`）
+- [ ] 公网无法访问 `/api/internal/crawler/**`
+- [ ] `robots.txt` 禁止抓取 `/admin`（`app/robots.ts`）
 
-## 8. 常见问题
+---
+
+## 9. 常见问题
 
 | 现象 | 可能原因 | 处理 |
 |------|----------|------|
-| `无法加载内容` / `ECONNRESET` | 远程库断开空闲连接 | 已实现 keep-alive + 重试；检查白名单与库侧限流 |
-| `SESSION_SECRET must be set...` | 密钥过短或未设置 | 使用 ≥ 32 字符 |
-| 登录后仍回登录页 | Cookie 域名/HTTPS 不一致 | 生产用 HTTPS，检查 `secure` Cookie |
-| `seed:admin` 无效果 | 已有 admin | 直接登录或在后台重置密码 |
-| 构建时无数据 | 正常 | 构建不连生产库；运行时读 `.env` |
+| healthcheck 失败 | 旧 compose 用了 alpine 无 wget | 使用当前 compose（Node `fetch` 探测 `/api/live`） |
+| `无法加载内容` / `ECONNRESET` | 远程库断开 | keep-alive + 重试；查白名单与库限流 |
+| `SESSION_SECRET must be set` | 过短或未设置 | ≥ 32 字符 |
+| 登录后 Cookie 丢失 | HTTP 生产环境 | 用 HTTPS；`secure` Cookie |
+| Docker 构建 Type 错误 | 旧提交 | 拉最新 `main` 重建 |
+| `CRAWLER_WORKER_TOKEN` 报错 | 启用了 worker profile 未设令牌 | 写入 `.env` 或不要 `--profile worker` |
+| Hub pull 失败 | 未 login / 用户名错 | `docker login`；核对 `DOCKERHUB_USERNAME` |
 
-## 9. 相关文档
+---
+
+## 10. 前台账号说明（与部署相关）
+
+- 用户使用**邮箱 + 密码**注册/登录（邮箱存为 `users.username`）
+- 收藏数据在表 `user_favorites`（迁移 `0003`）
+- 管理员仍用后台 `/admin/login`（`role=admin`）；前台登录若为管理员会跳转后台
+
+---
+
+## 11. 相关文档
 
 - [架构](./architecture.md)
 - [后台手册](./admin-guide.md)
+- [用户指南](./user-guide.md)
 - [API](./api/README.md)

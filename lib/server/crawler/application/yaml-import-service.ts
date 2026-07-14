@@ -44,12 +44,17 @@ export type YamlImportPreview = Readonly<{
 function depthOf(value: unknown, depth = 0): number {
   if (value === null || typeof value !== 'object') return depth;
   if (Array.isArray(value)) {
-    return value.reduce((max, item) => Math.max(max, depthOf(item, depth + 1)), depth);
+    let max = depth;
+    for (const item of value) {
+      max = Math.max(max, depthOf(item, depth + 1));
+    }
+    return max;
   }
-  return Object.values(value as Record<string, unknown>).reduce(
-    (max, item) => Math.max(max, depthOf(item, depth + 1)),
-    depth,
-  );
+  let max = depth;
+  for (const item of Object.values(value as Record<string, unknown>)) {
+    max = Math.max(max, depthOf(item, depth + 1));
+  }
+  return max;
 }
 
 function asArray(value: unknown): number[] {

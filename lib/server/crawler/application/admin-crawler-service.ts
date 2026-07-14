@@ -205,7 +205,7 @@ export class AdminCrawlerService {
         'failed',
         'cancelled',
       ]);
-      return all.sort((a, b) => b.id - a.id).slice(0, limit);
+      return [...all].sort((a, b) => b.id - a.id).slice(0, limit);
     });
   }
 

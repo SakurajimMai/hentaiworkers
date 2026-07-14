@@ -9,6 +9,16 @@ import type {
   UserRole,
 } from '../ports/user-repository';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export function isValidEmail(email: string): boolean {
+  return email.length <= 64 && EMAIL_RE.test(email);
+}
+
 export class IdentityService {
   constructor(
     private readonly users: UserRepository,
@@ -95,18 +105,85 @@ export class IdentityService {
     isActive?: number;
     password?: string;
   }): Promise<void> {
-    const patch: UpdateUserInput = {
-      role: input.role,
-      displayName: input.displayName,
-      isActive: input.isActive,
-    };
+    let passwordHash: string | undefined;
     if (input.password !== undefined && input.password !== '') {
       if (input.password.length < 8) {
         throw new AppError('RESULT_INVALID', '密码至少 8 位', 400);
       }
-      patch.passwordHash = await this.passwords.hash(input.password);
+      passwordHash = await this.passwords.hash(input.password);
     }
+    const patch: UpdateUserInput = {
+      role: input.role,
+      displayName: input.displayName,
+      isActive: input.isActive,
+      ...(passwordHash !== undefined ? { passwordHash } : {}),
+    };
     await this.users.update(id, patch);
+  }
+
+  /**
+   * Public site registration: email is stored as username (unique login id).
+   * Role is always `user` — cannot self-elevate to admin.
+   */
+  async registerWithEmail(input: {
+    email: string;
+    password: string;
+    displayName?: string | null;
+  }): Promise<UserRecord> {
+    const email = normalizeEmail(input.email);
+    if (!isValidEmail(email)) {
+      throw new AppError('RESULT_INVALID', '请输入有效邮箱', 400, false, { field: 'email' });
+    }
+    if (input.password.length < 8) {
+      throw new AppError('RESULT_INVALID', '密码至少 8 位', 400, false, { field: 'password' });
+    }
+    const existing = await this.users.findByUsername(email);
+    if (existing) {
+      throw new AppError('RESULT_CONFLICT', '该邮箱已注册', 409, false, { field: 'email' });
+    }
+    const user = await this.users.create({
+      username: email,
+      passwordHash: await this.passwords.hash(input.password),
+      role: 'user',
+      displayName: input.displayName?.trim() || email.split('@')[0] || null,
+      isActive: 1,
+    });
+    await this.sessions.save({
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      isLoggedIn: true,
+    });
+    return user;
+  }
+
+  /** Public login: email or username + password. */
+  async loginPublic(emailOrUsername: string, password: string): Promise<UserRecord | null> {
+    const key = emailOrUsername.trim().toLowerCase().includes('@')
+      ? normalizeEmail(emailOrUsername)
+      : emailOrUsername.trim();
+    const user = await this.login(key, password);
+    return user;
+  }
+
+  async requireUser(): Promise<UserRecord> {
+    const session = await this.sessions.get();
+    if (!session.isLoggedIn || !session.userId) {
+      throw new AppError('WORKER_FORBIDDEN', '请先登录', 401);
+    }
+    const user = await this.users.findById(session.userId);
+    if (!user || !user.isActive) {
+      throw new AppError('WORKER_FORBIDDEN', '请先登录', 401);
+    }
+    return user;
+  }
+
+  async getCurrentUser(): Promise<UserRecord | null> {
+    const session = await this.sessions.get();
+    if (!session.isLoggedIn || !session.userId) return null;
+    const user = await this.users.findById(session.userId);
+    if (!user || !user.isActive) return null;
+    return user;
   }
 
   listUsers(): Promise<ReadonlyArray<UserRecord>> {

@@ -1,26 +1,54 @@
+# AnimeStream production Compose
+# - App: Next.js standalone on 127.0.0.1:3000
+# - DB: remote MySQL only (no db service)
+# - Worker: optional, profile "worker"
+#
+# Quick start (build locally):
+#   cp .env.example .env   # fill DATABASE_URL, SESSION_SECRET, …
+#   docker compose up -d --build app
+#
+# Pull prebuilt Hub images (set DOCKERHUB_USERNAME in .env or shell):
+#   docker compose pull app
+#   docker compose up -d app
+#
+# Optional crawler worker:
+#   # set CRAWLER_WORKER_TOKEN in .env first
+#   docker compose --profile worker up -d --build
+
 services:
   app:
-    build: .
+    image: ${DOCKERHUB_USERNAME:-local}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:3000:3000"
+      - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
     restart: unless-stopped
     healthcheck:
+      # node:22-alpine runner has no wget; use Node fetch against live probe
       test:
         [
           "CMD",
-          "wget",
-          "-qO-",
-          "http://127.0.0.1:3000/api/live",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
-    # Production ingress must block /api/internal/crawler/** from public clients.
+      start_period: 40s
+    # Production reverse proxy MUST block public access to:
+    #   /api/internal/crawler/**
 
   crawler-worker:
+    profiles: ["worker"]
+    image: ${DOCKERHUB_USERNAME:-local}/hentaiworkers-worker:${WORKER_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile.worker

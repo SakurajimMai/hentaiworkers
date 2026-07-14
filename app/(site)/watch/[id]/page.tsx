@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimeCard } from '@/components/AnimeCard';
+import { FavoriteButton } from '@/components/favorite-button';
 import { IconArrowLeft, IconCalendar, IconEye } from '@/components/icons';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { getAnimeById, getSimilarAnimes } from '@/lib/anime-service';
+import { getFavoritesService } from '@/lib/server/identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +17,10 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   const anime = await getAnimeById(id);
   if (!anime) notFound();
 
-  const similar = await getSimilarAnimes(id);
+  const [similar, favorited] = await Promise.all([
+    getSimilarAnimes(id),
+    getFavoritesService().isFavorite(id),
+  ]);
   const fanartList = anime.fanart
     ? anime.fanart.split(',').map((u) => u.trim()).filter(Boolean)
     : [];
@@ -52,7 +57,12 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
                 {anime.titleJapanese && <span>{anime.titleJapanese}</span>}
                 {anime.titleEnglish && <span>{anime.titleEnglish}</span>}
               </div>
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <FavoriteButton
+                  animeId={id}
+                  favorited={favorited}
+                  returnTo={`/watch/${id}`}
+                />
                 {anime.viewCount != null && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EDF3EC] px-2.5 py-1 font-ui text-[11px] font-medium text-[#346538] tabular">
                     <IconEye size={12} />

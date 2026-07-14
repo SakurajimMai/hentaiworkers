@@ -36,21 +36,23 @@ npm run dev
 
 密码中的 `@` 在 `DATABASE_URL` 里需写成 `%40`。
 
-## Docker 部署
+## Docker Compose 部署
 
 ```bash
-# 配置 .env 后，首次初始化管理员
+cp .env.example .env   # 填写 DATABASE_URL、SESSION_SECRET 等
 npm ci && npm run seed:admin
+CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler   # 控制面 + 收藏表
 
-docker compose up -d --build
+docker compose up -d --build app
 curl -s http://127.0.0.1:3000/api/live
 curl -s http://127.0.0.1:3000/api/ready
 ```
 
-爬虫 Worker（可选）：配置 `CRAWLER_WORKER_TOKEN` 后 `docker compose up -d crawler-worker`。  
-内部 API 契约：`docs/api/crawler-internal-openapi.yaml`。
+- 可选 Worker：`CRAWLER_WORKER_TOKEN=...` 后 `docker compose --profile worker up -d`
+- 预构建镜像：设置 `DOCKERHUB_USERNAME` 后 `docker compose pull app && docker compose up -d --no-build app`
+- 前台注册/登录/收藏：`/register`、`/login`、`/favorites`（见 [user-guide](./docs/user-guide.md)）
 
-详情：[docs/deployment.md](./docs/deployment.md)
+完整步骤、反代与排错：[docs/deployment.md](./docs/deployment.md)
 
 ## 文档索引
 

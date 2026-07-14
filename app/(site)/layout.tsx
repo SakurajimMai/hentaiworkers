@@ -16,6 +16,12 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             <Link href="/browse?sort=popular" className="hover:text-[#111]">
               热门
             </Link>
+            <Link href="/favorites" className="hover:text-[#111]">
+              收藏
+            </Link>
+            <Link href="/login" className="hover:text-[#111]">
+              登录
+            </Link>
             <Link href="/admin" className="hover:text-[#111]">
               管理
             </Link>

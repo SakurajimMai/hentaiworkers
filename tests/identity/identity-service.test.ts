@@ -192,3 +192,61 @@ test('middleware and iron adapter source share session-config module', () => {
   assert.match(ironSource, /createSessionOptions/);
   assert.doesNotMatch(middlewareSource, /cookieName:\s*['\"]animestream_session['\"]/);
 });
+
+test('registerWithEmail normalizes email, sets user role, and logs in', async () => {
+  const { sessions, service } = build();
+  const user = await service.registerWithEmail({
+    email: '  Alice@Example.COM ',
+    password: 'password1',
+    displayName: 'Alice',
+  });
+  assert.equal(user.username, 'alice@example.com');
+  assert.equal(user.role, 'user');
+  assert.equal(user.displayName, 'Alice');
+  assert.equal(sessions.data.isLoggedIn, true);
+  assert.equal(sessions.data.userId, user.id);
+
+  await assert.rejects(
+    () => service.registerWithEmail({ email: 'alice@example.com', password: 'password1' }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.code, 'RESULT_CONFLICT');
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => service.registerWithEmail({ email: 'not-an-email', password: 'password1' }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.details?.field, 'email');
+      return true;
+    },
+  );
+});
+
+test('loginPublic accepts email case-insensitively', async () => {
+  const { service } = build();
+  await service.registerWithEmail({
+    email: 'bob@example.com',
+    password: 'password1',
+  });
+  await service.logout();
+  const user = await service.loginPublic('Bob@Example.com', 'password1');
+  assert.equal(user?.username, 'bob@example.com');
+  assert.equal(await service.loginPublic('bob@example.com', 'wrong'), null);
+});
+
+test('requireUser and getCurrentUser honor session', async () => {
+  const { service } = build();
+  await assert.rejects(() => service.requireUser(), AppError);
+  assert.equal(await service.getCurrentUser(), null);
+
+  const created = await service.registerWithEmail({
+    email: 'c@example.com',
+    password: 'password1',
+  });
+  const me = await service.requireUser();
+  assert.equal(me.id, created.id);
+  assert.equal((await service.getCurrentUser())?.id, created.id);
+});

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { PublicAnimeService, TagSummary } from '@/lib/public-api-types';
 
-export type ListTagsDependency = () => Promise<TagSummary[]>;
+export type ListTagsDependency = () => Promise<readonly TagSummary[]>;
 export type TagsAnimeServiceLoader = () => Promise<
   Pick<PublicAnimeService, 'listTags'>
 >;

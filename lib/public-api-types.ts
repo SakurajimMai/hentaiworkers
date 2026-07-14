@@ -24,7 +24,7 @@ export type Pagination = {
 };
 
 export type AnimeListResponse = {
-  data: AnimeListItem[];
+  data: readonly AnimeListItem[];
   pagination: Pagination;
 };
 
@@ -56,7 +56,7 @@ export type AnimeDetail = {
   categoryId: number | null;
   createdAt: string | null;
   updatedAt: string | null;
-  tags: Tag[];
+  tags: readonly Tag[];
 };
 
 export type AnimeSimilarItem = {
@@ -91,6 +91,6 @@ export type ErrorResponse = {
 export interface PublicAnimeService {
   listAnimes(options: ListAnimesOptions): Promise<AnimeListResponse>;
   getAnimeById(id: number): Promise<AnimeDetail | null>;
-  getSimilarAnimes(id: number): Promise<AnimeSimilarItem[]>;
-  listTags(): Promise<TagSummary[]>;
+  getSimilarAnimes(id: number): Promise<readonly AnimeSimilarItem[]>;
+  listTags(): Promise<readonly TagSummary[]>;
 }

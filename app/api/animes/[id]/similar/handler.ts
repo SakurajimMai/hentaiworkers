@@ -4,7 +4,9 @@ import type {
   PublicAnimeService,
 } from '@/lib/public-api-types';
 
-export type GetSimilarAnimesDependency = (id: number) => Promise<AnimeSimilarItem[]>;
+export type GetSimilarAnimesDependency = (
+  id: number,
+) => Promise<readonly AnimeSimilarItem[]>;
 export type SimilarAnimeServiceLoader = () => Promise<
   Pick<PublicAnimeService, 'getSimilarAnimes'>
 >;
