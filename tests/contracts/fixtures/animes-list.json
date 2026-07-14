@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "id": 910001,
+      "title": "Synthetic Contract List Item",
+      "cover": null,
+      "viewCount": 0,
+      "titleEnglish": null
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 48,
+    "total": 1,
+    "totalPages": 1
+  }
+}

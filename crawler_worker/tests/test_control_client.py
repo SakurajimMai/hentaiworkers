@@ -1,0 +1,113 @@
+import json
+import unittest
+
+from crawler_worker.models.config import WorkerRuntimeConfig
+from crawler_worker.transport.control_client import ControlClient, ControlPlaneError
+
+
+class ControlClientTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.cfg = WorkerRuntimeConfig(
+            control_base_url="http://app:3000/api/internal/crawler/v1",
+            worker_id=1,
+            machine_token="token-abc",
+        )
+        self.calls: list[tuple] = []
+
+    def _transport(self, method, url, data, headers):
+        self.calls.append((method, url, data, dict(headers)))
+        path = url.split("/v1", 1)[-1]
+        if path.endswith("/jobs/claim") and b'"empty"' in data:
+            return 204, b""
+        if path.endswith("/jobs/claim"):
+            body = {
+                "data": {
+                    "jobId": 9,
+                    "attemptId": 3,
+                    "leaseToken": "lease-1",
+                    "leaseExpiresAt": "2099-01-01T00:00:00.000Z",
+                    "kind": "crawl",
+                    "status": "leased",
+                    "configSnapshotJson": "{}",
+                    "profileVersionId": 1,
+                    "maxAttempts": 3,
+                    "attemptNo": 1,
+                }
+            }
+            return 200, json.dumps(body).encode()
+        if "register" in path:
+            return 200, json.dumps({"data": {"workerId": 1, "protocolVersion": 1}}).encode()
+        if path.endswith("/heartbeat") and "/workers/" in path:
+            return 200, json.dumps({"data": {"workerId": 1}}).encode()
+        if path.endswith("/start"):
+            return 200, json.dumps({"data": {"status": "running"}}).encode()
+        if "/jobs/" in path and path.endswith("/heartbeat"):
+            return 200, json.dumps(
+                {"data": {"cancelRequested": False, "leaseExpiresAt": "t", "status": "running"}}
+            ).encode()
+        if path.endswith("/events/batch"):
+            return 200, json.dumps({"data": {"accepted": 1}}).encode()
+        if path.endswith("/items/commit"):
+            return 200, json.dumps(
+                {"data": {"replayed": False, "itemId": 1, "status": "succeeded"}}
+            ).encode()
+        if path.endswith("/complete"):
+            return 200, json.dumps({"data": {"status": "succeeded"}}).encode()
+        if path.endswith("/credentials/refresh"):
+            return 200, json.dumps(
+                {"data": {"driver": "s3", "sessionToken": "s", "prefix": "p/"}}
+            ).encode()
+        if path.endswith("/media/reserve"):
+            return 200, json.dumps(
+                {
+                    "data": {
+                        "uploadId": 1,
+                        "stagingKey": "staging/a",
+                        "finalKey": "final/a",
+                        "status": "reserved",
+                    }
+                }
+            ).encode()
+        return 500, json.dumps({"error": {"code": "INTERNAL_ERROR", "message": "x"}}).encode()
+
+    def test_register_and_claim(self):
+        client = ControlClient(self.cfg, transport=self._transport)
+        reg = client.register()
+        self.assertEqual(reg["protocolVersion"], 1)
+        job = client.claim()
+        self.assertIsNotNone(job)
+        self.assertEqual(job.job_id, 9)
+        self.assertEqual(job.lease_token, "lease-1")
+        auth = self.calls[0][3]["Authorization"]
+        self.assertTrue(auth.startswith("Bearer "))
+
+    def test_lease_header_on_start(self):
+        client = ControlClient(self.cfg, transport=self._transport)
+        job = client.claim()
+        client.start(job)
+        headers = self.calls[-1][3]
+        self.assertEqual(headers["X-Crawler-Lease-Token"], "lease-1")
+
+    def test_batch_too_large(self):
+        client = ControlClient(self.cfg, transport=self._transport)
+        job = client.claim()
+        with self.assertRaises(ControlPlaneError) as ctx:
+            client.events_batch(job, [{"sequence": i, "eventType": "x"} for i in range(101)])
+        self.assertEqual(ctx.exception.code, "BATCH_TOO_LARGE")
+
+    def test_empty_claim(self):
+        def transport(method, url, data, headers):
+            return 204, b""
+
+        client = ControlClient(self.cfg, transport=transport)
+        self.assertIsNone(client.claim())
+
+    def test_capabilities_have_no_db_fields(self):
+        caps = self.cfg.capabilities()
+        blob = json.dumps(caps)
+        for banned in ("host", "password", "DATABASE", "mysql", "table"):
+            self.assertNotIn(banned.lower(), blob.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -23,19 +23,29 @@ dist-ssr
 *.sln
 *.sw?
 
-# Cloudflare
-.wrangler/
-.dev.vars
-wrangler.toml
-
 # Environment files
-.env
-.env.local
-.env.production
+.env*
+!.env.example
 
 # Database
 *.db
 *.sqlite
-*.yml
+
+# Keep docker compose / yaml configs in repo
+!docker-compose.yml
+!docker-compose.yaml
 !.github/workflows/*.yml
 
+# Next.js
+.next/
+out/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Local tooling and crawler configuration
+.playwright-mcp/
+__pycache__/
+*.py[cod]
+scripts/production_config.yml
+production_config.yml
+config.yml

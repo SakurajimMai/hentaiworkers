@@ -1,4 +1,4 @@
-// 与生产环境 Cloudflare Functions API 保持一致的响应类型。
+// 与生产环境 Next.js 公开 API 保持一致的响应类型。
 
 export interface Tag {
   id: number;

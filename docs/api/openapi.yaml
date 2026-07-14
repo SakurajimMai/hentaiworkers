@@ -1,0 +1,345 @@
+openapi: 3.0.3
+info:
+  title: AnimeStream Public API
+  version: 1.0.0
+  description: |
+    AnimeStream 公开只读 REST API。
+
+    - 无需鉴权
+    - 数据源：远程 MySQL（经 Next.js Route Handlers）
+    - 默认仅返回上架作品（`is_active = 1` 或 `NULL`）
+  contact:
+    name: AnimeStream
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://anime.ixacg.top
+    description: Production
+
+tags:
+  - name: System
+  - name: Animes
+  - name: Tags
+
+paths:
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service and database are healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthOk"
+        "500":
+          description: Database unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthError"
+
+  /api/animes:
+    get:
+      tags: [Animes]
+      summary: List animes
+      operationId: listAnimes
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 48
+        - name: sort
+          in: query
+          description: "`latest` by created time; `popular` by view_count"
+          schema:
+            type: string
+            enum: [latest, popular]
+            default: latest
+        - name: tag
+          in: query
+          description: Filter by tag id
+          schema:
+            type: integer
+        - name: search
+          in: query
+          description: Fuzzy match title / title_japanese
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated anime list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnimeListResponse"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/animes/{id}:
+    get:
+      tags: [Animes]
+      summary: Get anime detail
+      operationId: getAnime
+      parameters:
+        - $ref: "#/components/parameters/AnimeId"
+      responses:
+        "200":
+          description: Full anime record with tags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnimeDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/animes/{id}/similar:
+    get:
+      tags: [Animes]
+      summary: Similar animes
+      operationId: getSimilarAnimes
+      description: |
+        Series-prefix match first, then shared tags, then popular fallback.
+        Invalid id returns empty array.
+      parameters:
+        - $ref: "#/components/parameters/AnimeId"
+      responses:
+        "200":
+          description: Similar items (up to ~12)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnimeSimilarItem"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/tags:
+    get:
+      tags: [Tags]
+      summary: List all tags
+      operationId: listTags
+      responses:
+        "200":
+          description: Tags ordered by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TagSummary"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  parameters:
+    AnimeId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    HealthOk:
+      type: object
+      required: [ok, database, result, version]
+      properties:
+        ok:
+          type: boolean
+          example: true
+        database:
+          type: string
+          example: mysql
+        result:
+          type: array
+          items:
+            type: object
+        version:
+          type: string
+          example: "1.0.0"
+
+    HealthError:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+
+    Pagination:
+      type: object
+      required: [page, limit, total, totalPages]
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    AnimeListItem:
+      type: object
+      required: [id, title, cover, viewCount, titleEnglish]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        cover:
+          type: string
+          nullable: true
+        viewCount:
+          type: integer
+          nullable: true
+        titleEnglish:
+          type: string
+          nullable: true
+
+    AnimeListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnimeListItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    Tag:
+      type: object
+      required: [id, name, description]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    TagSummary:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    AnimeDetail:
+      type: object
+      required: [id, title, titleEnglish, titleJapanese, description, cover, fanart, videoUrl, releaseYear, releaseDate, viewCount, favoriteCount, isActive, categoryId, createdAt, updatedAt, tags]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        titleEnglish:
+          type: string
+          nullable: true
+        titleJapanese:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        cover:
+          type: string
+          nullable: true
+        fanart:
+          type: string
+          nullable: true
+          description: Comma-separated image URLs
+        videoUrl:
+          type: string
+        releaseYear:
+          type: integer
+          nullable: true
+        releaseDate:
+          type: string
+          nullable: true
+        viewCount:
+          type: integer
+          nullable: true
+        favoriteCount:
+          type: integer
+          nullable: true
+        isActive:
+          type: integer
+          nullable: true
+        categoryId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+
+    AnimeSimilarItem:
+      type: object
+      required: [id, title, cover, fanart, viewCount]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        cover:
+          type: string
+          nullable: true
+        fanart:
+          type: string
+          nullable: true
+        viewCount:
+          type: integer
+          nullable: true
+        matches:
+          type: integer
+          description: Present when ranked by shared tags
+          nullable: true
+
+  responses:
+    ServerError:
+      description: Unexpected server or database error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

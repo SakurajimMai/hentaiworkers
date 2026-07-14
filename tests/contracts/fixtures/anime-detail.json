@@ -1,0 +1,25 @@
+{
+  "id": 910002,
+  "title": "Synthetic Contract Detail",
+  "titleEnglish": null,
+  "titleJapanese": null,
+  "description": null,
+  "cover": null,
+  "fanart": null,
+  "videoUrl": "https://media.fixture.invalid/video/910002.mp4",
+  "releaseYear": null,
+  "releaseDate": null,
+  "viewCount": 0,
+  "favoriteCount": 0,
+  "isActive": 1,
+  "categoryId": null,
+  "createdAt": null,
+  "updatedAt": null,
+  "tags": [
+    {
+      "id": 920001,
+      "name": "Synthetic Contract Tag",
+      "description": null
+    }
+  ]
+}

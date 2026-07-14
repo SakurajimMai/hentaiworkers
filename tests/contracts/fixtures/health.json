@@ -1,0 +1,16 @@
+{
+  "success": {
+    "ok": true,
+    "database": "mysql",
+    "result": [
+      {
+        "ok": 1
+      }
+    ],
+    "version": "1.0.0"
+  },
+  "failure": {
+    "ok": false,
+    "error": "synthetic database unavailable"
+  }
+}

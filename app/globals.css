@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 14% 97%;
+    --foreground: 0 0% 7%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 10% 95%;
+    --secondary-foreground: 0 0% 12%;
+    --muted: 40 10% 95%;
+    --muted-foreground: 40 4% 47%;
+    --border: 0 0% 92%;
+    --ring: 0 0% 7%;
+    --destructive: 2 55% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans SC", sans-serif;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    font-weight: 500;
+  }
+}
+
+@layer components {
+  .font-ui {
+    font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans SC", sans-serif;
+    letter-spacing: 0;
+  }
+  .font-meta {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+  .surface-card {
+    background: #fff;
+    border: 1px solid #eaeaea;
+    border-radius: 12px;
+  }
+  .btn-ink {
+    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium text-white transition-all duration-200;
+    background: #111;
+    border-radius: 6px;
+    padding: 0.625rem 1.125rem;
+  }
+  .btn-ink:hover { background: #333; }
+  .btn-ink:active { transform: scale(0.98); }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200;
+    background: transparent;
+    color: #111;
+    border: 1px solid #eaeaea;
+    border-radius: 6px;
+    padding: 0.625rem 1.125rem;
+  }
+  .btn-ghost:hover { background: #f7f6f3; }
+  .admin-input {
+    @apply w-full rounded-sm border border-[#EAEAEA] bg-white px-3 py-2 font-ui text-sm outline-none focus:border-[#111]/40;
+  }
+  .admin-label {
+    @apply mb-1 block font-ui text-xs font-medium text-[#787774];
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+}

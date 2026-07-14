@@ -1,0 +1,426 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+import { NextRequest } from 'next/server';
+import { parse } from 'yaml';
+import {
+  createListAnimesDependency,
+  createListAnimesHandler,
+} from '../../app/api/animes/handler';
+import {
+  createAnimeDetailDependency,
+  createAnimeDetailHandler,
+} from '../../app/api/animes/[id]/handler';
+import {
+  createSimilarAnimesDependency,
+  createSimilarAnimesHandler,
+} from '../../app/api/animes/[id]/similar/handler';
+import {
+  createHealthHandler,
+  createHealthQueryDependency,
+} from '../../app/api/health/handler';
+import {
+  createTagsDependency,
+  createTagsHandler,
+} from '../../app/api/tags/handler';
+import type {
+  AnimeDetail,
+  AnimeListResponse,
+  AnimeSimilarItem,
+  HealthError,
+  HealthOk,
+  ListAnimesOptions,
+  TagSummary,
+} from '../../lib/public-api-types';
+import detailFixtureJson from './fixtures/anime-detail.json';
+import listFixtureJson from './fixtures/animes-list.json';
+import healthFixtureJson from './fixtures/health.json';
+import similarFixtureJson from './fixtures/similar.json';
+import tagsFixtureJson from './fixtures/tags.json';
+
+type OpenApiSchema = {
+  required?: string[];
+  properties?: Record<string, unknown>;
+};
+
+type OpenApiDocument = {
+  components?: {
+    schemas?: Record<string, OpenApiSchema>;
+  };
+};
+
+const listFixture = listFixtureJson satisfies AnimeListResponse;
+const detailFixture = detailFixtureJson satisfies AnimeDetail;
+const similarFixture = similarFixtureJson satisfies AnimeSimilarItem[];
+const tagsFixture = tagsFixtureJson satisfies TagSummary[];
+const healthFixture = healthFixtureJson satisfies {
+  success: HealthOk;
+  failure: HealthError;
+};
+
+async function loadRouteModules() {
+  const [listRoute, detailRoute, similarRoute, tagsRoute, healthRoute] = await Promise.all([
+    import('../../app/api/animes/route'),
+    import('../../app/api/animes/[id]/route'),
+    import('../../app/api/animes/[id]/similar/route'),
+    import('../../app/api/tags/route'),
+    import('../../app/api/health/route'),
+  ]);
+
+  return { listRoute, detailRoute, similarRoute, tagsRoute, healthRoute };
+}
+
+async function responseJson(response: Response): Promise<unknown> {
+  return response.json() as Promise<unknown>;
+}
+
+async function withMutedConsoleError<T>(run: () => Promise<T>): Promise<T> {
+  const original = console.error;
+  console.error = () => {};
+  try {
+    return await run();
+  } finally {
+    console.error = original;
+  }
+}
+
+function assertOwnKeys(value: object, keys: readonly string[]) {
+  for (const key of keys) {
+    assert.equal(Object.hasOwn(value, key), true, `响应缺少必选字段：${key}`);
+  }
+}
+
+function getOpenApiSchemas(): Record<string, OpenApiSchema> {
+  const source = readFileSync('docs/api/openapi.yaml', 'utf8');
+  const document = parse(source) as OpenApiDocument;
+  assert.ok(document.components?.schemas, 'OpenAPI 必须声明 components.schemas');
+  return document.components.schemas;
+}
+
+function assertSchemaRequired(
+  schemas: Record<string, OpenApiSchema>,
+  schemaName: string,
+  expected: readonly string[],
+) {
+  const schema = schemas[schemaName];
+  assert.ok(schema, `OpenAPI 缺少 schema：${schemaName}`);
+  assert.deepEqual(schema.required, [...expected]);
+  for (const key of expected) {
+    assert.ok(schema.properties?.[key], `${schemaName} 缺少属性：${key}`);
+  }
+}
+
+test('TypeScript 测试脚本使用跨平台带引号递归 glob', () => {
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    scripts?: Record<string, string>;
+  };
+
+  assert.equal(packageJson.scripts?.['test:ts'], 'tsx --test "tests/**/*.test.ts"');
+});
+
+test('五个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
+  const databaseUrl = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+  let routes: Awaited<ReturnType<typeof loadRouteModules>>;
+  try {
+    routes = await loadRouteModules();
+  } finally {
+    if (databaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = databaseUrl;
+    }
+  }
+
+  for (const route of Object.values(routes)) {
+    assert.equal(typeof route.GET, 'function');
+  }
+
+  for (const factory of [
+    createListAnimesHandler,
+    createAnimeDetailHandler,
+    createSimilarAnimesHandler,
+    createTagsHandler,
+    createHealthHandler,
+  ]) {
+    assert.equal(typeof factory, 'function');
+  }
+});
+
+test('生产惰性适配器选择正确导出并原样转发参数', async () => {
+  const listOptions: ListAnimesOptions = {
+    page: 3,
+    limit: 24,
+    tagId: 920001,
+    search: 'synthetic search',
+    sort: 'popular',
+  };
+  let receivedListOptions: ListAnimesOptions | undefined;
+  const listDependency = createListAnimesDependency(async () => ({
+    listAnimes: async (options) => {
+      receivedListOptions = options;
+      return listFixture;
+    },
+  }));
+  const detailDependency = createAnimeDetailDependency(async () => ({
+    getAnimeById: async (id) => {
+      assert.equal(id, detailFixture.id);
+      return detailFixture;
+    },
+  }));
+  const similarDependency = createSimilarAnimesDependency(async () => ({
+    getSimilarAnimes: async (id) => {
+      assert.equal(id, detailFixture.id);
+      return similarFixture;
+    },
+  }));
+  const tagsDependency = createTagsDependency(async () => ({
+    listTags: async () => tagsFixture,
+  }));
+
+  assert.deepEqual(await listDependency(listOptions), listFixture);
+  assert.deepEqual(receivedListOptions, listOptions);
+  assert.deepEqual(await detailDependency(detailFixture.id), detailFixture);
+  assert.deepEqual(await similarDependency(detailFixture.id), similarFixture);
+  assert.deepEqual(await tagsDependency(), tagsFixture);
+});
+
+test('健康检查惰性适配器只执行 SELECT 1', async () => {
+  const queries: string[] = [];
+  const dependency = createHealthQueryDependency(async () => ({
+    pool: {
+      query: async (sql) => {
+        queries.push(sql);
+        return [healthFixture.success.result, []];
+      },
+    },
+  }));
+
+  assert.deepEqual(await dependency(), healthFixture.success.result);
+  assert.deepEqual(queries, ['SELECT 1 AS ok']);
+});
+
+test('动漫列表保持 200 黄金响应和默认查询参数', async () => {
+  let received: ListAnimesOptions | undefined;
+  const handler = createListAnimesHandler(async (options) => {
+    received = options;
+    return listFixture;
+  });
+
+  const response = await handler(new NextRequest('http://fixture.invalid/api/animes'));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseJson(response), listFixture);
+  assert.deepEqual(received, {
+    page: 1,
+    limit: 48,
+    tagId: undefined,
+    search: undefined,
+    sort: 'latest',
+  });
+});
+
+test('动漫列表依赖异常保持 500 和 error 字符串', async () => {
+  const handler = createListAnimesHandler(async () => {
+    throw new Error('synthetic list failure');
+  });
+
+  const response = await withMutedConsoleError(() =>
+    handler(new NextRequest('http://fixture.invalid/api/animes')),
+  );
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await responseJson(response), { error: 'synthetic list failure' });
+});
+
+test('动漫详情保持 200 黄金响应', async () => {
+  const handler = createAnimeDetailHandler(async (id) => {
+    assert.equal(id, detailFixture.id);
+    return detailFixture;
+  });
+
+  const response = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: String(detailFixture.id) }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseJson(response), detailFixture);
+});
+
+test('动漫详情非法 id 与不存在记录均保持 404', async () => {
+  let calls = 0;
+  const handler = createAnimeDetailHandler(async () => {
+    calls += 1;
+    return null;
+  });
+
+  const invalidResponse = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: 'invalid' }),
+  });
+  const missingResponse = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: '910404' }),
+  });
+
+  assert.equal(invalidResponse.status, 404);
+  assert.deepEqual(await responseJson(invalidResponse), { error: 'Not found' });
+  assert.equal(missingResponse.status, 404);
+  assert.deepEqual(await responseJson(missingResponse), { error: 'Not found' });
+  assert.equal(calls, 1);
+});
+
+test('动漫详情依赖异常保持 500 和 error 字符串', async () => {
+  const handler = createAnimeDetailHandler(async () => {
+    throw new Error('synthetic detail failure');
+  });
+
+  const response = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: String(detailFixture.id) }),
+  });
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await responseJson(response), { error: 'synthetic detail failure' });
+});
+
+test('相似动漫保持 200 黄金响应，非法 id 保持 200 空数组', async () => {
+  let calls = 0;
+  const handler = createSimilarAnimesHandler(async (id) => {
+    calls += 1;
+    assert.equal(id, detailFixture.id);
+    return similarFixture;
+  });
+
+  const successResponse = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: String(detailFixture.id) }),
+  });
+  const invalidResponse = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: 'invalid' }),
+  });
+
+  assert.equal(successResponse.status, 200);
+  assert.deepEqual(await responseJson(successResponse), similarFixture);
+  assert.equal(invalidResponse.status, 200);
+  assert.deepEqual(await responseJson(invalidResponse), []);
+  assert.equal(calls, 1);
+});
+
+test('相似动漫依赖异常保持 500 和 error 字符串', async () => {
+  const handler = createSimilarAnimesHandler(async () => {
+    throw new Error('synthetic similar failure');
+  });
+
+  const response = await handler(new Request('http://fixture.invalid'), {
+    params: Promise.resolve({ id: String(detailFixture.id) }),
+  });
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await responseJson(response), { error: 'synthetic similar failure' });
+});
+
+test('标签列表保持 200 黄金响应和 500 错误结构', async () => {
+  const success = createTagsHandler(async () => tagsFixture);
+  const failure = createTagsHandler(async () => {
+    throw new Error('synthetic tags failure');
+  });
+
+  const successResponse = await success();
+  const failureResponse = await failure();
+
+  assert.equal(successResponse.status, 200);
+  assert.deepEqual(await responseJson(successResponse), tagsFixture);
+  assert.equal(failureResponse.status, 500);
+  assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic tags failure' });
+});
+
+test('健康检查保持成功和失败黄金契约', async () => {
+  const success = createHealthHandler(async () => healthFixture.success.result);
+  const failure = createHealthHandler(async () => {
+    throw new Error(healthFixture.failure.error);
+  });
+
+  const successResponse = await success();
+  const failureResponse = await failure();
+
+  assert.equal(successResponse.status, 200);
+  assert.deepEqual(await responseJson(successResponse), healthFixture.success);
+  assert.equal(failureResponse.status, 500);
+  assert.deepEqual(await responseJson(failureResponse), healthFixture.failure);
+});
+
+test('null 字段仍作为公开契约必选键存在', () => {
+  assertOwnKeys(listFixture.data[0], ['id', 'title', 'cover', 'viewCount', 'titleEnglish']);
+  assert.equal(listFixture.data[0].cover, null);
+  assertOwnKeys(detailFixture, [
+    'id',
+    'title',
+    'titleEnglish',
+    'titleJapanese',
+    'description',
+    'cover',
+    'fanart',
+    'videoUrl',
+    'releaseYear',
+    'releaseDate',
+    'viewCount',
+    'favoriteCount',
+    'isActive',
+    'categoryId',
+    'createdAt',
+    'updatedAt',
+    'tags',
+  ]);
+  assert.equal(detailFixture.titleEnglish, null);
+  assertOwnKeys(detailFixture.tags[0], ['id', 'name', 'description']);
+  assert.equal(detailFixture.tags[0].description, null);
+  assertOwnKeys(similarFixture[0], ['id', 'title', 'cover', 'fanart', 'viewCount']);
+  assert.equal(similarFixture[0].fanart, null);
+});
+
+test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
+  const schemas = getOpenApiSchemas();
+  const required = {
+    Error: ['error'],
+    HealthOk: ['ok', 'database', 'result', 'version'],
+    HealthError: ['ok', 'error'],
+    Pagination: ['page', 'limit', 'total', 'totalPages'],
+    AnimeListItem: ['id', 'title', 'cover', 'viewCount', 'titleEnglish'],
+    AnimeListResponse: ['data', 'pagination'],
+    Tag: ['id', 'name', 'description'],
+    TagSummary: ['id', 'name'],
+    AnimeDetail: [
+      'id',
+      'title',
+      'titleEnglish',
+      'titleJapanese',
+      'description',
+      'cover',
+      'fanart',
+      'videoUrl',
+      'releaseYear',
+      'releaseDate',
+      'viewCount',
+      'favoriteCount',
+      'isActive',
+      'categoryId',
+      'createdAt',
+      'updatedAt',
+      'tags',
+    ],
+    AnimeSimilarItem: ['id', 'title', 'cover', 'fanart', 'viewCount'],
+  } as const;
+
+  for (const [schemaName, keys] of Object.entries(required)) {
+    assertSchemaRequired(schemas, schemaName, keys);
+  }
+
+  assertOwnKeys(listFixture, required.AnimeListResponse);
+  assertOwnKeys(listFixture.data[0], required.AnimeListItem);
+  assertOwnKeys(listFixture.pagination, required.Pagination);
+  assertOwnKeys(detailFixture, required.AnimeDetail);
+  assertOwnKeys(detailFixture.tags[0], required.Tag);
+  assertOwnKeys(similarFixture[0], required.AnimeSimilarItem);
+  assertOwnKeys(tagsFixture[0], required.TagSummary);
+  assertOwnKeys(healthFixture.success, required.HealthOk);
+  assertOwnKeys(healthFixture.failure, required.HealthError);
+  assert.equal(schemas.AnimeSimilarItem.required?.includes('matches'), false);
+});

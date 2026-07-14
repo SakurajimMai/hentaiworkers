@@ -1,0 +1,10 @@
+# Worker runtime dependencies (no PyMySQL / database drivers).
+# Install: pip install -r requirements-worker.lock
+requests>=2.32.0
+PyYAML>=6.0.1
+cloudscraper>=1.2.71
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+selenium>=4.20.0
+boto3>=1.34.0
+paramiko>=3.4.0
