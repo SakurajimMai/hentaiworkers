@@ -151,6 +151,24 @@ class HanimeLiveParsingTests(unittest.TestCase):
         self.assertEqual(items[0].status, "failed")
         self.assertEqual(items[0].error_code, "RESULT_INVALID")
 
+    def test_fixture_items_are_not_a_runtime_data_source(self):
+        source = HanimeSource(fetch_html=lambda _url: "")
+        items = source.crawl(
+            {
+                "source": {"baseUrl": ""},
+                "fixtureItems": [
+                    {"id": "mock-1", "title": "Mock", "videos": ["1080.mp4"]}
+                ],
+                "dateFilter": {"years": [2026], "months": [7]},
+            },
+            workdir=Path(tempfile.mkdtemp()),
+            should_stop=lambda: False,
+        )
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].status, "failed")
+        self.assertEqual(items[0].error_code, "RESULT_INVALID")
+        self.assertNotEqual(items[0].source_id, "mock-1")
+
 
 if __name__ == "__main__":
     unittest.main()

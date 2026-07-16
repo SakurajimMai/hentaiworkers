@@ -1,6 +1,6 @@
 # 公开 API 参考
 
-基础路径：同源 `/api`（生产示例 `https://anime.ixacg.top/api`）。
+基础路径：同源 `/api`（生产环境使用你在 `SITE_URL` 配置的 HTTPS 域名）。
 
 - 协议：HTTPS（生产）/ HTTP（本地）
 - 格式：JSON，`Content-Type: application/json`

@@ -58,7 +58,7 @@ class RunnerTests(unittest.TestCase):
                             "kind": "crawl",
                             "status": "leased",
                             "configSnapshotJson": json.dumps(
-                                {"requiredSource": "hanime", "fixtureItems": [{"id": "1", "title": "T", "videos": ["1080.mp4"]}]}
+                                {"requiredSource": "hanime"}
                             ),
                             "profileVersionId": 1,
                             "maxAttempts": 3,
@@ -87,7 +87,7 @@ class RunnerTests(unittest.TestCase):
             return 500, b"{}"
 
         client = ControlClient(cfg, transport=transport)
-        runner = Runner(cfg, client, {"hanime": HanimeSource()}, sleep=lambda _s: None)
+        runner = Runner(cfg, client, {"hanime": FakeSource()}, sleep=lambda _s: None)
         runner.run_forever(max_iterations=2)
         self.assertTrue(state["claimed"])
 

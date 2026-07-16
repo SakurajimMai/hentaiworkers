@@ -117,7 +117,18 @@ npm run build
 
 ## 7. 移动端
 
-`mobile/` 为 Expo 工程，独立安装依赖与构建。API 基址指向部署后的 Next 源站 `/api`。
+`mobile/` 为 Expo 工程，独立安装依赖与构建。**不内置任何业务域名**；必须显式配置 API 基址：
+
+```bash
+cd mobile
+# 二选一（绝对 HTTP(S) 源站，无路径）
+export EXPO_PUBLIC_API_BASE_URL=https://your-domain.example
+# 或写入 app.json → expo.extra.apiBaseUrl
+npm install
+npx expo start
+```
+
+本地 Metro 的 `/api` 代理读取同一环境变量（或 `MOBILE_DEV_API_BASE_URL`）。未配置时原生端启动会失败，代理返回 503。
 
 契约文档：`docs/api/README.md`。
 

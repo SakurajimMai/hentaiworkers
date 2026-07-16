@@ -11,7 +11,7 @@
 3. 成功后进入概览页。
 4. 右上角「退出」清除会话。
 
-首次部署使用 `npm run seed:admin` 创建引导账号（见 `.env` 中 `ADMIN_BOOTSTRAP_*`，默认登录邮箱 `admin@ixacg.top`）。登录后请立即修改密码。
+首次部署使用 `npm run seed:admin` 创建引导账号。必须先在 `.env` 显式填写 `ADMIN_BOOTSTRAP_USER` 与至少 12 位的 `ADMIN_BOOTSTRAP_PASSWORD`；项目不提供默认账号或密码。登录后请立即修改密码。
 
 ## 2. 功能导航
 

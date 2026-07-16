@@ -182,4 +182,5 @@ test('missing base_url and date filters are reported', () => {
   assert.ok(preview.missing.some((i) => i.path === 'crawl.base_url'));
   assert.ok(preview.missing.some((i) => i.path === 'crawl.date_filter.year'));
   assert.ok(preview.missing.some((i) => i.path === 'crawl.date_filter.month'));
+  assert.equal(preview.profileConfig, null);
 });

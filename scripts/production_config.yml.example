@@ -67,7 +67,7 @@ download:
 # ========== Web访问配置 ==========
 web_access:
   # 域名前缀配置 - 用于生成完整的可访问URL
-  domain_prefix: "https://static.hxsl.org" # 静态文件域名前缀
+  domain_prefix: "https://media.your-domain.example" # 静态文件域名前缀（必填真实可访问 URL）
 
   # URL路径配置
   base_path: "" # 基础路径 (可选，如: "/anime" 或 "/static")

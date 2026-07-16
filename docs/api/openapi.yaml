@@ -12,10 +12,10 @@ info:
     name: AnimeStream
 
 servers:
+  - url: /
+    description: Same-origin API (production)
   - url: http://localhost:3000
     description: Local development
-  - url: https://anime.ixacg.top
-    description: Production
 
 tags:
   - name: System

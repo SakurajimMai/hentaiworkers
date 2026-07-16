@@ -125,4 +125,4 @@ docker-compose.yml
 
 - 生产路径为 Next 全栈 + 远程 MySQL；不再依赖 Cloudflare Workers / D1。
 - MacCMS 与 Hanime 目录分离：外链进 `anime_works`，托管 MP4 进 `animes`。
-- `mobile/` 通过同一 `/api` 契约访问；云端片单/进度以前台 Web 为准。
+- `mobile/` 通过同一 `/api` 契约访问（须配置 `EXPO_PUBLIC_API_BASE_URL` / `expo.extra.apiBaseUrl`，无内置域名）；云端片单/进度以前台 Web 为准。

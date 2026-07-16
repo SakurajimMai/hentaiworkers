@@ -71,7 +71,7 @@ export const MACCMS_PRESETS: ReadonlyArray<MacCmsPreset> = [
   {
     key: 'maccms',
     label: '通用 MacCMS（自定义 API）',
-    baseUrl: 'https://example.com/api.php/provide/vod/',
+    baseUrl: '',
     typeIds: [],
   },
 ] as const;

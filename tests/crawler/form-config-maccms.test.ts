@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { profileConfigFromForm } from '../../app/admin/crawler/form-config';
 import { parseCrawlerProfileConfig } from '../../lib/server/crawler/domain/config';
+import { getMacCmsPreset } from '../../lib/server/crawler/domain/maccms-presets';
 
 function form(entries: Record<string, string>): FormData {
   const fd = new FormData();
@@ -10,6 +11,10 @@ function form(entries: Record<string, string>): FormData {
   }
   return fd;
 }
+
+test('generic MacCMS preset requires an explicit API URL', () => {
+  assert.equal(getMacCmsPreset('maccms')?.baseUrl, '');
+});
 
 test('profileConfigFromForm builds ikun MacCMS config with typeIds and filters', () => {
   const json = profileConfigFromForm(

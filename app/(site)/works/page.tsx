@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getWorksQueryService } from '@/lib/server/works';
+import { PosterPlaceholder } from '@/components/poster-placeholder';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,18 +98,21 @@ export default async function WorksBrowsePage({
                 <Link key={work.id} href={`/works/${work.id}`} className="group flex h-full">
                   <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-[#e8e4dc] bg-white shadow-[0_1px_0_hsla(30,12%,18%,0.03)] transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-ink">
                     <div className="relative w-full shrink-0 aspect-[2/3] overflow-hidden bg-[#f0eee9]">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={
-                          work.coverUrl
-                          || 'https://placehold.co/400x600/f6f4ef/787774?text=No+Cover'
-                        }
-                        alt={work.title}
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#1a1917]/30 via-transparent to-transparent opacity-80" />
+                      {work.coverUrl ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={work.coverUrl}
+                            alt={work.title}
+                            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#1a1917]/30 via-transparent to-transparent opacity-80" />
+                        </>
+                      ) : (
+                        <PosterPlaceholder title={work.title} />
+                      )}
                     </div>
                     <div className="flex flex-1 flex-col p-3.5 min-h-[4.5rem]">
                       <p

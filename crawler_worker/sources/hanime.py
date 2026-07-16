@@ -152,10 +152,6 @@ class HanimeSource(SourceAdapter):
         priority = tuple(str(v) for v in (snapshot.get("qualityPriority") or ["1080", "720"]))
         skips = tuple(str(v) for v in (snapshot.get("skipKeywords") or []))
 
-        embedded = snapshot.get("fixtureItems")
-        if isinstance(embedded, list):
-            return self._from_fixture(embedded, priority, skips, should_stop)
-
         if not _is_safe_http_url(base_url):
             return [self._failure("source", "RESULT_INVALID", "invalid source base URL")]
 
@@ -450,59 +446,6 @@ class HanimeSource(SourceAdapter):
                 )
             )
         return results
-
-    def _from_fixture(
-        self,
-        embedded: list[Any],
-        priority: Sequence[str],
-        skips: Sequence[str],
-        should_stop: Callable[[], bool],
-    ) -> list[CrawlItemResult]:
-        out: list[CrawlItemResult] = []
-        for raw in embedded:
-            if should_stop():
-                break
-            if not isinstance(raw, dict):
-                continue
-            title = _strip_brackets(str(raw.get("title", "")))
-            source_id = str(raw.get("id", ""))
-            if should_skip(title, skips):
-                out.append(
-                    CrawlItemResult(
-                        source=self.name,
-                        source_id=source_id,
-                        title=title,
-                        video_url=None,
-                        cover_url=None,
-                        tags=tuple(str(tag) for tag in (raw.get("tags") or ())),
-                        status="skipped",
-                    )
-                )
-                continue
-            videos = raw.get("videos") or []
-            if isinstance(videos, str):
-                videos = [videos]
-            chosen = select_quality([str(value) for value in videos], priority)
-            out.append(
-                CrawlItemResult(
-                    source=self.name,
-                    source_id=source_id,
-                    title=title,
-                    video_url=chosen,
-                    cover_url=str(raw.get("cover") or "") or None,
-                    tags=tuple(str(tag) for tag in (raw.get("tags") or ())),
-                    status="succeeded" if chosen else "failed",
-                    title_english=str(raw.get("titleEnglish") or "") or None,
-                    title_japanese=str(raw.get("titleJapanese") or title) or None,
-                    description=str(raw.get("description") or "") or None,
-                    fanart_urls=tuple(str(url) for url in (raw.get("fanartUrls") or ())),
-                    release_year=int(raw["releaseYear"]) if raw.get("releaseYear") else None,
-                    release_date=str(raw.get("releaseDate") or "") or None,
-                    error_code=None if chosen else "RESULT_INVALID",
-                    source_page_url=str(raw.get("sourcePageUrl") or "") or None,
-                )
-            )
-        return out
 
     @staticmethod
     def _failure(

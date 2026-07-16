@@ -1,7 +1,14 @@
-export const DEFAULT_SITE_URL = 'https://anime.ixacg.top';
-
-export function resolveSiteUrl(value: string | undefined) {
-  const candidate = value?.trim() || DEFAULT_SITE_URL;
+export function resolveSiteUrl(
+  value: string | undefined,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+) {
+  const candidate = value?.trim();
+  if (!candidate) {
+    if (nodeEnv === 'production') {
+      throw new Error('SITE_URL 在生产环境中必须显式配置');
+    }
+    return 'http://localhost:3000';
+  }
 
   let parsed: URL;
   try {

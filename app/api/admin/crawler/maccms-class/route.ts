@@ -24,9 +24,8 @@ type ClassNode = FlatClass & { children: ClassNode[] };
 type LiveResult = {
   flat: FlatClass[];
   baseUrl: string;
-  transport: 'python' | 'node' | 'fallback';
+  transport: 'python' | 'node';
   python?: string;
-  note?: string;
 };
 
 function isSafeHttpUrl(value: string): boolean {
@@ -220,28 +219,7 @@ async function fetchViaNode(baseUrl: string): Promise<LiveResult> {
   return { flat, baseUrl, transport: 'node' };
 }
 
-function loadProviderFallback(provider: string, baseUrl: string): LiveResult | null {
-  if (provider !== 'ikun') return null;
-  try {
-    const path = resolve(
-      process.cwd(),
-      'lib/server/crawler/domain/maccms-class-fallback-ikun.json',
-    );
-    if (!existsSync(path)) return null;
-    const flat = normalizeFlat(JSON.parse(readFileSync(path, 'utf8')) as FlatClass[]);
-    if (!flat.length) return null;
-    return {
-      flat,
-      baseUrl,
-      transport: 'fallback',
-      note: '实时拉取失败，已使用本地缓存分类表；仍可勾选采集。',
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function loadClasses(provider: string, baseUrl: string): Promise<LiveResult> {
+async function loadClasses(baseUrl: string): Promise<LiveResult> {
   const errors: string[] = [];
 
   try {
@@ -255,9 +233,6 @@ async function loadClasses(provider: string, baseUrl: string): Promise<LiveResul
   } catch (err) {
     errors.push(`node: ${err instanceof Error ? err.message : String(err)}`);
   }
-
-  const fallback = loadProviderFallback(provider, baseUrl);
-  if (fallback) return fallback;
 
   throw new AppError(
     'SOURCE_UNAVAILABLE',
@@ -277,7 +252,7 @@ export async function GET(req: NextRequest) {
       throw new AppError('RESULT_INVALID', '无效的 API Base URL', 400);
     }
 
-    const result = await loadClasses(provider || preset?.key || '', baseUrl);
+    const result = await loadClasses(baseUrl);
 
     return NextResponse.json({
       data: {
@@ -287,7 +262,6 @@ export async function GET(req: NextRequest) {
         tree: buildTree(result.flat),
         transport: result.transport,
         python: result.python,
-        note: result.note,
         suggestedTypeIds: result.flat
           .filter((c) => /日本动漫|日韩动漫|里番/.test(c.typeName))
           .map((c) => c.typeId),

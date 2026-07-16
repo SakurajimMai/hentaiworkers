@@ -92,8 +92,8 @@ APP_ENCRYPTION_CURRENT_KEY_ID=primary
 
 | 变量 | 说明 |
 |------|------|
-| `ADMIN_BOOTSTRAP_USER` | 管理员登录邮箱，默认 `admin@ixacg.top` |
-| `ADMIN_BOOTSTRAP_PASSWORD` | ≥ 8 位；**上线后立刻在后台改密** |
+| `ADMIN_BOOTSTRAP_USER` | 首次管理员登录邮箱；运行 seed 时必填，不提供默认账号 |
+| `ADMIN_BOOTSTRAP_PASSWORD` | ≥ 12 位随机密码；运行 seed 时必填，**上线后立刻在后台改密** |
 
 ### 3.3 Docker / 端口（可选）
 
@@ -424,7 +424,7 @@ MacCMS 写入 `anime_works`（外链 only）；Hanime 写入 `animes` 并上传 
 - [ ] `SESSION_SECRET`、`APP_ENCRYPTION_KEYRING` 为生产随机值（非示例）
 - [ ] `DATABASE_TLS_MODE=required`（远程库）
 - [ ] 迁移已执行至当前最新（含 `0010`–`0016` 若使用动漫/存储）
-- [ ] `seed:admin` 完成且默认密码已改
+- [ ] `seed:admin` 完成且一次性引导密码已改
 - [ ] `curl` live / ready 正常
 - [ ] HTTPS 反代生效；`SITE_URL` 与域名一致
 - [ ] 公网 **403** `/api/internal/crawler/**`

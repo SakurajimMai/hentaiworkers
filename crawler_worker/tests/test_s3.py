@@ -1,8 +1,41 @@
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
-from crawler_worker.media.s3 import InMemoryS3Client, S3Credentials, S3MediaAdapter
+from crawler_worker.media.s3 import S3Credentials, S3MediaAdapter
+
+
+class InMemoryS3Client:
+    """Test-only S3 protocol implementation."""
+
+    def __init__(self) -> None:
+        self.objects: dict[str, bytes] = {}
+        self.meta: dict[str, dict[str, str]] = {}
+
+    def put_object(self, *, Bucket: str, Key: str, Body: Any, **kwargs: Any) -> dict:
+        self.objects[Key] = Body.read() if hasattr(Body, "read") else bytes(Body)
+        self.meta[Key] = dict(kwargs.get("Metadata") or {})
+        return {}
+
+    def copy_object(self, *, Bucket: str, CopySource: dict, Key: str, **kwargs: Any) -> dict:
+        src = CopySource["Key"]
+        self.objects[Key] = self.objects[src]
+        self.meta[Key] = dict(self.meta.get(src, {}))
+        return {}
+
+    def delete_object(self, *, Bucket: str, Key: str, **kwargs: Any) -> dict:
+        self.objects.pop(Key, None)
+        self.meta.pop(Key, None)
+        return {}
+
+    def head_object(self, *, Bucket: str, Key: str, **kwargs: Any) -> dict:
+        if Key not in self.objects:
+            raise KeyError(Key)
+        return {
+            "ContentLength": len(self.objects[Key]),
+            "Metadata": self.meta.get(Key, {}),
+        }
 
 
 class S3AdapterTests(unittest.TestCase):

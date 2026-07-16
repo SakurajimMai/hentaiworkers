@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { colors, radius, spacing } from '../constants/theme';
+import { API_BASE_URL } from '../services/api';
 import { normalizeMediaUrl } from '../services/media';
 import { ARTPLAYER_JS, HLS_JS } from './player-libs';
 
@@ -145,7 +146,7 @@ export default function VideoPlayer({ videoUrl, title, poster, fill }: VideoPlay
       <WebView
         key={reloadKey}
         ref={webviewRef}
-        source={{ html, baseUrl: 'https://anime.ixacg.top' }}
+        source={{ html, baseUrl: API_BASE_URL || 'http://localhost' }}
         style={styles.webview}
         allowsFullscreenVideo
         allowsInlineMediaPlayback

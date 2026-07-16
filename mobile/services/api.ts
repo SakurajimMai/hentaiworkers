@@ -2,11 +2,36 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { Anime, AnimeListParams, AnimeListResponse } from './types';
 
-const DEFAULT_API_BASE_URL = 'https://anime.ixacg.top';
+function resolveApiBaseUrl(): string {
+  if (Platform.OS === 'web') return '';
 
-const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
-const configured = (extra?.apiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
-export const API_BASE_URL = Platform.OS === 'web' ? '' : configured;
+  const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
+  const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  const fromExtra = extra?.apiBaseUrl?.trim();
+  const candidate = (fromEnv || fromExtra || '').replace(/\/+$/, '');
+
+  if (!candidate) {
+    throw new Error(
+      'Mobile API base URL is required. Set EXPO_PUBLIC_API_BASE_URL or expo.extra.apiBaseUrl.',
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('Mobile API base URL must be an absolute HTTP(S) origin');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Mobile API base URL only supports HTTP(S)');
+  }
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('Mobile API base URL must not include path, query, or hash');
+  }
+  return parsed.origin;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;

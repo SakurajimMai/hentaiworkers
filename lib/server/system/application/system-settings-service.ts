@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { resolveSiteUrl } from '@/lib/site-url';
 import type { SecretCipher } from '../../crawler/ports/secret-cipher';
 import { sha256Bytes } from '../../crawler/domain/hashing';
 import { AppError } from '../../shared/errors';
@@ -331,8 +332,7 @@ export class SystemSettingsService {
     const expiresAt = new Date(Date.now() + ttlMs);
     await this.tokens.create({ userId: user.id, tokenHash, expiresAt });
 
-    const base = (this.options?.siteUrl || process.env.SITE_URL || 'http://127.0.0.1:3000')
-      .replace(/\/+$/, '');
+    const base = resolveSiteUrl(this.options?.siteUrl || process.env.SITE_URL);
     const link = `${base}/verify-email?token=${encodeURIComponent(rawToken)}`;
 
     await sendSmtpMail(smtp, {
@@ -382,8 +382,7 @@ export class SystemSettingsService {
           tokenHash,
           expiresAt: new Date(Date.now() + ttlMs),
         });
-        const base = (this.options?.siteUrl || process.env.SITE_URL || 'http://127.0.0.1:3000')
-          .replace(/\/+$/, '');
+        const base = resolveSiteUrl(this.options?.siteUrl || process.env.SITE_URL);
         const link = `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
         try {
           await sendSmtpMail(smtp, {

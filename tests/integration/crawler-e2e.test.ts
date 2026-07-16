@@ -101,7 +101,6 @@ download:
       requiredSource: 'hanime',
       schemaVersion: 1,
       storageDriver: 's3',
-      fixtureItems: [{ id: '1', title: 'A', videos: ['1080.mp4'] }],
     }),
   });
 

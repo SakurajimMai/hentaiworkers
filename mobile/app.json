@@ -33,7 +33,7 @@
       "expo-router"
     ],
     "extra": {
-      "apiBaseUrl": "https://anime.ixacg.top"
+      "apiBaseUrl": ""
     }
   }
 }

@@ -247,42 +247,40 @@ export class YamlImportService {
     }
 
     let profileConfig: CrawlerProfileConfig | null = null;
-    try {
-      profileConfig = parseCrawlerProfileConfig({
-        schemaVersion: 1,
-        source: {
-          baseUrl: String(crawl.base_url || 'https://example.invalid'),
-          genre: search.genre ? String(search.genre) : undefined,
-          sort: search.sort ? String(search.sort) : undefined,
-          type: search.type ? String(search.type) : undefined,
-        },
-        dateFilter: {
-          years: years.length ? years : [new Date().getUTCFullYear()],
-          months: months.length ? months : [1],
-        },
-        qualityPriority: Array.isArray(crawl.quality_priority) && crawl.quality_priority.length
-          ? crawl.quality_priority.map(String)
-          : ['1080'],
-        skipKeywords: Array.isArray(crawl.skip_keywords)
-          ? crawl.skip_keywords.map(String)
-          : [],
-        concurrency: {
-          download: Number(downloadConcurrent ?? 1) || 1,
-          parse: 2,
-        },
-        continueOnError: true,
-        maxActiveJobs: 1,
-      });
-    } catch (error) {
-      invalid.push({
-        bucket: 'invalid',
-        path: 'profile',
-        message: error instanceof Error ? error.message : '配置校验失败',
-      });
-    }
-
-    if (!crawl.base_url || crawl.base_url === 'https://example.invalid') {
-      // already in missing
+    if (crawl.base_url) {
+      try {
+        profileConfig = parseCrawlerProfileConfig({
+          schemaVersion: 1,
+          source: {
+            baseUrl: String(crawl.base_url),
+            genre: search.genre ? String(search.genre) : undefined,
+            sort: search.sort ? String(search.sort) : undefined,
+            type: search.type ? String(search.type) : undefined,
+          },
+          dateFilter: {
+            years: years.length ? years : [new Date().getUTCFullYear()],
+            months: months.length ? months : [1],
+          },
+          qualityPriority: Array.isArray(crawl.quality_priority) && crawl.quality_priority.length
+            ? crawl.quality_priority.map(String)
+            : ['1080'],
+          skipKeywords: Array.isArray(crawl.skip_keywords)
+            ? crawl.skip_keywords.map(String)
+            : [],
+          concurrency: {
+            download: Number(downloadConcurrent ?? 1) || 1,
+            parse: 2,
+          },
+          continueOnError: true,
+          maxActiveJobs: 1,
+        });
+      } catch (error) {
+        invalid.push({
+          bucket: 'invalid',
+          path: 'profile',
+          message: error instanceof Error ? error.message : '配置校验失败',
+        });
+      }
     }
 
     return {

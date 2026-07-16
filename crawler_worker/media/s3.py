@@ -49,7 +49,6 @@ class S3MediaAdapter(MediaAdapter):
         self._public_base_url = public_base_url
         self._delivery_mode = delivery_mode
         self._force_path_style = force_path_style
-        self._objects: dict[str, bytes] = {}  # mirrored for fake clients that need it
 
     def refresh_credentials(self, credentials: S3Credentials) -> None:
         self._creds = credentials
@@ -99,35 +98,3 @@ class S3MediaAdapter(MediaAdapter):
         close = getattr(self._client, "close", None)
         if callable(close):
             close()
-
-
-class InMemoryS3Client:
-    """Test double for S3MediaAdapter."""
-
-    def __init__(self) -> None:
-        self.objects: dict[str, bytes] = {}
-        self.meta: dict[str, dict[str, str]] = {}
-
-    def put_object(self, *, Bucket: str, Key: str, Body: Any, **kwargs: Any) -> dict:
-        self.objects[Key] = Body.read() if hasattr(Body, "read") else bytes(Body)
-        self.meta[Key] = dict(kwargs.get("Metadata") or {})
-        return {}
-
-    def copy_object(self, *, Bucket: str, CopySource: dict, Key: str, **kwargs: Any) -> dict:
-        src = CopySource["Key"]
-        self.objects[Key] = self.objects[src]
-        self.meta[Key] = dict(self.meta.get(src, {}))
-        return {}
-
-    def delete_object(self, *, Bucket: str, Key: str, **kwargs: Any) -> dict:
-        self.objects.pop(Key, None)
-        self.meta.pop(Key, None)
-        return {}
-
-    def head_object(self, *, Bucket: str, Key: str, **kwargs: Any) -> dict:
-        if Key not in self.objects:
-            raise KeyError(Key)
-        return {
-            "ContentLength": len(self.objects[Key]),
-            "Metadata": self.meta.get(Key, {}),
-        }
