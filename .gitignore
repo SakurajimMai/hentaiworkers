@@ -52,3 +52,12 @@ __pycache__/
 scripts/production_config.yml
 production_config.yml
 config.yml
+
+# Agent/session scratch (not product source)
+findings.md
+progress.md
+task_plan.md
+.claude/
+
+# Windows accidental empty files from shell redirection
+/nul
