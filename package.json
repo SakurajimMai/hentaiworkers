@@ -12,6 +12,7 @@
     "test:ts": "tsx --test \"tests/**/*.test.ts\"",
     "test:python": "node scripts/run-python-tests.mjs",
     "check:legacy": "node scripts/check-no-legacy.mjs",
+    "check:worker-requirements": "node scripts/check-worker-requirements.mjs",
     "db:baseline": "node scripts/export-schema-baseline.mjs",
     "db:setup:crawler": "node scripts/setup-crawler-core.mjs",
     "db:migrate:crawler": "node scripts/apply-crawler-migration.mjs",

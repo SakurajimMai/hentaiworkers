@@ -25,6 +25,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Fail fast on worker lock conflicts before Docker login/build (Python 3.12 matches Dockerfile.worker).
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check worker requirements lock
+        run: npm run check:worker-requirements
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
