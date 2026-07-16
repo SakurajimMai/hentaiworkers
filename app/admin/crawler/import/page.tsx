@@ -19,8 +19,8 @@ export default async function CrawlerImportPage({
         <p className="font-meta mb-2">Advanced</p>
         <h1 className="font-serif text-3xl">旧配置导入（高级）</h1>
         <p className="mt-2 font-ui text-sm text-[#787774] max-w-2xl">
-          日常请使用「模板 / 存储 / 调度」页面的<strong>表单</strong>配置。本页仅用于迁移历史
-          production_config.yml，不是常规操作入口。
+          日常请使用「模板 / 调度」页面的<strong>表单</strong>配置。本页仅用于迁移历史
+          production_config.yml；旧存储字段会被转换为警告，不进入外链采集运行配置。
         </p>
       </div>
       <CrawlerNav current="/admin/crawler/import" />
@@ -35,10 +35,6 @@ export default async function CrawlerImportPage({
           推荐流程：
           <Link href="/admin/crawler/profiles" className="underline mx-1">
             模板表单
-          </Link>
-          →
-          <Link href="/admin/crawler/storage" className="underline mx-1">
-            存储表单
           </Link>
           →
           <Link href="/admin/crawler/jobs" className="underline mx-1">

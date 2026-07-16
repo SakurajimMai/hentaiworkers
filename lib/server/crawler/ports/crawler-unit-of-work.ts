@@ -9,6 +9,7 @@ export type ScheduleRecord = Readonly<{
   id: number;
   profileId: number;
   profileVersionId: number;
+  storageProfileVersionId: number | null;
   name: string;
   kind: ScheduleKind;
   cronExpression: string | null;
@@ -63,6 +64,8 @@ export type AttemptRecord = Readonly<{
     | 'failed'
     | 'cancelled'
     | 'lease_lost';
+  errorCode: string | null;
+  errorMessage: string | null;
 }>;
 
 export type OperationReceiptRecord = Readonly<{
@@ -149,6 +152,8 @@ export interface CrawlerJobRepository {
     retryOfJobId?: number | null;
   }): Promise<JobRecord>;
   get(jobId: number): Promise<JobRecord | null>;
+  /** Lock a job row for the remainder of the current transaction. */
+  getForUpdate(jobId: number): Promise<JobRecord | null>;
   /**
    * Compare-and-set status transition. Returns updated row or null if predicate failed.
    */
@@ -174,6 +179,20 @@ export interface CrawlerJobRepository {
   listByStatuses(
     statuses: readonly CrawlerJobStatus[],
   ): Promise<ReadonlyArray<JobRecord>>;
+  /**
+   * Hard-delete a job and its child control-plane rows (items/attempts/events/receipts).
+   * Does not touch catalog tables (animes / anime_works).
+   */
+  deleteCascade(jobId: number): Promise<boolean>;
+  /**
+   * Hard-delete terminal jobs older than the given ISO cutoff (by finished_at, else created_at).
+   * Returns number of jobs removed.
+   */
+  deleteTerminalOlderThan(input: {
+    olderThanIso: string;
+    statuses: readonly CrawlerJobStatus[];
+    limit?: number;
+  }): Promise<number>;
   createAttempt(input: {
     jobId: number;
     attemptNo: number;
@@ -185,7 +204,7 @@ export interface CrawlerJobRepository {
   getCurrentAttempt(jobId: number): Promise<AttemptRecord | null>;
   updateAttempt(
     attemptId: number,
-    patch: Partial<Pick<AttemptRecord, 'leaseExpiresAt' | 'finishedAt' | 'resultStatus'>>,
+    patch: Partial<Pick<AttemptRecord, 'leaseExpiresAt' | 'finishedAt' | 'resultStatus' | 'errorCode' | 'errorMessage'>>,
   ): Promise<AttemptRecord>;
 }
 

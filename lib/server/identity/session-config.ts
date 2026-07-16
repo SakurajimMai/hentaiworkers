@@ -7,6 +7,8 @@ export type SessionData = {
   userId?: number;
   username?: string;
   role?: 'user' | 'admin';
+  /** Must match users.session_version or the session is rejected. */
+  sessionVersion?: number;
   isLoggedIn: boolean;
 };
 

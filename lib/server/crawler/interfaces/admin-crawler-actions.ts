@@ -11,6 +11,22 @@ async function requireAdmin(ctx: AdminActionContext) {
   return ctx.identity.requireAdmin();
 }
 
+export async function adminProvisionWorker(
+  ctx: AdminActionContext,
+  name: string,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.provisionWorker(name);
+}
+
+export async function adminRevokeWorkerCredential(
+  ctx: AdminActionContext,
+  credentialId: number,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.revokeWorkerCredential(credentialId);
+}
+
 export async function adminCreateProfile(
   ctx: AdminActionContext,
   input: { name: string; configJson: string },
@@ -38,6 +54,14 @@ export async function adminStartManualJob(
   return ctx.crawler.startManualJob(input);
 }
 
+export async function adminStartProfileJob(
+  ctx: AdminActionContext,
+  profileVersionId: number,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.startProfileJob(profileVersionId);
+}
+
 export async function adminSaveSchedule(
   ctx: AdminActionContext,
   input: Parameters<AdminCrawlerService['saveSchedule']>[0],
@@ -46,14 +70,54 @@ export async function adminSaveSchedule(
   return ctx.crawler.saveSchedule(input);
 }
 
+function requirePositiveJobId(jobId: number): void {
+  if (!Number.isInteger(jobId) || jobId <= 0) {
+    throw new AppError('RESULT_INVALID', '无效任务 ID', 400);
+  }
+}
+
 export async function adminCancelJob(ctx: AdminActionContext, jobId: number) {
   await requireAdmin(ctx);
+  requirePositiveJobId(jobId);
   return ctx.crawler.cancelJob(jobId);
 }
 
 export async function adminRetryJob(ctx: AdminActionContext, jobId: number) {
   await requireAdmin(ctx);
+  requirePositiveJobId(jobId);
   return ctx.crawler.retryJob(jobId);
+}
+
+export async function adminDeleteJob(ctx: AdminActionContext, jobId: number) {
+  await requireAdmin(ctx);
+  requirePositiveJobId(jobId);
+  return ctx.crawler.deleteJob(jobId);
+}
+
+export async function adminPurgeTerminalJobs(
+  ctx: AdminActionContext,
+  input: {
+    olderThanDays: number;
+    /** success | failed | cancelled | all */
+    scope?: string;
+  },
+) {
+  await requireAdmin(ctx);
+  const scope = (input.scope || 'all').trim().toLowerCase();
+  const statusByScope: Readonly<Record<
+    string,
+    readonly import('../domain/job').CrawlerJobStatus[]
+  >> = {
+    all: ['succeeded', 'partial_succeeded', 'failed', 'cancelled'],
+    success: ['succeeded', 'partial_succeeded'],
+    failed: ['failed'],
+    cancelled: ['cancelled'],
+  };
+  const statuses = statusByScope[scope];
+  if (!statuses) {
+    throw new AppError('RESULT_INVALID', '无效清理范围', 400, false, { scope });
+  }
+  return ctx.crawler.purgeTerminalJobs({ olderThanDays: input.olderThanDays, statuses });
 }
 
 export async function adminRevealSecret(ctx: AdminActionContext, secretId: number) {

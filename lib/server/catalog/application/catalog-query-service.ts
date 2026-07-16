@@ -42,6 +42,42 @@ export class CatalogQueryService {
     return data;
   }
 
+  /**
+   * Rule-based discovery: shared tags with seed anime ids, excluding already known ids.
+   * Score is implicit via shared-tag repository ordering + popularity fallback.
+   */
+  async recommendFromSeeds(
+    seedAnimeIds: readonly number[],
+    options?: { excludeIds?: readonly number[]; limit?: number },
+  ): Promise<AnimeSimilarItem[]> {
+    const limit = Math.min(24, Math.max(1, options?.limit ?? 12));
+    const exclude = new Set<number>([
+      ...seedAnimeIds,
+      ...(options?.excludeIds ?? []),
+    ]);
+    const tagIdSet = new Set<number>();
+    for (const animeId of seedAnimeIds.slice(0, 20)) {
+      const tagIds = await this.repository.listTagIdsForAnime(animeId);
+      for (const tagId of tagIds) tagIdSet.add(tagId);
+      if (tagIdSet.size >= 40) break;
+    }
+    const excludeIds = [...exclude];
+    if (tagIdSet.size === 0) {
+      return [...(await this.repository.listPopular({ excludeIds, limit }))];
+    }
+    const tagMatches = await this.repository.listBySharedTags({
+      tagIds: [...tagIdSet],
+      excludeIds,
+      limit,
+    });
+    if (tagMatches.length >= limit) return [...tagMatches];
+    const popular = await this.repository.listPopular({
+      excludeIds: [...excludeIds, ...tagMatches.map((item) => item.id)],
+      limit: limit - tagMatches.length,
+    });
+    return [...tagMatches, ...popular];
+  }
+
   async getSimilar(id: number, limit = 12): Promise<AnimeSimilarItem[]> {
     const current = await this.repository.getById(id);
     if (!current) return [];

@@ -11,10 +11,10 @@ import {
 import {
   MariaDbCrawlerConfigRepository,
   MariaDbCrawlerUnitOfWork,
-  MariaDbSecretRepository,
   MariaDbStorageConfigRepository,
   MariaDbWorkerRepository,
 } from '../../infrastructure/database/mariadb-crawler-repositories';
+import { MariaDbCrawlerCatalogIngestion } from '../../infrastructure/database/mariadb-crawler-catalog-ingestion';
 import { AppError } from '../../shared/errors';
 import { getProcessEnvironment, type EnvironmentSource } from '../../shared/config';
 import { CrawlerConfigService } from '../application/crawler-config-service';
@@ -102,14 +102,13 @@ export function createMariaDbAdminDeps(
   env: EnvironmentSource = getProcessEnvironment(),
 ): AdminCrawlerDeps {
   const uow = new MariaDbCrawlerUnitOfWork();
-  const cipher = resolveSecretCipher(env);
   return {
     uow,
     jobs: new CrawlerJobService(uow),
     schedules: new CrawlerScheduleService(uow),
     profiles: new CrawlerConfigService(new MariaDbCrawlerConfigRepository()),
+    // Hanime download/upload jobs need object storage profiles (S3/SFTP).
     storage: new StorageConfigService(new MariaDbStorageConfigRepository()),
-    secrets: new SecretService(new MariaDbSecretRepository(), cipher),
     yaml: new YamlImportService(),
     workers: new MariaDbWorkerRepository(),
   };
@@ -127,9 +126,10 @@ export function createMariaDbWorkerApiDeps(): WorkerApiDeps {
     auth: new WorkerAuthService(workers),
     registry: new WorkerRegistryService(workers),
     jobs: new CrawlerJobService(uow),
-    results: new CrawlerResultService(uow),
+    results: new CrawlerResultService(uow, new MariaDbCrawlerCatalogIngestion()),
     logs: new CrawlerLogService(uow),
     media: new MediaReservationService(uow),
     credentials: new CredentialRefreshService(uow, null),
+    storage: new StorageConfigService(new MariaDbStorageConfigRepository()),
   };
 }

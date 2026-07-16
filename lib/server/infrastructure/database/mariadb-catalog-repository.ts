@@ -32,14 +32,26 @@ export class MariaDbCatalogRepository
   list(input: CatalogListQuery): Promise<CatalogPage> {
     return withDbRetry(async () => {
       const { page, limit, sort, activeOnly, offset } = normalizeListQuery(input);
-      const orderColumn = sort === 'popular' ? animes.viewCount : animes.createdAt;
+      // "latest" uses COALESCE(updated_at, created_at) so recrawls surface as 最近更新.
+      const orderBy =
+        sort === 'popular'
+          ? desc(animes.viewCount)
+          : sql`COALESCE(${animes.updatedAt}, ${animes.createdAt}) DESC`;
       const conditions = [];
       if (activeOnly) conditions.push(activeAnimeCondition());
       if (input.search) {
-        const searchLike = `%${input.search}%`;
-        conditions.push(
-          sql`(${animes.title} LIKE ${searchLike} OR ${animes.titleJapanese} LIKE ${searchLike})`,
-        );
+        const needle = input.search.trim();
+        if (needle) {
+          const searchLike = `%${needle}%`;
+          conditions.push(
+            sql`(
+              ${animes.title} LIKE ${searchLike}
+              OR ${animes.titleJapanese} LIKE ${searchLike}
+              OR ${animes.titleEnglish} LIKE ${searchLike}
+              OR ${animes.description} LIKE ${searchLike}
+            )`,
+          );
+        }
       }
 
       if (input.tagId) {
@@ -55,7 +67,7 @@ export class MariaDbCatalogRepository
           .from(animes)
           .innerJoin(animeTags, eq(animes.id, animeTags.animeId))
           .where(where)
-          .orderBy(desc(orderColumn))
+          .orderBy(orderBy)
           .limit(limit)
           .offset(offset);
 
@@ -88,7 +100,7 @@ export class MariaDbCatalogRepository
         })
         .from(animes)
         .where(where)
-        .orderBy(desc(orderColumn))
+        .orderBy(orderBy)
         .limit(limit)
         .offset(offset);
 

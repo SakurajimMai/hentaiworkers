@@ -16,12 +16,12 @@ class WorkerRuntimeConfig:
     machine_token: str
     protocol_version: int = 1
     worker_version: str = "1.0.0"
-    sources: Sequence[str] = field(default_factory=lambda: ("hanime", "getchu"))
-    storage_drivers: Sequence[StorageDriver] = field(default_factory=lambda: ("s3", "sftp"))
+    sources: Sequence[str] = field(default_factory=lambda: ("hanime",))
+    storage_drivers: Sequence[StorageDriver] = field(default_factory=tuple)
     config_schema_versions: Sequence[int] = field(default_factory=lambda: (1,))
     max_concurrency: int = 1
     idle_heartbeat_seconds: int = 30
-    job_heartbeat_seconds: int = 15
+    job_heartbeat_seconds: int = 10
     claim_wait_seconds: int = 20
     temp_dir: str = "/tmp/crawler-worker"
     browser_version: str | None = "chrome"

@@ -14,12 +14,16 @@ class HeartbeatLoop:
     def __init__(
         self,
         client: ControlClient,
-        interval_seconds: float,
+        idle_interval_seconds: float,
         *,
+        job_interval_seconds: float | None = None,
         on_cancel: Optional[Callable[[], None]] = None,
     ) -> None:
         self._client = client
-        self._interval = interval_seconds
+        self._idle_interval = idle_interval_seconds
+        self._job_interval = (
+            job_interval_seconds if job_interval_seconds is not None else idle_interval_seconds
+        )
         self._on_cancel = on_cancel
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -39,7 +43,8 @@ class HeartbeatLoop:
     def stop(self) -> None:
         self._stop.set()
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=self._interval + 1)
+            join_timeout = max(self._idle_interval, self._job_interval) + 1
+            self._thread.join(timeout=join_timeout)
         self._thread = None
         self._stop.clear()
 
@@ -49,8 +54,12 @@ class HeartbeatLoop:
         self._thread = threading.Thread(target=self._run, name="worker-heartbeat", daemon=True)
         self._thread.start()
 
+    def _interval(self) -> float:
+        return self._job_interval if self._mode == "job" else self._idle_interval
+
     def _run(self) -> None:
-        while not self._stop.wait(self._interval):
+        # Immediate beat so long first crawl/API cold-start does not burn the whole lease.
+        while True:
             try:
                 if self._mode == "job" and self._job is not None:
                     result = self._client.job_heartbeat(self._job)
@@ -64,3 +73,5 @@ class HeartbeatLoop:
                 # swallow transient errors; runner will re-evaluate
             except Exception:
                 time.sleep(0.1)
+            if self._stop.wait(self._interval()):
+                break

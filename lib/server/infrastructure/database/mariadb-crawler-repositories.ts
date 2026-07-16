@@ -1,6 +1,7 @@
 /**
  * MariaDB-backed crawler control-plane repositories (no in-memory fallback).
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { pool, withDbRetry } from '@/lib/db';
 import { AppError } from '../../shared/errors';
@@ -64,18 +65,54 @@ function buf(value: unknown): Uint8Array {
   return new Uint8Array(Buffer.from(value as ArrayBuffer));
 }
 
+export type CrawlerSqlExecutor = Readonly<{
+  query(sql: string, params?: unknown[]): Promise<[unknown, unknown]>;
+}>;
+
+export type CrawlerTransactionConnection = CrawlerSqlExecutor & Readonly<{
+  beginTransaction(): Promise<void>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  release(): void;
+}>;
+
+const transactionExecutor = new AsyncLocalStorage<CrawlerSqlExecutor>();
+
+/** Shared by crawler repositories and catalog ingestion to preserve atomic commits. */
+export function getCrawlerSqlExecutor(): CrawlerSqlExecutor {
+  return transactionExecutor.getStore() ?? (pool as unknown as CrawlerSqlExecutor);
+}
+
+async function queryRows<T extends RowDataPacket[]>(
+  executor: CrawlerSqlExecutor,
+  sql: string,
+  params: unknown[],
+): Promise<T> {
+  const [rows] = await executor.query(sql, params);
+  return rows as T;
+}
+
 async function q<T extends RowDataPacket[]>(sql: string, params: unknown[] = []): Promise<T> {
-  return withDbRetry(async () => {
-    const [rows] = await pool.query<T>(sql, params);
-    return rows;
-  });
+  const executor = transactionExecutor.getStore();
+  if (executor) return queryRows<T>(executor, sql, params);
+  return withDbRetry(() => queryRows<T>(pool as unknown as CrawlerSqlExecutor, sql, params));
+}
+
+async function executeStatement(
+  executor: CrawlerSqlExecutor,
+  sql: string,
+  params: unknown[],
+): Promise<ResultSetHeader> {
+  const [result] = await executor.query(sql, params);
+  return result as ResultSetHeader;
 }
 
 async function exec(sql: string, params: unknown[] = []): Promise<ResultSetHeader> {
-  return withDbRetry(async () => {
-    const [result] = await pool.query<ResultSetHeader>(sql, params);
-    return result;
-  });
+  const executor = transactionExecutor.getStore();
+  if (executor) return executeStatement(executor, sql, params);
+  return withDbRetry(() =>
+    executeStatement(pool as unknown as CrawlerSqlExecutor, sql, params),
+  );
 }
 
 function mapJob(row: RowDataPacket): JobRecord {
@@ -110,6 +147,9 @@ function mapSchedule(row: RowDataPacket): ScheduleRecord {
     id: Number(row.id),
     profileId: Number(row.profile_id),
     profileVersionId: Number(row.profile_version_id ?? 1),
+    storageProfileVersionId: row.storage_profile_version_id == null
+      ? null
+      : Number(row.storage_profile_version_id),
     name: String(row.name),
     kind: row.kind,
     cronExpression: row.cron_expression == null ? null : String(row.cron_expression),
@@ -127,76 +167,84 @@ function mapSchedule(row: RowDataPacket): ScheduleRecord {
 }
 
 export class MariaDbCrawlerConfigRepository implements CrawlerConfigRepository {
+  async listProfiles() {
+    const rows = await q<RowDataPacket[]>(
+      'SELECT id, name, is_enabled FROM crawler_profiles ORDER BY id DESC',
+    );
+    return rows.map((row) => ({
+      id: Number(row.id),
+      name: String(row.name),
+      currentVersionId: Number(row.id),
+      isEnabled: Number(row.is_enabled) === 1,
+    }));
+  }
+
   async createProfile(name: string, config: CrawlerProfileConfig): Promise<ProfileVersionRecord> {
     const ins = await exec(
-      'INSERT INTO crawler_profiles (name, is_enabled) VALUES (?, 1)',
-      [name],
+      `INSERT INTO crawler_profiles
+        (name, version, schema_version, config_json, is_enabled)
+       VALUES (?, 1, ?, ?, 1)`,
+      [name, config.schemaVersion, JSON.stringify(config)],
     );
-    const profileId = Number(ins.insertId);
-    return this.appendProfileVersion(profileId, config);
+    return (await this.getProfileVersion(Number(ins.insertId)))!;
   }
 
   async appendProfileVersion(
     profileId: number,
     config: CrawlerProfileConfig,
   ): Promise<ProfileVersionRecord> {
-    const rows = await q<RowDataPacket[]>(
-      'SELECT COALESCE(MAX(version), 0) AS v FROM crawler_profile_versions WHERE profile_id = ?',
-      [profileId],
+    const result = await exec(
+      `UPDATE crawler_profiles
+       SET version = version + 1, schema_version = ?, config_json = ?, updated_at = UTC_TIMESTAMP()
+       WHERE id = ?`,
+      [config.schemaVersion, JSON.stringify(config), profileId],
     );
-    const version = Number(rows[0]?.v ?? 0) + 1;
-    const configJson = JSON.stringify(config);
-    const ins = await exec(
-      `INSERT INTO crawler_profile_versions (profile_id, version, schema_version, config_json)
-       VALUES (?, ?, ?, ?)`,
-      [profileId, version, config.schemaVersion, configJson],
-    );
-    const id = Number(ins.insertId);
-    await exec('UPDATE crawler_profiles SET current_version_id = ? WHERE id = ?', [id, profileId]);
-    return {
-      id,
-      profileId,
-      version,
-      schemaVersion: config.schemaVersion,
-      config,
-      createdAt: new Date().toISOString(),
-    };
+    if (result.affectedRows === 0) {
+      throw new AppError('RESULT_INVALID', '模板不存在', 404);
+    }
+    return (await this.getProfileVersion(profileId))!;
   }
 
-  async getProfileVersion(versionId: number): Promise<ProfileVersionRecord | null> {
+  async getProfileVersion(profileId: number): Promise<ProfileVersionRecord | null> {
     const rows = await q<RowDataPacket[]>(
-      'SELECT * FROM crawler_profile_versions WHERE id = ? LIMIT 1',
-      [versionId],
+      'SELECT * FROM crawler_profiles WHERE id = ? LIMIT 1',
+      [profileId],
     );
     const row = rows[0];
     if (!row) return null;
     return {
       id: Number(row.id),
-      profileId: Number(row.profile_id),
-      version: Number(row.version),
-      schemaVersion: Number(row.schema_version),
+      profileId: Number(row.id),
+      version: Number(row.version ?? 1),
+      schemaVersion: Number(row.schema_version ?? 1),
       config: parseCrawlerProfileConfig(JSON.parse(String(row.config_json))),
       createdAt: asIso(row.created_at),
     };
   }
 
   async listProfileVersions(profileId: number): Promise<ReadonlyArray<ProfileVersionRecord>> {
-    const rows = await q<RowDataPacket[]>(
-      'SELECT * FROM crawler_profile_versions WHERE profile_id = ? ORDER BY version ASC',
-      [profileId],
-    );
-    return rows.map((row) => ({
-      id: Number(row.id),
-      profileId: Number(row.profile_id),
-      version: Number(row.version),
-      schemaVersion: Number(row.schema_version),
-      config: parseCrawlerProfileConfig(JSON.parse(String(row.config_json))),
-      createdAt: asIso(row.created_at),
-    }));
+    const current = await this.getProfileVersion(profileId);
+    return current ? [current] : [];
   }
 }
 
 export class MariaDbStorageConfigRepository implements StorageConfigRepository {
+  async listProfiles() {
+    const rows = await q<RowDataPacket[]>(
+      `SELECT id, name, driver, is_enabled, current_version_id
+       FROM storage_profiles
+       ORDER BY id DESC`,
+    );
+    return rows.map((row) => ({
+      id: Number(row.id),
+      name: String(row.name),
+      driver: (String(row.driver) === 'sftp' ? 'sftp' : 's3') as 's3' | 'sftp',
+      isEnabled: Number(row.is_enabled) === 1,
+      currentVersionId:
+        row.current_version_id == null ? null : Number(row.current_version_id),
+    }));
+  }
+
   async createProfile(name: string, config: StorageConfig): Promise<StorageVersionRecord> {
     const ins = await exec(
       'INSERT INTO storage_profiles (name, driver, is_enabled) VALUES (?, ?, 1)',
@@ -243,6 +291,23 @@ export class MariaDbStorageConfigRepository implements StorageConfigRepository {
     };
   }
 
+  async listVersions(profileId: number): Promise<ReadonlyArray<StorageVersionRecord>> {
+    const rows = await q<RowDataPacket[]>(
+      `SELECT * FROM storage_profile_versions
+       WHERE profile_id = ?
+       ORDER BY version ASC`,
+      [profileId],
+    );
+    return rows.map((row) => ({
+      id: Number(row.id),
+      profileId: Number(row.profile_id),
+      version: Number(row.version),
+      config: parseStorageConfig(JSON.parse(String(row.config_json))),
+      storageTestPassed: Number(row.storage_test_passed ?? 0) === 1,
+      createdAt: asIso(row.created_at),
+    }));
+  }
+
   async markStorageTestPassed(versionId: number): Promise<void> {
     await exec(
       'UPDATE storage_profile_versions SET storage_test_passed = 1 WHERE id = ?',
@@ -257,7 +322,7 @@ export class MariaDbStorageConfigRepository implements StorageConfigRepository {
       throw new AppError('RESULT_CONFLICT', '须先通过 storage_test', 409);
     }
     await exec(
-      'UPDATE storage_profiles SET current_version_id = ? WHERE id = ?',
+      'UPDATE storage_profiles SET current_version_id = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
       [versionId, version.profileId],
     );
   }
@@ -440,20 +505,18 @@ export class MariaDbWorkerRepository implements WorkerRepository {
     tokenHash: Uint8Array,
   ): Promise<WorkerCredentialRecord | null> {
     const rows = await q<RowDataPacket[]>(
-      'SELECT * FROM worker_credentials WHERE token_hash = ? LIMIT 1',
+      'SELECT * FROM crawler_workers WHERE token_hash = ? LIMIT 1',
       [Buffer.from(tokenHash)],
     );
-    const row = rows[0];
-    if (!row) return null;
-    return mapCredential(row);
+    return rows[0] ? mapEmbeddedCredential(rows[0]) : null;
   }
 
   async listCredentials(workerId: number): Promise<ReadonlyArray<WorkerCredentialRecord>> {
     const rows = await q<RowDataPacket[]>(
-      'SELECT * FROM worker_credentials WHERE worker_id = ?',
+      'SELECT * FROM crawler_workers WHERE id = ? AND token_hash IS NOT NULL LIMIT 1',
       [workerId],
     );
-    return rows.map(mapCredential);
+    return rows[0] ? [mapEmbeddedCredential(rows[0])] : [];
   }
 
   async createWorkerWithToken(input: {
@@ -462,27 +525,27 @@ export class MariaDbWorkerRepository implements WorkerRepository {
     scopes: readonly string[];
     version?: string;
   }): Promise<{ worker: WorkerRecord; credential: WorkerCredentialRecord }> {
-    const wIns = await exec(
-      `INSERT INTO crawler_workers (name, version, capabilities_json, is_enabled)
-       VALUES (?, ?, '{}', 1)`,
-      [input.name, input.version ?? '0.0.0'],
+    const ins = await exec(
+      `INSERT INTO crawler_workers
+        (name, version, capabilities_json, is_enabled, token_hash, scope_json, token_revoked)
+       VALUES (?, ?, '{}', 1, ?, ?, 0)`,
+      [
+        input.name,
+        input.version ?? '0.0.0',
+        Buffer.from(input.tokenHash),
+        JSON.stringify([...input.scopes]),
+      ],
     );
-    const workerId = Number(wIns.insertId);
-    const cIns = await exec(
-      `INSERT INTO worker_credentials (worker_id, token_hash, scope_json, is_revoked)
-       VALUES (?, ?, ?, 0)`,
-      [workerId, Buffer.from(input.tokenHash), JSON.stringify([...input.scopes])],
-    );
-    const worker = (await this.getWorker(workerId))!;
-    const creds = await q<RowDataPacket[]>(
-      'SELECT * FROM worker_credentials WHERE id = ? LIMIT 1',
-      [cIns.insertId],
-    );
-    return { worker, credential: mapCredential(creds[0]) };
+    const worker = (await this.getWorker(Number(ins.insertId)))!;
+    const credential = (await this.listCredentials(worker.id))[0];
+    return { worker, credential };
   }
 
   async revokeCredential(credentialId: number): Promise<void> {
-    await exec('UPDATE worker_credentials SET is_revoked = 1 WHERE id = ?', [credentialId]);
+    await exec(
+      'UPDATE crawler_workers SET token_revoked = 1, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+      [credentialId],
+    );
   }
 }
 
@@ -499,16 +562,16 @@ function mapWorker(row: RowDataPacket): WorkerRecord {
   };
 }
 
-function mapCredential(row: RowDataPacket): WorkerCredentialRecord {
+function mapEmbeddedCredential(row: RowDataPacket): WorkerCredentialRecord {
   return {
     id: Number(row.id),
-    workerId: Number(row.worker_id),
+    workerId: Number(row.id),
     tokenHash: buf(row.token_hash),
     scopeJson: String(row.scope_json ?? '[]'),
-    isRevoked: Number(row.is_revoked) === 1,
-    expiresAt: asIsoOrNull(row.expires_at),
+    isRevoked: Number(row.token_revoked) === 1,
+    expiresAt: asIsoOrNull(row.token_expires_at),
     createdAt: asIso(row.created_at),
-    rotatedAt: asIsoOrNull(row.rotated_at),
+    rotatedAt: null,
   };
 }
 
@@ -520,12 +583,15 @@ class MariaDbScheduleRepo implements CrawlerScheduleRepository {
   ): Promise<ScheduleRecord> {
     const ins = await exec(
       `INSERT INTO crawler_schedules (
-        profile_id, name, kind, cron_expression, interval_seconds, timezone,
+        profile_id, profile_version_id, storage_profile_version_id,
+        name, kind, cron_expression, interval_seconds, timezone,
         overlap_policy, misfire_policy, catch_up_limit, max_active_jobs, is_enabled,
         next_run_at, last_materialized_at, config_snapshot_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.profileId,
+        input.profileVersionId,
+        input.storageProfileVersionId,
         input.name,
         input.kind,
         input.cronExpression,
@@ -541,15 +607,6 @@ class MariaDbScheduleRepo implements CrawlerScheduleRepository {
         input.configSnapshotJson,
       ],
     );
-    // profile_version_id may exist only after 0002; store via update if column present
-    try {
-      await exec(
-        'UPDATE crawler_schedules SET profile_version_id = ? WHERE id = ?',
-        [input.profileVersionId, ins.insertId],
-      );
-    } catch {
-      /* column may not exist on partial deploys */
-    }
     const rows = await q<RowDataPacket[]>(
       'SELECT * FROM crawler_schedules WHERE id = ? LIMIT 1',
       [ins.insertId],
@@ -612,18 +669,8 @@ class MariaDbScheduleRepo implements CrawlerScheduleRepository {
     return rows.map(mapSchedule);
   }
 
-  async listSkipped(scheduleId: number): Promise<ReadonlyArray<SkippedOccurrenceRecord>> {
-    const rows = await q<RowDataPacket[]>(
-      'SELECT * FROM crawler_schedule_skips WHERE schedule_id = ? ORDER BY id DESC LIMIT 100',
-      [scheduleId],
-    );
-    return rows.map((r) => ({
-      id: Number(r.id),
-      scheduleId: Number(r.schedule_id),
-      scheduledFor: asIso(r.scheduled_for),
-      reason: String(r.reason),
-      createdAt: asIso(r.created_at),
-    }));
+  async listSkipped(_scheduleId: number): Promise<ReadonlyArray<SkippedOccurrenceRecord>> {
+    return [];
   }
 
   async recordSkipped(input: {
@@ -631,13 +678,8 @@ class MariaDbScheduleRepo implements CrawlerScheduleRepository {
     scheduledFor: string;
     reason: string;
   }): Promise<SkippedOccurrenceRecord> {
-    const ins = await exec(
-      `INSERT INTO crawler_schedule_skips (schedule_id, scheduled_for, reason)
-       VALUES (?, ?, ?)`,
-      [input.scheduleId, input.scheduledFor.replace('T', ' ').replace('Z', ''), input.reason],
-    );
     return {
-      id: Number(ins.insertId),
+      id: 0,
       scheduleId: input.scheduleId,
       scheduledFor: input.scheduledFor,
       reason: input.reason,
@@ -683,6 +725,14 @@ class MariaDbJobRepo implements CrawlerJobRepository {
   async get(jobId: number): Promise<JobRecord | null> {
     const rows = await q<RowDataPacket[]>(
       'SELECT * FROM crawler_jobs WHERE id = ? LIMIT 1',
+      [jobId],
+    );
+    return rows[0] ? mapJob(rows[0]) : null;
+  }
+
+  async getForUpdate(jobId: number): Promise<JobRecord | null> {
+    const rows = await q<RowDataPacket[]>(
+      'SELECT * FROM crawler_jobs WHERE id = ? LIMIT 1 FOR UPDATE',
       [jobId],
     );
     return rows[0] ? mapJob(rows[0]) : null;
@@ -791,6 +841,55 @@ class MariaDbJobRepo implements CrawlerJobRepository {
     return rows.map(mapJob);
   }
 
+  async deleteCascade(jobId: number): Promise<boolean> {
+    // retry_of_job_id is intentionally not an FK; preserve retries without dangling lineage.
+    await exec('UPDATE crawler_jobs SET retry_of_job_id = NULL WHERE retry_of_job_id = ?', [jobId]);
+    // Receipts may reference the job directly or only one of its items.
+    await exec(
+      `DELETE FROM crawler_operation_receipts
+       WHERE job_id = ?
+          OR item_id IN (SELECT id FROM crawler_job_items WHERE job_id = ?)`,
+      [jobId, jobId],
+    );
+    // Media reservations reference jobs with RESTRICT and must be removed first.
+    await exec('DELETE FROM crawler_media_uploads WHERE job_id = ?', [jobId]);
+    await exec('DELETE FROM crawler_job_events WHERE job_id = ?', [jobId]);
+    await exec('DELETE FROM crawler_job_items WHERE job_id = ?', [jobId]);
+    await exec('DELETE FROM crawler_job_attempts WHERE job_id = ?', [jobId]);
+    const result = await exec('DELETE FROM crawler_jobs WHERE id = ?', [jobId]);
+    return Number(result.affectedRows ?? 0) > 0;
+  }
+
+  async deleteTerminalOlderThan(input: {
+    olderThanIso: string;
+    statuses: readonly CrawlerJobStatus[];
+    limit?: number;
+  }): Promise<number> {
+    if (!input.statuses.length) return 0;
+    const cutoff = input.olderThanIso
+      .replace('T', ' ')
+      .replace(/\.\d{3}Z$/, '')
+      .replace('Z', '');
+    const limit = Math.min(500, Math.max(1, input.limit ?? 100));
+    const placeholders = input.statuses.map(() => '?').join(',');
+    const idRows = await q<RowDataPacket[]>(
+      `SELECT id FROM crawler_jobs
+       WHERE status IN (${placeholders})
+         AND COALESCE(finished_at, created_at) < ?
+       ORDER BY COALESCE(finished_at, created_at) ASC
+       LIMIT ?
+       FOR UPDATE`,
+      [...input.statuses, cutoff, limit],
+    );
+    let removed = 0;
+    for (const row of idRows) {
+      const id = Number(row.id);
+      if (!id) continue;
+      if (await this.deleteCascade(id)) removed += 1;
+    }
+    return removed;
+  }
+
   async createAttempt(input: {
     jobId: number;
     attemptNo: number;
@@ -834,6 +933,8 @@ class MariaDbJobRepo implements CrawlerJobRepository {
       startedAt: asIso(row.started_at),
       finishedAt: asIsoOrNull(row.finished_at),
       resultStatus: row.result_status,
+      errorCode: row.error_code == null ? null : String(row.error_code),
+      errorMessage: row.error_message == null ? null : String(row.error_message),
     };
   }
 
@@ -849,7 +950,7 @@ class MariaDbJobRepo implements CrawlerJobRepository {
 
   async updateAttempt(
     attemptId: number,
-    patch: Partial<Pick<AttemptRecord, 'leaseExpiresAt' | 'finishedAt' | 'resultStatus'>>,
+    patch: Partial<Pick<AttemptRecord, 'leaseExpiresAt' | 'finishedAt' | 'resultStatus' | 'errorCode' | 'errorMessage'>>,
   ): Promise<AttemptRecord> {
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -870,6 +971,14 @@ class MariaDbJobRepo implements CrawlerJobRepository {
     if (patch.resultStatus !== undefined) {
       sets.push('result_status = ?');
       params.push(patch.resultStatus);
+    }
+    if (patch.errorCode !== undefined) {
+      sets.push('error_code = ?');
+      params.push(patch.errorCode);
+    }
+    if (patch.errorMessage !== undefined) {
+      sets.push('error_message = ?');
+      params.push(patch.errorMessage);
     }
     if (sets.length) {
       params.push(attemptId);
@@ -1100,7 +1209,7 @@ class MariaDbEventRepo implements JobEventRepository {
   }
 }
 
-class MariaDbMediaRepo implements MediaUploadRepository {
+class LegacyMariaDbMediaRepo implements MediaUploadRepository {
   async reserve(input: {
     jobId: number;
     attemptId: number;
@@ -1176,6 +1285,32 @@ class MariaDbMediaRepo implements MediaUploadRepository {
   }
 }
 
+class DisabledMediaUploadRepository implements MediaUploadRepository {
+  async reserve(): Promise<MediaUploadRecord> {
+    throw new AppError(
+      'STORAGE_UNAVAILABLE',
+      '当前为外链采集模式，未启用对象上传',
+      503,
+    );
+  }
+
+  async get(): Promise<MediaUploadRecord | null> {
+    return null;
+  }
+
+  async listByStatus(): Promise<ReadonlyArray<MediaUploadRecord>> {
+    return [];
+  }
+
+  async markStatus(): Promise<MediaUploadRecord> {
+    throw new AppError('STORAGE_UNAVAILABLE', '当前未启用对象上传', 503);
+  }
+
+  async listExpiredReserved(): Promise<ReadonlyArray<MediaUploadRecord>> {
+    return [];
+  }
+}
+
 export class MariaDbCrawlerUnitOfWork implements CrawlerUnitOfWork {
   readonly repos: CrawlerRepositories = {
     schedules: new MariaDbScheduleRepo(),
@@ -1183,17 +1318,26 @@ export class MariaDbCrawlerUnitOfWork implements CrawlerUnitOfWork {
     receipts: new MariaDbReceiptRepo(),
     items: new MariaDbItemRepo(),
     events: new MariaDbEventRepo(),
-    media: new MariaDbMediaRepo(),
+    // Hanime download/upload jobs need reservation rows; MacCMS external-URL jobs never call media.reserve.
+    media: new LegacyMariaDbMediaRepo(),
   };
 
+  constructor(
+    private readonly acquireConnection: () => Promise<CrawlerTransactionConnection> = async () =>
+      (await pool.getConnection()) as unknown as CrawlerTransactionConnection,
+  ) {}
+
   async runInTransaction<T>(fn: (repos: CrawlerRepositories) => Promise<T>): Promise<T> {
-    // Pool-level sequential critical sections: use a connection transaction.
-    const connection = await pool.getConnection();
+    if (transactionExecutor.getStore()) return fn(this.repos);
+
+    const connection = await this.acquireConnection();
     try {
       await connection.beginTransaction();
-      const result = await fn(this.repos);
-      await connection.commit();
-      return result;
+      return await transactionExecutor.run(connection, async () => {
+        const result = await fn(this.repos);
+        await connection.commit();
+        return result;
+      });
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -1201,4 +1345,10 @@ export class MariaDbCrawlerUnitOfWork implements CrawlerUnitOfWork {
       connection.release();
     }
   }
+}
+
+export function createMariaDbCrawlerUnitOfWork(
+  acquireConnection: () => Promise<CrawlerTransactionConnection>,
+): MariaDbCrawlerUnitOfWork {
+  return new MariaDbCrawlerUnitOfWork(acquireConnection);
 }

@@ -38,3 +38,10 @@ export async function listSitemapData() {
 export async function getSimilarAnimes(id: number, limit = 12) {
   return getCatalogQueryService().getSimilar(id, limit);
 }
+
+export async function recommendFromSeeds(
+  seedAnimeIds: readonly number[],
+  options?: { excludeIds?: readonly number[]; limit?: number },
+) {
+  return getCatalogQueryService().recommendFromSeeds(seedAnimeIds, options);
+}

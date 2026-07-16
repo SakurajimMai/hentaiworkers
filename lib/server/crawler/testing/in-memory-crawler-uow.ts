@@ -99,6 +99,8 @@ export class InMemoryCrawlerJobRepository implements CrawlerJobRepository {
   /** Unique (scheduleId, scheduledFor) guard */
   private readonly scheduleKeys = new Set<string>();
 
+  constructor(private readonly deleteSiblingRows: (jobId: number) => void = () => undefined) {}
+
   async create(input: {
     kind: JobRecord['kind'];
     profileId: number;
@@ -147,6 +149,10 @@ export class InMemoryCrawlerJobRepository implements CrawlerJobRepository {
   async get(jobId: number): Promise<JobRecord | null> {
     const row = this.jobs.get(jobId);
     return row ? cloneJob(row) : null;
+  }
+
+  async getForUpdate(jobId: number): Promise<JobRecord | null> {
+    return this.get(jobId);
   }
 
   async casStatus(input: {
@@ -198,6 +204,44 @@ export class InMemoryCrawlerJobRepository implements CrawlerJobRepository {
     return [...this.jobs.values()].filter((j) => set.has(j.status)).map(cloneJob);
   }
 
+  async deleteCascade(jobId: number): Promise<boolean> {
+    if (!this.jobs.has(jobId)) return false;
+    for (const [id, job] of this.jobs) {
+      if (job.retryOfJobId === jobId) {
+        this.jobs.set(id, { ...job, retryOfJobId: null, updatedAt: nowIso() });
+      }
+    }
+    for (const [id, attempt] of [...this.attempts.entries()]) {
+      if (attempt.jobId === jobId) this.attempts.delete(id);
+    }
+    this.deleteSiblingRows(jobId);
+    this.jobs.delete(jobId);
+    return true;
+  }
+
+  async deleteTerminalOlderThan(input: {
+    olderThanIso: string;
+    statuses: readonly CrawlerJobStatus[];
+    limit?: number;
+  }): Promise<number> {
+    const set = new Set(input.statuses);
+    const cutoff = Date.parse(input.olderThanIso);
+    const limit = Math.min(500, Math.max(1, input.limit ?? 100));
+    const candidates = [...this.jobs.values()]
+      .filter((j) => set.has(j.status))
+      .filter((j) => Date.parse(j.finishedAt ?? j.createdAt) < cutoff)
+      .sort(
+        (a, b) =>
+          Date.parse(a.finishedAt ?? a.createdAt) - Date.parse(b.finishedAt ?? b.createdAt),
+      )
+      .slice(0, limit);
+    let removed = 0;
+    for (const job of candidates) {
+      if (await this.deleteCascade(job.id)) removed += 1;
+    }
+    return removed;
+  }
+
   async createAttempt(input: {
     jobId: number;
     attemptNo: number;
@@ -215,6 +259,8 @@ export class InMemoryCrawlerJobRepository implements CrawlerJobRepository {
       startedAt: nowIso(),
       finishedAt: null,
       resultStatus: 'running',
+      errorCode: null,
+      errorMessage: null,
     };
     this.attempts.set(row.id, row);
     return { ...row, leaseTokenHash: new Uint8Array(row.leaseTokenHash) };
@@ -239,7 +285,7 @@ export class InMemoryCrawlerJobRepository implements CrawlerJobRepository {
 
   async updateAttempt(
     attemptId: number,
-    patch: Partial<Pick<AttemptRecord, 'leaseExpiresAt' | 'finishedAt' | 'resultStatus'>>,
+    patch: Partial<Pick<AttemptRecord, 'leaseExpiresAt' | 'finishedAt' | 'resultStatus' | 'errorCode' | 'errorMessage'>>,
   ): Promise<AttemptRecord> {
     const current = this.attempts.get(attemptId);
     if (!current) throw new AppError('RESULT_INVALID', 'attempt 不存在', 404);
@@ -264,6 +310,15 @@ export class InMemoryOperationReceiptRepository implements OperationReceiptRepos
           && hashesEqual(r.idempotencyKeyHash, idempotencyKeyHash),
       ) ?? null
     );
+  }
+
+  deleteByJob(jobId: number, itemIds: ReadonlySet<number>): void {
+    for (let index = this.rows.length - 1; index >= 0; index -= 1) {
+      const receipt = this.rows[index];
+      if (receipt.jobId === jobId || (receipt.itemId != null && itemIds.has(receipt.itemId))) {
+        this.rows.splice(index, 1);
+      }
+    }
   }
 
   async save(input: {
@@ -339,6 +394,14 @@ export class InMemoryJobItemRepository implements JobItemRepository {
     return row;
   }
 
+  deleteByJob(jobId: number): void {
+    for (const [id, item] of this.rows) {
+      if (item.jobId !== jobId) continue;
+      this.rows.delete(id);
+      this.uniq.delete(`${item.jobId}|${item.source}|${item.sourceId}`);
+    }
+  }
+
   async listByJob(jobId: number): Promise<ReadonlyArray<JobItemRecord>> {
     return [...this.rows.values()].filter((r) => r.jobId === jobId);
   }
@@ -380,6 +443,15 @@ export class InMemoryJobEventRepository implements JobEventRepository {
     };
     this.rows.push(row);
     return row;
+  }
+
+  deleteByJob(jobId: number): void {
+    for (let index = this.rows.length - 1; index >= 0; index -= 1) {
+      const event = this.rows[index];
+      if (event.jobId !== jobId) continue;
+      this.rows.splice(index, 1);
+      this.uniq.delete(`${event.jobId}|${event.attemptId ?? 'null'}|${event.sequence}`);
+    }
   }
 
   async listByAttempt(
@@ -448,15 +520,33 @@ export class InMemoryMediaUploadRepository implements MediaUploadRepository {
       (r) => r.status === 'reserved' && r.createdAt < beforeIso,
     );
   }
+
+  deleteByJob(jobId: number): void {
+    for (const [id, upload] of this.rows) {
+      if (upload.jobId !== jobId) continue;
+      this.rows.delete(id);
+      this.stagingKeys.delete(upload.stagingKey);
+    }
+  }
 }
 
 export class InMemoryCrawlerUnitOfWork implements CrawlerUnitOfWork {
   readonly schedules = new InMemoryCrawlerScheduleRepository();
-  readonly jobs = new InMemoryCrawlerJobRepository();
   readonly receipts = new InMemoryOperationReceiptRepository();
   readonly items = new InMemoryJobItemRepository();
   readonly events = new InMemoryJobEventRepository();
   readonly media = new InMemoryMediaUploadRepository();
+  readonly jobs = new InMemoryCrawlerJobRepository((jobId) => {
+    const itemIds = new Set(
+      [...this.items.rows.values()]
+        .filter((item) => item.jobId === jobId)
+        .map((item) => item.id),
+    );
+    this.receipts.deleteByJob(jobId, itemIds);
+    this.media.deleteByJob(jobId);
+    this.items.deleteByJob(jobId);
+    this.events.deleteByJob(jobId);
+  });
 
   private chain: Promise<unknown> = Promise.resolve();
 

@@ -245,7 +245,7 @@ test('media reserve uses deterministic staging/final keys', async () => {
   assert.equal(reserved.status, 'reserved');
 
   const expired = await media.listExpiredReservations(
-    new Date('2026-07-14T00:00:00.000Z'),
+    new Date(Date.now() + 24 * 60 * 60 * 1000),
   );
   assert.equal(expired.length, 1);
 });
@@ -309,4 +309,127 @@ test('manual retry creates linked job from terminal status', async () => {
   assert.equal(retry.retryOfJobId, claimed.job.id);
   assert.equal(retry.status, 'queued');
   assert.notEqual(retry.id, claimed.job.id);
+});
+
+test('deleteJob only allows terminal jobs and removes all control-plane children', async () => {
+  const { jobs, claimed, workerId, uow } = await seedClaimed();
+  await assert.rejects(() => jobs.deleteJob(claimed.job.id), /仅可删除已结束/);
+
+  const binding = {
+    jobId: claimed.job.id,
+    attemptId: claimed.attempt.id,
+    workerId,
+    leaseToken: claimed.leaseToken,
+  };
+  await jobs.start(binding);
+  await jobs.complete({
+    ...binding,
+    outcome: 'succeeded',
+    idempotencyKey: 'ok-done',
+  });
+  const retry = await jobs.manualRetry(claimed.job.id);
+  const item = await uow.items.upsert({
+    jobId: claimed.job.id,
+    source: 'test',
+    sourceId: 'one',
+    stage: 'commit',
+    status: 'succeeded',
+  });
+  await uow.events.append({
+    jobId: claimed.job.id,
+    attemptId: claimed.attempt.id,
+    sequence: 99,
+    level: 'info',
+    eventType: 'test',
+  });
+  await uow.receipts.save({
+    operationScope: 'test.delete',
+    idempotencyKeyHash: new Uint8Array(32).fill(1),
+    jobId: null,
+    itemId: item.id,
+    requestHash: new Uint8Array(32).fill(2),
+    responseJson: '{}',
+  });
+
+  await jobs.deleteJob(claimed.job.id);
+  assert.equal(await uow.jobs.get(claimed.job.id), null);
+  assert.equal(await uow.jobs.getAttempt(claimed.attempt.id), null);
+  assert.deepEqual(await uow.items.listByJob(claimed.job.id), []);
+  assert.deepEqual(await uow.events.listByAttempt(claimed.job.id, claimed.attempt.id), []);
+  assert.equal(uow.receipts.rows.some((row) => row.itemId === item.id), false);
+  assert.equal((await uow.jobs.get(retry.id))?.retryOfJobId, null);
+});
+
+test('purgeTerminalJobs removes old finished jobs by retention days', async () => {
+  const uow = new InMemoryCrawlerUnitOfWork();
+  const jobs = new CrawlerJobService(uow, 60_000);
+  const oldJob = await jobs.enqueueManual({
+    profileId: 1,
+    profileVersionId: 1,
+    configSnapshotJson: '{}',
+  });
+  // Force terminal + old timestamps
+  await uow.jobs.casStatus({
+    jobId: oldJob.id,
+    expectedStatuses: ['queued'],
+    nextStatus: 'failed',
+    patch: {
+      finishedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  });
+  const recent = await jobs.enqueueManual({
+    profileId: 1,
+    profileVersionId: 1,
+    configSnapshotJson: '{}',
+  });
+  await uow.jobs.casStatus({
+    jobId: recent.id,
+    expectedStatuses: ['queued'],
+    nextStatus: 'failed',
+    patch: {
+      finishedAt: new Date().toISOString(),
+    },
+  });
+
+  const result = await jobs.purgeTerminalJobs({ olderThanDays: 7, batchSize: 1 });
+  assert.deepEqual(result, { deleted: 1, truncated: false });
+  assert.equal(await uow.jobs.get(oldJob.id), null);
+  assert.ok(await uow.jobs.get(recent.id));
+});
+
+test('purgeTerminalJobs loops batches and reports the defensive total cap', async () => {
+  const uow = new InMemoryCrawlerUnitOfWork();
+  const jobs = new CrawlerJobService(uow, 60_000);
+  const ids: number[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const job = await jobs.enqueueManual({
+      profileId: 1,
+      profileVersionId: 1,
+      configSnapshotJson: '{}',
+    });
+    ids.push(job.id);
+    await uow.jobs.casStatus({
+      jobId: job.id,
+      expectedStatuses: ['queued'],
+      nextStatus: 'failed',
+      patch: {
+        finishedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    });
+  }
+
+  const first = await jobs.purgeTerminalJobs({
+    olderThanDays: 7,
+    batchSize: 1,
+    maxTotal: 2,
+  });
+  assert.deepEqual(first, { deleted: 2, truncated: true });
+  assert.equal(ids.filter((id) => uow.jobs.jobs.has(id)).length, 1);
+
+  const second = await jobs.purgeTerminalJobs({
+    olderThanDays: 7,
+    batchSize: 1,
+    maxTotal: 2,
+  });
+  assert.deepEqual(second, { deleted: 1, truncated: false });
 });

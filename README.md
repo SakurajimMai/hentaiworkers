@@ -1,32 +1,36 @@
 # AnimeStream
 
-Next.js 全栈动漫视频站：公网站点 + 管理后台 + REST API，对接远程 MySQL，支持 Docker 部署。
+Next.js 全栈动漫视频站：公网站点 + 管理后台 + REST API，对接**远程 MySQL**，支持 **Docker Compose** 部署。
 
 > 完整文档请见 **[docs/README.md](./docs/README.md)**（架构 · API · 部署 · 开发 · 前台/后台手册 · OpenAPI）。
 
 ## 技术栈
 
 - **Next.js 15** (App Router) + React 19 + Tailwind
-- **Drizzle ORM** + **MySQL**
-- **iron-session** + bcrypt 管理员鉴权
-- **Docker** 单服务部署（不内置数据库）
+- **Drizzle ORM** + **MySQL / MariaDB**
+- **iron-session** + bcrypt 鉴权；AES-GCM 密钥环保护后台密钥字段
+- **ArtPlayer**（里番 MP4 + 可选广告）/ 线路解析 iframe（动漫）
+- **Docker Compose**：`app` + 可选 `crawler-worker`（无内置数据库）
 
-## 功能
+## 功能一览
 
-| 区域 | 路径 | 说明 |
-|------|------|------|
-| 前台 | `/` `/browse` `/watch/[id]` | 片库、搜索、播放 |
-| API | `/api/animes` `/api/tags` … | 公开只读，兼容移动端 |
-| 后台 | `/admin` | 作品 / 标签 / 导入 / 用户 / **爬虫控制面** |
-| Worker | `crawler_worker/` | 无数据库爬虫容器，经内部 API 领取任务 |
+| 区域 | 路径 / 组件 | 说明 |
+|------|-------------|------|
+| 前台 | `/` `/browse` `/works` `/watch/[id]` `/works/[id]` | 里番 + 动漫双片库、搜索、播放、进度、片单 |
+| API | `/api/animes` `/api/me/*` … | 公开只读 + 登录用户进度/片单 |
+| 后台 | `/admin` | 作品、标签、用户、系统设置、爬虫控制面、存储、播放器广告 |
+| Worker | `crawler_worker/` | 无 DB；MacCMS 外链 → `anime_works`；Hanime MP4 → S3/SFTP → `animes` |
 
 ## 本地开发
 
 ```bash
 cp .env.example .env
-# 编辑 DATABASE_URL / SESSION_SECRET / SITE_URL 等
+# 必填：DATABASE_URL、SESSION_SECRET(≥32)、APP_ENCRYPTION_KEYRING、APP_ENCRYPTION_CURRENT_KEY_ID、SITE_URL
+# 密钥示例：openssl rand -base64 48   /   openssl rand -base64 32
 
 npm install
+# 空库：CRAWLER_MIGRATE_CONFIRM=yes npm run db:setup:crawler
+# 已有库：CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
 npm run seed:admin
 npm run dev
 ```
@@ -34,59 +38,79 @@ npm run dev
 - 前台: http://localhost:3000  
 - 后台: http://localhost:3000/admin  
 
-密码中的 `@` 在 `DATABASE_URL` 里需写成 `%40`。
+`DATABASE_URL` 密码中的 `@` 写成 `%40`。
 
-## Docker Compose 部署
+## 服务器 Docker Compose 部署（摘要）
 
 ```bash
-cp .env.example .env   # 填写 DATABASE_URL、SESSION_SECRET 等
-npm ci && npm run seed:admin
-CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler   # 控制面 + 收藏表
+# 1) 服务器安装 Docker Compose v2，clone 本仓库
+cp .env.example .env && chmod 600 .env
+# 填写 DATABASE_URL / SESSION_SECRET / APP_ENCRYPTION_* / SITE_URL / ADMIN_BOOTSTRAP_*
 
+# 2) 迁移 + 管理员（本机 Node 或一次性 node 容器，见 docs/deployment.md §4）
+CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler   # 或 db:setup:crawler
+npm run seed:admin
+
+# 3) 启动
 docker compose up -d --build app
-curl -s http://127.0.0.1:3000/api/live
-curl -s http://127.0.0.1:3000/api/ready
+curl -sS http://127.0.0.1:3000/api/live
+curl -sS http://127.0.0.1:3000/api/ready
+
+# 4) 反代 HTTPS → 127.0.0.1:3000，并禁止公网访问 /api/internal/crawler/**
 ```
 
-- 可选 Worker：`CRAWLER_WORKER_TOKEN=...` 后 `docker compose --profile worker up -d`
-- 预构建镜像：设置 `DOCKERHUB_USERNAME` 后 `docker compose pull app && docker compose up -d --no-build app`
-- 前台注册/登录/收藏：`/register`、`/login`、`/favorites`（见 [user-guide](./docs/user-guide.md)）
+可选 Worker：
 
-完整步骤、反代与排错：[docs/deployment.md](./docs/deployment.md)
+```bash
+# 后台签发令牌后写入 CRAWLER_WORKER_ID / CRAWLER_WORKER_TOKEN
+docker compose --profile worker up -d --build
+```
+
+预构建镜像：设置 `DOCKERHUB_USERNAME` 后  
+`docker compose pull app && docker compose up -d --no-build app`。
+
+**完整步骤、环境变量表、Nginx/Caddy、迁移 0001–0016、检查清单与排错 → [docs/deployment.md](./docs/deployment.md)**
 
 ## 文档索引
 
 | 文档 | 内容 |
 |------|------|
 | [docs/README.md](./docs/README.md) | 文档中心 |
+| [docs/deployment.md](./docs/deployment.md) | **Compose 生产部署教程** |
+| [docs/user-guide.md](./docs/user-guide.md) | 前台使用（播放 / 进度 / 片单） |
+| [docs/admin-guide.md](./docs/admin-guide.md) | 后台：采集、存储、播放器广告 |
 | [docs/architecture.md](./docs/architecture.md) | 架构与数据流 |
+| [docs/development.md](./docs/development.md) | 开发约定与脚本 |
 | [docs/api/README.md](./docs/api/README.md) | API 说明 |
-| [docs/api/openapi.yaml](./docs/api/openapi.yaml) | OpenAPI 3.0 |
-| [docs/admin-guide.md](./docs/admin-guide.md) | 后台操作手册 |
-| [docs/user-guide.md](./docs/user-guide.md) | 前台使用说明 |
-| [docs/development.md](./docs/development.md) | 开发约定 |
 
 ## 常用脚本
 
 ```bash
-npm run dev          # 开发
-npm run build        # 构建
-npm run start        # 生产启动
-npm run seed:admin   # 无管理员时创建引导账号
-npm run test         # 测试入口
-npm run db:push      # Drizzle 推送 schema（慎用生产）
+npm run dev                 # 开发
+npm run build && npm start  # 生产（非 Docker）
+npm run seed:admin          # 引导管理员
+npm run seed:maccms-profiles
+npm run worker:provision    # 本地 Worker 令牌
+npm run worker:start
+npm run db:setup:crawler    # 全新核心表（需 CRAWLER_MIGRATE_CONFIRM=yes）
+npm run db:migrate:crawler  # 加法迁移 0001–0016
+npm run test                # 测试入口
 ```
+
+`npm run db:push` 已禁用；生产只用审查过的 SQL 迁移。
 
 ## 目录
 
 ```
-app/           # Next 路由（site + admin + api）
-components/    # UI 组件
-lib/           # db / schema / auth / 业务查询
-scripts/       # seed-admin、采集工具等
-mobile/        # Expo 客户端
-docs/          # 项目文档
-Dockerfile
+app/                 # Next 路由（site + admin + api）
+components/          # UI / ArtPlayer / 播放面板
+lib/                 # db、领域服务、系统设置、爬虫控制面
+crawler_worker/      # Python Worker（无 DATABASE_URL）
+drizzle/migrations/  # 0001–0016
+scripts/             # seed、迁移、worker 运维
+docs/                # 项目文档
+Dockerfile           # app
+Dockerfile.worker    # crawler-worker
 docker-compose.yml
 ```
 
@@ -95,10 +119,10 @@ docker-compose.yml
 `users.role`：
 
 - `admin`：可访问 `/admin`
-- `user`：预留；本阶段前台匿名观看
+- `user`：前台注册用户（片单 / 云端进度）
 
 ## 相关说明
 
-- 已不依赖 Cloudflare Workers / D1 作为生产路径。
-- `mobile/` 通过同一 `/api` 契约访问。
-- Python 采集脚本直写 MySQL，与 Web 进程解耦。
+- 生产路径为 Next 全栈 + 远程 MySQL；不再依赖 Cloudflare Workers / D1。
+- MacCMS 与 Hanime 目录分离：外链进 `anime_works`，托管 MP4 进 `animes`。
+- `mobile/` 通过同一 `/api` 契约访问；云端片单/进度以前台 Web 为准。

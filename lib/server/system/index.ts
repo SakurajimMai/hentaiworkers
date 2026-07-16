@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { resolveSecretCipher } from '../crawler/interfaces/compose-mariadb-crawler';
 import { getIdentityService } from '../identity';
 import type { SecretCipher } from '../crawler/ports/secret-cipher';
+import type { PasswordResetRepository } from '../identity/ports/password-reset-repository';
 import { SystemSettingsService } from './application/system-settings-service';
 import type {
   EmailVerificationTokenRepository,
@@ -15,6 +16,7 @@ let overrides: {
   settings?: SystemSettingsRepository;
   tokens?: EmailVerificationTokenRepository;
   cipher?: SecretCipher;
+  passwordResets?: PasswordResetRepository;
 } = {};
 
 function defaultSettingsRepo(): SystemSettingsRepository {
@@ -31,6 +33,13 @@ function defaultTokenRepo(): EmailVerificationTokenRepository {
   return new mod.MariaDbEmailVerificationTokenRepository();
 }
 
+function defaultPasswordResets(): PasswordResetRepository {
+  const mod = require('../infrastructure/database/mariadb-password-reset-repository') as {
+    MariaDbPasswordResetRepository: new () => PasswordResetRepository;
+  };
+  return new mod.MariaDbPasswordResetRepository();
+}
+
 export function getSystemSettingsService(): SystemSettingsService {
   if (!service) {
     service = new SystemSettingsService(
@@ -38,7 +47,10 @@ export function getSystemSettingsService(): SystemSettingsService {
       overrides.tokens ?? defaultTokenRepo(),
       overrides.cipher ?? resolveSecretCipher(),
       getIdentityService(),
-      { siteUrl: process.env.SITE_URL },
+      {
+        siteUrl: process.env.SITE_URL,
+        passwordResets: overrides.passwordResets ?? defaultPasswordResets(),
+      },
     );
   }
   return service;
@@ -54,6 +66,7 @@ export function setSystemSettingsDependenciesForTests(deps?: {
   settings?: SystemSettingsRepository;
   tokens?: EmailVerificationTokenRepository;
   cipher?: SecretCipher;
+  passwordResets?: PasswordResetRepository;
 }): void {
   overrides = deps ?? {};
   service = undefined;
@@ -61,9 +74,15 @@ export function setSystemSettingsDependenciesForTests(deps?: {
 
 export { SystemSettingsService } from './application/system-settings-service';
 export {
+  buildParserPlaybackUrl,
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
+  resolveLineParser,
   toPublicAuthConfig,
+  toPublicPlayerConfig,
+  type PlayerLineParser,
+  type PlayerSettings,
   type PublicAuthConfig,
+  type PublicPlayerConfig,
   type SystemSettings,
 } from './domain/settings';

@@ -20,6 +20,7 @@ export class IronSessionAdapter implements SessionPort {
       userId: session.userId,
       username: session.username,
       role: session.role,
+      sessionVersion: session.sessionVersion,
       isLoggedIn: !!session.isLoggedIn,
     };
   }
@@ -29,6 +30,7 @@ export class IronSessionAdapter implements SessionPort {
     session.userId = data.userId;
     session.username = data.username;
     session.role = data.role;
+    session.sessionVersion = data.sessionVersion;
     session.isLoggedIn = data.isLoggedIn;
     await session.save();
   }

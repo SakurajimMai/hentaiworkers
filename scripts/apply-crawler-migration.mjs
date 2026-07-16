@@ -45,9 +45,29 @@ function listMigrationFiles() {
 
 function loadMigrationSql(fileName) {
   const sql = readFileSync(join(migrationsDir, fileName), 'utf8');
-  for (const table of ['animes', 'tags', 'anime_tags', 'categories', 'users']) {
-    if (new RegExp(`\\b(?:ALTER|DROP)\\s+TABLE\\s+[\`']?${table}[\`']?`, 'i').test(sql)) {
-      throw new Error(`Migration mutates catalog table ${table}`);
+  const catalogTables = ['animes', 'tags', 'anime_tags', 'categories', 'users'];
+  for (const table of catalogTables) {
+    // Hard-block DROP of catalog tables.
+    if (new RegExp(`\\bDROP\\s+TABLE\\s+[\`']?${table}[\`']?`, 'i').test(sql)) {
+      throw new Error(`Migration drops catalog table ${table}`);
+    }
+    // Allow additive ALTER ... ADD COLUMN only; block other mutations.
+    const alterRe = new RegExp(
+      `\\bALTER\\s+TABLE\\s+[\`']?${table}[\`']?\\s+([\\s\\S]*?)(?=;|$)`,
+      'gi',
+    );
+    let match;
+    while ((match = alterRe.exec(sql)) !== null) {
+      const clause = match[1] ?? '';
+      const isAdditiveColumn =
+        /\bADD\s+COLUMN\b/i.test(clause)
+        && !/\bDROP\b/i.test(clause)
+        && !/\bMODIFY\b/i.test(clause)
+        && !/\bCHANGE\b/i.test(clause)
+        && !/\bRENAME\b/i.test(clause);
+      if (!isAdditiveColumn) {
+        throw new Error(`Migration mutates catalog table ${table} (non-additive ALTER)`);
+      }
     }
   }
   if (/\bDROP\s+TABLE\b/i.test(sql)) {

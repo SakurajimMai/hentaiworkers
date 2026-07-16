@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Protocol
 
-from crawler_worker.media.base import MediaAdapter, UploadResult
+from crawler_worker.media.base import MediaAdapter, UploadResult, sha256_file
 from crawler_worker.media.paths import public_url_for
 
 
@@ -56,15 +55,15 @@ class S3MediaAdapter(MediaAdapter):
         self._creds = credentials
 
     def upload_staging(self, local_path: Path, staging_key: str) -> str:
-        data = local_path.read_bytes()
-        digest = hashlib.sha256(data).hexdigest()
-        self._client.put_object(
-            Bucket=self._creds.bucket,
-            Key=staging_key,
-            Body=data,
-            Metadata={"sha256": digest},
-        )
-        self._objects[staging_key] = data
+        digest = sha256_file(local_path)
+        # boto3 streams file objects; this keeps multi-GB Hanime media out of RAM.
+        with local_path.open("rb") as stream:
+            self._client.put_object(
+                Bucket=self._creds.bucket,
+                Key=staging_key,
+                Body=stream,
+                Metadata={"sha256": digest},
+            )
         return digest
 
     def publish(self, staging_key: str, final_key: str) -> UploadResult:
@@ -73,13 +72,9 @@ class S3MediaAdapter(MediaAdapter):
             CopySource={"Bucket": self._creds.bucket, "Key": staging_key},
             Key=final_key,
         )
-        if staging_key in self._objects:
-            self._objects[final_key] = self._objects[staging_key]
         head = self.head(final_key)
-        size = int(head.get("ContentLength") or len(self._objects.get(final_key, b"")))
+        size = int(head.get("ContentLength") or 0)
         checksum = str(head.get("Metadata", {}).get("sha256") or "")
-        if not checksum and final_key in self._objects:
-            checksum = hashlib.sha256(self._objects[final_key]).hexdigest()
         url = public_url_for(
             driver="s3",
             final_key=final_key,
@@ -96,10 +91,14 @@ class S3MediaAdapter(MediaAdapter):
 
     def cleanup(self, key: str) -> None:
         self._client.delete_object(Bucket=self._creds.bucket, Key=key)
-        self._objects.pop(key, None)
 
     def head(self, key: str) -> dict:
         return self._client.head_object(Bucket=self._creds.bucket, Key=key)
+
+    def close(self) -> None:
+        close = getattr(self._client, "close", None)
+        if callable(close):
+            close()
 
 
 class InMemoryS3Client:
@@ -109,8 +108,8 @@ class InMemoryS3Client:
         self.objects: dict[str, bytes] = {}
         self.meta: dict[str, dict[str, str]] = {}
 
-    def put_object(self, *, Bucket: str, Key: str, Body: bytes, **kwargs: Any) -> dict:
-        self.objects[Key] = Body
+    def put_object(self, *, Bucket: str, Key: str, Body: Any, **kwargs: Any) -> dict:
+        self.objects[Key] = Body.read() if hasattr(Body, "read") else bytes(Body)
         self.meta[Key] = dict(kwargs.get("Metadata") or {})
         return {}
 

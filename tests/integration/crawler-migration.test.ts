@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import type { RowDataPacket } from 'mysql2';
 import { join } from 'node:path';
 import test from 'node:test';
 import { CRAWLER_CONTROL_TABLES } from '../../lib/server/infrastructure/database/schema/crawler';
@@ -14,7 +15,7 @@ const REQUIRED_UNIQUE = [
   'crawler_job_items_job_source_uidx',
   'crawler_operation_receipts_scope_key_uidx',
   'anime_sources_source_uidx',
-  'worker_credentials_token_hash_uidx',
+  'crawler_workers_token_hash_uidx',
 ] as const;
 
 const REQUIRED_BINARY_HASH_COLUMNS = [
@@ -39,18 +40,38 @@ function loadMigrationSql(): string {
 
 test('migration is additive and does not mutate catalog tables', () => {
   const sql = loadMigrationSql();
-  // Follow-up migrations may ALTER control tables (ADD COLUMN); never drop tables/columns.
+  // Never drop tables/columns.
   assert.doesNotMatch(sql, /\bDROP\s+TABLE\b/i);
   assert.doesNotMatch(sql, /\bDROP\s+COLUMN\b/i);
 
   for (const table of CATALOG_TABLES) {
+    // Catalog DROP is always forbidden.
     assert.doesNotMatch(
       sql,
-      new RegExp(`\\b(?:ALTER|DROP)\\s+TABLE\\s+[\\\`']?${table}[\\\`']?`, 'i'),
+      new RegExp(`\\bDROP\\s+TABLE\\s+[\\\`']?${table}[\\\`']?`, 'i'),
     );
+    // Catalog ALTER is only allowed as ADD COLUMN (e.g. users.session_version).
+    const alterRe = new RegExp(
+      `\\bALTER\\s+TABLE\\s+[\\\`']?${table}[\\\`']?\\s+([\\s\\S]*?)(?=;|$)`,
+      'gi',
+    );
+    let match: RegExpExecArray | null;
+    while ((match = alterRe.exec(sql)) !== null) {
+      const clause = match[1] ?? '';
+      const isAdditiveColumn =
+        /\bADD\s+COLUMN\b/i.test(clause)
+        && !/\bDROP\b/i.test(clause)
+        && !/\bMODIFY\b/i.test(clause)
+        && !/\bCHANGE\b/i.test(clause)
+        && !/\bRENAME\b/i.test(clause);
+      assert.ok(
+        isAdditiveColumn,
+        `catalog table ${table} may only receive additive ADD COLUMN`,
+      );
+    }
   }
-  // Follow-ups may ADD COLUMN / MODIFY COLUMN on control tables only.
   assert.match(sql, /\bADD\s+COLUMN\b/i);
+  assert.match(sql, /session_version/i);
 });
 
 test('migration creates every control-plane table', () => {
@@ -66,24 +87,14 @@ test('migration creates every control-plane table', () => {
     [...CRAWLER_CONTROL_TABLES].sort(),
     [
       'anime_sources',
-      'audit_logs',
       'crawler_job_attempts',
       'crawler_job_events',
       'crawler_job_items',
       'crawler_jobs',
-      'crawler_media_uploads',
       'crawler_operation_receipts',
-      'crawler_profile_versions',
       'crawler_profiles',
-      'crawler_schedule_skips',
       'crawler_schedules',
       'crawler_workers',
-      'media_assets',
-      'secret_versions',
-      'secrets',
-      'storage_profile_versions',
-      'storage_profiles',
-      'worker_credentials',
     ].sort(),
   );
 });
@@ -101,7 +112,11 @@ test('migration enforces binary hashes, UTC defaults, uniques, FKs and JSON_VALI
   assert.match(sql, /SET time_zone\s*=\s*'\+00:00'/i);
 
   for (const name of REQUIRED_UNIQUE) {
-    assert.match(sql, new RegExp(`UNIQUE KEY \`${name}\``), name);
+    assert.match(
+      sql,
+      new RegExp('UNIQUE KEY(?: IF NOT EXISTS)? `' + name + '`'),
+      name,
+    );
   }
 
   assert.match(sql, /FOREIGN KEY \(`profile_id`\) REFERENCES `crawler_profiles`/);
@@ -160,7 +175,7 @@ test('optional disposable MariaDB apply (skipped without env)', async (t) => {
       }
       await connection.query(statement);
     }
-    const [rows] = await connection.query<Array<{ table_name: string }>>(
+    const [rows] = await connection.query<Array<RowDataPacket & { table_name: string }>>(
       `SELECT table_name AS table_name
        FROM information_schema.tables
        WHERE table_schema = DATABASE()

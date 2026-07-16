@@ -24,7 +24,7 @@ export default async function AdminSystemSettingsPage({
         <p className="font-meta mb-2">System</p>
         <h1 className="font-serif text-3xl">系统设置</h1>
         <p className="mt-2 font-ui text-sm text-[#787774] max-w-2xl leading-relaxed">
-          配置前台注册策略：邮箱白名单、SMTP、Trust 安全开关与 Cloudflare Turnstile。
+          配置前台注册策略、播放器（里番 ArtPlayer 广告/右键、动漫线路解析器）、SMTP、Trust 与 Cloudflare Turnstile。
           SMTP 密码与 Turnstile Secret 加密存库，表单留空表示不修改。
         </p>
       </div>
@@ -201,6 +201,216 @@ export default async function AdminSystemSettingsPage({
               defaultValue={view.trust.verificationTokenTtlMinutes}
             />
           </label>
+        </section>
+
+        {/* Player */}
+        <section className="surface-card p-5 space-y-4">
+          <h2 className="font-ui text-sm font-semibold">播放器（ArtPlayer / 线路解析）</h2>
+          <p className="font-ui text-[12px] text-[#787774] leading-relaxed">
+            <strong>里番</strong>页固定使用本站 ArtPlayer（MP4）。
+            <strong>动漫</strong>页按线路匹配「解析播放器」iframe；未匹配时可回退 ArtPlayer+代理。
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 font-ui text-sm">
+              <input
+                type="checkbox"
+                name="playerEnableContextMenu"
+                value="1"
+                defaultChecked={view.player.enableContextMenu}
+              />
+              允许播放器右键菜单
+            </label>
+            <label className="flex items-center gap-2 font-ui text-sm">
+              <input
+                type="checkbox"
+                name="playerWorksFallbackArtPlayer"
+                value="1"
+                defaultChecked={view.player.worksFallbackArtPlayer}
+              />
+              动漫未匹配解析器时回退 ArtPlayer
+            </label>
+            <label className="block font-meta text-[12px]">
+              主题色
+              <input
+                name="playerTheme"
+                className="admin-input mt-1 font-mono text-[12px]"
+                defaultValue={view.player.theme}
+                placeholder="#E53935"
+              />
+            </label>
+          </div>
+
+          <div className="border-t border-[#EAEAEA] pt-4 space-y-3">
+            <h3 className="font-ui text-[13px] font-semibold">片头广告（视频 / 图片）</h3>
+            <p className="font-ui text-[12px] text-[#6f6d68] leading-relaxed">
+              展示优先级：视频 → 自定义 HTML → 图片。用于里番 ArtPlayer 与动漫 ArtPlayer 回退。
+              「可关闭前秒数」内不能跳过；到总时长后自动进入正片。
+              仅勾选启用但未填写视频/HTML/图片时，用户不会看到广告。
+              可关闭前秒数填 0 时，插件仍约有 1 秒后才显示关闭按钮。
+            </p>
+            <label className="field-check text-sm">
+              <input
+                type="checkbox"
+                name="playerPreRollEnabled"
+                value="1"
+                defaultChecked={view.player.preRollAd.enabled}
+              />
+              启用片头广告
+            </label>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="block font-meta text-[12px] sm:col-span-2">
+                视频广告 URL（优先）
+                <input
+                  name="playerPreRollVideoUrl"
+                  className="admin-input mt-1"
+                  defaultValue={view.player.preRollAd.videoUrl}
+                  placeholder="https://cdn.example/ad.mp4"
+                />
+              </label>
+              <label className="block font-meta text-[12px] sm:col-span-2">
+                图片广告 URL
+                <input
+                  name="playerPreRollImageUrl"
+                  className="admin-input mt-1"
+                  defaultValue={view.player.preRollAd.imageUrl}
+                  placeholder="https://cdn.example/ad.jpg"
+                />
+              </label>
+              <label className="block font-meta text-[12px] sm:col-span-2">
+                自定义 HTML（无视频时优先于图片）
+                <textarea
+                  name="playerPreRollHtml"
+                  rows={2}
+                  className="admin-input mt-1 font-mono text-[12px]"
+                  defaultValue={view.player.preRollAd.html}
+                  placeholder={'<div style="color:#fff">广告文案</div>'}
+                />
+              </label>
+              <label className="block font-meta text-[12px]">
+                点击跳转 URL
+                <input
+                  name="playerPreRollClickUrl"
+                  className="admin-input mt-1"
+                  defaultValue={view.player.preRollAd.clickUrl}
+                  placeholder="https://example.com/landing"
+                />
+              </label>
+              <label className="field-check text-sm self-end pb-2">
+                <input
+                  type="checkbox"
+                  name="playerPreRollMuted"
+                  value="1"
+                  defaultChecked={view.player.preRollAd.muted}
+                />
+                视频广告默认静音
+              </label>
+              <label className="block font-meta text-[12px]">
+                可关闭前秒数
+                <input
+                  name="playerPreRollPlayDuration"
+                  type="number"
+                  min={0}
+                  max={120}
+                  className="admin-input mt-1"
+                  defaultValue={view.player.preRollAd.playDuration}
+                />
+              </label>
+              <label className="block font-meta text-[12px]">
+                总时长（秒）
+                <input
+                  name="playerPreRollTotalDuration"
+                  type="number"
+                  min={0}
+                  max={180}
+                  className="admin-input mt-1"
+                  defaultValue={view.player.preRollAd.totalDuration}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="border-t border-[#EAEAEA] pt-4 space-y-3">
+            <h3 className="font-ui text-[13px] font-semibold">暂停广告</h3>
+            <p className="font-ui text-[12px] text-[#6f6d68] leading-relaxed">
+              用户暂停正片后覆盖一层广告。展示优先级：视频 → 自定义 HTML → 图片。
+              片头广告播放期间不会弹出暂停广告。
+              仅勾选启用但未填写视频/HTML/图片时，用户不会看到广告。
+            </p>
+            <label className="field-check text-sm">
+              <input
+                type="checkbox"
+                name="playerPauseAdEnabled"
+                value="1"
+                defaultChecked={view.player.pauseAd.enabled}
+              />
+              启用暂停广告
+            </label>
+            <label className="block font-meta text-[12px]">
+              视频 URL（优先）
+              <input
+                name="playerPauseAdVideoUrl"
+                className="admin-input mt-1"
+                defaultValue={view.player.pauseAd.videoUrl}
+                placeholder="https://cdn.example/pause-ad.mp4"
+              />
+            </label>
+            <label className="block font-meta text-[12px]">
+              图片 URL
+              <input
+                name="playerPauseAdImageUrl"
+                className="admin-input mt-1"
+                defaultValue={view.player.pauseAd.imageUrl}
+                placeholder="https://cdn.example/pause-ad.jpg"
+              />
+            </label>
+            <label className="block font-meta text-[12px]">
+              自定义 HTML
+              <textarea
+                name="playerPauseAdHtml"
+                rows={2}
+                className="admin-input mt-1 font-mono text-[12px]"
+                defaultValue={view.player.pauseAd.html}
+              />
+            </label>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="block font-meta text-[12px]">
+                点击跳转 URL
+                <input
+                  name="playerPauseAdClickUrl"
+                  className="admin-input mt-1"
+                  defaultValue={view.player.pauseAd.clickUrl}
+                />
+              </label>
+              <label className="field-check text-sm self-end pb-2">
+                <input
+                  type="checkbox"
+                  name="playerPauseAdMuted"
+                  value="1"
+                  defaultChecked={view.player.pauseAd.muted}
+                />
+                暂停视频广告静音
+              </label>
+            </div>
+          </div>
+
+          <div className="border-t border-[#EAEAEA] pt-4 space-y-3">
+            <h3 className="font-ui text-[13px] font-semibold">动漫线路 → 解析播放器</h3>
+            <p className="font-ui text-[12px] text-[#787774] leading-relaxed">
+              每行一条：<code className="font-mono">匹配关键字|解析地址</code>。
+              匹配线路 <code className="font-mono">flag</code> 或名称（包含即可，如 <code className="font-mono">hnm3u8</code> / <code className="font-mono">红牛</code>）。
+              解析地址示例：<code className="font-mono">https://www.hnjiexi.com/m3u8/?url=</code>
+              （分集 m3u8 会拼到后面）。行尾加 <code className="font-mono">|0</code> 可禁用。
+            </p>
+            <textarea
+              name="playerLineParsers"
+              rows={6}
+              className="admin-input font-mono text-[12px]"
+              defaultValue={view.player.lineParsers
+                .map((p) => `${p.match}|${p.parserUrl}${p.enabled ? '' : '|0'}`)
+                .join('\n')}
+              placeholder={'hnm3u8|https://www.hnjiexi.com/m3u8/?url=\n红牛|https://www.hnjiexi.com/m3u8/?url='}
+            />
+          </div>
         </section>
 
         {/* Turnstile */}

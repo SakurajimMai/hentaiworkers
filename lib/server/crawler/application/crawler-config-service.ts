@@ -11,6 +11,10 @@ import type {
 export class CrawlerConfigService {
   constructor(private readonly repository: CrawlerConfigRepository) {}
 
+  listProfiles() {
+    return this.repository.listProfiles();
+  }
+
   async createProfile(name: string, configInput: unknown): Promise<ProfileVersionRecord> {
     const trimmed = name.trim();
     if (!trimmed) throw new AppError('RESULT_INVALID', '模板名称必填', 400);

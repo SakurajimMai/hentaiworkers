@@ -26,10 +26,13 @@ dist-ssr
 # Environment files
 .env*
 !.env.example
+.crawler-worker.env
+.crawler-worker-tmp/
 
 # Database
 *.db
 *.sqlite
+backups/
 
 # Keep docker compose / yaml configs in repo
 !docker-compose.yml

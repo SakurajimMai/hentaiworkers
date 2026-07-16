@@ -47,6 +47,10 @@ class ControlClientTests(unittest.TestCase):
             ).encode()
         if path.endswith("/events/batch"):
             return 200, json.dumps({"data": {"accepted": 1}}).encode()
+        if path.endswith("/items/exists"):
+            return 200, json.dumps(
+                {"data": {"exists": False, "animeId": None, "target": None}}
+            ).encode()
         if path.endswith("/items/commit"):
             return 200, json.dumps(
                 {"data": {"replayed": False, "itemId": 1, "status": "succeeded"}}
@@ -68,6 +72,10 @@ class ControlClientTests(unittest.TestCase):
                     }
                 }
             ).encode()
+        if path.endswith("/media/status"):
+            return 200, json.dumps(
+                {"data": {"uploadId": 1, "status": "published"}}
+            ).encode()
         return 500, json.dumps({"error": {"code": "INTERNAL_ERROR", "message": "x"}}).encode()
 
     def test_register_and_claim(self):
@@ -86,6 +94,24 @@ class ControlClientTests(unittest.TestCase):
         job = client.claim()
         client.start(job)
         headers = self.calls[-1][3]
+        self.assertEqual(headers["X-Crawler-Lease-Token"], "lease-1")
+
+    def test_item_exists_uses_source_mapping_endpoint(self):
+        client = ControlClient(self.cfg, transport=self._transport)
+        job = client.claim()
+        result = client.item_exists(job, "hanime", "42")
+        self.assertFalse(result["exists"])
+        self.assertTrue(self.calls[-1][1].endswith("/jobs/9/items/exists"))
+
+    def test_media_status_uses_lease_binding(self):
+        client = ControlClient(self.cfg, transport=self._transport)
+        job = client.claim()
+        result = client.media_status(job, 1, "published")
+        self.assertEqual(result["status"], "published")
+        method, url, raw, headers = self.calls[-1]
+        self.assertEqual(method, "POST")
+        self.assertTrue(url.endswith("/jobs/9/media/status"))
+        self.assertEqual(json.loads(raw)["uploadId"], 1)
         self.assertEqual(headers["X-Crawler-Lease-Token"], "lease-1")
 
     def test_batch_too_large(self):
@@ -107,6 +133,23 @@ class ControlClientTests(unittest.TestCase):
         blob = json.dumps(caps)
         for banned in ("host", "password", "DATABASE", "mysql", "table"):
             self.assertNotIn(banned.lower(), blob.lower())
+
+    def test_default_config_sources_include_maccms_presets_when_main_builds(self):
+        from crawler_worker.sources.maccms import PROVIDER_PRESETS, build_maccms_sources
+
+        sources = set(build_maccms_sources().keys())
+        self.assertIn("maccms", sources)
+        for key in PROVIDER_PRESETS:
+            self.assertIn(key, sources)
+        cfg = WorkerRuntimeConfig(
+            control_base_url="http://app:3000/api/internal/crawler/v1",
+            worker_id=1,
+            machine_token="token-abc",
+            sources=("hanime", *sorted(sources)),
+        )
+        caps = cfg.capabilities()
+        self.assertIn("ikun", caps["sources"])
+        self.assertIn("hongniu", caps["sources"])
 
 
 if __name__ == "__main__":

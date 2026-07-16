@@ -85,6 +85,15 @@ paths:
       responses:
         '200':
           description: Reserved
+  /jobs/{id}/media/status:
+    post:
+      summary: Update a reserved media upload lifecycle status
+      security: [{ workerBearer: [], leaseToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/jobId'
+      responses:
+        '200':
+          description: Updated
   /jobs/{id}/credentials/refresh:
     post:
       summary: Short-lived storage credentials (Cache-Control no-store)
@@ -94,6 +103,15 @@ paths:
       responses:
         '200':
           description: Temporary credentials
+  /jobs/{id}/items/exists:
+    post:
+      summary: Lease-protected source mapping lookup for skipExisting
+      security: [{ workerBearer: [], leaseToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/jobId'
+      responses:
+        '200':
+          description: Existing catalog mapping or miss
   /jobs/{id}/items/commit:
     post:
       summary: Idempotent item commit

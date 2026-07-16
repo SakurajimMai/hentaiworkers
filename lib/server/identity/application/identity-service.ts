@@ -46,6 +46,7 @@ export class IdentityService {
       userId: user.id,
       username: user.username,
       role: user.role,
+      sessionVersion: user.sessionVersion ?? 1,
       isLoggedIn: true,
     });
   }
@@ -65,11 +66,15 @@ export class IdentityService {
   async requireAdmin(): Promise<UserRecord> {
     const session = await this.sessions.get();
     if (!session.isLoggedIn || !session.userId || session.role !== 'admin') {
-      throw new AppError('WORKER_FORBIDDEN', '未授权', 401);
+      throw new AppError('AUTH_REQUIRED', '未授权', 401);
     }
     const user = await this.users.findById(session.userId);
     if (!user || !user.isActive || user.role !== 'admin') {
-      throw new AppError('WORKER_FORBIDDEN', '未授权', 401);
+      throw new AppError('AUTH_REQUIRED', '未授权', 401);
+    }
+    if (!this.sessionVersionMatches(session.sessionVersion, user.sessionVersion)) {
+      await this.sessions.destroy();
+      throw new AppError('AUTH_REQUIRED', '未授权', 401);
     }
     return user;
   }
@@ -80,7 +85,7 @@ export class IdentityService {
     }
     const user = await this.users.findById(userId);
     if (!user) {
-      throw new AppError('WORKER_FORBIDDEN', '未授权', 401);
+      throw new AppError('AUTH_REQUIRED', '未授权', 401);
     }
     const ok = await this.passwords.verify(current, user.passwordHash);
     if (!ok) {
@@ -88,7 +93,10 @@ export class IdentityService {
     }
     await this.users.update(userId, {
       passwordHash: await this.passwords.hash(next),
+      bumpSessionVersion: true,
     });
+    // Current cookie is stale until re-login.
+    await this.sessions.destroy();
   }
 
   async createUser(input: {
@@ -133,7 +141,9 @@ export class IdentityService {
       role: input.role,
       displayName: input.displayName,
       isActive: input.isActive,
-      ...(passwordHash !== undefined ? { passwordHash } : {}),
+      ...(passwordHash !== undefined
+        ? { passwordHash, bumpSessionVersion: true }
+        : {}),
     };
     await this.users.update(id, patch);
   }
@@ -186,11 +196,15 @@ export class IdentityService {
   async requireUser(): Promise<UserRecord> {
     const session = await this.sessions.get();
     if (!session.isLoggedIn || !session.userId) {
-      throw new AppError('WORKER_FORBIDDEN', '请先登录', 401);
+      throw new AppError('AUTH_REQUIRED', '请先登录', 401);
     }
     const user = await this.users.findById(session.userId);
     if (!user || !user.isActive) {
-      throw new AppError('WORKER_FORBIDDEN', '请先登录', 401);
+      throw new AppError('AUTH_REQUIRED', '请先登录', 401);
+    }
+    if (!this.sessionVersionMatches(session.sessionVersion, user.sessionVersion)) {
+      await this.sessions.destroy();
+      throw new AppError('AUTH_REQUIRED', '请先登录', 401);
     }
     return user;
   }
@@ -200,7 +214,38 @@ export class IdentityService {
     if (!session.isLoggedIn || !session.userId) return null;
     const user = await this.users.findById(session.userId);
     if (!user || !user.isActive) return null;
+    if (!this.sessionVersionMatches(session.sessionVersion, user.sessionVersion)) {
+      await this.sessions.destroy();
+      return null;
+    }
     return user;
+  }
+
+  async getUserByUsername(username: string): Promise<UserRecord | null> {
+    const trimmed = username.trim();
+    const key = trimmed.includes('@') ? trimmed.toLowerCase() : trimmed;
+    return this.users.findByUsername(key);
+  }
+
+  async setPassword(userId: number, nextPassword: string): Promise<void> {
+    if (nextPassword.length < 8) {
+      throw new AppError('RESULT_INVALID', '密码至少 8 位', 400, false, { field: 'password' });
+    }
+    await this.users.update(userId, {
+      passwordHash: await this.passwords.hash(nextPassword),
+      bumpSessionVersion: true,
+    });
+  }
+
+  private sessionVersionMatches(
+    cookieVersion: number | undefined,
+    userVersion: number | undefined,
+  ): boolean {
+    const expected = userVersion ?? 1;
+    // Missing cookie version is treated as 1 for pre-migration sessions that
+    // have not re-logged-in; they remain valid until the first password bump.
+    const actual = cookieVersion ?? 1;
+    return actual === expected;
   }
 
   listUsers(): Promise<ReadonlyArray<UserRecord>> {

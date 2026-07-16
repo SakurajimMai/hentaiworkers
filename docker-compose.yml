@@ -3,17 +3,25 @@
 # - DB: remote MySQL only (no db service)
 # - Worker: optional, profile "worker"
 #
+# Full guide: docs/deployment.md
+#
 # Quick start (build locally):
-#   cp .env.example .env   # fill DATABASE_URL, SESSION_SECRET, …
+#   cp .env.example .env
+#   # fill DATABASE_URL, SESSION_SECRET, APP_ENCRYPTION_KEYRING,
+#   # APP_ENCRYPTION_CURRENT_KEY_ID, SITE_URL, ADMIN_BOOTSTRAP_*
+#   # migrate + seed (Node 22 or one-shot container) — see docs/deployment.md §4
 #   docker compose up -d --build app
+#   curl -sS http://127.0.0.1:3000/api/live && curl -sS http://127.0.0.1:3000/api/ready
 #
 # Pull prebuilt Hub images (set DOCKERHUB_USERNAME in .env or shell):
 #   docker compose pull app
-#   docker compose up -d app
+#   docker compose up -d --no-build app
 #
 # Optional crawler worker:
-#   # set CRAWLER_WORKER_TOKEN in .env first
+#   # set CRAWLER_WORKER_ID + CRAWLER_WORKER_TOKEN from /admin crawler workers
 #   docker compose --profile worker up -d --build
+#
+# Reverse proxy MUST terminate TLS and block public /api/internal/crawler/**
 
 services:
   app:

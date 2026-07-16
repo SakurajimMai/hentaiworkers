@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
-from crawler_worker.media.base import MediaAdapter, UploadResult
+from crawler_worker.media.base import MediaAdapter, UploadResult, sha256_file
 from crawler_worker.media.paths import public_url_for
 
 
@@ -39,6 +38,7 @@ class SFTPMediaAdapter(MediaAdapter):
         config: SFTPConfig,
         *,
         observed_fingerprint: str,
+        transport: Any | None = None,
     ) -> None:
         if not config.host_key_fingerprint or len(config.host_key_fingerprint) < 16:
             raise ValueError("host key fingerprint required")
@@ -47,14 +47,14 @@ class SFTPMediaAdapter(MediaAdapter):
             raise PermissionError("SFTP host key fingerprint mismatch")
         self._client = client
         self._config = config
+        self._transport = transport
 
     def _abs(self, key: str) -> str:
         root = self._config.root_path.rstrip("/")
         return f"{root}/{key.lstrip('/')}"
 
     def upload_staging(self, local_path: Path, staging_key: str) -> str:
-        data = local_path.read_bytes()
-        digest = hashlib.sha256(data).hexdigest()
+        digest = sha256_file(local_path)
         remote = self._abs(staging_key)
         self._ensure_parent(remote)
         with local_path.open("rb") as fl:
@@ -95,6 +95,14 @@ class SFTPMediaAdapter(MediaAdapter):
     def head(self, key: str) -> dict:
         st = self._client.stat(self._abs(key))
         return {"ContentLength": int(getattr(st, "st_size", 0))}
+
+    def close(self) -> None:
+        close_client = getattr(self._client, "close", None)
+        if callable(close_client):
+            close_client()
+        close_transport = getattr(self._transport, "close", None)
+        if callable(close_transport):
+            close_transport()
 
     def _ensure_parent(self, remote: str) -> None:
         parent = os.path.dirname(remote)

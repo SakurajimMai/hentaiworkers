@@ -19,14 +19,14 @@ export async function middleware(req: NextRequest) {
       );
       if (!isAdminSessionCookie(session)) {
         return NextResponse.json(
-          { error: { code: 'WORKER_FORBIDDEN', message: '需要管理员' } },
+          { error: { code: 'AUTH_REQUIRED', message: '需要管理员' } },
           { status: 403 },
         );
       }
       return res;
     } catch {
       return NextResponse.json(
-        { error: { code: 'WORKER_FORBIDDEN', message: '需要管理员' } },
+        { error: { code: 'AUTH_REQUIRED', message: '需要管理员' } },
         { status: 403 },
       );
     }

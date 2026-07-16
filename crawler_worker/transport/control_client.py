@@ -131,11 +131,45 @@ class ControlClient:
             status=str(data["status"]),
         )
 
+    def media_status(
+        self,
+        job: ClaimedJob,
+        upload_id: int,
+        status: str,
+    ) -> dict[str, Any]:
+        return self._json(
+            "POST",
+            f"/jobs/{job.job_id}/media/status",
+            {
+                "attemptId": job.attempt_id,
+                "uploadId": upload_id,
+                "status": status,
+            },
+            lease=job.lease_token,
+        )
+
     def credentials_refresh(self, job: ClaimedJob, prefix: str = "") -> dict[str, Any]:
         return self._json(
             "POST",
             f"/jobs/{job.job_id}/credentials/refresh",
             {"attemptId": job.attempt_id, "prefix": prefix},
+            lease=job.lease_token,
+        )
+
+    def item_exists(
+        self,
+        job: ClaimedJob,
+        source: str,
+        source_id: str,
+    ) -> dict[str, Any]:
+        return self._json(
+            "POST",
+            f"/jobs/{job.job_id}/items/exists",
+            {
+                "attemptId": job.attempt_id,
+                "source": source,
+                "sourceId": source_id,
+            },
             lease=job.lease_token,
         )
 
@@ -148,8 +182,26 @@ class ControlClient:
         source_id: str,
         status: str,
         anime_id: Optional[int] = None,
+        title: Optional[str] = None,
+        title_english: Optional[str] = None,
+        title_japanese: Optional[str] = None,
+        video_url: Optional[str] = None,
+        cover_url: Optional[str] = None,
+        fanart_urls: tuple[str, ...] = (),
+        description: Optional[str] = None,
+        tags: tuple[str, ...] = (),
+        release_year: Optional[int] = None,
+        release_date: Optional[str] = None,
+        remarks: Optional[str] = None,
+        actors: Optional[str] = None,
+        directors: Optional[str] = None,
+        aliases: Optional[str] = None,
+        area: Optional[str] = None,
+        lang: Optional[str] = None,
+        source_updated_at: Optional[str] = None,
         error_code: Optional[str] = None,
         error_message: Optional[str] = None,
+        play_lines: Optional[list[dict[str, Any]]] = None,
     ) -> ItemCommitResult:
         data = self._json(
             "POST",
@@ -161,8 +213,26 @@ class ControlClient:
                 "sourceId": source_id,
                 "status": status,
                 "animeId": anime_id,
+                "title": title,
+                "titleEnglish": title_english,
+                "titleJapanese": title_japanese,
+                "videoUrl": video_url,
+                "coverUrl": cover_url,
+                "fanartUrls": list(fanart_urls),
+                "description": description,
+                "tags": list(tags),
+                "releaseYear": release_year,
+                "releaseDate": release_date,
+                "remarks": remarks,
+                "actors": actors,
+                "directors": directors,
+                "aliases": aliases,
+                "area": area,
+                "lang": lang,
+                "sourceUpdatedAt": source_updated_at,
                 "errorCode": error_code,
                 "errorMessage": error_message,
+                "playLines": play_lines or [],
             },
             lease=job.lease_token,
         )
@@ -172,7 +242,16 @@ class ControlClient:
             status=str(data["status"]),
         )
 
-    def complete(self, job: ClaimedJob, idempotency_key: str, outcome: str = "succeeded") -> dict[str, Any]:
+    def complete(
+        self,
+        job: ClaimedJob,
+        idempotency_key: str,
+        outcome: str = "succeeded",
+        *,
+        succeeded_items: int = 0,
+        failed_items: int = 0,
+        continue_on_error: bool = True,
+    ) -> dict[str, Any]:
         return self._json(
             "POST",
             f"/jobs/{job.job_id}/complete",
@@ -180,6 +259,9 @@ class ControlClient:
                 "attemptId": job.attempt_id,
                 "idempotencyKey": idempotency_key,
                 "outcome": outcome,
+                "succeededItems": succeeded_items,
+                "failedItems": failed_items,
+                "continueOnError": continue_on_error,
             },
             lease=job.lease_token,
         )

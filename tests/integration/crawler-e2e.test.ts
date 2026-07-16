@@ -58,8 +58,10 @@ test('e2e: yaml import → manual job → worker claim → complete → cancel/r
           id: 1,
           username: 'admin',
           role: 'admin',
+          displayName: 'Admin',
           isActive: 1,
           passwordHash: 'x',
+          sessionVersion: 1,
         };
       },
     },

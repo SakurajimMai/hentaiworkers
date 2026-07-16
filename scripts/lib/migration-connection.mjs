@@ -8,23 +8,25 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 export const CRAWLER_CONTROL_TABLES_FALLBACK = Object.freeze([
   'crawler_profiles',
-  'crawler_profile_versions',
-  'storage_profiles',
-  'storage_profile_versions',
-  'secrets',
-  'secret_versions',
   'crawler_schedules',
-  'crawler_schedule_skips',
   'crawler_jobs',
   'crawler_job_attempts',
   'crawler_job_items',
   'crawler_job_events',
   'crawler_operation_receipts',
-  'crawler_media_uploads',
   'crawler_workers',
+  'anime_sources',
+]);
+
+export const CRAWLER_LEGACY_TABLES = Object.freeze([
+  'crawler_profile_versions',
+  // storage_profiles / storage_profile_versions / crawler_media_uploads are runtime
+  // tables again for Hanime direct-to-S3/SFTP publishing (migrations 0014/0015).
+  'secret_versions',
+  'secrets',
+  'crawler_schedule_skips',
   'worker_credentials',
   'audit_logs',
-  'anime_sources',
   'media_assets',
 ]);
 

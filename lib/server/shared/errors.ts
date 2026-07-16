@@ -14,6 +14,8 @@ export const APP_ERROR_CODES = [
   'WORKER_TOKEN_INVALID',
   'WORKER_TOKEN_REVOKED',
   'WORKER_FORBIDDEN',
+  /** Human session missing / invalid / not admin (identity layer). */
+  'AUTH_REQUIRED',
   'BATCH_TOO_LARGE',
   'DATABASE_TRANSIENT',
   'CANCELLED',
@@ -34,4 +36,11 @@ export class AppError extends Error {
     super(message);
     this.name = 'AppError';
   }
+}
+
+/** True when an error means the browser user must log in (or re-auth). */
+export function isAuthRequiredError(
+  error: unknown,
+): error is AppError & { code: 'AUTH_REQUIRED' } {
+  return error instanceof AppError && error.code === 'AUTH_REQUIRED';
 }

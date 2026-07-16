@@ -40,6 +40,7 @@ class MemoryUsers implements UserRepository {
       role: input.role,
       displayName: input.displayName ?? null,
       isActive: input.isActive ?? 1,
+      sessionVersion: 1,
     };
     this.rows.set(id, row);
     return row;
@@ -54,6 +55,9 @@ class MemoryUsers implements UserRepository {
       displayName: input.displayName === undefined ? current.displayName : input.displayName,
       isActive: input.isActive ?? current.isActive,
       passwordHash: input.passwordHash ?? current.passwordHash,
+      sessionVersion: input.bumpSessionVersion
+        ? current.sessionVersion + 1
+        : current.sessionVersion,
     });
   }
 
@@ -96,6 +100,43 @@ function build() {
   return { users, sessions, service };
 }
 
+test('password change bumps session version and rejects stale cookie', async () => {
+  const { users, sessions, service } = build();
+  const admin = await users.create({
+    username: 'admin',
+    passwordHash: 'hash:old-pass',
+    role: 'admin',
+    isActive: 1,
+  });
+
+  await service.login('admin', 'old-pass');
+  assert.equal(sessions.data.sessionVersion, 1);
+  assert.equal((await service.requireAdmin()).id, admin.id);
+
+  await service.changePassword(admin.id, 'old-pass', 'new-pass-ok');
+  const after = await users.findById(admin.id);
+  assert.equal(after?.sessionVersion, 2);
+  assert.equal(after?.passwordHash, 'hash:new-pass-ok');
+  // changePassword destroys current session.
+  assert.equal(sessions.data.isLoggedIn, false);
+
+  // Attacker still holding old sessionVersion=1 cookie.
+  sessions.data = {
+    isLoggedIn: true,
+    userId: admin.id,
+    username: 'admin',
+    role: 'admin',
+    sessionVersion: 1,
+  };
+  await assert.rejects(() => service.requireAdmin(), AppError);
+  assert.equal(sessions.data.isLoggedIn, false);
+
+  // Fresh login gets new version.
+  await service.login('admin', 'new-pass-ok');
+  assert.equal(sessions.data.sessionVersion, 2);
+  assert.equal((await service.requireAdmin()).id, admin.id);
+});
+
 test('session config is shared shape for middleware and node adapter', () => {
   const options = createSessionOptions({
     SESSION_SECRET: 'x'.repeat(32),
@@ -134,7 +175,7 @@ test('login rejects inactive users and requireAdmin rechecks database', async ()
   await users.update(admin.id, { isActive: 0 });
   await assert.rejects(() => service.requireAdmin(), (error: unknown) => {
     assert.ok(error instanceof AppError);
-    assert.equal(error.code, 'WORKER_FORBIDDEN');
+    assert.equal(error.code, 'AUTH_REQUIRED');
     return true;
   });
 });
@@ -179,6 +220,7 @@ test('changePassword requires current password and min length', async () => {
   await service.changePassword(admin.id, 'old-pass', 'long-enough');
   const updated = await users.findById(admin.id);
   assert.equal(updated?.passwordHash, 'hash:long-enough');
+  assert.equal(updated?.sessionVersion, 2);
 });
 
 test('middleware and iron adapter source share session-config module', () => {

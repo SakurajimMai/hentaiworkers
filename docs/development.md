@@ -11,9 +11,12 @@
 
 ```bash
 cp .env.example .env
-# 编辑 DATABASE_URL / SESSION_SECRET / SITE_URL 等
+# 编辑 DATABASE_URL / SESSION_SECRET / APP_ENCRYPTION_* / SITE_URL 等
+# 密钥：openssl rand -base64 48 与 openssl rand -base64 32（见 docs/deployment.md）
 
 npm install
+# 空库：CRAWLER_MIGRATE_CONFIRM=yes npm run db:setup:crawler
+# 已有库：CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
 npm run seed:admin   # 首次
 npm run dev          # http://localhost:3000
 ```
@@ -39,9 +42,17 @@ npm run dev          # http://localhost:3000
 | `npm run test:ts` | `tsx --test tests/**/*.test.ts` |
 | `npm run test:python` | `scripts/tests` + `crawler_worker/tests` |
 | `npm run seed:admin` | 引导管理员 |
-| `npm run db:push` | Drizzle 推送 schema（**慎用生产**） |
+| `npm run seed:maccms-profiles` | 种子 6 个日韩 MacCMS 模板 |
+| `npm run worker:provision` | 签发本地 Worker 令牌 → `.crawler-worker.env` |
+| `npm run worker:start` | 启动 Python crawler worker |
+| `npm run db:setup:crawler` | 全新库创建爬虫核心表（需 `CRAWLER_MIGRATE_CONFIRM=yes`） |
+| `npm run db:migrate:crawler` | 应用 `drizzle/migrations` 加法迁移（需确认变量） |
+| `npm run db:compact:crawler` | 旧爬虫表审计 / 可选收敛 |
+| `npm run db:push` | **已禁用**；生产只用审查过的 SQL |
 | `npm run db:studio` | Drizzle Studio |
 | `npm run check:legacy` | 检查是否误引入废弃路径 |
+
+生产 Compose 与服务器清单见 [deployment.md](./deployment.md)。
 
 ## 4. 代码约定
 

@@ -1,4 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { AppError } from '../../shared/errors';
+import { hashOpaqueToken } from '../domain/hashing';
+import { WORKER_SCOPES } from '../interfaces/worker-auth';
 import {
   parseCrawlerProfileConfig,
   parseStorageConfig,
@@ -41,8 +44,8 @@ export type AdminCrawlerDeps = Readonly<{
   jobs: CrawlerJobService;
   schedules: CrawlerScheduleService;
   profiles: CrawlerConfigService;
-  storage: StorageConfigService;
-  secrets: SecretService;
+  storage?: StorageConfigService;
+  secrets?: SecretService;
   yaml: YamlImportService;
   workers: WorkerRepository;
   /** Wall clock for online threshold (default 90s). */
@@ -138,6 +141,53 @@ export class AdminCrawlerService {
     return this.deps.workers.listWorkers();
   }
 
+  async listWorkerCredentials(workerId: number) {
+    const rows = await this.deps.workers.listCredentials(workerId);
+    return rows.map((row) => ({
+      id: row.id,
+      workerId: row.workerId,
+      isRevoked: row.isRevoked,
+      expiresAt: row.expiresAt,
+      createdAt: row.createdAt,
+      rotatedAt: row.rotatedAt,
+    }));
+  }
+
+  async provisionWorker(name: string) {
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      throw new AppError('RESULT_INVALID', 'Worker 名称必填', 400);
+    }
+    const token = randomBytes(32).toString('base64url');
+    const created = await this.deps.workers.createWorkerWithToken({
+      name: normalizedName,
+      tokenHash: hashOpaqueToken(token),
+      scopes: WORKER_SCOPES,
+      version: '1.0.0',
+    });
+    return {
+      worker: created.worker,
+      credentialId: created.credential.id,
+      token,
+      scopes: [...WORKER_SCOPES],
+    } as const;
+  }
+
+  async revokeWorkerCredential(credentialId: number): Promise<void> {
+    if (!Number.isInteger(credentialId) || credentialId <= 0) {
+      throw new AppError('RESULT_INVALID', '无效凭据 ID', 400);
+    }
+    await this.deps.workers.revokeCredential(credentialId);
+  }
+
+  async listProfiles() {
+    return this.deps.profiles.listProfiles();
+  }
+
+  async getProfileVersion(versionId: number) {
+    return this.deps.profiles.getVersion(versionId);
+  }
+
   async createProfile(name: string, config: unknown) {
     return this.deps.profiles.createProfile(name, config);
   }
@@ -162,22 +212,95 @@ export class AdminCrawlerService {
     });
   }
 
+  private async resolveProfileSnapshot(profileVersionId: number) {
+    if (!Number.isInteger(profileVersionId) || profileVersionId <= 0) {
+      throw new AppError('RESULT_INVALID', '请选择有效模板', 400);
+    }
+    const version = await this.deps.profiles.getVersion(profileVersionId);
+    if (!version) throw new AppError('RESULT_INVALID', '模板版本不存在', 404);
+
+    let storageProfileVersionId: number | null = null;
+    let configSnapshot: Record<string, unknown> = {
+      ...(version.config as unknown as Record<string, unknown>),
+    };
+    const driver = version.config.storageDriver;
+    if (driver === 's3' || driver === 'sftp') {
+      const storage = await this.requireStorage().findActiveByDriver(driver);
+      if (!storage) {
+        throw new AppError(
+          'RESULT_CONFLICT',
+          `模板要求 ${driver.toUpperCase()} 存储，但尚无已激活且通过 storage_test 的配置。请先在「爬虫 → 存储」创建并激活。`,
+          409,
+          false,
+          { storageDriver: driver },
+        );
+      }
+      storageProfileVersionId = storage.id;
+      configSnapshot = {
+        ...configSnapshot,
+        storageProfileVersionId: storage.id,
+        storageConfig: storage.config,
+      };
+    }
+    return {
+      version,
+      storageProfileVersionId,
+      configSnapshotJson: JSON.stringify(configSnapshot),
+    };
+  }
+
+  async startProfileJob(profileVersionId: number): Promise<JobRecord> {
+    const resolved = await this.resolveProfileSnapshot(profileVersionId);
+    return this.deps.jobs.enqueueManual({
+      kind: 'crawl',
+      profileId: resolved.version.profileId,
+      profileVersionId: resolved.version.id,
+      storageProfileVersionId: resolved.storageProfileVersionId,
+      configSnapshotJson: resolved.configSnapshotJson,
+    });
+  }
+
   async startStorageTestJob(input: {
     profileId: number;
     storageProfileVersionId: number;
     configSnapshotJson: string;
   }): Promise<JobRecord> {
+    const version = await this.requireStorage().getVersion(input.storageProfileVersionId);
+    if (!version) {
+      throw new AppError('RESULT_INVALID', '存储版本不存在', 404);
+    }
+    const snapshot = {
+      kind: 'storage_test',
+      storageProfileVersionId: version.id,
+      storageConfig: version.config,
+    };
     return this.deps.jobs.enqueueManual({
       kind: 'storage_test',
       profileId: input.profileId,
       profileVersionId: 0,
       storageProfileVersionId: input.storageProfileVersionId,
-      configSnapshotJson: input.configSnapshotJson,
+      configSnapshotJson: JSON.stringify(snapshot),
     });
   }
 
-  async saveSchedule(input: Parameters<CrawlerScheduleService['create']>[0]): Promise<ScheduleRecord> {
-    return this.deps.schedules.create(input);
+  async saveSchedule(
+    input: Omit<Parameters<CrawlerScheduleService['create']>[0],
+      'profileId' | 'storageProfileVersionId' | 'configSnapshotJson'> & {
+        profileId?: number;
+        configSnapshotJson?: string;
+      },
+  ): Promise<ScheduleRecord> {
+    const resolved = await this.resolveProfileSnapshot(input.profileVersionId);
+    if (input.profileId != null && input.profileId > 0 && input.profileId !== resolved.version.profileId) {
+      throw new AppError('RESULT_INVALID', '模板 ID 与版本不匹配', 400);
+    }
+    return this.deps.schedules.create({
+      ...input,
+      profileId: resolved.version.profileId,
+      profileVersionId: resolved.version.id,
+      storageProfileVersionId: resolved.storageProfileVersionId,
+      configSnapshotJson: resolved.configSnapshotJson,
+    });
   }
 
   async cancelJob(jobId: number): Promise<JobRecord> {
@@ -186,6 +309,19 @@ export class AdminCrawlerService {
 
   async retryJob(jobId: number): Promise<JobRecord> {
     return this.deps.jobs.manualRetry(jobId);
+  }
+
+  async deleteJob(jobId: number): Promise<void> {
+    return this.deps.jobs.deleteJob(jobId);
+  }
+
+  async purgeTerminalJobs(input: {
+    olderThanDays: number;
+    statuses?: readonly import('../domain/job').CrawlerJobStatus[];
+    batchSize?: number;
+    maxTotal?: number;
+  }): Promise<{ deleted: number; truncated: boolean }> {
+    return this.deps.jobs.purgeTerminalJobs(input);
   }
 
   async getJob(jobId: number): Promise<JobRecord | null> {
@@ -218,36 +354,66 @@ export class AdminCrawlerService {
       const events = attempt
         ? await repos.events.listByAttempt(jobId, attempt.id)
         : [];
-      const media = (await repos.media.listByStatus('reserved'))
-        .concat(await repos.media.listByStatus('uploaded'))
-        .concat(await repos.media.listByStatus('published'))
-        .filter((m) => m.jobId === jobId);
-      return { job, attempt, items, events, media };
+      return { job, attempt, items, events, media: [] as const };
     });
   }
 
+  private requireSecrets(): SecretService {
+    if (!this.deps.secrets) {
+      throw new AppError('CONFIG_INVALID', '精简外链采集模式未启用独立爬虫密钥库', 410);
+    }
+    return this.deps.secrets;
+  }
+
+  private requireStorage(): StorageConfigService {
+    if (!this.deps.storage) {
+      throw new AppError('CONFIG_INVALID', '精简外链采集模式未启用对象上传存储', 410);
+    }
+    return this.deps.storage;
+  }
+
   async createSecret(name: string, scope: string, plaintext: string): Promise<SecretMeta> {
-    return this.deps.secrets.create({ name, scope, plaintext });
+    return this.requireSecrets().create({ name, scope, plaintext });
   }
 
   async revealSecret(secretId: number) {
-    return this.deps.secrets.reveal(secretId);
+    return this.requireSecrets().reveal(secretId);
   }
 
   async listSecrets() {
-    return this.deps.secrets.list();
+    return this.requireSecrets().list();
+  }
+
+  async listStorageProfiles() {
+    return this.requireStorage().listProfiles();
+  }
+
+  async listStorageVersions(profileId: number) {
+    return this.requireStorage().listVersions(profileId);
+  }
+
+  async getStorageVersion(versionId: number) {
+    return this.requireStorage().getVersion(versionId);
   }
 
   async createStorageDraft(name: string, config: unknown) {
-    return this.deps.storage.createDraft(name, config);
+    return this.requireStorage().createDraft(name, config);
+  }
+
+  async appendStorageDraft(profileId: number, config: unknown) {
+    return this.requireStorage().appendDraft(profileId, config);
   }
 
   async activateStorage(versionId: number) {
-    return this.deps.storage.activate(versionId);
+    return this.requireStorage().activate(versionId);
   }
 
   async markStorageTestPassed(versionId: number) {
-    return this.deps.storage.markStorageTestPassed(versionId);
+    return this.requireStorage().markStorageTestPassed(versionId);
+  }
+
+  async findActiveStorageByDriver(driver: 's3' | 'sftp') {
+    return this.requireStorage().findActiveByDriver(driver);
   }
 
   previewYaml(raw: string): YamlImportPreview {

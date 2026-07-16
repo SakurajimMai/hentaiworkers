@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import type { CatalogIngestionPort } from '../ports/catalog-ingestion-port';
+import type { StorageConfigService } from '../application/storage-config-service';
 import { CrawlerJobService } from '../application/crawler-job-service';
 import { CrawlerLogService } from '../application/crawler-log-service';
 import { CrawlerResultService } from '../application/crawler-result-service';
@@ -28,17 +30,21 @@ export type TestWorkerApi = Readonly<{
   }>;
 }>;
 
-export function createTestWorkerApi(): TestWorkerApi {
+export function createTestWorkerApi(options?: {
+  catalog?: CatalogIngestionPort;
+  storage?: StorageConfigService;
+}): TestWorkerApi {
   const uow = new InMemoryCrawlerUnitOfWork();
   const workers = new InMemoryWorkerRepository();
   const deps: WorkerApiDeps = {
     auth: new WorkerAuthService(workers),
     registry: new WorkerRegistryService(workers),
     jobs: new CrawlerJobService(uow),
-    results: new CrawlerResultService(uow),
+    results: new CrawlerResultService(uow, options?.catalog),
     logs: new CrawlerLogService(uow),
     media: new MediaReservationService(uow),
     credentials: new CredentialRefreshService(uow, testOnlyCredentialIssuer),
+    storage: options?.storage,
   };
 
   return {

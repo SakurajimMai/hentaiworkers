@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { db, withDbRetry } from '@/lib/db';
 import { users } from '@/lib/schema';
 import type {
@@ -16,6 +16,7 @@ function mapUser(row: typeof users.$inferSelect): UserRecord {
     role: row.role,
     displayName: row.displayName,
     isActive: row.isActive,
+    sessionVersion: Number(row.sessionVersion ?? 1),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -58,7 +59,20 @@ export class MariaDbUserRepository implements UserRepository {
       if (input.displayName !== undefined) patch.displayName = input.displayName;
       if (input.isActive !== undefined) patch.isActive = input.isActive;
       if (input.passwordHash !== undefined) patch.passwordHash = input.passwordHash;
-      if (Object.keys(patch).length === 0) return;
+      if (Object.keys(patch).length === 0 && !input.bumpSessionVersion) return;
+
+      if (input.bumpSessionVersion) {
+        // Atomic bump so concurrent password changes cannot reuse the same epoch.
+        await db
+          .update(users)
+          .set({
+            ...patch,
+            sessionVersion: sql`${users.sessionVersion} + 1`,
+          })
+          .where(eq(users.id, id));
+        return;
+      }
+
       await db.update(users).set(patch).where(eq(users.id, id));
     });
   }

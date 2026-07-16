@@ -21,7 +21,8 @@ async function ensureUsersTable() {
 }
 
 async function main() {
-  const username = process.env.ADMIN_BOOTSTRAP_USER || 'admin';
+  // Login id is username; public site uses email-as-username — prefer a real mailbox for admin.
+  const username = process.env.ADMIN_BOOTSTRAP_USER || 'admin@ixacg.top';
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD || 'admin123456';
 
   await ensureUsersTable();

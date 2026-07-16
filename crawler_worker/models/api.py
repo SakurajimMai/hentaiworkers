@@ -66,5 +66,22 @@ class CrawlItemResult:
     cover_url: Optional[str]
     tags: tuple[str, ...]
     status: Literal["succeeded", "failed", "skipped"]
+    title_english: Optional[str] = None
+    title_japanese: Optional[str] = None
+    description: Optional[str] = None
+    fanart_urls: tuple[str, ...] = ()
+    release_year: Optional[int] = None
+    release_date: Optional[str] = None
+    remarks: Optional[str] = None
+    actors: Optional[str] = None
+    directors: Optional[str] = None
+    aliases: Optional[str] = None
+    area: Optional[str] = None
+    lang: Optional[str] = None
+    source_updated_at: Optional[str] = None
     error_code: Optional[str] = None
     error_message: Optional[str] = None
+    # Source page used as Referer for protected media downloads; never persisted.
+    source_page_url: Optional[str] = None
+    # [{name, flag, episodes:[{name,url}]}]
+    play_lines: tuple[dict[str, Any], ...] = ()

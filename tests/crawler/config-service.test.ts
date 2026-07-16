@@ -22,6 +22,14 @@ const sampleProfile = (): CrawlerProfileConfig => ({
   concurrency: { download: 2, parse: 2 },
   continueOnError: true,
   maxActiveJobs: 1,
+  skipExisting: true,
+  requestDelaySeconds: 1,
+  media: {
+    enableVideo: true,
+    enableCover: true,
+    enableFanart: true,
+    maxFanartImages: 50,
+  },
 });
 
 const sampleS3 = (): StorageConfig =>

@@ -4,6 +4,7 @@ import type { CrawlerResultService } from '../application/crawler-result-service
 import type { CredentialRefreshService } from '../application/credential-refresh-service';
 import type { MediaReservationService } from '../application/media-reservation-service';
 import type { WorkerRegistryService } from '../application/worker-registry-service';
+import type { StorageConfigService } from '../application/storage-config-service';
 import type { WorkerAuthService } from './worker-auth';
 import { AppError } from '../../shared/errors';
 import { getProcessEnvironment } from '../../shared/config';
@@ -22,6 +23,8 @@ export type WorkerApiDeps = Readonly<{
   logs: CrawlerLogService;
   media: MediaReservationService;
   credentials: CredentialRefreshService;
+  /** Optional for external-only tests; production marks successful storage_test versions. */
+  storage?: StorageConfigService;
 }>;
 
 let overrideDeps: WorkerApiDeps | null = null;

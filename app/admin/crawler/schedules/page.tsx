@@ -12,7 +12,14 @@ export default async function CrawlerSchedulesPage({
 }) {
   await requireAdmin();
   const sp = await searchParams;
-  const overdue = await getAdminCrawlerService().getDashboard().then((d) => d.overdueSchedules);
+  const service = getAdminCrawlerService();
+  const [overdue, profiles] = await Promise.all([
+    service.getDashboard().then((d) => d.overdueSchedules),
+    service.listProfiles(),
+  ]);
+  const runnableProfiles = profiles.filter(
+    (profile) => profile.isEnabled && profile.currentVersionId != null,
+  );
 
   return (
     <div className="space-y-6">
@@ -29,13 +36,15 @@ export default async function CrawlerSchedulesPage({
           名称
           <input name="name" required className="mt-1 w-full border border-[#EAEAEA] px-3 py-2 font-ui text-sm" />
         </label>
-        <label className="block font-meta text-[12px]">
-          Profile ID
-          <input name="profileId" defaultValue="1" className="mt-1 w-full border border-[#EAEAEA] px-3 py-2 font-ui text-sm" />
-        </label>
-        <label className="block font-meta text-[12px]">
-          Profile Version ID
-          <input name="profileVersionId" defaultValue="1" className="mt-1 w-full border border-[#EAEAEA] px-3 py-2 font-ui text-sm" />
+        <label className="block font-meta text-[12px] sm:col-span-2">
+          采集模板
+          <select name="profileVersionId" required className="admin-input mt-1">
+            {runnableProfiles.map((profile) => (
+              <option key={profile.id} value={profile.currentVersionId!}>
+                {profile.name}（#{profile.id}）
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block font-meta text-[12px]">
           类型
@@ -87,10 +96,9 @@ export default async function CrawlerSchedulesPage({
           next_run_at (ISO，可选)
           <input name="nextRunAt" placeholder={new Date().toISOString()} className="mt-1 w-full border border-[#EAEAEA] px-3 py-2 font-ui text-sm" />
         </label>
-        <label className="block font-meta text-[12px] sm:col-span-2">
-          config snapshot JSON
-          <textarea name="configSnapshotJson" rows={3} defaultValue="{}" className="mt-1 w-full border border-[#EAEAEA] px-3 py-2 font-mono text-[12px]" />
-        </label>
+        <p className="sm:col-span-2 font-meta text-[12px] text-[#787774]">
+          调度保存时自动复制模板与已激活 S3/SFTP 版本；后续修改模板或存储不会改变本调度快照。
+        </p>
         <div className="sm:col-span-2">
           <button type="submit" className="btn-ink">
             保存调度

@@ -9,99 +9,30 @@ import {
   text,
   tinyint,
   uniqueIndex,
-  varbinary,
   varchar,
 } from 'drizzle-orm/mysql-core';
 import { sql } from 'drizzle-orm';
 
-/** Prefer UTC via connection timezone (mysql2 `timezone: 'Z'`) + CURRENT_TIMESTAMP. */
 const utcNow = sql`CURRENT_TIMESTAMP`;
 
 export const crawlerProfiles = mysqlTable('crawler_profiles', {
   id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
   name: varchar('name', { length: 128 }).notNull(),
+  version: int('version', { unsigned: true }).notNull().default(1),
+  schemaVersion: int('schema_version', { unsigned: true }).notNull().default(1),
+  configJson: text('config_json').notNull(),
   isEnabled: tinyint('is_enabled').notNull().default(1),
-  currentVersionId: bigint('current_version_id', { mode: 'number', unsigned: true }),
   createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
   updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
 });
-
-export const crawlerProfileVersions = mysqlTable(
-  'crawler_profile_versions',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    profileId: bigint('profile_id', { mode: 'number', unsigned: true }).notNull(),
-    version: int('version', { unsigned: true }).notNull(),
-    schemaVersion: int('schema_version', { unsigned: true }).notNull().default(1),
-    configJson: text('config_json').notNull(),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-    createdByUserId: bigint('created_by_user_id', { mode: 'number', unsigned: true }),
-  },
-  (t) => [
-    uniqueIndex('crawler_profile_versions_profile_version_uidx').on(t.profileId, t.version),
-    index('crawler_profile_versions_profile_id_idx').on(t.profileId),
-  ],
-);
-
-export const storageProfiles = mysqlTable('storage_profiles', {
-  id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-  name: varchar('name', { length: 128 }).notNull(),
-  driver: mysqlEnum('driver', ['s3', 'sftp']).notNull(),
-  isEnabled: tinyint('is_enabled').notNull().default(1),
-  currentVersionId: bigint('current_version_id', { mode: 'number', unsigned: true }),
-  createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-  updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
-});
-
-export const storageProfileVersions = mysqlTable(
-  'storage_profile_versions',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    profileId: bigint('profile_id', { mode: 'number', unsigned: true }).notNull(),
-    version: int('version', { unsigned: true }).notNull(),
-    configJson: text('config_json').notNull(),
-    storageTestPassed: tinyint('storage_test_passed').notNull().default(0),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-    createdByUserId: bigint('created_by_user_id', { mode: 'number', unsigned: true }),
-  },
-  (t) => [
-    uniqueIndex('storage_profile_versions_profile_version_uidx').on(t.profileId, t.version),
-  ],
-);
-
-export const secrets = mysqlTable('secrets', {
-  id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-  name: varchar('name', { length: 128 }).notNull(),
-  scope: varchar('scope', { length: 64 }).notNull(),
-  isRevoked: tinyint('is_revoked').notNull().default(0),
-  currentVersionId: bigint('current_version_id', { mode: 'number', unsigned: true }),
-  createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-  updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
-});
-
-export const secretVersions = mysqlTable(
-  'secret_versions',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    secretId: bigint('secret_id', { mode: 'number', unsigned: true }).notNull(),
-    version: int('version', { unsigned: true }).notNull(),
-    keyId: varchar('key_id', { length: 64 }).notNull(),
-    ciphertext: varbinary('ciphertext', { length: 4096 }).notNull(),
-    nonce: binary('nonce', { length: 12 }).notNull(),
-    authTag: binary('auth_tag', { length: 16 }).notNull(),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-    createdByUserId: bigint('created_by_user_id', { mode: 'number', unsigned: true }),
-  },
-  (t) => [
-    uniqueIndex('secret_versions_secret_version_uidx').on(t.secretId, t.version),
-  ],
-);
 
 export const crawlerSchedules = mysqlTable(
   'crawler_schedules',
   {
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
     profileId: bigint('profile_id', { mode: 'number', unsigned: true }).notNull(),
+    profileVersionId: bigint('profile_version_id', { mode: 'number', unsigned: true }).notNull(),
+    storageProfileVersionId: bigint('storage_profile_version_id', { mode: 'number', unsigned: true }),
     name: varchar('name', { length: 128 }).notNull(),
     kind: mysqlEnum('kind', ['manual', 'interval', 'daily', 'weekly', 'cron']).notNull(),
     cronExpression: varchar('cron_expression', { length: 64 }),
@@ -118,19 +49,7 @@ export const crawlerSchedules = mysqlTable(
     createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
     updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
   },
-  (t) => [index('crawler_schedules_profile_id_idx').on(t.profileId)],
-);
-
-export const crawlerScheduleSkips = mysqlTable(
-  'crawler_schedule_skips',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    scheduleId: bigint('schedule_id', { mode: 'number', unsigned: true }).notNull(),
-    scheduledFor: datetime('scheduled_for', { mode: 'string' }).notNull(),
-    reason: varchar('reason', { length: 255 }).notNull(),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-  },
-  (t) => [index('crawler_schedule_skips_schedule_id_idx').on(t.scheduleId)],
+  (table) => [index('crawler_schedules_profile_id_idx').on(table.profileId)],
 );
 
 export const crawlerJobs = mysqlTable(
@@ -139,15 +58,8 @@ export const crawlerJobs = mysqlTable(
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
     kind: mysqlEnum('kind', ['crawl', 'storage_test', 'cleanup']).notNull().default('crawl'),
     status: mysqlEnum('status', [
-      'queued',
-      'leased',
-      'running',
-      'retry_wait',
-      'cancel_requested',
-      'succeeded',
-      'partial_succeeded',
-      'failed',
-      'cancelled',
+      'queued', 'leased', 'running', 'retry_wait', 'cancel_requested',
+      'succeeded', 'partial_succeeded', 'failed', 'cancelled',
     ]).notNull().default('queued'),
     profileId: bigint('profile_id', { mode: 'number', unsigned: true }),
     profileVersionId: bigint('profile_version_id', { mode: 'number', unsigned: true }),
@@ -167,10 +79,10 @@ export const crawlerJobs = mysqlTable(
     startedAt: datetime('started_at', { mode: 'string' }),
     finishedAt: datetime('finished_at', { mode: 'string' }),
   },
-  (t) => [
-    uniqueIndex('crawler_jobs_schedule_scheduled_for_uidx').on(t.scheduleId, t.scheduledFor),
-    index('crawler_jobs_status_idx').on(t.status),
-    index('crawler_jobs_profile_id_idx').on(t.profileId),
+  (table) => [
+    uniqueIndex('crawler_jobs_schedule_scheduled_for_uidx').on(table.scheduleId, table.scheduledFor),
+    index('crawler_jobs_status_idx').on(table.status),
+    index('crawler_jobs_profile_id_idx').on(table.profileId),
   ],
 );
 
@@ -186,19 +98,12 @@ export const crawlerJobAttempts = mysqlTable(
     startedAt: datetime('started_at', { mode: 'string' }).notNull().default(utcNow),
     finishedAt: datetime('finished_at', { mode: 'string' }),
     resultStatus: mysqlEnum('result_status', [
-      'running',
-      'succeeded',
-      'partial_succeeded',
-      'failed',
-      'cancelled',
-      'lease_lost',
+      'running', 'succeeded', 'partial_succeeded', 'failed', 'cancelled', 'lease_lost',
     ]).notNull().default('running'),
-    errorCode: varchar('error_code', { length: 64 }),
-    errorMessage: text('error_message'),
   },
-  (t) => [
-    uniqueIndex('crawler_job_attempts_job_attempt_uidx').on(t.jobId, t.attemptNo),
-    index('crawler_job_attempts_worker_id_idx').on(t.workerId),
+  (table) => [
+    uniqueIndex('crawler_job_attempts_job_attempt_uidx').on(table.jobId, table.attemptNo),
+    index('crawler_job_attempts_worker_id_idx').on(table.workerId),
   ],
 );
 
@@ -211,23 +116,16 @@ export const crawlerJobItems = mysqlTable(
     sourceId: varchar('source_id', { length: 255 }).notNull(),
     sourceKeyHash: binary('source_key_hash', { length: 32 }).notNull(),
     stage: varchar('stage', { length: 64 }).notNull().default('pending'),
-    status: mysqlEnum('status', [
-      'pending',
-      'running',
-      'succeeded',
-      'failed',
-      'skipped',
-      'cancelled',
-    ]).notNull().default('pending'),
+    status: mysqlEnum('status', ['pending', 'running', 'succeeded', 'failed', 'skipped', 'cancelled']).notNull().default('pending'),
     animeId: bigint('anime_id', { mode: 'number', unsigned: true }),
     errorCode: varchar('error_code', { length: 64 }),
     errorMessage: text('error_message'),
     createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
     updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
   },
-  (t) => [
-    uniqueIndex('crawler_job_items_job_source_uidx').on(t.jobId, t.source, t.sourceId),
-    uniqueIndex('crawler_job_items_source_key_hash_uidx').on(t.jobId, t.sourceKeyHash),
+  (table) => [
+    uniqueIndex('crawler_job_items_job_source_uidx').on(table.jobId, table.source, table.sourceId),
+    uniqueIndex('crawler_job_items_source_key_hash_uidx').on(table.jobId, table.sourceKeyHash),
   ],
 );
 
@@ -244,9 +142,9 @@ export const crawlerJobEvents = mysqlTable(
     payloadJson: text('payload_json'),
     createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
   },
-  (t) => [
-    uniqueIndex('crawler_job_events_job_attempt_seq_uidx').on(t.jobId, t.attemptId, t.sequence),
-    index('crawler_job_events_job_id_idx').on(t.jobId),
+  (table) => [
+    uniqueIndex('crawler_job_events_job_attempt_seq_uidx').on(table.jobId, table.attemptId, table.sequence),
+    index('crawler_job_events_job_id_idx').on(table.jobId),
   ],
 );
 
@@ -262,81 +160,28 @@ export const crawlerOperationReceipts = mysqlTable(
     responseJson: text('response_json').notNull(),
     createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
   },
-  (t) => [
-    uniqueIndex('crawler_operation_receipts_scope_key_uidx').on(
-      t.operationScope,
-      t.idempotencyKeyHash,
-    ),
+  (table) => [
+    uniqueIndex('crawler_operation_receipts_scope_key_uidx').on(table.operationScope, table.idempotencyKeyHash),
   ],
 );
 
-export const crawlerMediaUploads = mysqlTable(
-  'crawler_media_uploads',
+export const crawlerWorkers = mysqlTable(
+  'crawler_workers',
   {
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    jobId: bigint('job_id', { mode: 'number', unsigned: true }).notNull(),
-    attemptId: bigint('attempt_id', { mode: 'number', unsigned: true }).notNull(),
-    itemId: bigint('item_id', { mode: 'number', unsigned: true }),
-    stagingKey: varchar('staging_key', { length: 512 }).notNull(),
-    finalKey: varchar('final_key', { length: 512 }).notNull(),
-    status: mysqlEnum('status', [
-      'reserved',
-      'uploaded',
-      'published',
-      'abandoned',
-      'cleaned',
-    ]).notNull().default('reserved'),
+    name: varchar('name', { length: 128 }).notNull(),
+    version: varchar('version', { length: 64 }).notNull(),
+    capabilitiesJson: text('capabilities_json').notNull(),
+    lastHeartbeatAt: datetime('last_heartbeat_at', { mode: 'string' }),
+    isEnabled: tinyint('is_enabled').notNull().default(1),
+    tokenHash: binary('token_hash', { length: 32 }),
+    scopeJson: text('scope_json').notNull(),
+    tokenRevoked: tinyint('token_revoked').notNull().default(0),
+    tokenExpiresAt: datetime('token_expires_at', { mode: 'string' }),
     createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
     updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
   },
-  (t) => [
-    index('crawler_media_uploads_job_attempt_idx').on(t.jobId, t.attemptId),
-    uniqueIndex('crawler_media_uploads_staging_key_uidx').on(t.stagingKey),
-  ],
-);
-
-export const crawlerWorkers = mysqlTable('crawler_workers', {
-  id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-  name: varchar('name', { length: 128 }).notNull(),
-  version: varchar('version', { length: 64 }).notNull(),
-  capabilitiesJson: text('capabilities_json').notNull(),
-  lastHeartbeatAt: datetime('last_heartbeat_at', { mode: 'string' }),
-  isEnabled: tinyint('is_enabled').notNull().default(1),
-  createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-  updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
-});
-
-export const workerCredentials = mysqlTable(
-  'worker_credentials',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    workerId: bigint('worker_id', { mode: 'number', unsigned: true }).notNull(),
-    tokenHash: binary('token_hash', { length: 32 }).notNull(),
-    scopeJson: text('scope_json').notNull(),
-    isRevoked: tinyint('is_revoked').notNull().default(0),
-    expiresAt: datetime('expires_at', { mode: 'string' }),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-    rotatedAt: datetime('rotated_at', { mode: 'string' }),
-  },
-  (t) => [
-    uniqueIndex('worker_credentials_token_hash_uidx').on(t.tokenHash),
-    index('worker_credentials_worker_id_idx').on(t.workerId),
-  ],
-);
-
-export const auditLogs = mysqlTable(
-  'audit_logs',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    actorType: mysqlEnum('actor_type', ['admin', 'worker', 'system']).notNull(),
-    actorId: bigint('actor_id', { mode: 'number', unsigned: true }),
-    action: varchar('action', { length: 128 }).notNull(),
-    resourceType: varchar('resource_type', { length: 64 }).notNull(),
-    resourceId: varchar('resource_id', { length: 64 }),
-    payloadJson: text('payload_json'),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-  },
-  (t) => [index('audit_logs_resource_idx').on(t.resourceType, t.resourceId)],
+  (table) => [uniqueIndex('crawler_workers_token_hash_uidx').on(table.tokenHash)],
 );
 
 export const animeSources = mysqlTable(
@@ -349,50 +194,21 @@ export const animeSources = mysqlTable(
     sourceKeyHash: binary('source_key_hash', { length: 32 }).notNull(),
     createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
   },
-  (t) => [
-    uniqueIndex('anime_sources_source_uidx').on(t.source, t.sourceId),
-    uniqueIndex('anime_sources_source_key_hash_uidx').on(t.sourceKeyHash),
-    index('anime_sources_anime_id_idx').on(t.animeId),
+  (table) => [
+    uniqueIndex('anime_sources_source_uidx').on(table.source, table.sourceId),
+    uniqueIndex('anime_sources_source_key_hash_uidx').on(table.sourceKeyHash),
+    index('anime_sources_anime_id_idx').on(table.animeId),
   ],
 );
 
-export const mediaAssets = mysqlTable(
-  'media_assets',
-  {
-    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
-    animeId: bigint('anime_id', { mode: 'number', unsigned: true }).notNull(),
-    kind: mysqlEnum('kind', ['video', 'cover', 'fanart']).notNull(),
-    storageDriver: mysqlEnum('storage_driver', ['s3', 'sftp', 'external']).notNull(),
-    objectKey: varchar('object_key', { length: 512 }),
-    publicUrl: varchar('public_url', { length: 1000 }),
-    checksumSha256: binary('checksum_sha256', { length: 32 }),
-    byteSize: bigint('byte_size', { mode: 'number', unsigned: true }),
-    status: mysqlEnum('status', ['active', 'pending', 'deleted']).notNull().default('active'),
-    createdAt: datetime('created_at', { mode: 'string' }).notNull().default(utcNow),
-    updatedAt: datetime('updated_at', { mode: 'string' }).notNull().default(utcNow),
-  },
-  (t) => [index('media_assets_anime_id_idx').on(t.animeId)],
-);
-
-/** Tables introduced by the crawler control-plane migration (additive only). */
 export const CRAWLER_CONTROL_TABLES = [
   'crawler_profiles',
-  'crawler_profile_versions',
-  'storage_profiles',
-  'storage_profile_versions',
-  'secrets',
-  'secret_versions',
   'crawler_schedules',
-  'crawler_schedule_skips',
   'crawler_jobs',
   'crawler_job_attempts',
   'crawler_job_items',
   'crawler_job_events',
   'crawler_operation_receipts',
-  'crawler_media_uploads',
   'crawler_workers',
-  'worker_credentials',
-  'audit_logs',
   'anime_sources',
-  'media_assets',
 ] as const;

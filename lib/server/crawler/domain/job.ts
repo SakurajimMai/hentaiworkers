@@ -24,6 +24,11 @@ export const TERMINAL_JOB_STATUSES = [
 
 const TERMINAL = new Set<string>(TERMINAL_JOB_STATUSES);
 
+/** Statuses an admin may hard-delete (history cleanup only). */
+export function isDeletableJobStatus(status: CrawlerJobStatus): boolean {
+  return isTerminalJobStatus(status);
+}
+
 export type JobTransitionEvent =
   | { type: 'claim' }
   | { type: 'start' }

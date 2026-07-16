@@ -6,9 +6,15 @@ import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CrawlerDashboardPage() {
+export default async function CrawlerDashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ notice?: string }>;
+}) {
   await requireAdmin();
   const dash = await getAdminCrawlerService().getDashboard();
+  const params = (await searchParams) ?? {};
+  const externalNotice = params.notice === 'external-storage';
 
   return (
     <div className="space-y-6">
@@ -18,11 +24,20 @@ export default async function CrawlerDashboardPage() {
         <p className="mt-2 font-ui text-sm text-[#787774] max-w-2xl leading-relaxed">
           主程序（Next.js）负责配置与任务；Python 采集以<strong>同仓库组件</strong>
           <code className="mx-1 font-mono text-[12px]">crawler_worker</code>
-          运行（开发可本机启动，生产可用 Compose 同栈部署）。你只需在后台填表单，不必再维护
-          YAML / JSON 配置文件。
+          运行（开发可本机启动，生产可用 Compose 同栈部署）。默认模式只保存来源外链，
+          不需要独立对象存储/密钥库。
         </p>
       </div>
       <CrawlerNav current="/admin/crawler" />
+      {externalNotice ? (
+        <p className="surface-card p-4 font-ui text-sm text-[#444]">
+          MacCMS 外链采集不需要对象存储。Hanime 下载上传请到{' '}
+          <Link href="/admin/crawler/storage" className="underline text-[#111]">
+            爬虫 → 存储
+          </Link>{' '}
+          配置并激活 S3/SFTP。
+        </p>
+      ) : null}
 
       <section className="surface-card p-5 space-y-3">
         <h2 className="font-ui text-sm font-semibold">推荐操作路径</h2>
@@ -40,18 +55,23 @@ export default async function CrawlerDashboardPage() {
             ：手动入队并查看进度（仅写外链 URL 时<strong>不需要</strong>真实 S3）
           </li>
           <li>
-            （可选）
+            <Link href="/admin/crawler/workers" className="underline">
+              Worker
+            </Link>
+            ：创建节点并复制一次性机器令牌
+          </li>
+          <li>
             <Link href="/admin/crawler/storage" className="underline">
               存储
             </Link>
-            ：仅当需要把媒体文件上传到对象存储时配置 S3 / SFTP
+            ：Hanime 必配 S3/SFTP；MacCMS 外链可跳过
           </li>
           <li>
             （可选）
             <Link href="/admin/crawler/schedules" className="underline">
               调度
             </Link>
-            定时执行
+            ：配置定时执行
           </li>
         </ol>
         <p className="font-meta text-[12px] text-[#787774]">

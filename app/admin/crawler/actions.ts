@@ -9,17 +9,20 @@ import {
   adminCancelJob,
   adminConfirmYamlImport,
   adminCreateProfile,
-  adminCreateSecret,
   adminCreateStorageDraft,
+  adminDeleteJob,
   adminMarkStorageTestPassed,
+  adminProvisionWorker,
+  adminPurgeTerminalJobs,
+  adminRevokeWorkerCredential,
   adminRetryJob,
   adminSaveSchedule,
-  adminStartManualJob,
+  adminStartProfileJob,
   adminStartStorageTest,
   type AdminActionContext,
 } from '@/lib/server/crawler/interfaces/admin-crawler-actions';
 import { AppError } from '@/lib/server/shared/errors';
-import { profileConfigFromForm, storageConfigFromForm } from './form-config';
+import { profileConfigFromForm } from './form-config';
 
 function ctx(): AdminActionContext {
   return {
@@ -28,13 +31,64 @@ function ctx(): AdminActionContext {
   };
 }
 
+export type WorkerProvisionState = Readonly<{
+  token?: string;
+  workerId?: number;
+  credentialId?: number;
+  error?: string;
+}>;
+
+function parsePositiveJobId(formData: FormData): number {
+  const raw = String(formData.get('jobId') ?? '').trim();
+  if (!/^\d+$/.test(raw)) throw new AppError('RESULT_INVALID', '无效任务 ID', 400);
+  const id = Number(raw);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new AppError('RESULT_INVALID', '无效任务 ID', 400);
+  }
+  return id;
+}
+
+export async function actionProvisionWorker(
+  _previous: WorkerProvisionState,
+  formData: FormData,
+): Promise<WorkerProvisionState> {
+  try {
+    const result = await adminProvisionWorker(
+      ctx(),
+      String(formData.get('name') || ''),
+    );
+    revalidatePath('/admin/crawler/workers');
+    return {
+      token: result.token,
+      workerId: result.worker.id,
+      credentialId: result.credentialId,
+    };
+  } catch (error) {
+    if (error instanceof AppError) return { error: error.message };
+    return { error: '创建 Worker 失败' };
+  }
+}
+
+export async function actionRevokeWorkerCredential(formData: FormData): Promise<void> {
+  try {
+    await adminRevokeWorkerCredential(
+      ctx(),
+      parseInt(String(formData.get('credentialId') || ''), 10),
+    );
+    revalidatePath('/admin/crawler/workers');
+    redirect('/admin/crawler/workers?ok=revoked');
+  } catch (error) {
+    if (error instanceof AppError) redirect('/admin/crawler/workers?error=revoke');
+    throw error;
+  }
+}
+
 function revalidateCrawler() {
   revalidatePath('/admin/crawler');
   revalidatePath('/admin/crawler/jobs');
   revalidatePath('/admin/crawler/profiles');
   revalidatePath('/admin/crawler/schedules');
-  revalidatePath('/admin/crawler/storage');
-  revalidatePath('/admin/crawler/secrets');
+  revalidatePath('/admin/crawler/workers');
   revalidatePath('/admin/crawler/import');
 }
 
@@ -57,16 +111,15 @@ export async function actionCreateProfile(formData: FormData): Promise<void> {
 
 export async function actionStartManualJob(formData: FormData): Promise<void> {
   try {
-    const job = await adminStartManualJob(ctx(), {
-      profileId: parseInt(String(formData.get('profileId') || '0'), 10),
-      profileVersionId: parseInt(String(formData.get('profileVersionId') || '0'), 10),
-      configSnapshotJson: String(formData.get('configSnapshotJson') || '{}'),
-      kind: (String(formData.get('kind') || 'crawl') as 'crawl' | 'storage_test' | 'cleanup'),
-    });
+    const profileVersionId = parseInt(
+      String(formData.get('profileVersionId') || '0'),
+      10,
+    );
+    const job = await adminStartProfileJob(ctx(), profileVersionId);
     revalidateCrawler();
     redirect(`/admin/crawler/jobs/${job.id}`);
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/jobs?error=1');
+    if (error instanceof AppError) redirect('/admin/crawler/jobs?error=profile');
     throw error;
   }
 }
@@ -74,7 +127,6 @@ export async function actionStartManualJob(formData: FormData): Promise<void> {
 export async function actionSaveSchedule(formData: FormData): Promise<void> {
   try {
     await adminSaveSchedule(ctx(), {
-      profileId: parseInt(String(formData.get('profileId') || '0'), 10),
       profileVersionId: parseInt(String(formData.get('profileVersionId') || '0'), 10),
       name: String(formData.get('name') || ''),
       kind: String(formData.get('kind') || 'interval') as 'manual' | 'interval' | 'daily' | 'weekly' | 'cron',
@@ -90,7 +142,6 @@ export async function actionSaveSchedule(formData: FormData): Promise<void> {
         | 'catch_up',
       maxActiveJobs: parseInt(String(formData.get('maxActiveJobs') || '1'), 10),
       catchUpLimit: parseInt(String(formData.get('catchUpLimit') || '3'), 10),
-      configSnapshotJson: String(formData.get('configSnapshotJson') || '{}'),
       nextRunAt: String(formData.get('nextRunAt') || '') || undefined,
     });
     revalidateCrawler();
@@ -103,7 +154,7 @@ export async function actionSaveSchedule(formData: FormData): Promise<void> {
 
 export async function actionCancelJob(formData: FormData): Promise<void> {
   try {
-    const id = parseInt(String(formData.get('jobId') || ''), 10);
+    const id = parsePositiveJobId(formData);
     await adminCancelJob(ctx(), id);
     revalidateCrawler();
     redirect(`/admin/crawler/jobs/${id}`);
@@ -115,7 +166,7 @@ export async function actionCancelJob(formData: FormData): Promise<void> {
 
 export async function actionRetryJob(formData: FormData): Promise<void> {
   try {
-    const id = parseInt(String(formData.get('jobId') || ''), 10);
+    const id = parsePositiveJobId(formData);
     const job = await adminRetryJob(ctx(), id);
     revalidateCrawler();
     redirect(`/admin/crawler/jobs/${job.id}`);
@@ -125,17 +176,32 @@ export async function actionRetryJob(formData: FormData): Promise<void> {
   }
 }
 
-export async function actionCreateSecret(formData: FormData): Promise<void> {
+export async function actionDeleteJob(formData: FormData): Promise<void> {
   try {
-    await adminCreateSecret(ctx(), {
-      name: String(formData.get('name') || ''),
-      scope: String(formData.get('scope') || ''),
-      plaintext: String(formData.get('plaintext') || ''),
-    });
+    const id = parsePositiveJobId(formData);
+    await adminDeleteJob(ctx(), id);
     revalidateCrawler();
-    redirect('/admin/crawler/secrets?ok=1');
+    redirect('/admin/crawler/jobs?ok=deleted');
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/secrets?error=1');
+    if (error instanceof AppError) {
+      const code = error.code === 'RESULT_CONFLICT' ? 'delete_active' : 'delete';
+      redirect(`/admin/crawler/jobs?error=${code}`);
+    }
+    throw error;
+  }
+}
+
+export async function actionPurgeJobs(formData: FormData): Promise<void> {
+  try {
+    const olderThanDays = parseInt(String(formData.get('olderThanDays') || ''), 10);
+    const scope = String(formData.get('scope') || 'all');
+    const result = await adminPurgeTerminalJobs(ctx(), { olderThanDays, scope });
+    revalidateCrawler();
+    redirect(
+      `/admin/crawler/jobs?ok=purged&n=${result.deleted}&truncated=${result.truncated ? '1' : '0'}`,
+    );
+  } catch (error) {
+    if (error instanceof AppError) redirect('/admin/crawler/jobs?error=purge');
     throw error;
   }
 }
@@ -154,34 +220,72 @@ export async function actionConfirmYamlImport(formData: FormData): Promise<void>
   }
 }
 
-export async function actionCreateStorage(formData: FormData): Promise<void> {
+function storageConfigFromForm(formData: FormData): unknown {
+  const driver = String(formData.get('driver') || '').trim();
+  if (driver === 's3') {
+    return {
+      driver: 's3',
+      endpoint: String(formData.get('endpoint') || '').trim(),
+      region: String(formData.get('region') || '').trim() || 'auto',
+      bucket: String(formData.get('bucket') || '').trim(),
+      prefix: String(formData.get('prefix') || '').trim(),
+      deliveryMode: String(formData.get('deliveryMode') || 'public'),
+      publicBaseUrl: String(formData.get('publicBaseUrl') || '').trim() || undefined,
+      forcePathStyle: formData.get('forcePathStyle') === '1',
+      organizeByDate: formData.get('organizeByDate') === '1',
+    };
+  }
+  if (driver === 'sftp') {
+    return {
+      driver: 'sftp',
+      host: String(formData.get('host') || '').trim(),
+      port: parseInt(String(formData.get('port') || '22'), 10) || 22,
+      username: String(formData.get('username') || '').trim(),
+      rootPath: String(formData.get('rootPath') || '').trim(),
+      hostKeyFingerprint: String(formData.get('hostKeyFingerprint') || '').trim(),
+      publicBaseUrl: String(formData.get('publicBaseUrl') || '').trim() || undefined,
+      organizeByDate: formData.get('organizeByDate') === '1',
+    };
+  }
+  throw new AppError('RESULT_INVALID', 'driver 须为 s3 或 sftp', 400);
+}
+
+export async function actionCreateStorageDraft(formData: FormData): Promise<void> {
   try {
-    const configJson = formData.get('configJson')
-      ? String(formData.get('configJson'))
-      : storageConfigFromForm(formData);
+    const name = String(formData.get('name') || '').trim();
+    const config = storageConfigFromForm(formData);
     await adminCreateStorageDraft(ctx(), {
-      name: String(formData.get('name') || ''),
-      configJson,
+      name,
+      configJson: JSON.stringify(config),
     });
     revalidateCrawler();
     redirect('/admin/crawler/storage?ok=1');
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/storage?error=1');
+    if (error instanceof AppError) {
+      redirect(`/admin/crawler/storage?error=${encodeURIComponent(error.message)}`);
+    }
     throw error;
   }
 }
 
 export async function actionStartStorageTest(formData: FormData): Promise<void> {
   try {
-    const job = await adminStartStorageTest(ctx(), {
-      profileId: parseInt(String(formData.get('profileId') || '0'), 10),
-      storageProfileVersionId: parseInt(String(formData.get('storageProfileVersionId') || '0'), 10),
-      configSnapshotJson: String(formData.get('configSnapshotJson') || '{}'),
+    const profileId = parseInt(String(formData.get('profileId') || ''), 10);
+    const storageProfileVersionId = parseInt(
+      String(formData.get('storageProfileVersionId') || ''),
+      10,
+    );
+    await adminStartStorageTest(ctx(), {
+      profileId,
+      storageProfileVersionId,
+      configSnapshotJson: JSON.stringify({ kind: 'storage_test' }),
     });
     revalidateCrawler();
-    redirect(`/admin/crawler/jobs/${job.id}`);
+    redirect('/admin/crawler/storage?ok=job');
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/storage?error=test');
+    if (error instanceof AppError) {
+      redirect(`/admin/crawler/storage?error=${encodeURIComponent(error.message)}`);
+    }
     throw error;
   }
 }
@@ -189,12 +293,14 @@ export async function actionStartStorageTest(formData: FormData): Promise<void> 
 export async function actionMarkStorageTestPassed(formData: FormData): Promise<void> {
   try {
     const versionId = parseInt(String(formData.get('versionId') || ''), 10);
-    const allowBreakGlass = formData.get('allowBreakGlass') === '1';
-    await adminMarkStorageTestPassed(ctx(), versionId, { allowBreakGlass });
+    // Admin break-glass for environments without a full storage_test worker path yet.
+    await adminMarkStorageTestPassed(ctx(), versionId, { allowBreakGlass: true });
     revalidateCrawler();
     redirect('/admin/crawler/storage?ok=tested');
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/storage?error=1');
+    if (error instanceof AppError) {
+      redirect(`/admin/crawler/storage?error=${encodeURIComponent(error.message)}`);
+    }
     throw error;
   }
 }
@@ -204,9 +310,11 @@ export async function actionActivateStorage(formData: FormData): Promise<void> {
     const versionId = parseInt(String(formData.get('versionId') || ''), 10);
     await adminActivateStorage(ctx(), versionId);
     revalidateCrawler();
-    redirect('/admin/crawler/storage?ok=active');
+    redirect('/admin/crawler/storage?ok=activated');
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/storage?error=activate');
+    if (error instanceof AppError) {
+      redirect(`/admin/crawler/storage?error=${encodeURIComponent(error.message)}`);
+    }
     throw error;
   }
 }

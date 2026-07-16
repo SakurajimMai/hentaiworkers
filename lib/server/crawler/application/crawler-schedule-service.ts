@@ -32,6 +32,7 @@ export type OverdueScheduleView = Readonly<{
 export type CreateScheduleInput = ScheduleDefinition & Readonly<{
   profileId: number;
   profileVersionId: number;
+  storageProfileVersionId?: number | null;
   name: string;
   configSnapshotJson: string;
   nextRunAt?: string | null;
@@ -74,6 +75,7 @@ export class CrawlerScheduleService {
       repos.schedules.create({
         profileId: input.profileId,
         profileVersionId: input.profileVersionId,
+        storageProfileVersionId: input.storageProfileVersionId ?? null,
         name: input.name.trim(),
         kind: input.kind,
         cronExpression: input.cron ?? null,
@@ -175,6 +177,7 @@ export class CrawlerScheduleService {
             kind: 'crawl',
             profileId: schedule.profileId,
             profileVersionId: schedule.profileVersionId,
+            storageProfileVersionId: schedule.storageProfileVersionId,
             scheduleId: schedule.id,
             scheduledFor,
             configSnapshotJson: schedule.configSnapshotJson,

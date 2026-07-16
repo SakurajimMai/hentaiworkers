@@ -14,6 +14,7 @@ const ERRORS: Record<string, string> = {
   whitelist: '该邮箱不在允许注册的白名单中。',
   closed: '当前未开放注册。',
   turnstile: '人机验证失败，请重试。',
+  rate: '尝试次数过多，请稍后再试。',
   '1': '注册失败，请稍后重试。',
 };
 
@@ -31,19 +32,21 @@ export default async function RegisterPage({
   const auth = await getSystemSettingsService().getPublicAuthConfig();
 
   return (
-    <div className="mx-auto max-w-sm px-4 sm:px-6 py-12 sm:py-16">
-      <p className="font-meta mb-2">Account</p>
-      <h1 className="font-serif text-3xl mb-2">注册</h1>
-      <p className="font-ui text-sm text-[#787774] mb-6">
-        用邮箱创建账号
-        {auth.requireEmailVerification ? '；提交后请查收验证邮件' : '，登录后可跨设备同步收藏'}
-        {auth.emailWhitelistEnabled ? '（仅白名单邮箱）' : ''}
-        。
-      </p>
+    <div className="mx-auto max-w-md px-4 sm:px-6 py-12 sm:py-16">
+      <div className="mb-8">
+        <p className="font-meta mb-2">Account</p>
+        <h1 className="section-title text-3xl sm:text-4xl text-ink">注册</h1>
+        <p className="mt-2 font-ui text-sm text-[#6f6d68] leading-relaxed">
+          用邮箱创建账号
+          {auth.requireEmailVerification ? '；提交后请查收验证邮件' : '，登录后可跨设备同步收藏'}
+          {auth.emailWhitelistEnabled ? '（仅白名单邮箱）' : ''}
+          。
+        </p>
+      </div>
 
       {!auth.registrationOpen ? (
-        <div className="surface-card p-6 space-y-3">
-          <p className="font-ui text-sm text-[#787774]">当前未开放注册，请联系管理员。</p>
+        <div className="surface-panel p-6 space-y-4">
+          <p className="font-ui text-sm text-[#6f6d68]">当前未开放注册，请联系管理员。</p>
           <Link href="/login" className="btn-ink inline-flex">
             去登录
           </Link>
@@ -51,12 +54,12 @@ export default async function RegisterPage({
       ) : (
         <>
           {sp.error && (
-            <p className="mb-4 font-ui text-sm text-[#C5221F]">
+            <div className="mb-4 rounded-xl border border-[#f3d4d3] bg-[#fdf2f2] px-4 py-3 font-ui text-sm text-[#9F2F2D]">
               {ERRORS[sp.error] ?? ERRORS['1']}
-            </p>
+            </div>
           )}
 
-          <form action={actionPublicRegister} className="surface-card p-6 space-y-4">
+          <form action={actionPublicRegister} className="surface-panel p-6 sm:p-7 space-y-4">
             <input type="hidden" name="next" value={sp.next || '/favorites'} />
             <div>
               <label className="admin-label" htmlFor="email">
@@ -110,11 +113,11 @@ export default async function RegisterPage({
         </>
       )}
 
-      <p className="mt-6 font-ui text-sm text-[#787774] text-center">
+      <p className="mt-6 font-ui text-sm text-[#6f6d68] text-center">
         已有账号？{' '}
         <Link
           href={`/login${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ''}`}
-          className="text-[#111] underline"
+          className="text-ink font-medium underline underline-offset-2 decoration-[#d8d4cb] hover:decoration-[#1a1917]"
         >
           登录
         </Link>

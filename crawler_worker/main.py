@@ -8,8 +8,8 @@ from pathlib import Path
 
 from crawler_worker.models.config import WorkerRuntimeConfig
 from crawler_worker.runtime.runner import Runner
-from crawler_worker.sources.getchu import GetchuSource
 from crawler_worker.sources.hanime import HanimeSource
+from crawler_worker.sources.maccms import build_maccms_sources
 from crawler_worker.transport.control_client import ControlClient
 
 
@@ -28,12 +28,35 @@ def config_from_env(env: dict[str, str] | None = None) -> WorkerRuntimeConfig:
             raise SystemExit(f"Worker must not receive {banned}")
     temp = e.get("CRAWLER_TEMP_DIR", "/tmp/crawler-worker")
     Path(temp).mkdir(parents=True, exist_ok=True)
+    maccms_names = tuple(sorted(build_maccms_sources().keys()))
+    sources = ("hanime", *maccms_names)
+    # Advertise only storage drivers for which this Worker has real credentials.
+    # An explicit CRAWLER_STORAGE_DRIVERS value remains available for brokered creds.
+    configured_drivers = e.get("CRAWLER_STORAGE_DRIVERS")
+    if configured_drivers is not None:
+        storage_drivers = tuple(
+            d.strip()
+            for d in configured_drivers.split(",")
+            if d.strip() in ("s3", "sftp")
+        )
+    else:
+        detected: list[str] = []
+        if (
+            (e.get("CRAWLER_S3_ACCESS_KEY_ID") or e.get("AWS_ACCESS_KEY_ID"))
+            and (e.get("CRAWLER_S3_SECRET_ACCESS_KEY") or e.get("AWS_SECRET_ACCESS_KEY"))
+        ):
+            detected.append("s3")
+        if e.get("CRAWLER_SFTP_PASSWORD") or e.get("CRAWLER_SFTP_PRIVATE_KEY"):
+            detected.append("sftp")
+        storage_drivers = tuple(detected)
     return WorkerRuntimeConfig(
         control_base_url=base.rstrip("/"),
         worker_id=int(worker_id),
         machine_token=token,
         temp_dir=temp,
         worker_version=e.get("CRAWLER_WORKER_VERSION", "1.0.0"),
+        sources=sources,
+        storage_drivers=storage_drivers,
     )
 
 
@@ -41,14 +64,8 @@ def main(argv: list[str] | None = None) -> int:
     _ = argv
     cfg = config_from_env()
     client = ControlClient(cfg)
-    runner = Runner(
-        cfg,
-        client,
-        {
-            "hanime": HanimeSource(),
-            "getchu": GetchuSource(),
-        },
-    )
+    adapters = {"hanime": HanimeSource(), **build_maccms_sources()}
+    runner = Runner(cfg, client, adapters)
     runner.run_forever()
     return 0
 

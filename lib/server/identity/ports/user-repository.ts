@@ -7,6 +7,8 @@ export type UserRecord = Readonly<{
   role: UserRole;
   displayName: string | null;
   isActive: number;
+  /** Cookie session epoch; mismatch invalidates old sessions. */
+  sessionVersion: number;
   createdAt?: unknown;
   updatedAt?: unknown;
 }>;
@@ -24,6 +26,8 @@ export type UpdateUserInput = Readonly<{
   displayName?: string | null;
   isActive?: number;
   passwordHash?: string;
+  /** When true, session_version is incremented (password change / reset). */
+  bumpSessionVersion?: boolean;
 }>;
 
 export interface UserRepository {

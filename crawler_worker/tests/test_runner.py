@@ -2,13 +2,15 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from crawler_worker.models.api import ClaimedJob, CrawlItemResult
 from crawler_worker.models.config import WorkerRuntimeConfig
 from crawler_worker.runtime.runner import Runner
 from crawler_worker.sources.base import select_quality, should_skip
 from crawler_worker.sources.hanime import HanimeSource
-from crawler_worker.transport.control_client import ControlClient
+from crawler_worker.sources.maccms import MacCmsSource
+from crawler_worker.transport.control_client import ControlClient, ControlPlaneError
 
 
 class FakeSource:
@@ -74,6 +76,8 @@ class RunnerTests(unittest.TestCase):
                 ).encode()
             if path.endswith("/events/batch"):
                 return 200, json.dumps({"data": {"accepted": 1}}).encode()
+            if path.endswith("/items/exists"):
+                return 200, json.dumps({"data": {"exists": False}}).encode()
             if path.endswith("/items/commit"):
                 return 200, json.dumps(
                     {"data": {"replayed": False, "itemId": 1, "status": "succeeded"}}
@@ -87,10 +91,430 @@ class RunnerTests(unittest.TestCase):
         runner.run_forever(max_iterations=2)
         self.assertTrue(state["claimed"])
 
+    def test_skip_existing_avoids_storage_and_getchu_and_preserves_metadata(self):
+        class ExistingSource:
+            name = "hanime"
+
+            def crawl(self, snapshot, *, workdir, should_stop):
+                return [
+                    CrawlItemResult(
+                        source="hanime",
+                        source_id="42",
+                        title="Existing",
+                        video_url="https://cdn.example/v.mp4",
+                        cover_url="https://cdn.example/c.jpg",
+                        tags=("Drama",),
+                        status="succeeded",
+                        actors="Actor A",
+                        directors="Director D",
+                        aliases="Alias",
+                        area="日本",
+                        lang="日语",
+                        play_lines=({"name": "line", "episodes": []},),
+                    )
+                ]
+
+        class Client:
+            def __init__(self):
+                self.commit = None
+                self.completed = False
+
+            def start(self, job):
+                return None
+
+            def item_exists(self, job, source, source_id):
+                return {"exists": True, "animeId": 77}
+
+            def items_commit(self, job, **kwargs):
+                self.commit = kwargs
+                return type("R", (), {"replayed": False})()
+
+            def complete(self, *args, **kwargs):
+                self.completed = True
+                return {"status": "succeeded"}
+
+            def fail(self, *args, **kwargs):
+                raise AssertionError("skip-existing job should not fail")
+
+            def events_batch(self, job, events):
+                return None
+
+            def job_heartbeat(self, job):
+                return type(
+                    "HB",
+                    (),
+                    {"cancel_requested": False, "lease_expires_at": "t", "status": "running"},
+                )()
+
+        cfg = WorkerRuntimeConfig(
+            control_base_url="https://control.example",
+            worker_id=1,
+            machine_token="t",
+        )
+        job = ClaimedJob(
+            job_id=1,
+            attempt_id=1,
+            lease_token="lease",
+            lease_expires_at="2099-01-01T00:00:00Z",
+            kind="crawl",
+            status="leased",
+            config_snapshot_json=json.dumps(
+                {
+                    "requiredSource": "hanime",
+                    "storageDriver": "s3",
+                    "storageConfig": {"driver": "s3"},
+                    "skipExisting": True,
+                    "requestDelaySeconds": 0,
+                }
+            ),
+            profile_version_id=1,
+            max_attempts=3,
+            attempt_no=1,
+        )
+        client = Client()
+        runner = Runner(cfg, client, {"hanime": ExistingSource()}, sleep=lambda _s: None)
+        with patch(
+            "crawler_worker.runtime.runner.build_media_adapter",
+            side_effect=AssertionError("storage must not initialize"),
+        ), patch(
+            "crawler_worker.runtime.runner.find_getchu_fanart",
+            side_effect=AssertionError("Getchu must not run"),
+        ):
+            runner._run_job(job)
+
+        self.assertTrue(client.completed)
+        self.assertEqual(client.commit["status"], "skipped")
+        self.assertEqual(client.commit["actors"], "Actor A")
+        self.assertEqual(client.commit["directors"], "Director D")
+        self.assertEqual(client.commit["aliases"], "Alias")
+        self.assertEqual(client.commit["play_lines"], [{"name": "line", "episodes": []}])
+
+    def test_commit_failure_after_publish_abandons_media_and_records_failed_item(self):
+        class Source:
+            name = "hanime"
+
+            def crawl(self, snapshot, *, workdir, should_stop):
+                return [
+                    CrawlItemResult(
+                        source="hanime",
+                        source_id="55",
+                        title="Published",
+                        video_url="https://cdn.example/v.mp4",
+                        cover_url=None,
+                        tags=(),
+                        status="succeeded",
+                    )
+                ]
+
+        class Client:
+            def __init__(self):
+                self.commits = []
+                self.completed = False
+
+            def start(self, job):
+                return None
+
+            def item_exists(self, job, source, source_id):
+                return {"exists": False}
+
+            def items_commit(self, job, **kwargs):
+                self.commits.append(kwargs)
+                if kwargs["status"] == "succeeded":
+                    raise ControlPlaneError(500, "INTERNAL_ERROR", "commit unavailable")
+                return type("R", (), {"replayed": False, "item_id": 9, "status": kwargs["status"]})()
+
+            def complete(self, *args, **kwargs):
+                self.completed = True
+                return {"status": "failed"}
+
+            def fail(self, *args, **kwargs):
+                raise AssertionError("item-level commit failure should not fail the job lease")
+
+            def events_batch(self, job, events):
+                return None
+
+            def job_heartbeat(self, job):
+                return type(
+                    "HB",
+                    (),
+                    {"cancel_requested": False, "lease_expires_at": "t", "status": "running"},
+                )()
+
+        cfg = WorkerRuntimeConfig(
+            control_base_url="https://control.example",
+            worker_id=1,
+            machine_token="t",
+        )
+        job = ClaimedJob(
+            job_id=8,
+            attempt_id=1,
+            lease_token="lease",
+            lease_expires_at="2099-01-01T00:00:00Z",
+            kind="crawl",
+            status="leased",
+            config_snapshot_json=json.dumps(
+                {
+                    "requiredSource": "hanime",
+                    "storageDriver": "s3",
+                    "storageConfig": {"driver": "s3"},
+                    "skipExisting": False,
+                    "continueOnError": True,
+                }
+            ),
+            profile_version_id=1,
+            max_attempts=3,
+            attempt_no=1,
+        )
+        client = Client()
+        runner = Runner(cfg, client, {"hanime": Source()}, sleep=lambda _s: None)
+        from crawler_worker.media.upload_pipeline import PublishedItemMedia, PublishedMediaHandle
+
+        published = PublishedItemMedia(
+            item=CrawlItemResult(
+                source="hanime",
+                source_id="55",
+                title="Published",
+                video_url="https://media.example/final.mp4",
+                cover_url=None,
+                tags=(),
+                status="succeeded",
+            ),
+            handles=(
+                PublishedMediaHandle(
+                    upload_id=3,
+                    final_key="final/video.mp4",
+                    public_url="https://media.example/final.mp4",
+                ),
+            ),
+        )
+        abandoned = {"called": False}
+
+        with patch(
+            "crawler_worker.runtime.runner.build_media_adapter",
+            return_value=object(),
+        ), patch(
+            "crawler_worker.runtime.runner.publish_item_media",
+            return_value=published,
+        ), patch(
+            "crawler_worker.runtime.runner.abandon_published_media",
+            side_effect=lambda **kwargs: abandoned.__setitem__("called", True),
+        ):
+            runner._run_job(job)
+
+        self.assertTrue(client.completed)
+        self.assertTrue(abandoned["called"])
+        self.assertEqual(client.commits[-1]["status"], "failed")
+        self.assertEqual(client.commits[-1]["error_code"], "RESULT_COMMIT_FAILED")
+
     def test_quality_and_skip_helpers(self):
         self.assertEqual(select_quality(["720.mp4", "1080.mp4"], ["1080", "720"]), "1080.mp4")
         self.assertTrue(should_skip("Preview PV", ["pv"]))
         self.assertFalse(should_skip("Main", ["pv"]))
+
+    def test_maccms_job_commits_latest_m3u8(self):
+        pages = {
+            "https://api.example/provide/vod/?ac=detail&t=37&pg=1": {
+                "code": 1,
+                "list": [
+                    {
+                        "vod_id": 77,
+                        "vod_name": "MacCMS 日番",
+                        "type_name": "日本动漫",
+                        "vod_area": "日本",
+                        "vod_year": "2026",
+                        "vod_play_from": "ikm3u8",
+                        "vod_play_url": "第1集$https://cdn.example/e1.m3u8#第2集$https://cdn.example/e2.m3u8",
+                        "vod_pic": "https://img.example/c.jpg",
+                    }
+                ],
+            }
+        }
+        from crawler_worker.sources.maccms import MacCmsSource
+
+        class Client:
+            def __init__(self):
+                self.commits = []
+                self.completed = False
+
+            def register(self):
+                return None
+
+            def claim(self):
+                if self.completed:
+                    return None
+                return ClaimedJob(
+                    job_id=9,
+                    attempt_id=1,
+                    lease_token="tok",
+                    lease_expires_at="2099-01-01T00:00:00Z",
+                    kind="crawl",
+                    status="leased",
+                    config_snapshot_json=json.dumps(
+                        {
+                            "requiredSource": "ikun",
+                            "source": {
+                                "baseUrl": "https://api.example/provide/vod/",
+                                "typeIds": [37],
+                                "maxPages": 1,
+                                "filterJpKr": True,
+                            },
+                            "dateFilter": {"years": [2026], "months": [7]},
+                        }
+                    ),
+                    profile_version_id=1,
+                    max_attempts=3,
+                    attempt_no=1,
+                )
+
+            def start(self, job):
+                return None
+
+            def items_commit(self, job, **kwargs):
+                self.commits.append(kwargs)
+                return type("R", (), {"replayed": False, "item_id": 1, "status": kwargs["status"]})()
+
+            def complete(self, job, idempotency_key, outcome="succeeded", **kwargs):
+                self.completed = True
+                return {"status": outcome}
+
+            def fail(self, *a, **k):
+                raise AssertionError("should not fail")
+
+            def cancel_ack(self, job):
+                return None
+
+            def worker_heartbeat(self, current_load=0):
+                return None
+
+            def job_heartbeat(self, job):
+                return type(
+                    "HB",
+                    (),
+                    {"cancel_requested": False, "lease_expires_at": "t", "status": "running"},
+                )()
+
+            def events_batch(self, job, events):
+                return None
+
+        cfg = WorkerRuntimeConfig(
+            control_base_url="https://control.example",
+            worker_id=1,
+            machine_token="t",
+            sources=("ikun",),
+        )
+        client = Client()
+        runner = Runner(
+            cfg,
+            client,
+            {"ikun": MacCmsSource("ikun", fetch_json=lambda url: pages[url])},
+            sleep=lambda _s: None,
+        )
+        runner.run_forever(max_iterations=1)
+        self.assertTrue(client.completed)
+        self.assertEqual(len(client.commits), 1)
+        self.assertEqual(client.commits[0]["video_url"], "https://cdn.example/e2.m3u8")
+        self.assertEqual(client.commits[0]["source"], "ikun")
+
+
+    def test_transient_source_unavailable_calls_fail_retryable(self):
+        class Client:
+            def __init__(self):
+                self.failed = None
+                self.completed = False
+                self.commits = []
+
+            def register(self):
+                return None
+
+            def claim(self, sources=None, max_jobs=1):
+                return type(
+                    "J",
+                    (),
+                    {
+                        "job_id": 9,
+                        "attempt_id": 90,
+                        "lease_token": "lease",
+                        "lease_expires_at": "2099-01-01T00:00:00Z",
+                        "kind": "crawl",
+                        "status": "leased",
+                        "config_snapshot_json": json.dumps(
+                            {
+                                "requiredSource": "ikun",
+                                "source": {
+                                    "baseUrl": "https://api.example/provide/vod/",
+                                    "typeIds": [37],
+                                    "maxPages": 1,
+                                    "filterJpKr": False,
+                                    "autoDetectTypes": False,
+                                },
+                                "dateFilter": {"years": [2026], "months": [7]},
+                                "continueOnError": True,
+                            }
+                        ),
+                        "profile_version_id": 1,
+                        "max_attempts": 3,
+                        "attempt_no": 1,
+                    },
+                )()
+
+            def start(self, job):
+                return None
+
+            def items_commit(self, job, **kwargs):
+                self.commits.append(kwargs)
+                return type("R", (), {"replayed": False, "item_id": 1, "status": kwargs["status"]})()
+
+            def complete(self, *a, **k):
+                self.completed = True
+                raise AssertionError("pure source outage should not complete")
+
+            def fail(self, job, idempotency_key, *, retryable, error_code="", error_message=""):
+                self.failed = {
+                    "retryable": retryable,
+                    "error_code": error_code,
+                    "error_message": error_message,
+                }
+                return {"status": "retry_wait"}
+
+            def cancel_ack(self, job):
+                return None
+
+            def worker_heartbeat(self, current_load=0):
+                return None
+
+            def job_heartbeat(self, job):
+                return type(
+                    "HB",
+                    (),
+                    {"cancel_requested": False, "lease_expires_at": "t", "status": "running"},
+                )()
+
+            def events_batch(self, job, events):
+                return None
+
+        def boom(_url: str):
+            raise ConnectionResetError(10054, "远程主机强迫关闭了一个现有的连接。")
+
+        cfg = WorkerRuntimeConfig(
+            control_base_url="https://control.example",
+            worker_id=1,
+            machine_token="t",
+            sources=("ikun",),
+        )
+        client = Client()
+        runner = Runner(
+            cfg,
+            client,
+            {"ikun": MacCmsSource("ikun", fetch_json=boom)},
+            sleep=lambda _s: None,
+        )
+        runner.run_forever(max_iterations=1)
+        self.assertFalse(client.completed)
+        self.assertIsNotNone(client.failed)
+        self.assertTrue(client.failed["retryable"])
+        self.assertEqual(client.failed["error_code"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(len(client.commits), 1)
+        self.assertEqual(client.commits[0]["status"], "failed")
 
     def test_hanime_parse_list_html(self):
         html = '<div data-id="9" data-title="Show" data-video="720.mp4,1080.mp4"></div>'

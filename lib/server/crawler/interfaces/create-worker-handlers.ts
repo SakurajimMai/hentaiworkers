@@ -14,10 +14,12 @@ import {
   credentialsRefreshBodySchema,
   eventsBatchBodySchema,
   failBodySchema,
+  itemExistsBodySchema,
   itemsCommitBodySchema,
   jobHeartbeatBodySchema,
   MAX_WORKER_BODY_BYTES,
   mediaReserveBodySchema,
+  mediaStatusBodySchema,
   registerBodySchema,
   startBodySchema,
   workerHeartbeatBodySchema,
@@ -268,6 +270,29 @@ export function createWorkerHandlers(deps: WorkerApiDeps) {
       }
     },
 
+    async mediaStatus(req: NextRequest, params: { id: string }) {
+      try {
+        const auth = await authenticate(deps, req, 'jobs:write');
+        const jobId = jobIdFromParams(params);
+        const body = mediaStatusBodySchema.parse(await readJsonBody(req));
+        const leaseToken = extractLeaseToken(req.headers, body.leaseToken);
+        const upload = await deps.media.markStatus(
+          {
+            jobId,
+            attemptId: body.attemptId,
+            workerId: auth.worker.id,
+            leaseToken,
+          },
+          body.uploadId,
+          body.status,
+        );
+        return presentWorkerOk({ uploadId: upload.id, status: upload.status });
+      } catch (error) {
+        if (error instanceof ZodError) return presentWorkerError(zodToAppError(error));
+        return presentWorkerError(error);
+      }
+    },
+
     async credentialsRefresh(req: NextRequest, params: { id: string }) {
       try {
         const auth = await authenticate(deps, req, 'jobs:credentials');
@@ -293,6 +318,31 @@ export function createWorkerHandlers(deps: WorkerApiDeps) {
       }
     },
 
+    async itemExists(req: NextRequest, params: { id: string }) {
+      try {
+        const auth = await authenticate(deps, req, 'jobs:write');
+        const jobId = jobIdFromParams(params);
+        const body = itemExistsBodySchema.parse(await readJsonBody(req));
+        const leaseToken = extractLeaseToken(req.headers, body.leaseToken);
+        const existing = await deps.results.findExisting({
+          jobId,
+          attemptId: body.attemptId,
+          workerId: auth.worker.id,
+          leaseToken,
+          source: body.source,
+          sourceId: body.sourceId,
+        });
+        return presentWorkerOk({
+          exists: existing != null,
+          animeId: existing?.animeId ?? null,
+          target: existing?.target ?? null,
+        });
+      } catch (error) {
+        if (error instanceof ZodError) return presentWorkerError(zodToAppError(error));
+        return presentWorkerError(error);
+      }
+    },
+
     async itemsCommit(req: NextRequest, params: { id: string }) {
       try {
         const auth = await authenticate(deps, req, 'jobs:write');
@@ -311,12 +361,32 @@ export function createWorkerHandlers(deps: WorkerApiDeps) {
           stage: body.stage,
           status: body.status,
           animeId: body.animeId,
+          title: body.title,
+          titleEnglish: body.titleEnglish,
+          titleJapanese: body.titleJapanese,
+          videoUrl: body.videoUrl,
+          coverUrl: body.coverUrl,
+          fanartUrls: body.fanartUrls,
+          description: body.description,
+          tags: body.tags,
+          releaseYear: body.releaseYear,
+          releaseDate: body.releaseDate,
+          remarks: body.remarks,
+          actors: body.actors,
+          directors: body.directors,
+          aliases: body.aliases,
+          area: body.area,
+          lang: body.lang,
+          sourceUpdatedAt: body.sourceUpdatedAt,
           errorCode: body.errorCode,
           errorMessage: body.errorMessage,
+          playLines: body.playLines,
         });
         return presentWorkerOk({
           replayed: result.replayed,
           itemId: result.item.id,
+          animeId: result.item.animeId,
+          created: result.catalog?.created ?? false,
           status: result.item.status,
         });
       } catch (error) {
@@ -351,6 +421,14 @@ export function createWorkerHandlers(deps: WorkerApiDeps) {
           failedItems: body.failedItems,
           continueOnError: body.continueOnError,
         });
+        if (
+          result.job.kind === 'storage_test'
+          && result.job.status === 'succeeded'
+          && result.job.storageProfileVersionId
+          && deps.storage
+        ) {
+          await deps.storage.markStorageTestPassed(result.job.storageProfileVersionId);
+        }
         return presentWorkerOk({
           replayed: result.replayed,
           jobId: result.job.id,

@@ -41,18 +41,24 @@ export function HorizontalCarousel({
   const scrollBy = (dir: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir === 'left' ? -el.clientWidth * 0.75 : el.clientWidth * 0.75, behavior: 'smooth' });
+    el.scrollBy({
+      left: dir === 'left' ? -el.clientWidth * 0.75 : el.clientWidth * 0.75,
+      behavior: 'smooth',
+    });
   };
 
   return (
-    <section>
-      <div className="mb-5 flex items-end justify-between gap-4 border-b border-[#EAEAEA] pb-3">
-        <div>
+    <section className="min-w-0">
+      <div className="mb-5 flex items-end justify-between gap-4 border-b border-[#ece8e0] pb-3.5">
+        <div className="min-w-0">
           {meta && <p className="font-meta mb-1">{meta}</p>}
-          <h2 className="font-serif text-xl sm:text-2xl text-[#111]">{title}</h2>
+          <h2 className="section-title text-xl sm:text-2xl text-ink">{title}</h2>
         </div>
         {viewAllHref && (
-          <Link href={viewAllHref} className="font-ui text-[13px] text-[#787774] hover:text-[#111]">
+          <Link
+            href={viewAllHref}
+            className="shrink-0 rounded-full px-3 py-1.5 font-ui text-[13px] text-soft hover:bg-white hover:text-ink transition-colors duration-200"
+          >
             查看全部
           </Link>
         )}
@@ -61,9 +67,9 @@ export function HorizontalCarousel({
         {canL && (
           <button
             type="button"
-            aria-label="向左"
+            aria-label="向左滚动"
             onClick={() => scrollBy('left')}
-            className="hidden md:flex absolute left-0 top-1/2 z-10 h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-sm border border-[#EAEAEA] bg-white"
+            className="hidden md:flex absolute left-0 top-1/2 z-10 h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8e4dc] bg-white/95 shadow-whisper backdrop-blur-sm transition hover:bg-white active:scale-[0.98]"
           >
             <IconChevronLeft size={16} />
           </button>
@@ -71,9 +77,9 @@ export function HorizontalCarousel({
         {canR && (
           <button
             type="button"
-            aria-label="向右"
+            aria-label="向右滚动"
             onClick={() => scrollBy('right')}
-            className="hidden md:flex absolute right-0 top-1/2 z-10 h-9 w-9 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-sm border border-[#EAEAEA] bg-white"
+            className="hidden md:flex absolute right-0 top-1/2 z-10 h-10 w-10 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#e8e4dc] bg-white/95 shadow-whisper backdrop-blur-sm transition hover:bg-white active:scale-[0.98]"
           >
             <IconChevronRight size={16} />
           </button>

@@ -38,6 +38,7 @@ class MemoryUsers implements UserRepository {
       role: input.role,
       displayName: input.displayName ?? null,
       isActive: input.isActive ?? 1,
+      sessionVersion: 1,
     };
     this.rows.set(id, row);
     return row;
@@ -52,6 +53,9 @@ class MemoryUsers implements UserRepository {
       displayName: input.displayName === undefined ? current.displayName : input.displayName,
       isActive: input.isActive ?? current.isActive,
       passwordHash: input.passwordHash ?? current.passwordHash,
+      sessionVersion: input.bumpSessionVersion
+        ? current.sessionVersion + 1
+        : current.sessionVersion,
     });
   }
 

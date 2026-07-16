@@ -35,8 +35,11 @@ export default async function AdminAnimeEditPage({
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <p className="font-meta mb-2">Anime</p>
-        <h1 className="font-serif text-3xl">{isNew ? '新建作品' : '编辑作品'}</h1>
+        <p className="font-meta mb-2">里番 · animes / tags</p>
+        <h1 className="font-serif text-3xl">{isNew ? '新建里番' : '编辑里番'}</h1>
+        <p className="mt-2 font-ui text-sm text-[#787774]">
+          使用里番标签字典 tags；动漫标签在 work_tags，互不通用。
+        </p>
       </div>
 
       <form action={actionSaveAnime} className="surface-card p-6 space-y-4">

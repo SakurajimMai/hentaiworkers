@@ -15,9 +15,20 @@ export class InMemoryCrawlerConfigRepository implements CrawlerConfigRepository 
   private versionSeq = 1;
   private readonly versions = new Map<number, ProfileVersionRecord>();
   private readonly profileCurrent = new Map<number, number>();
+  private readonly profileNames = new Map<number, string>();
+
+  async listProfiles() {
+    return [...this.profileNames.entries()].map(([id, name]) => ({
+      id,
+      name,
+      currentVersionId: this.profileCurrent.get(id) ?? null,
+      isEnabled: true,
+    }));
+  }
 
   async createProfile(name: string, config: CrawlerProfileConfig): Promise<ProfileVersionRecord> {
     const profileId = this.profileSeq++;
+    this.profileNames.set(profileId, name);
     return this.appendProfileVersion(profileId, config);
   }
 
@@ -54,15 +65,43 @@ export class InMemoryCrawlerConfigRepository implements CrawlerConfigRepository 
 export class InMemoryStorageConfigRepository implements StorageConfigRepository {
   private profileSeq = 1;
   private versionSeq = 1;
+  private readonly profiles = new Map<
+    number,
+    { name: string; driver: 's3' | 'sftp'; isEnabled: boolean; currentVersionId: number | null }
+  >();
   private readonly versions = new Map<number, StorageVersionRecord>();
   private readonly activated = new Set<number>();
 
+  async listProfiles() {
+    return [...this.profiles.entries()].map(([id, p]) => ({
+      id,
+      name: p.name,
+      driver: p.driver,
+      isEnabled: p.isEnabled,
+      currentVersionId: p.currentVersionId,
+    }));
+  }
+
   async createProfile(name: string, config: StorageConfig): Promise<StorageVersionRecord> {
     const profileId = this.profileSeq++;
+    this.profiles.set(profileId, {
+      name,
+      driver: config.driver,
+      isEnabled: true,
+      currentVersionId: null,
+    });
     return this.appendVersion(profileId, config);
   }
 
   async appendVersion(profileId: number, config: StorageConfig): Promise<StorageVersionRecord> {
+    if (!this.profiles.has(profileId)) {
+      this.profiles.set(profileId, {
+        name: `profile-${profileId}`,
+        driver: config.driver,
+        isEnabled: true,
+        currentVersionId: null,
+      });
+    }
     const existing = [...this.versions.values()].filter((v) => v.profileId === profileId);
     const record: StorageVersionRecord = {
       id: this.versionSeq++,
@@ -80,6 +119,12 @@ export class InMemoryStorageConfigRepository implements StorageConfigRepository 
     return this.versions.get(versionId) ?? null;
   }
 
+  async listVersions(profileId: number): Promise<ReadonlyArray<StorageVersionRecord>> {
+    return [...this.versions.values()]
+      .filter((v) => v.profileId === profileId)
+      .sort((a, b) => a.version - b.version);
+  }
+
   async markStorageTestPassed(versionId: number): Promise<void> {
     const current = this.versions.get(versionId);
     if (!current) throw new AppError('RESULT_INVALID', '版本不存在', 404);
@@ -90,6 +135,13 @@ export class InMemoryStorageConfigRepository implements StorageConfigRepository 
     const current = this.versions.get(versionId);
     if (!current) throw new AppError('RESULT_INVALID', '版本不存在', 404);
     this.activated.add(versionId);
+    const profile = this.profiles.get(current.profileId);
+    if (profile) {
+      this.profiles.set(current.profileId, {
+        ...profile,
+        currentVersionId: versionId,
+      });
+    }
   }
 
   isActivated(versionId: number): boolean {

@@ -49,6 +49,98 @@ test('public auth config hides turnstile without secret', () => {
   assert.equal(pub.turnstile.onRegister, false);
 });
 
+test('player settings parse defaults and line parsers', () => {
+  const settings = parseSystemSettings({
+    player: {
+      enableContextMenu: false,
+      lineParsers: [
+        { match: 'hnm3u8', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=' },
+        { match: '红牛', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=', enabled: false },
+      ],
+    },
+  });
+  assert.equal(settings.player.enableContextMenu, false);
+  assert.equal(settings.player.worksFallbackArtPlayer, true);
+  assert.equal(settings.player.lineParsers.length, 2);
+  assert.equal(settings.player.preRollAd.enabled, false);
+  assert.equal(settings.player.preRollAd.muted, true);
+  assert.equal(settings.player.preRollAd.playDuration, 5);
+  assert.equal(settings.player.preRollAd.totalDuration, 10);
+  assert.equal(settings.player.pauseAd.enabled, false);
+  assert.equal(settings.player.pauseAd.videoUrl, '');
+  assert.equal(settings.player.pauseAd.muted, true);
+});
+
+test('player ads accept video and image pre-roll and pause configs', () => {
+  const settings = parseSystemSettings({
+    player: {
+      preRollAd: {
+        enabled: true,
+        videoUrl: 'https://cdn.example/pre.mp4',
+        imageUrl: 'https://cdn.example/pre.jpg',
+        clickUrl: 'https://example.com/a',
+        playDuration: 3,
+        totalDuration: 8,
+        muted: false,
+      },
+      pauseAd: {
+        enabled: true,
+        videoUrl: 'https://cdn.example/pause.mp4',
+        imageUrl: 'https://cdn.example/pause.jpg',
+        html: '',
+        clickUrl: 'https://example.com/b',
+        muted: true,
+      },
+    },
+  });
+  assert.equal(settings.player.preRollAd.enabled, true);
+  assert.equal(settings.player.preRollAd.videoUrl, 'https://cdn.example/pre.mp4');
+  assert.equal(settings.player.preRollAd.playDuration, 3);
+  assert.equal(settings.player.pauseAd.videoUrl, 'https://cdn.example/pause.mp4');
+  assert.equal(settings.player.pauseAd.muted, true);
+});
+
+test('toPublicPlayerConfig preserves preRoll and pause ad video/muted fields', async () => {
+  const { toPublicPlayerConfig } = await import('../../lib/server/system/domain/settings');
+  const settings = parseSystemSettings({
+    player: {
+      preRollAd: {
+        enabled: true,
+        videoUrl: 'https://cdn.example/pre.mp4',
+        muted: false,
+      },
+      pauseAd: {
+        enabled: true,
+        videoUrl: 'https://cdn.example/pause.mp4',
+        muted: false,
+      },
+    },
+  });
+  const pub = toPublicPlayerConfig(settings);
+  assert.equal(pub.preRollAd.videoUrl, 'https://cdn.example/pre.mp4');
+  assert.equal(pub.preRollAd.muted, false);
+  assert.equal(pub.pauseAd.videoUrl, 'https://cdn.example/pause.mp4');
+  assert.equal(pub.pauseAd.muted, false);
+});
+
+test('resolveLineParser and buildParserPlaybackUrl', async () => {
+  const { resolveLineParser, buildParserPlaybackUrl } = await import(
+    '../../lib/server/system/domain/settings'
+  );
+  const parsers = [
+    { match: 'hnm3u8', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=', enabled: true },
+    { match: '红牛', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=', enabled: true },
+  ];
+  const hit = resolveLineParser({ flag: 'hnm3u8', name: '红牛' }, parsers);
+  assert.ok(hit);
+  assert.equal(hit?.match, 'hnm3u8');
+  const src = buildParserPlaybackUrl(
+    'https://www.hnjiexi.com/m3u8/?url=',
+    'https://cdn.example/a.m3u8',
+  );
+  assert.equal(src, 'https://www.hnjiexi.com/m3u8/?url=https%3A%2F%2Fcdn.example%2Fa.m3u8');
+});
+
 class MemorySettings implements SystemSettingsRepository {
   data: SystemSettings | null = null;
   async get() {
@@ -104,6 +196,7 @@ class MemoryUsers implements UserRepository {
       role: input.role,
       displayName: input.displayName ?? null,
       isActive: input.isActive ?? 1,
+      sessionVersion: 1,
     };
     this.rows.set(id, row);
     return row;
@@ -117,6 +210,9 @@ class MemoryUsers implements UserRepository {
       displayName: input.displayName === undefined ? cur.displayName : input.displayName,
       isActive: input.isActive ?? cur.isActive,
       passwordHash: input.passwordHash ?? cur.passwordHash,
+      sessionVersion: input.bumpSessionVersion
+        ? cur.sessionVersion + 1
+        : cur.sessionVersion,
     });
   }
   async list() {

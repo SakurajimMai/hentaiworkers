@@ -1,5 +1,12 @@
 import type { CrawlerProfileConfig, StorageConfig } from '../domain/config';
 
+export type ProfileSummary = Readonly<{
+  id: number;
+  name: string;
+  currentVersionId: number | null;
+  isEnabled: boolean;
+}>;
+
 export type ProfileVersionRecord = Readonly<{
   id: number;
   profileId: number;
@@ -7,6 +14,14 @@ export type ProfileVersionRecord = Readonly<{
   schemaVersion: number;
   config: CrawlerProfileConfig;
   createdAt: string;
+}>;
+
+export type StorageProfileSummary = Readonly<{
+  id: number;
+  name: string;
+  driver: 's3' | 'sftp';
+  isEnabled: boolean;
+  currentVersionId: number | null;
 }>;
 
 export type StorageVersionRecord = Readonly<{
@@ -37,6 +52,7 @@ export type SecretVersionRecord = Readonly<{
 }>;
 
 export interface CrawlerConfigRepository {
+  listProfiles(): Promise<ReadonlyArray<ProfileSummary>>;
   createProfile(name: string, config: CrawlerProfileConfig): Promise<ProfileVersionRecord>;
   appendProfileVersion(profileId: number, config: CrawlerProfileConfig): Promise<ProfileVersionRecord>;
   getProfileVersion(versionId: number): Promise<ProfileVersionRecord | null>;
@@ -44,9 +60,11 @@ export interface CrawlerConfigRepository {
 }
 
 export interface StorageConfigRepository {
+  listProfiles(): Promise<ReadonlyArray<StorageProfileSummary>>;
   createProfile(name: string, config: StorageConfig): Promise<StorageVersionRecord>;
   appendVersion(profileId: number, config: StorageConfig): Promise<StorageVersionRecord>;
   getVersion(versionId: number): Promise<StorageVersionRecord | null>;
+  listVersions(profileId: number): Promise<ReadonlyArray<StorageVersionRecord>>;
   markStorageTestPassed(versionId: number): Promise<void>;
   activateVersion(versionId: number): Promise<void>;
 }

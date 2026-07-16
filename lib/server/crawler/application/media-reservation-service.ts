@@ -61,6 +61,23 @@ export class MediaReservationService {
     );
   }
 
+  async markStatus(
+    binding: LeaseBinding,
+    uploadId: number,
+    status: 'uploaded' | 'published' | 'abandoned' | 'cleaned',
+  ): Promise<MediaUploadRecord> {
+    return this.uow.runInTransaction(async (repos) => {
+      await assertValidLease(repos, binding);
+      const upload = await repos.media.get(uploadId);
+      if (!upload) throw new AppError('RESULT_INVALID', '媒体预留不存在', 404);
+      if (upload.jobId !== binding.jobId || upload.attemptId !== binding.attemptId) {
+        throw new AppError('WORKER_FORBIDDEN', '媒体预留不属于当前任务尝试', 403);
+      }
+      return repos.media.markStatus(uploadId, status);
+    });
+  }
+
+  /** Reconciliation-only helper; Worker runtime should use markStatus with lease binding. */
   async markAbandoned(uploadId: number): Promise<MediaUploadRecord> {
     return this.uow.runInTransaction((repos) =>
       repos.media.markStatus(uploadId, 'abandoned'),

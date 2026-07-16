@@ -1,3 +1,5 @@
+import tailwindcssAnimate from 'tailwindcss-animate';
+
 /** @type {import('tailwindcss').Config} */
 const tailwindConfig = {
   content: [
@@ -41,25 +43,30 @@ const tailwindConfig = {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          soft: 'hsl(var(--accent-soft))',
+        },
       },
       boxShadow: {
-        soft: '0 2px 8px rgba(0,0,0,0.04)',
-        whisper: '0 2px 8px rgba(0,0,0,0.04)',
+        soft: '0 2px 10px hsla(30, 12%, 18%, 0.05)',
+        whisper: '0 1px 0 hsla(30, 12%, 18%, 0.03), 0 8px 24px hsla(30, 12%, 18%, 0.06)',
+        ink: '0 12px 30px hsla(30, 12%, 18%, 0.08)',
       },
       keyframes: {
         shimmer: { '100%': { transform: 'translateX(100%)' } },
         'fade-in': {
-          from: { opacity: '0', transform: 'translateY(12px)' },
+          from: { opacity: '0', transform: 'translateY(10px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
       animation: {
         shimmer: 'shimmer 1.6s infinite',
-        'fade-in': 'fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+        'fade-in': 'fade-in 0.55s cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [tailwindcssAnimate],
 };
 
 export default tailwindConfig;

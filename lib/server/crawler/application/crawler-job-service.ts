@@ -1,8 +1,10 @@
 import { AppError } from '../../shared/errors';
 import {
   createManualRetrySeed,
+  isDeletableJobStatus,
   isTerminalJobStatus,
   resolveFinalStatus,
+  TERMINAL_JOB_STATUSES,
   transitionJobStatus,
   type CrawlerJobKind,
   type CrawlerJobStatus,
@@ -36,7 +38,12 @@ export type ClaimedJob = Readonly<{
 
 export type { LeaseBinding };
 
-const DEFAULT_LEASE_TTL_MS = 60_000;
+/**
+ * Lease TTL must outlive cold Next.js route compiles + MacCMS network retries.
+ * Worker job heartbeats renew the lease; 5 minutes gives headroom when a single
+ * commit/request stalls without losing the job to expireStaleLeases.
+ */
+const DEFAULT_LEASE_TTL_MS = 300_000;
 
 export class CrawlerJobService {
   private readonly schedules: CrawlerScheduleService;
@@ -415,6 +422,8 @@ export class CrawlerJobService {
               transition.status === 'retry_wait'
                 ? 'failed'
                 : (transition.status as AttemptRecord['resultStatus']),
+            errorCode: input.errorCode ?? null,
+            errorMessage: input.errorMessage ?? null,
           });
 
           return { job: updated };
@@ -595,7 +604,7 @@ export class CrawlerJobService {
 
   async manualRetry(jobId: number): Promise<JobRecord> {
     return this.uow.runInTransaction(async (repos) => {
-      const job = await repos.jobs.get(jobId);
+      const job = await repos.jobs.getForUpdate(jobId);
       if (!job) throw new AppError('RESULT_INVALID', '任务不存在', 404);
       const seed = createManualRetrySeed({
         status: job.status,
@@ -615,6 +624,66 @@ export class CrawlerJobService {
         retryOfJobId: seed.retryOfJobId,
       });
     });
+  }
+
+  /**
+   * Hard-delete a terminal job and related control-plane rows.
+   * Running / queued jobs must be cancelled first.
+   */
+  async deleteJob(jobId: number): Promise<void> {
+    return this.uow.runInTransaction(async (repos) => {
+      const job = await repos.jobs.getForUpdate(jobId);
+      if (!job) throw new AppError('RESULT_INVALID', '任务不存在', 404);
+      if (!isDeletableJobStatus(job.status)) {
+        throw new AppError(
+          'RESULT_CONFLICT',
+          '仅可删除已结束的任务（成功/失败/取消）。运行中的请先取消。',
+          409,
+          false,
+          { status: job.status },
+        );
+      }
+      const ok = await repos.jobs.deleteCascade(jobId);
+      if (!ok) throw new AppError('RESULT_INVALID', '任务删除失败', 500);
+    });
+  }
+
+  /**
+   * Purge terminal jobs whose finished_at/created_at is older than `olderThanDays`.
+   * Runs bounded batches in separate transactions and reports when the defensive
+   * total cap may have left matching rows behind.
+   */
+  async purgeTerminalJobs(input: {
+    olderThanDays: number;
+    statuses?: readonly CrawlerJobStatus[];
+    batchSize?: number;
+    maxTotal?: number;
+  }): Promise<{ deleted: number; truncated: boolean }> {
+    const days = Math.floor(input.olderThanDays);
+    if (!Number.isFinite(days) || days < 1 || days > 3650) {
+      throw new AppError('RESULT_INVALID', '保留天数须在 1–3650 之间', 400);
+    }
+    const statuses = input.statuses?.length ? input.statuses : TERMINAL_JOB_STATUSES;
+    if (!statuses.length || statuses.some((status) => !isDeletableJobStatus(status))) {
+      throw new AppError('RESULT_INVALID', '仅可清理终态任务', 400);
+    }
+
+    const batchSize = Math.min(500, Math.max(1, Math.floor(input.batchSize ?? 200)));
+    const maxTotal = Math.min(100_000, Math.max(1, Math.floor(input.maxTotal ?? 10_000)));
+    const olderThanIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    let deleted = 0;
+
+    while (deleted < maxTotal) {
+      const limit = Math.min(batchSize, maxTotal - deleted);
+      const batchDeleted = await this.uow.runInTransaction((repos) =>
+        repos.jobs.deleteTerminalOlderThan({ olderThanIso, statuses, limit }),
+      );
+      if (batchDeleted <= 0) return { deleted, truncated: false };
+      deleted += batchDeleted;
+      if (batchDeleted < limit) return { deleted, truncated: false };
+    }
+
+    return { deleted, truncated: true };
   }
 }
 

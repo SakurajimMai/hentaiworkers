@@ -10,7 +10,7 @@ export const workerCapabilitiesSchema = z.object({
   protocolVersion: z.number().int().positive(),
   workerVersion: z.string().min(1).max(64),
   sources: z.array(z.string().min(1)).min(1),
-  storageDrivers: z.array(z.enum(['s3', 'sftp'])).min(1),
+  storageDrivers: z.array(z.enum(['s3', 'sftp'])).default([]),
   configSchemaVersions: z.array(z.number().int().positive()).min(1),
   maxConcurrency: z.number().int().min(1).max(64),
   currentLoad: z.number().int().min(0).max(64).default(0),

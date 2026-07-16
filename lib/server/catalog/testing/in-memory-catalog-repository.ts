@@ -44,7 +44,9 @@ export class InMemoryCatalogRepository implements CatalogReadRepository {
       rows = rows.filter(
         (row) =>
           row.title.toLowerCase().includes(needle)
-          || (row.titleJapanese ?? '').toLowerCase().includes(needle),
+          || (row.titleJapanese ?? '').toLowerCase().includes(needle)
+          || (row.titleEnglish ?? '').toLowerCase().includes(needle)
+          || (row.description ?? '').toLowerCase().includes(needle),
       );
     }
     if (input.tagId !== undefined) {
@@ -55,8 +57,8 @@ export class InMemoryCatalogRepository implements CatalogReadRepository {
       if (sort === 'popular') {
         return (b.viewCount ?? 0) - (a.viewCount ?? 0) || b.id - a.id;
       }
-      const aTime = a.createdAt ?? '';
-      const bTime = b.createdAt ?? '';
+      const aTime = a.updatedAt ?? a.createdAt ?? '';
+      const bTime = b.updatedAt ?? b.createdAt ?? '';
       return bTime.localeCompare(aTime) || b.id - a.id;
     });
 

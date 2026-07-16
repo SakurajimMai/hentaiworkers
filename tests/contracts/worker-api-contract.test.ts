@@ -11,6 +11,8 @@ import { LEASE_TOKEN_HEADER } from '../../lib/server/crawler/interfaces/worker-a
 import { mapWorkerError } from '../../lib/server/crawler/interfaces/worker-presenter';
 import { AppError } from '../../lib/server/shared/errors';
 import { WORKER_SCOPES } from '../../lib/server/crawler/interfaces/worker-auth';
+import { StorageConfigService } from '../../lib/server/crawler/application/storage-config-service';
+import { InMemoryStorageConfigRepository } from '../../lib/server/crawler/testing/in-memory-config-repos';
 
 function jsonRequest(
   url: string,
@@ -141,6 +143,36 @@ test('register negotiates protocol and rejects unsupported version', async () =>
     ((await readJson(bad)).error as { code: string }).code,
     'WORKER_INCOMPATIBLE',
   );
+});
+
+test('external-url worker may register and claim without storage drivers', async () => {
+  const api = createTestWorkerApi();
+  const { token, workerId } = await api.provisionWorker();
+  const capabilities = sampleCapabilities({ storageDrivers: [] });
+
+  const registered = await api.handlers.register(
+    jsonRequest('http://localhost/api/internal/crawler/v1/workers/register', {
+      token,
+      body: { workerId, capabilities },
+    }),
+  );
+  assert.equal(registered.status, 200);
+
+  await api.deps.jobs.enqueueManual({
+    profileId: 1,
+    profileVersionId: 1,
+    configSnapshotJson: JSON.stringify({
+      requiredSource: 'hanime',
+      schemaVersion: 1,
+    }),
+  });
+  const claim = await api.handlers.claim(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/claim', {
+      token,
+      body: { capabilities },
+    }),
+  );
+  assert.equal(claim.status, 200);
 });
 
 test('capability mismatch leaves job queued with visible skip reason', async () => {
@@ -346,6 +378,69 @@ test('events batch over 100 returns BATCH_TOO_LARGE', async () => {
   assert.ok(code === 'BATCH_TOO_LARGE' || code === 'RESULT_INVALID');
 });
 
+test('item exists is lease-protected and returns catalog source mapping', async () => {
+  const api = createTestWorkerApi({
+    catalog: {
+      async findExistingBySource(source, sourceId) {
+        return source === 'hanime' && sourceId === '42'
+          ? { animeId: 77, created: false, target: 'legacy_animes' as const }
+          : null;
+      },
+      async upsertFromCrawler() {
+        throw new Error('not used');
+      },
+    },
+  });
+  const { token, workerId } = await api.provisionWorker();
+  await api.handlers.register(
+    jsonRequest('http://localhost/api/internal/crawler/v1/workers/register', {
+      token,
+      body: { workerId, capabilities: sampleCapabilities() },
+    }),
+  );
+  await api.deps.jobs.enqueueManual({
+    profileId: 1,
+    profileVersionId: 1,
+    configSnapshotJson: '{}',
+  });
+  const claim = await api.handlers.claim(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/claim', {
+      token,
+      body: {},
+    }),
+  );
+  const claimed = (await readJson(claim)).data as {
+    attemptId: number;
+    leaseToken: string;
+  };
+
+  const existing = await api.handlers.itemExists(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/1/items/exists', {
+      token,
+      leaseToken: claimed.leaseToken,
+      body: { attemptId: claimed.attemptId, source: 'hanime', sourceId: '42' },
+    }),
+    { id: '1' },
+  );
+  assert.equal(existing.status, 200);
+  assert.deepEqual((await readJson(existing)).data, {
+    exists: true,
+    animeId: 77,
+    target: 'legacy_animes',
+  });
+
+  const lost = await api.handlers.itemExists(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/1/items/exists', {
+      token,
+      leaseToken: 'wrong-token',
+      body: { attemptId: claimed.attemptId, source: 'hanime', sourceId: '42' },
+    }),
+    { id: '1' },
+  );
+  assert.equal(lost.status, 409);
+  assert.equal(((await readJson(lost)).error as { code: string }).code, 'LEASE_LOST');
+});
+
 test('item commit idempotency: same key replays; different payload conflicts', async () => {
   const api = createTestWorkerApi();
   const { token, workerId } = await api.provisionWorker();
@@ -421,6 +516,66 @@ test('item commit idempotency: same key replays; different payload conflicts', a
     ((await readJson(conflict)).error as { code: string }).code,
     'RESULT_CONFLICT',
   );
+});
+
+test('successful storage_test completion automatically marks its version passed', async () => {
+  const storage = new StorageConfigService(new InMemoryStorageConfigRepository());
+  const draft = await storage.createDraft('contract-s3', {
+    driver: 's3',
+    endpoint: 'https://s3.example.com',
+    region: 'auto',
+    bucket: 'anime',
+    prefix: 'test/',
+    deliveryMode: 'public',
+    publicBaseUrl: 'https://cdn.example.com',
+  });
+  const api = createTestWorkerApi({ storage });
+  const { token, workerId } = await api.provisionWorker();
+  await api.handlers.register(
+    jsonRequest('http://localhost/api/internal/crawler/v1/workers/register', {
+      token,
+      body: { workerId, capabilities: sampleCapabilities() },
+    }),
+  );
+  await api.deps.jobs.enqueueManual({
+    kind: 'storage_test',
+    profileId: draft.profileId,
+    profileVersionId: 0,
+    storageProfileVersionId: draft.id,
+    configSnapshotJson: JSON.stringify({ kind: 'storage_test', storageDriver: 's3' }),
+  });
+  const claim = await api.handlers.claim(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/claim', {
+      token,
+      body: { capabilities: sampleCapabilities() },
+    }),
+  );
+  const claimed = (await readJson(claim)).data as {
+    attemptId: number;
+    leaseToken: string;
+  };
+  await api.handlers.start(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/1/start', {
+      token,
+      leaseToken: claimed.leaseToken,
+      body: { attemptId: claimed.attemptId },
+    }),
+    { id: '1' },
+  );
+  const completed = await api.handlers.complete(
+    jsonRequest('http://localhost/api/internal/crawler/v1/jobs/1/complete', {
+      token,
+      leaseToken: claimed.leaseToken,
+      body: {
+        attemptId: claimed.attemptId,
+        idempotencyKey: 'storage-test-complete',
+        outcome: 'succeeded',
+      },
+    }),
+    { id: '1' },
+  );
+  assert.equal(completed.status, 200);
+  assert.equal((await storage.getVersion(draft.id))?.storageTestPassed, true);
 });
 
 test('credentials refresh requires scope and returns no-store short-lived creds', async () => {
@@ -572,7 +727,9 @@ test('internal crawler routes exist under v1 and export POST only', () => {
     'jobs/[id]/heartbeat/route.ts',
     'jobs/[id]/events/batch/route.ts',
     'jobs/[id]/media/reserve/route.ts',
+    'jobs/[id]/media/status/route.ts',
     'jobs/[id]/credentials/refresh/route.ts',
+    'jobs/[id]/items/exists/route.ts',
     'jobs/[id]/items/commit/route.ts',
     'jobs/[id]/complete/route.ts',
     'jobs/[id]/fail/route.ts',

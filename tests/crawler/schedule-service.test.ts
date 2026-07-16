@@ -113,6 +113,7 @@ test('catch_up materializes up to 3 interval points and advances next_run_at', a
   const schedule = await service.create({
     profileId: 7,
     profileVersionId: 1,
+    storageProfileVersionId: 19,
     name: 'hourly',
     kind: 'interval',
     intervalSeconds: 3600,
@@ -131,6 +132,10 @@ test('catch_up materializes up to 3 interval points and advances next_run_at', a
 
   assert.equal(result.created.length, 3);
   assert.equal(result.skipped.length, 0);
+  assert.deepEqual(
+    result.created.map((job) => job.storageProfileVersionId),
+    [19, 19, 19],
+  );
   // unique schedule points
   const keys = new Set(result.created.map((j) => `${j.scheduleId}|${j.scheduledFor}`));
   assert.equal(keys.size, 3);

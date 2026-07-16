@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -16,6 +17,15 @@ class UploadResult:
     checksum_sha256: str
     byte_size: int
     public_url: Optional[str]
+
+
+def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
+    """Hash large media without loading it into memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 class MediaAdapter(ABC):
@@ -36,3 +46,6 @@ class MediaAdapter(ABC):
     @abstractmethod
     def head(self, key: str) -> dict:
         """Return metadata for key."""
+
+    def close(self) -> None:
+        """Release network resources held by a long-lived adapter."""

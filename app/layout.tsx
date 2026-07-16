@@ -1,9 +1,36 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AnimeStream - 在线动漫视频播放平台',
-  description: 'AnimeStream 提供高清动漫在线观看服务，海量动漫资源，支持多标签筛选。',
+  title: {
+    default: 'AnimeStream · 里番与动漫分馆',
+    template: '%s · AnimeStream',
+  },
+  description:
+    '里番与动漫独立片库：在线观看、进度同步、片单收藏。支持线路解析与托管 MP4 播放。',
+  applicationName: 'AnimeStream',
+  openGraph: {
+    title: 'AnimeStream · 里番与动漫分馆',
+    description: '双片库浏览与播放，继续上次进度，管理你的片单。',
+    type: 'website',
+    locale: 'zh_CN',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'AnimeStream',
+    description: '里番与动漫独立片库在线观看。',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#f6f4ef',
+  width: 'device-width',
+  initialScale: 1,
+  colorScheme: 'light',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -10,34 +10,40 @@ export async function SiteHeader() {
     <SiteHeaderClient
       accountSlot={
         user ? (
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <Link
+              href="/history"
+              className="hidden sm:inline rounded-full px-2.5 py-1 font-ui text-[13px] text-soft hover:bg-white hover:text-ink transition-colors"
+            >
+              历史
+            </Link>
             <Link
               href="/favorites"
-              className="hidden sm:inline font-ui text-[13px] text-[#787774] hover:text-[#111]"
+              className="hidden sm:inline rounded-full px-2.5 py-1 font-ui text-[13px] text-soft hover:bg-white hover:text-ink transition-colors"
             >
-              收藏
+              片单
             </Link>
-            <span className="hidden md:inline font-ui text-[12px] text-[#787774] max-w-[10rem] truncate">
+            <span className="hidden md:inline max-w-[9rem] truncate rounded-full border border-[#e8e4dc] bg-white/80 px-2.5 py-1 font-ui text-[12px] text-soft">
               {user.displayName || user.username}
             </span>
             <form action={actionPublicLogout}>
               <button
                 type="submit"
-                className="font-ui text-[13px] text-[#787774] hover:text-[#111]"
+                className="rounded-full border border-[#e8e4dc] bg-white px-3 py-1.5 font-ui text-[12px] font-medium text-[#333] hover:bg-[#f5f3ee] transition active:scale-[0.98]"
               >
                 退出
               </button>
             </form>
           </div>
         ) : (
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/login"
-              className="font-ui text-[13px] text-[#787774] hover:text-[#111]"
+              className="rounded-full px-2.5 py-1.5 font-ui text-[13px] text-soft hover:text-ink hover:bg-white/70 transition-colors"
             >
               登录
             </Link>
-            <Link href="/register" className="btn-ink !py-1.5 !px-3 !text-[12px]">
+            <Link href="/register" className="btn-ink !py-1.5 !px-3.5 !text-[12px]">
               注册
             </Link>
           </div>
