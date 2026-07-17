@@ -11,10 +11,10 @@
 | **app** | Next.js standalone：前台 + 管理后台 + 公开 API + Worker 控制面 |
 | **数据库** | 远程 MySQL 8+ / MariaDB 10.6+（需本机出口 IP 白名单） |
 | **crawler-worker** | 可选；Compose profile `worker`，无 DB 凭据，只调内网控制面 |
-| **端口** | 容器内 `3000`，默认映射 `127.0.0.1:3000`（须反代 TLS，勿裸暴露公网） |
+| **端口** | 容器内固定 `3000`；宿主机由 `APP_PORT` 映射（默认 `127.0.0.1:3000`，可改为 `13000` 等；须反代 TLS，勿裸暴露公网） |
 
 ```
-Internet → 反向代理 (HTTPS) → 127.0.0.1:3000 → app 容器
+Internet → 反向代理 (HTTPS) → 127.0.0.1:${APP_PORT:-3000} → app 容器 :3000
                                                  ↓
                                             远程 MySQL
 app ←—— Compose 内网 ——→ crawler-worker（可选 profile）
@@ -103,7 +103,7 @@ APP_ENCRYPTION_CURRENT_KEY_ID=primary
 | `APP_IMAGE_TAG` | `latest` | App 镜像标签 |
 | `WORKER_IMAGE_TAG` | `latest` | Worker 镜像标签 |
 | `APP_HOST_BIND` | `127.0.0.1` | 宿主机绑定地址；**勿**改为 `0.0.0.0` 除非已有防火墙与反代策略 |
-| `APP_PORT` | `3000` | 宿主机端口 |
+| `APP_PORT` | `3000` | **仅宿主机**发布端口。容器内仍为 `3000`。可设为 `13000` 等任意空闲端口；反代/健康检查请对齐该值 |
 
 ### 3.4 可选 Worker
 
@@ -203,12 +203,13 @@ chmod 600 .env
 # npm run seed:admin
 
 # 3) 构建并启动 app
+# 可选：.env 中设置 APP_PORT=13000 将宿主机端口改为 13000（容器内仍 3000）
 docker compose up -d --build app
 
-# 4) 健康检查
+# 4) 健康检查（端口与 APP_PORT 一致，默认 3000）
 docker compose ps
-curl -sS http://127.0.0.1:3000/api/live
-curl -sS http://127.0.0.1:3000/api/ready
+curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
+curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 # live → 进程 OK；ready → 含 DB SELECT 1，应 ok: true
 ```
 
@@ -290,7 +291,7 @@ App 以非 root 用户跑 Next standalone。
 
 ## 6. 反向代理与 TLS（必须）
 
-将 `https://你的域名` 反代到 `127.0.0.1:${APP_PORT:-3000}`。
+将 `https://你的域名` 反代到 `127.0.0.1:${APP_PORT}`（默认 `3000`；若 `.env` 写了 `APP_PORT=13000` 则反代到 `13000`）。
 
 要点：
 
@@ -299,6 +300,7 @@ App 以非 root 用户跑 Next standalone。
 - 建议对 `/admin`、`/api` 做来源限制或限流
 - 传递 `Host`、`X-Forwarded-For`、`X-Forwarded-Proto`
 - WebSocket **非必须**（当前播放不依赖）
+- 反代 upstream **只跟宿主机 `APP_PORT` 对齐**；不要改容器内 `PORT=3000`
 
 ### Nginx 示例
 
@@ -317,6 +319,7 @@ server {
   }
 
   location / {
+    # 与 .env 的 APP_PORT 一致：默认 3000；若 APP_PORT=13000 则改为 13000
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -335,6 +338,7 @@ anime.example.com {
   @internal path /api/internal/*
   respond @internal 403
 
+  # 与 .env 的 APP_PORT 一致：默认 3000；若 APP_PORT=13000 则改为 13000
   reverse_proxy 127.0.0.1:3000
 }
 ```
@@ -443,6 +447,8 @@ MacCMS 写入 `anime_works`（外链 only）；Hanime 写入 `animes` 并上传 
 | 现象 | 可能原因 | 处理 |
 |------|----------|------|
 | healthcheck 失败 | 启动未完成 / 端口错 | 看 `docker compose logs app`；确认 `start_period` |
+| 本机访问端口不通 | `APP_PORT` 与 curl/反代不一致 | 用 `127.0.0.1:$APP_PORT`；`docker compose ps` 看 `0.0.0.0:13000->3000/tcp` 一类映射 |
+| 宿主机 3000 被占用 | 默认 `APP_PORT=3000` 冲突 | `.env` 设 `APP_PORT=13000`（或其它空闲端口）后 `docker compose up -d app` |
 | ready 失败 | DB 不可达、TLS、白名单 | 查 `DATABASE_URL`、云厂商 IP 白名单、`DATABASE_TLS_MODE` |
 | `SESSION_SECRET must be set` | 过短或未设置 | ≥ 32 字符 |
 | 加密 / keyring 报错 | `APP_ENCRYPTION_*` 非法 | 用 `openssl rand -base64 32` 生成 32 字节密钥 |

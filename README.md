@@ -51,12 +51,13 @@ cp .env.example .env && chmod 600 .env
 CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler   # 或 db:setup:crawler
 npm run seed:admin
 
-# 3) 启动
+# 3) 启动（宿主机端口可用 APP_PORT 自定义，例如 13000；容器内仍是 3000）
+# APP_PORT=13000
 docker compose up -d --build app
-curl -sS http://127.0.0.1:3000/api/live
-curl -sS http://127.0.0.1:3000/api/ready
+curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
+curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 
-# 4) 反代 HTTPS → 127.0.0.1:3000，并禁止公网访问 /api/internal/crawler/**
+# 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，并禁止公网访问 /api/internal/crawler/**
 ```
 
 可选 Worker：

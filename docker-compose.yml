@@ -1,7 +1,8 @@
 # AnimeStream production Compose
-# - App: Next.js standalone on 127.0.0.1:3000
+# - App: container listens on :3000; host maps APP_HOST_BIND:APP_PORT -> 3000
+#   defaults: 127.0.0.1:3000; customize host port via APP_PORT (e.g. 13000)
 # - DB: remote MySQL only (no db service)
-# - Worker: optional, profile "worker"
+# - Worker: optional, profile "worker" (always dials app:3000 on Compose DNS)
 #
 # Full guide: docs/deployment.md
 #
@@ -9,9 +10,11 @@
 #   cp .env.example .env
 #   # fill DATABASE_URL, SESSION_SECRET, APP_ENCRYPTION_KEYRING,
 #   # APP_ENCRYPTION_CURRENT_KEY_ID, SITE_URL, ADMIN_BOOTSTRAP_*
+#   # optional: APP_PORT=13000  (host port; container stays 3000)
 #   # migrate + seed (Node 22 or one-shot container) — see docs/deployment.md §4
 #   docker compose up -d --build app
-#   curl -sS http://127.0.0.1:3000/api/live && curl -sS http://127.0.0.1:3000/api/ready
+#   curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
+#   curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 #
 # Pull prebuilt Hub images (set DOCKERHUB_USERNAME in .env or shell):
 #   docker compose pull app
@@ -33,12 +36,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Host publish: <APP_HOST_BIND>:<APP_PORT> -> container 3000
+    # APP_PORT only changes the host-side port (e.g. 13000); leave container at 3000.
     ports:
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
     environment:
       NODE_ENV: production
+      # Internal listen port is fixed; do not map host APP_PORT into PORT.
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
     restart: unless-stopped
