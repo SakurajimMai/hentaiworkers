@@ -29,6 +29,9 @@ dist-ssr
 .crawler-worker.env
 .crawler-worker-tmp/
 
+# Docker Compose relative bind-mount data (host paths)
+/data/
+
 # Database
 *.db
 *.sqlite

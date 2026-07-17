@@ -63,6 +63,7 @@ curl -sS http://127.0.0.1:3000/api/ready
 
 ```bash
 # 后台签发令牌后写入 CRAWLER_WORKER_ID / CRAWLER_WORKER_TOKEN
+mkdir -p data/crawler-worker   # 相对路径 bind mount：./data/crawler-worker
 docker compose --profile worker up -d --build
 ```
 

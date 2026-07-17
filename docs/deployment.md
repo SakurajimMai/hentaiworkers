@@ -240,9 +240,10 @@ CRAWLER_WORKER_ID=后台显示的数字 ID
 CRAWLER_WORKER_TOKEN=一次性令牌明文
 ```
 
-4. 启动：
+4. 准备相对路径 bind mount 目录并启动：
 
 ```bash
+mkdir -p data/crawler-worker
 docker compose --profile worker up -d --build
 # 或仅 worker：
 docker compose --profile worker up -d crawler-worker
@@ -252,7 +253,8 @@ Worker 环境：
 
 - `CRAWLER_CONTROL_URL=http://app:3000/api/internal/crawler/v1`（Compose 已写死内网）
 - **不会**注入 `DATABASE_URL`
-- 临时目录 volume：`crawler-tmp` → `/var/tmp/crawler-worker`
+- 临时目录使用**相对路径 bind mount**（非 named volume）：`./data/crawler-worker` → `/var/tmp/crawler-worker`
+- 目录在仓库根下，已由 `.gitignore` 忽略；Compose 也可在缺失时自动创建宿主机路径
 
 本机开发也可用：
 
@@ -431,6 +433,7 @@ MacCMS 写入 `anime_works`（外链 only）；Hanime 写入 `animes` 并上传 
 - [ ] 前台首页、登录、片单可写
 - [ ] `/admin/login` 可登录
 - [ ] （可选）Worker 已上报 sources（`ikun` / `hanime` 等）
+- [ ] （可选）Worker 使用相对路径 bind mount：`./data/crawler-worker` 已存在且可写
 - [ ] `robots.txt` 禁止抓取 `/admin`
 
 ---
@@ -445,6 +448,7 @@ MacCMS 写入 `anime_works`（外链 only）；Hanime 写入 `animes` 并上传 
 | 加密 / keyring 报错 | `APP_ENCRYPTION_*` 非法 | 用 `openssl rand -base64 32` 生成 32 字节密钥 |
 | 登录后 Cookie 丢失 | 生产用 HTTP | 上 HTTPS；检查 `X-Forwarded-Proto` |
 | `CRAWLER_WORKER_TOKEN` 报错 | 开了 worker profile 未设令牌 | 写入 `.env` 或不要 `--profile worker` |
+| Worker 临时目录权限错误 | 相对 bind mount 目录不存在或不可写 | `mkdir -p data/crawler-worker`；检查宿主机目录属主/权限 |
 | Hub pull 失败 | 未 login / 用户名错 | `docker login`；核对 `DOCKERHUB_USERNAME` |
 | 动漫 m3u8 证书错误 | 源站证书过期 | 配置线路解析或 ArtPlayer 代理回退 |
 | 迁移被拒 | 未设确认变量 | `CRAWLER_MIGRATE_CONFIRM=yes` |
