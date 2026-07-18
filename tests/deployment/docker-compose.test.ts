@@ -6,30 +6,36 @@ import { parse } from 'yaml';
 
 const root = process.cwd();
 const composePaths = ['docker-compose.yml', 'deploy/docker-compose.yml'] as const;
+const workflow = readFileSync(join(root, '.github/workflows/docker-publish.yml'), 'utf8');
 
 for (const relativePath of composePaths) {
-  test(`${relativePath} is Docker Hub pull-only`, () => {
+  test(`${relativePath} is Docker Hub app-only`, () => {
     const source = readFileSync(join(root, relativePath), 'utf8');
     const compose = parse(source) as {
       services: Record<string, {
         build?: unknown;
         image?: string;
         pull_policy?: string;
-        profiles?: string[];
+        volumes?: string[];
       }>;
     };
 
+    assert.deepEqual(Object.keys(compose.services), ['app']);
     const app = compose.services.app;
-    const worker = compose.services['crawler-worker'];
-
     assert.ok(app);
-    assert.ok(worker);
     assert.equal('build' in app, false);
-    assert.equal('build' in worker, false);
     assert.match(app.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
-    assert.match(worker.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
+    assert.match(app.image ?? '', /hentaiworkers-app/);
     assert.equal(app.pull_policy, 'always');
-    assert.equal(worker.pull_policy, 'always');
-    assert.deepEqual(worker.profiles, ['worker']);
+    assert.ok(app.volumes?.includes('./certificates:/app/certificates:ro'));
+    assert.doesNotMatch(source, /hentaiworkers-(?:ops|worker)/);
+    assert.doesNotMatch(source, /profiles:/);
   });
 }
+
+test('Docker Hub workflow publishes only the app image', () => {
+  assert.match(workflow, /APP_IMAGE:.*hentaiworkers-app/);
+  assert.match(workflow, /file: \.\/Dockerfile/);
+  assert.doesNotMatch(workflow, /hentaiworkers-(?:ops|worker)/);
+  assert.doesNotMatch(workflow, /Dockerfile\.(?:ops|worker)/);
+});

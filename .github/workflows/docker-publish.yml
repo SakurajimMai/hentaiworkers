@@ -1,4 +1,4 @@
-name: Publish Docker images
+name: Publish Docker image
 
 on:
   push:
@@ -11,28 +11,17 @@ permissions:
 
 env:
   APP_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hentaiworkers-app
-  WORKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hentaiworkers-worker
 
 jobs:
   publish:
-    name: Build and push
+    name: Build and push app
     runs-on: ubuntu-latest
-    # Prefer current Actions Node runtime (Node 24); avoid Node 20 deprecation noise.
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # Fail fast on worker lock conflicts before Docker login/build (Python 3.12 matches Dockerfile.worker).
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Check worker requirements lock
-        run: npm run check:worker-requirements
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,18 +44,6 @@ jobs:
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Docker metadata (worker)
-        id: meta-worker
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.WORKER_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
@@ -77,16 +54,4 @@ jobs:
           labels: ${{ steps.meta-app.outputs.labels }}
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
-          provenance: false
-
-      - name: Build and push worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile.worker
-          push: true
-          tags: ${{ steps.meta-worker.outputs.tags }}
-          labels: ${{ steps.meta-worker.outputs.labels }}
-          cache-from: type=gha,scope=worker
-          cache-to: type=gha,mode=max,scope=worker
           provenance: false

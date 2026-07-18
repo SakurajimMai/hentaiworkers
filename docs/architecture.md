@@ -9,7 +9,7 @@ AnimeStream 是单进程 **Next.js 15（App Router）** 应用，同时提供：
 - 公开 REST API（`/api/*`，供 Web 与移动端）
 - Worker 控制面（`/api/internal/crawler/v1/**`，仅内网）
 
-业务数据存放在**远程 MySQL / MariaDB**，Docker Compose **不**包含数据库容器；可选 `crawler-worker` 通过 profile 启动。
+业务数据存放在外部维护的**远程 MySQL / MariaDB**。生产 Docker Compose 为 app-only，不包含数据库、ops 或 crawler-worker 容器。
 
 ```mermaid
 flowchart TB
@@ -19,30 +19,23 @@ flowchart TB
     AdminUser[管理员]
   end
 
-  subgraph DockerHost["服务器 / 本机 Docker"]
-    App["Next.js app :3000<br/>Site + Admin + Public API + Internal Worker API"]
-    Worker["crawler-worker<br/>no DB client"]
+  subgraph DockerHost["生产服务器 Docker"]
+    App["Next.js app :3000<br/>Site + Admin + Public API"]
   end
 
   subgraph Data
-    MySQL[(远程 MariaDB / MySQL)]
-    Hanime[(Hanime HTTP)]
-    MacCMS[(MacCMS JSON APIs)]
-    ObjectStore[(S3 / SFTP 公开 URL)]
+    MySQL[(外部维护的远程 MariaDB / MySQL)]
   end
 
   Browser --> App
   Mobile -->|GET /api/*| App
   AdminUser -->|/admin + Session Cookie| App
   App -->|DATABASE_URL<br/>mysql2 + Drizzle| MySQL
-  Worker -->|Bearer + lease<br/>/api/internal/crawler/v1| App
-  Worker -->|MP4 download| Hanime
-  Worker -->|metadata + m3u8 URLs| MacCMS
-  Worker -->|publish media| ObjectStore
-  App -.->|ingress MUST block public /api/internal/**| Worker
 ```
 
 ## 1.1 爬虫控制面
+
+> 生产 app-only Compose 不启动爬虫执行进程；控制面代码仍存在，但没有外部 Worker 时不会执行采集任务。
 
 - 后台：`/admin/crawler/**`（模板、调度、任务、Worker、YAML 导入）
 - Worker API：`/api/internal/crawler/v1/**`（见 `docs/api/crawler-internal-openapi.yaml`）
@@ -208,17 +201,14 @@ Internet
 [反向代理 必须 TLS：nginx/Caddy]
    │  屏蔽 /api/internal/crawler/**
    ▼
-docker compose:
-  app              Next standalone :3000（默认）
-  crawler-worker   profile "worker"（可选，无 DB）
+docker compose（app-only）:
+  app  Next standalone :3000
    │
-   ├── app DATABASE_URL ──► 远程 MySQL
-   └── worker ──HTTP──► app:3000/api/internal/crawler/v1
-                 └──► S3/SFTP（Hanime 媒体，密钥仅 Worker env）
+   └── DATABASE_URL ──► 外部维护的远程 MySQL / MariaDB
 ```
 
-- 见 `docker-compose.yml`；完整步骤 [deployment.md](./deployment.md)
-- App 镜像：`Dockerfile`（standalone）；Worker：`Dockerfile.worker`（无 ffmpeg）
+- 见 `docker-compose.yml` / `deploy/docker-compose.yml`；完整步骤 [deployment.md](./deployment.md)
+- GitHub Actions 只发布 App 镜像：`Dockerfile`（standalone）
 
 ## 8. 仓库结构（生产路径）
 

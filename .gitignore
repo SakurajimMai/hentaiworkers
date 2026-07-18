@@ -30,7 +30,6 @@ dist-ssr
 .crawler-worker-tmp/
 
 # Docker Compose relative bind-mount data (host paths)
-/data/
 
 # Database
 *.db

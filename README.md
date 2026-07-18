@@ -10,7 +10,7 @@ Next.js 全栈动漫视频站：公网站点 + 管理后台 + REST API，对接*
 - **Drizzle ORM** + **MySQL / MariaDB**
 - **iron-session** + bcrypt 鉴权；AES-GCM 密钥环保护后台密钥字段
 - **ArtPlayer**（里番 MP4 + 可选广告）/ 线路解析 iframe（动漫）
-- **Docker Compose**：`app` + 可选 `crawler-worker`（无内置数据库）
+- **Docker Compose**：app-only，从 Docker Hub 拉镜像并直连外部维护的远程数据库
 
 ## 功能一览
 
@@ -46,23 +46,21 @@ CI 在每次 `main` 推送后把镜像发到 Docker Hub（仓库 Secrets：`DOCK
 **生产机只拉镜像**，不需要 git 部署业务代码，也不需要在服务器 `docker build`。
 
 ```bash
-# 1) 服务器安装 Docker Compose v2；准备目录（只需 deploy 清单，不必完整 clone）
-mkdir -p /opt/anime-web && cd /opt/anime-web
+# 1) 远程数据库由你独立维护：schema 与管理员账号须提前就绪
+# 2) 服务器只准备 deploy 清单，不必完整 clone
+mkdir -p /opt/anime-web/certificates && cd /opt/anime-web
 # 放入 deploy/docker-compose.yml 与 deploy/.env.example → .env
 cp .env.example .env && chmod 600 .env
 # 必填：DOCKERHUB_USERNAME、DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL
 # 端口示例：APP_PORT=13000
 
-# 2) 迁移 + 管理员（运维机 Node，或一次性 node 容器；见 docs/deployment.md / deploy/README.md）
-# CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler && npm run seed:admin
-
-# 3) 拉镜像并启动（不要 --build）
+# 3) 只拉 app 镜像并启动；不迁移、不 seed、不启动其它节点
 docker compose pull app
 docker compose up -d app
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 
-# 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，禁止公网 /api/internal/crawler/**
+# 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，禁止公网 /api/internal/**
 ```
 
 升级：
@@ -71,7 +69,7 @@ curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 docker compose pull app && docker compose up -d --no-build app
 ```
 
-可选 Worker **默认不需要**。细节 → [deploy/README.md](./deploy/README.md) · [docs/deployment.md](./docs/deployment.md)
+生产 Compose 只包含 `app`，没有 `build:`、ops 或 worker 服务。细节 → [deploy/README.md](./deploy/README.md) · [docs/deployment.md](./docs/deployment.md)
 
 ## 文档索引
 

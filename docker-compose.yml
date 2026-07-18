@@ -1,43 +1,27 @@
-# AnimeStream Docker Hub Compose (image pull only; no host-side build)
+# AnimeStream — Docker Hub app-only deployment
 #
-# GitHub Actions builds Dockerfile / Dockerfile.worker and pushes images.
-# The server only pulls the published image and starts it.
-#
-# - App: container :3000; host APP_HOST_BIND:APP_PORT (e.g. 13000)
-# - DB: remote MySQL only
-# - Worker: optional profile "worker" (not required for website-only)
-#
-# Start:
-#   cp .env.example .env   # set DOCKERHUB_USERNAME + required app secrets
-#   docker compose pull app
-#   docker compose up -d app
-#
-# Upgrade:
-#   docker compose pull app && docker compose up -d --no-build app
-#
-# Storage uses relative host bind mounts (no named Compose volumes):
-#   ./data/crawler-worker -> /var/tmp/crawler-worker
-#
-# Reverse proxy MUST terminate TLS and block public /api/internal/crawler/**
+# GitHub Actions builds and pushes hentaiworkers-app. The server only pulls
+# that image and connects it to an externally managed remote database.
+# No build, migration, seed, ops, or crawler node runs in Compose.
 
 services:
   app:
     image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Docker Hub namespace}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
     pull_policy: always
-    # Host publish: <APP_HOST_BIND>:<APP_PORT> -> container 3000
-    # APP_PORT only changes the host-side port (e.g. 13000); leave container at 3000.
     ports:
+      # Host publish only: APP_HOST_BIND:APP_PORT -> container 3000
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
+    volumes:
+      # Optional custom DB CA: DATABASE_TLS_CA_FILE=certificates/mariadb-ca.pem
+      - ./certificates:/app/certificates:ro
     environment:
       NODE_ENV: production
-      # Internal listen port is fixed; do not map host APP_PORT into PORT.
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
     restart: unless-stopped
     healthcheck:
-      # node:22-alpine runner has no wget; use Node fetch against live probe
       test:
         [
           "CMD",
@@ -49,38 +33,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
-    # Production reverse proxy MUST block public access to:
-    #   /api/internal/crawler/**
-
-  crawler-worker:
-    profiles: ["worker"]
-    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Docker Hub namespace}/hentaiworkers-worker:${WORKER_IMAGE_TAG:-latest}
-    pull_policy: always
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy
-    environment:
-      CRAWLER_CONTROL_URL: http://app:3000/api/internal/crawler/v1
-      CRAWLER_WORKER_ID: ${CRAWLER_WORKER_ID:-1}
-      # Optional at compose-parse time so `docker compose up app` works without worker keys.
-      # Required only when this service is actually started (--profile worker); empty token
-      # fails inside the worker process, not while deploying the website alone.
-      CRAWLER_WORKER_TOKEN: ${CRAWLER_WORKER_TOKEN:-}
-      CRAWLER_TEMP_DIR: /var/tmp/crawler-worker
-      CRAWLER_WORKER_VERSION: "1.0.0"
-    # Explicitly do NOT pass DATABASE_URL / MYSQL_*
-    # Relative host bind mount (repo-local path), not a named Compose volume.
-    volumes:
-      - ./data/crawler-worker:/var/tmp/crawler-worker
-    read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    pids_limit: 256
-    mem_limit: 1g
-    cpus: 1.0
-    # No host ports — Worker only dials app over Compose DNS.

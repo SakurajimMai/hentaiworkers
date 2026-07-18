@@ -7,7 +7,7 @@
 | [架构说明](./architecture.md) | 系统结构、数据流、权限模型、目录职责 |
 | [API 参考](./api/README.md) | 公开 REST 接口说明与示例 |
 | [OpenAPI 规范](./api/openapi.yaml) | OpenAPI 3.0 机读规格 |
-| [**部署指南**](./deployment.md) | **Docker Hub 生产部署**：环境变量、迁移、TLS、检查清单 |
+| [**部署指南**](./deployment.md) | **app-only Docker Hub 部署**：远程数据库、稳定 env、TLS、升级 |
 | [Hub 部署清单](../deploy/README.md) | 服务器只拉镜像的 compose / `.env` 模板 |
 | [开发指南](./development.md) | 本地启动、脚本、测试与约定 |
 | [前台使用](./user-guide.md) | 双片库、ArtPlayer / 解析播放、进度、片单、广告体验 |
@@ -27,11 +27,11 @@
 
 ## 上线最短路径（Docker Hub）
 
-1. CI 已配置 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`（推 `main` 自动发镜像）
-2. 服务器只用 `deploy/` 清单：配置 `.env`（含 `DOCKERHUB_USERNAME`、`DATABASE_URL`、`SESSION_SECRET`、`APP_ENCRYPTION_*`、`SITE_URL`、`APP_PORT`）
-3. 运维侧迁移 + `seed:admin`（见 deployment.md §4）
+1. 远程数据库 schema 和管理员账号由你提前维护
+2. CI 使用 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` 自动发布 app 镜像
+3. 服务器只用 `deploy/` 清单和稳定 `.env`
 4. `docker compose pull app && docker compose up -d app`
-5. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截 `/api/internal/crawler/**`
+5. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截 `/api/internal/**`
 
 细节见 [deployment.md](./deployment.md) 与 [deploy/README.md](../deploy/README.md)。
 
