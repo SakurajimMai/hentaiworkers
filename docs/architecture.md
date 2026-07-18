@@ -208,19 +208,17 @@ Internet
 [反向代理 必须 TLS：nginx/Caddy]
    │  屏蔽 /api/internal/crawler/**
    ▼
-docker compose（全部从 Docker Hub 拉取）:
+docker compose:
   app              Next standalone :3000（默认）
-  ops              profile "ops"（一次性迁移/seed，不常驻）
   crawler-worker   profile "worker"（可选，无 DB）
    │
    ├── app DATABASE_URL ──► 远程 MySQL
-   ├── ops DATABASE_URL ──► 远程 MySQL（setup/migrate/seed-admin）
    └── worker ──HTTP──► app:3000/api/internal/crawler/v1
                  └──► S3/SFTP（Hanime 媒体，密钥仅 Worker env）
 ```
 
-- 见 `docker-compose.yml` / `deploy/docker-compose.yml`；完整步骤 [deployment.md](./deployment.md)
-- GitHub Actions 发布三镜像：App `Dockerfile`；Ops `Dockerfile.ops`；Worker `Dockerfile.worker`（无 ffmpeg）
+- 见 `docker-compose.yml`；完整步骤 [deployment.md](./deployment.md)
+- App 镜像：`Dockerfile`（standalone）；Worker：`Dockerfile.worker`（无 ffmpeg）
 
 ## 8. 仓库结构（生产路径）
 
@@ -232,13 +230,10 @@ anime-web/
 ├── crawler_worker/      # Python Worker（无 DATABASE_URL）
 ├── drizzle/             # core + migrations 0001–0016
 ├── scripts/             # seed、迁移、worker 运维
-├── ops/                 # 最小运维镜像依赖锁（mysql2/dotenv/bcryptjs）
 ├── mobile/              # Expo 客户端（独立构建）
 ├── docs/                # 本套文档
 ├── Dockerfile
-├── Dockerfile.ops
 ├── Dockerfile.worker
-├── deploy/               # 可独立复制的 Hub 生产部署清单
 ├── docker-compose.yml
 └── .env.example
 ```

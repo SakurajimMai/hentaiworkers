@@ -24,7 +24,6 @@ import {
   buildDatabaseConnectionSettings,
   CRAWLER_CONTROL_TABLES_FALLBACK,
 } from './lib/migration-connection.mjs';
-import { createSqlCompatibilityNormalizer } from './lib/sql-compat.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..');
@@ -126,12 +125,11 @@ async function listExistingControlTables(connection) {
   return rows.map((r) => r.name ?? r.TABLE_NAME ?? r.Name).filter(Boolean);
 }
 
-async function applyOne(connection, fileName, args, normalizeSql = (value) => value) {
+async function applyOne(connection, fileName, args) {
   const migrationId = fileName.replace(/\.sql$/, '');
-  const sourceSql = loadMigrationSql(fileName);
-  // Checksum the reviewed source file; compatibility changes affect execution only.
-  const hash = checksum(sourceSql);
-  const statements = splitStatements(normalizeSql(sourceSql));
+  const sql = loadMigrationSql(fileName);
+  const hash = checksum(sql);
+  const statements = splitStatements(sql);
 
   if (args.dryRun) {
     console.log(
@@ -249,10 +247,9 @@ async function main() {
 
   const connection = await mysql.createConnection(settings.connectionOptions);
   try {
-    const normalizeSql = await createSqlCompatibilityNormalizer(connection);
     await ensureMigrationsTable(connection);
     for (const file of files) {
-      await applyOne(connection, file, args, normalizeSql);
+      await applyOne(connection, file, args);
     }
     const existing = await listExistingControlTables(connection);
     const missing = CRAWLER_TABLES.filter((t) => !existing.includes(t));

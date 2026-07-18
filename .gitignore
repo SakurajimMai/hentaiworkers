@@ -31,7 +31,6 @@ dist-ssr
 
 # Docker Compose relative bind-mount data (host paths)
 /data/
-/certificates/
 
 # Database
 *.db

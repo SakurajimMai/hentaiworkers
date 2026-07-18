@@ -10,7 +10,6 @@
 |------|------|
 | **app** | Next.js standalone：前台 + 管理后台 + 公开 API + Worker 控制面 |
 | **数据库** | 远程 MySQL 8+ / MariaDB 10.6+（需本机出口 IP 白名单） |
-| **ops** | 一次性 Compose profile `ops`；全新库初始化、增量迁移、管理员引导，不常驻 |
 | **crawler-worker** | 可选；Compose profile `worker`，无 DB 凭据，只调内网控制面 |
 | **端口** | 容器内固定 `3000`；宿主机由 `APP_PORT` 映射（默认 `127.0.0.1:3000`，可改为 `13000` 等；须反代 TLS，勿裸暴露公网） |
 
@@ -24,7 +23,6 @@ app ←—— Compose 内网 ——→ crawler-worker（可选 profile）
 镜像名（由 GitHub Actions 推到 Docker Hub）：
 
 - App：`{DOCKERHUB_USERNAME}/hentaiworkers-app:{APP_IMAGE_TAG}`
-- Ops：`{DOCKERHUB_USERNAME}/hentaiworkers-ops:{OPS_IMAGE_TAG}`（一次性迁移/管理员引导）
 - Worker：`{DOCKERHUB_USERNAME}/hentaiworkers-worker:{WORKER_IMAGE_TAG}`
 
 服务器只执行 `docker compose pull`，两个 Compose 清单均**不包含** `build:`。
@@ -107,7 +105,6 @@ APP_ENCRYPTION_CURRENT_KEY_ID=primary
 |------|------|------|
 | `DOCKERHUB_USERNAME` | 必填 | Hub 命名空间，必须与 GitHub Actions Secret 同值，用于拉取 `用户名/hentaiworkers-app` |
 | `APP_IMAGE_TAG` | `latest` | App 镜像标签 |
-| `OPS_IMAGE_TAG` | `latest` | 数据库运维镜像标签；升级时建议与 App 一致 |
 | `WORKER_IMAGE_TAG` | `latest` | Worker 镜像标签 |
 | `APP_HOST_BIND` | `127.0.0.1` | 宿主机绑定地址；**勿**改为 `0.0.0.0` 除非已有防火墙与反代策略 |
 | `APP_PORT` | `3000` | **仅宿主机**发布端口。容器内仍为 `3000`。可设为 `13000` 等任意空闲端口；反代/健康检查请对齐该值 |
@@ -131,37 +128,26 @@ Hanime 上传到 S3/SFTP 时，密钥**只放 Worker 环境**，不入库：
 | `CRAWLER_SFTP_PASSWORD` 或 `CRAWLER_SFTP_PRIVATE_KEY` | SFTP |
 | `CRAWLER_STORAGE_DRIVERS` | 可选覆盖，如 `s3,sftp` |
 
-### 3.5 连接池与自定义 CA（可选）
+### 3.5 连接池（可选）
 
 见 `.env.example`：`DATABASE_POOL_*`、`DATABASE_CONNECT_TIMEOUT_MS`、`DATABASE_TLS_CA_FILE`。
-
-两个 Compose 清单都将相对路径 `./certificates` 只读挂载到 app/ops。若数据库使用私有 CA：
-
-```bash
-mkdir -p certificates
-cp /安全路径/mariadb-ca.pem certificates/
-# .env
-DATABASE_TLS_CA_FILE=certificates/mariadb-ca.pem
-```
-
-不需要自定义 CA 时保留空目录即可；系统公共 CA 仍由镜像提供。
 
 **切勿**把含真实密码的 `.env` 提交到 Git。
 
 ---
 
-## 4. 数据库迁移（Docker Hub ops 镜像）
+## 4. 数据库迁移
 
-CI 发布 `{DOCKERHUB_USERNAME}/hentaiworkers-ops:{OPS_IMAGE_TAG}`，内含审核过的 baseline、迁移 SQL 与管理员 seed。服务器不需要源码、Node 或 npm。
+迁移目录：`drizzle/migrations/`（`0001`–`0016`）与全新核心 `drizzle/core/0001-crawler-core.sql`。
 
 | 场景 | 命令 |
 |------|------|
-| **全新空库** | `docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops setup` |
-| **已有库 / 升级** | `docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops migrate` |
-| 迁移预览 | `docker compose --profile ops run --rm ops migrate --dry-run` |
-| 首次管理员 | `docker compose --profile ops run --rm ops seed-admin` |
+| **全新空库** | `CRAWLER_MIGRATE_CONFIRM=yes npm run db:setup:crawler` |
+| **已有库 / 升级** | `CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler` |
+| 旧 19 表审计 | `CRAWLER_MIGRATE_CONFIRM=yes npm run db:compact:crawler` |
+| 确认后删遗留表 | 额外 `CRAWLER_COMPACT_CONFIRM=drop-legacy-tables`（先备份） |
 
-先执行 `docker compose --profile ops pull ops`。非本机数据库必须显式传 `CRAWLER_MIGRATE_CONFIRM=yes`，否则写入会被拒绝。`setup` 只允许完全空库，发现已有表即拒绝。
+非本机数据库**必须**设置 `CRAWLER_MIGRATE_CONFIRM=yes`，否则脚本拒绝执行。
 
 ### 4.1 迁移覆盖（摘要）
 
@@ -175,25 +161,29 @@ CI 发布 `{DOCKERHUB_USERNAME}/hentaiworkers-ops:{OPS_IMAGE_TAG}`，内含审�
 | 0010–0013 | `anime_works` 外链、线路、标签、演职 |
 | 0014–0016 | 存储配置、媒体预留、调度绑定存储 |
 
-### 4.2 推荐执行顺序
+### 4.2 在服务器上跑迁移的两种方式
 
-全新空库：
-
-```bash
-docker compose --profile ops pull ops
-docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops setup
-docker compose --profile ops run --rm ops seed-admin
-```
-
-已有库升级：
+**方式 A — 本机有 Node 22+（推荐运维机 / 跳板）：**
 
 ```bash
-docker compose --profile ops pull ops
-docker compose --profile ops run --rm ops migrate --dry-run
-docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops migrate
+# 需已安装 Node 22+ 与 npm；使用与生产相同的 .env
+npm ci
+node scripts/apply-crawler-migration.mjs --dry-run   # 或 setup-crawler-core.mjs
+CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
+npm run seed:admin
 ```
 
-三个命令均为一次性容器，完成后自动删除；`ops` profile 不会随网站常驻。
+**方式 B — 服务器仅有 Docker（一次性 Node 容器）：**
+
+```bash
+docker run --rm -it \
+  --env-file .env \
+  -v "$PWD":/app -w /app \
+  node:22-bookworm \
+  bash -lc 'npm ci && CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler && npm run seed:admin'
+```
+
+全新库把 `db:migrate:crawler` 换成 `db:setup:crawler`。
 
 ---
 
@@ -207,7 +197,6 @@ docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops migrate
 两个清单都没有 `build:`，都要求 `DOCKERHUB_USERNAME`，并为服务设置 `pull_policy: always`。`Dockerfile*` 仅供 GitHub Actions 构建镜像。
 
 - **`app`**：主站（默认启动）
-- **`ops`**：profile `ops`，仅执行一次性 setup/migrate/seed，不常驻
 - **`crawler-worker`**：profile `worker`，**默认不启动**，网站业务不需要
 
 简版步骤也见 [`deploy/README.md`](../deploy/README.md)。
@@ -216,14 +205,13 @@ docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops migrate
 
 ```bash
 # 服务器只需 deploy 目录中的 compose + .env（可用 raw 下载，无需 git 部署业务）
-mkdir -p /opt/anime-web/certificates && cd /opt/anime-web
+mkdir -p /opt/anime-web && cd /opt/anime-web
 # 放入 deploy/docker-compose.yml 与 deploy/.env.example
 cp .env.example .env && chmod 600 .env
 
 # .env 至少包含：
 #   DOCKERHUB_USERNAME=与 CI Secret 相同的 Hub 命名空间
 #   APP_IMAGE_TAG=latest          # 或 main / sha / semver
-#   OPS_IMAGE_TAG=latest          # 建议与 APP_IMAGE_TAG 一致
 #   DATABASE_URL / DATABASE_TLS_MODE=required
 #   SITE_URL / SESSION_SECRET / APP_ENCRYPTION_KEYRING / APP_ENCRYPTION_CURRENT_KEY_ID
 #   APP_HOST_BIND=127.0.0.1
@@ -232,11 +220,8 @@ cp .env.example .env && chmod 600 .env
 # 不要填 CRAWLER_WORKER_*（除非你要跑 worker profile）
 
 # 1) 远程 MySQL：放行本机出口 IP；建好空库与账号
-# 2) 使用 Hub ops 镜像初始化/迁移 + 管理员（见第 4 节）
-docker compose --profile ops pull ops
-docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops setup
-docker compose --profile ops run --rm ops seed-admin
-# 3) 拉 app 镜像并启动（不要 --build）
+# 2) 迁移 + 管理员（见第 4 节；生产镜像不含迁移脚本）
+# 3) 拉镜像并启动（不要 --build）
 docker compose pull app
 docker compose up -d app
 
@@ -390,11 +375,7 @@ anime.example.com {
 
 **运行时**以 `env_file: .env` 为准，与构建占位无关。
 
-`Dockerfile.ops`：最小 Node 运维镜像，仅包含 `mysql2`、`dotenv`、`bcryptjs`、审核过的 SQL 与 `setup/migrate/seed-admin` 入口；非 root、不常驻。
-
 `Dockerfile.worker`：Python + Chromium 运行时，**无**数据库客户端；Hanime 为 **MP4 直传**，镜像**不含** ffmpeg。
-
-GitHub Actions 同一次发布 app / ops / worker 三个镜像。
 
 GitHub Actions Secrets（**仅 CI 推镜像用**，不是服务器业务 `.env` 里的数据库密码）：
 
@@ -423,12 +404,11 @@ NODE_ENV=production npm run start
 ```bash
 cd /opt/anime-web   # 或你的 deploy 目录
 
-# 建议 APP_IMAGE_TAG 与 OPS_IMAGE_TAG 固定为同一个 main / sha / semver
-# 先用同版本 ops 镜像迁移，再切 app
-docker compose --profile ops pull ops
-docker compose --profile ops run --rm ops migrate --dry-run
-docker compose --profile ops run --rm -e CRAWLER_MIGRATE_CONFIRM=yes ops migrate
+# 有新 SQL 时：在运维机/一次性 node 容器先迁移（见第 4 节），再换镜像
+# node scripts/apply-crawler-migration.mjs --dry-run
+# CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
 
+# 推荐：只拉 Hub 镜像（可把 APP_IMAGE_TAG 固定为 main / sha / semver）
 docker compose pull app
 docker compose up -d --no-build app
 
@@ -437,11 +417,9 @@ docker compose --profile worker pull
 docker compose --profile worker up -d --no-build
 ```
 
-回滚：`.env` 中把 `APP_IMAGE_TAG` 改回上一 tag（或 sha）后 `pull` + `up -d --no-build`；`OPS_IMAGE_TAG` 仅在运行迁移时使用。
-
-**数据在远程 MySQL**，回滚应用**不会**自动回滚 schema；迁移前务必备份。
-
-生产初始化、迁移和升级均只拉 Docker Hub 镜像，不依赖服务器 `git pull`、Node 或源码。
+回滚：`.env` 中把 `APP_IMAGE_TAG` 改回上一 tag（或 sha）后 `pull` + `up -d --no-build`。  
+**数据在远程 MySQL**，回滚应用**不会**自动回滚 schema；破坏性迁移前务必备份。  
+生产升级**不依赖**服务器 `git pull` 业务代码。
 
 ---
 
@@ -476,8 +454,8 @@ MacCMS 写入 `anime_works`（外链 only）；Hanime 写入 `animes` 并上传 
 - [ ] `.env` 权限 `chmod 600`，未进 Git
 - [ ] `SESSION_SECRET`、`APP_ENCRYPTION_KEYRING` 为生产随机值（非示例）
 - [ ] `DATABASE_TLS_MODE=required`（远程库）
-- [ ] `hentaiworkers-ops` 与 app 使用同版本 tag，迁移已执行至当前最新
-- [ ] `ops seed-admin` 完成且一次性引导密码已改
+- [ ] 迁移已执行至当前最新（含 `0010`–`0016` 若使用动漫/存储）
+- [ ] `seed:admin` 完成且一次性引导密码已改
 - [ ] `curl` live / ready 正常
 - [ ] HTTPS 反代生效；`SITE_URL` 与域名一致
 - [ ] 公网 **403** `/api/internal/crawler/**`

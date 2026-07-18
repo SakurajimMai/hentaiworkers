@@ -16,26 +16,20 @@ for (const relativePath of composePaths) {
         image?: string;
         pull_policy?: string;
         profiles?: string[];
-        volumes?: string[];
       }>;
     };
 
     const app = compose.services.app;
-    const ops = compose.services.ops;
     const worker = compose.services['crawler-worker'];
 
     assert.ok(app);
-    assert.ok(ops);
     assert.ok(worker);
-    for (const service of [app, ops, worker]) {
-      assert.equal('build' in service, false);
-      assert.match(service.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
-      assert.equal(service.pull_policy, 'always');
-    }
-    assert.match(ops.image ?? '', /hentaiworkers-ops/);
-    assert.ok(app.volumes?.includes('./certificates:/app/certificates:ro'));
-    assert.ok(ops.volumes?.includes('./certificates:/ops/certificates:ro'));
-    assert.deepEqual(ops.profiles, ['ops']);
+    assert.equal('build' in app, false);
+    assert.equal('build' in worker, false);
+    assert.match(app.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
+    assert.match(worker.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
+    assert.equal(app.pull_policy, 'always');
+    assert.equal(worker.pull_policy, 'always');
     assert.deepEqual(worker.profiles, ['worker']);
   });
 }
