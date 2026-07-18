@@ -24,8 +24,7 @@ for (const relativePath of composePaths) {
     const app = compose.services.app;
     assert.ok(app);
     assert.equal('build' in app, false);
-    assert.match(app.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
-    assert.match(app.image ?? '', /hentaiworkers-app/);
+    assert.equal(app.image, 'sakurajiamai/hentaiworkers-app:latest');
     assert.equal(app.pull_policy, 'always');
     assert.equal(app.volumes, undefined);
     assert.doesNotMatch(source, /DATABASE_TLS_CA_FILE|certificates/);
@@ -34,8 +33,8 @@ for (const relativePath of composePaths) {
   });
 }
 
-test('Docker Hub workflow publishes only the app image', () => {
-  assert.match(workflow, /APP_IMAGE:.*hentaiworkers-app/);
+test('Docker Hub workflow publishes only the fixed public app image', () => {
+  assert.match(workflow, /APP_IMAGE: sakurajiamai\/hentaiworkers-app/);
   assert.match(workflow, /file: \.\/Dockerfile/);
   assert.doesNotMatch(workflow, /hentaiworkers-(?:ops|worker)/);
   assert.doesNotMatch(workflow, /Dockerfile\.(?:ops|worker)/);

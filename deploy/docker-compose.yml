@@ -6,7 +6,7 @@
 
 services:
   app:
-    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Docker Hub namespace}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
+    image: sakurajiamai/hentaiworkers-app:latest
     pull_policy: always
     ports:
       # Host publish only: APP_HOST_BIND:APP_PORT -> container 3000

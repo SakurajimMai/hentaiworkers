@@ -31,7 +31,7 @@ Nginx / Caddy
 |------|------|
 | `app` | Next.js standalone：前台、后台和 API |
 | 远程数据库 | 由你独立维护；Compose 只连接，不修改 schema |
-| Docker Hub | GitHub Actions 推送 `{DOCKERHUB_USERNAME}/hentaiworkers-app` |
+| Docker Hub | 公开镜像 `sakurajiamai/hentaiworkers-app:latest` |
 
 ---
 
@@ -81,10 +81,6 @@ cd /opt/anime-web
 ## 4. 稳定 `.env`
 
 ```env
-# Docker Hub
-DOCKERHUB_USERNAME=你的DockerHub用户名
-APP_IMAGE_TAG=latest
-
 # 宿主机端口；容器内固定 3000
 APP_HOST_BIND=127.0.0.1
 APP_PORT=13000
@@ -141,23 +137,7 @@ openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
 
 如果远程数据库已经保存了 SMTP、Turnstile、爬虫存储等加密配置，必须使用原有 keyring；随意更换会导致旧密文无法解密。
 
-### 4.3 不需要的变量
-
-app-only 部署不需要：
-
-```text
-DOCKERHUB_TOKEN
-OPS_IMAGE_TAG
-WORKER_IMAGE_TAG
-ADMIN_BOOTSTRAP_USER
-ADMIN_BOOTSTRAP_PASSWORD
-CRAWLER_WORKER_ID
-CRAWLER_WORKER_TOKEN
-CRAWLER_S3_*
-CRAWLER_SFTP_*
-```
-
-`DOCKERHUB_TOKEN` 只存在于 GitHub Actions Secrets，用于 CI 推送镜像。公开镜像通常无需在服务器执行 `docker login`。
+服务器直接拉取固定公开镜像，不需要任何 Docker Hub 凭据或额外服务变量，也不需要执行 `docker login`。
 
 ---
 
@@ -245,23 +225,9 @@ docker compose pull app
 docker compose up -d --no-build app
 ```
 
-建议生产固定 tag：
+Compose 固定使用 `sakurajiamai/hentaiworkers-app:latest`。每次升级执行 `pull` 后重新创建 app 容器即可。
 
-```env
-APP_IMAGE_TAG=main
-```
-
-或使用版本号 / commit SHA，避免 `latest` 不可追踪。
-
-回滚：
-
-```bash
-# .env 改回上一 APP_IMAGE_TAG
-docker compose pull app
-docker compose up -d --no-build app
-```
-
-应用回滚不会改变远程数据库 schema。
+应用镜像更新不会改变远程数据库 schema。
 
 ---
 
@@ -277,12 +243,12 @@ DOCKERHUB_TOKEN
 CI 在 `main`、`v*` tag 和手动触发时构建并推送：
 
 ```text
-{DOCKERHUB_USERNAME}/hentaiworkers-app:latest
-{DOCKERHUB_USERNAME}/hentaiworkers-app:main
-{DOCKERHUB_USERNAME}/hentaiworkers-app:<commit-sha>
+sakurajiamai/hentaiworkers-app:latest
+sakurajiamai/hentaiworkers-app:main
+sakurajiamai/hentaiworkers-app:<commit-sha>
 ```
 
-服务器 `.env` 只需要 `DOCKERHUB_USERNAME`，不需要 Token。
+`DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN` 仅用于 GitHub Actions 登录；服务器不需要它们。
 
 ---
 
@@ -307,8 +273,7 @@ CI 在 `main`、`v*` tag 和手动触发时构建并推送：
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| Compose 提示缺少 `DOCKERHUB_USERNAME` | 未设置镜像命名空间 | 在 `.env` 填 Docker Hub 用户名 |
-| Hub pull 失败 | 镜像私有或名称/tag 错误 | 核对用户名/tag；私有镜像先 `docker login` |
+| Hub pull 失败 | 网络或 Docker Hub 临时故障 | 检查服务器网络后重试 `docker compose pull app` |
 | `/api/ready` 失败 | DB URL、TLS、IP 白名单或 schema 有问题 | 检查远程数据库连接与表结构 |
 | 后台无法登录 | 远程数据库没有管理员或密码不匹配 | 在远程数据库侧维护管理员账号 |
 | 宿主机端口冲突 | `APP_PORT` 已占用 | 改为 `13000` 等空闲端口 |

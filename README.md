@@ -42,8 +42,9 @@ npm run dev
 
 ## 服务器部署（Docker Hub，推荐）
 
-CI 在每次 `main` 推送后把镜像发到 Docker Hub（仓库 Secrets：`DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`）。  
-**生产机只拉镜像**，不需要 git 部署业务代码，也不需要在服务器 `docker build`。
+CI 在每次 `main` 推送后把镜像发布为公开镜像 `sakurajiamai/hentaiworkers-app:latest`。
+
+**生产机直接拉取该镜像**，不需要 Docker Hub 登录、git 源码或服务器本地 build。
 
 ```bash
 # 1) 远程数据库由你独立维护：schema 与管理员账号须提前就绪
@@ -51,7 +52,7 @@ CI 在每次 `main` 推送后把镜像发到 Docker Hub（仓库 Secrets：`DOCK
 mkdir -p /opt/anime-web && cd /opt/anime-web
 # 放入 deploy/docker-compose.yml 与 deploy/.env.example → .env
 cp .env.example .env && chmod 600 .env
-# 必填：DOCKERHUB_USERNAME、DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL
+# 必填：DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL
 # 端口示例：APP_PORT=13000
 
 # 3) 只拉 app 镜像并启动；不迁移、不 seed、不启动其它节点

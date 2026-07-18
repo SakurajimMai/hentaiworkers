@@ -28,8 +28,8 @@
 ## 上线最短路径（Docker Hub）
 
 1. 远程数据库 schema 和管理员账号由你提前维护
-2. CI 使用 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` 自动发布 app 镜像
-3. 服务器只用 `deploy/` 清单和稳定 `.env`
+2. CI 自动发布公开镜像 `sakurajiamai/hentaiworkers-app:latest`
+3. 服务器只用 `deploy/` 清单和稳定 `.env`，无需 Docker Hub 登录
 4. `docker compose pull app && docker compose up -d app`
 5. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截 `/api/internal/**`
 

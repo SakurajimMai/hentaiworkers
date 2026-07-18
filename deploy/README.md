@@ -2,7 +2,7 @@
 
 本目录是生产服务器使用的最小部署清单：
 
-- 只从 Docker Hub 拉取 `{DOCKERHUB_USERNAME}/hentaiworkers-app`
+- 直接拉取公开镜像 `sakurajiamai/hentaiworkers-app:latest`
 - 只启动 `app` 一个容器
 - 直接连接你维护的远程 MySQL / MariaDB
 - 不执行数据库初始化、迁移或 seed
@@ -37,9 +37,6 @@ docker-compose.yml
 ## 2. 配置 `.env`
 
 ```env
-DOCKERHUB_USERNAME=你的DockerHub用户名
-APP_IMAGE_TAG=latest
-
 APP_HOST_BIND=127.0.0.1
 APP_PORT=13000
 
@@ -52,7 +49,7 @@ APP_ENCRYPTION_KEYRING={"primary":"使用-openssl-rand-base64-32-生成"}
 APP_ENCRYPTION_CURRENT_KEY_ID=primary
 ```
 
-`DOCKERHUB_TOKEN` 只保存在 GitHub Actions Secrets，用来推送镜像；公开镜像部署时不写入服务器 `.env`。
+服务器不需要 `DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN` 或 `docker login`。
 
 ## 3. 启动
 
@@ -82,7 +79,7 @@ docker compose pull app
 docker compose up -d --no-build app
 ```
 
-需要稳定回滚时，建议将 `APP_IMAGE_TAG` 固定为 `main`、版本号或 commit SHA，而不是长期使用 `latest`。
+当前 Compose 固定拉取公开 `latest` 镜像；更新后重新执行 `pull` + `up` 即可。
 
 ## 5. 反向代理
 

@@ -1,12 +1,12 @@
 # AnimeStream — Docker Hub app-only deployment
 #
-# GitHub Actions builds and pushes hentaiworkers-app. The server only pulls
-# that image and connects it to an externally managed remote database.
+# The server pulls the public sakurajiamai/hentaiworkers-app:latest image
+# and connects it to an externally managed remote database.
 # No build, migration, seed, ops, or crawler node runs in Compose.
 
 services:
   app:
-    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Docker Hub namespace}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
+    image: sakurajiamai/hentaiworkers-app:latest
     pull_policy: always
     ports:
       # Host publish only: APP_HOST_BIND:APP_PORT -> container 3000

@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  APP_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hentaiworkers-app
+  APP_IMAGE: sakurajiamai/hentaiworkers-app
 
 jobs:
   publish:
