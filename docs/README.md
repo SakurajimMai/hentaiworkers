@@ -7,7 +7,8 @@
 | [架构说明](./architecture.md) | 系统结构、数据流、权限模型、目录职责 |
 | [API 参考](./api/README.md) | 公开 REST 接口说明与示例 |
 | [OpenAPI 规范](./api/openapi.yaml) | OpenAPI 3.0 机读规格 |
-| [**部署指南**](./deployment.md) | **服务器 Compose 教程**：环境变量、迁移 0001–0016、Worker、TLS、检查清单 |
+| [**部署指南**](./deployment.md) | **Docker Hub 生产部署**：环境变量、迁移、TLS、检查清单 |
+| [Hub 部署清单](../deploy/README.md) | 服务器只拉镜像的 compose / `.env` 模板 |
 | [开发指南](./development.md) | 本地启动、脚本、测试与约定 |
 | [前台使用](./user-guide.md) | 双片库、ArtPlayer / 解析播放、进度、片单、广告体验 |
 | [后台管理](./admin-guide.md) | 采集、存储、播放器广告、用户与系统设置 |
@@ -19,18 +20,20 @@
 - 本地前台：`http://localhost:3000`
 - 本地后台：`http://localhost:3000/admin`
 - 存活探针：`GET /api/live` · 就绪（含 DB）：`GET /api/ready` · 兼容：`GET /api/health`
-- 环境模板：[`.env.example`](../.env.example)
-- Compose：[docker-compose.yml](../docker-compose.yml)
+- 环境模板：[`.env.example`](../.env.example) · 生产精简：[deploy/.env.example](../deploy/.env.example)
+- Compose（Hub）：[deploy/docker-compose.yml](../deploy/docker-compose.yml)
+- Compose（本地 build）：[docker-compose.yml](../docker-compose.yml)
 - 主 README：[../README.md](../README.md)
 
-## 上线最短路径
+## 上线最短路径（Docker Hub）
 
-1. 配置 `.env`（`DATABASE_URL`、`SESSION_SECRET`、`APP_ENCRYPTION_*`、`SITE_URL`）
-2. `CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler`（或空库 `db:setup:crawler`）+ `seed:admin`
-3. `docker compose up -d --build app`
-4. HTTPS 反代到 `127.0.0.1:3000`，拦截 `/api/internal/crawler/**`
+1. CI 已配置 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`（推 `main` 自动发镜像）
+2. 服务器只用 `deploy/` 清单：配置 `.env`（含 `DOCKERHUB_USERNAME`、`DATABASE_URL`、`SESSION_SECRET`、`APP_ENCRYPTION_*`、`SITE_URL`、`APP_PORT`）
+3. 运维侧迁移 + `seed:admin`（见 deployment.md §4）
+4. `docker compose pull app && docker compose up -d app`
+5. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截 `/api/internal/crawler/**`
 
-细节见 [deployment.md](./deployment.md)。
+细节见 [deployment.md](./deployment.md) 与 [deploy/README.md](../deploy/README.md)。
 
 ## 文档维护约定
 

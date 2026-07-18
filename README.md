@@ -40,38 +40,38 @@ npm run dev
 
 `DATABASE_URL` 密码中的 `@` 写成 `%40`。
 
-## 服务器 Docker Compose 部署（摘要）
+## 服务器部署（Docker Hub，推荐）
+
+CI 在每次 `main` 推送后把镜像发到 Docker Hub（仓库 Secrets：`DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`）。  
+**生产机只拉镜像**，不需要 git 部署业务代码，也不需要在服务器 `docker build`。
 
 ```bash
-# 1) 服务器安装 Docker Compose v2，clone 本仓库
+# 1) 服务器安装 Docker Compose v2；准备目录（只需 deploy 清单，不必完整 clone）
+mkdir -p /opt/anime-web && cd /opt/anime-web
+# 放入 deploy/docker-compose.yml 与 deploy/.env.example → .env
 cp .env.example .env && chmod 600 .env
-# 填写 DATABASE_URL / SESSION_SECRET / APP_ENCRYPTION_* / SITE_URL / ADMIN_BOOTSTRAP_*
+# 必填：DOCKERHUB_USERNAME、DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL
+# 端口示例：APP_PORT=13000
 
-# 2) 迁移 + 管理员（本机 Node 或一次性 node 容器，见 docs/deployment.md §4）
-CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler   # 或 db:setup:crawler
-npm run seed:admin
+# 2) 迁移 + 管理员（运维机 Node，或一次性 node 容器；见 docs/deployment.md / deploy/README.md）
+# CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler && npm run seed:admin
 
-# 3) 启动（宿主机端口可用 APP_PORT 自定义，例如 13000；容器内仍是 3000）
-# APP_PORT=13000
-docker compose up -d --build app
+# 3) 拉镜像并启动（不要 --build）
+docker compose pull app
+docker compose up -d app
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 
-# 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，并禁止公网访问 /api/internal/crawler/**
+# 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，禁止公网 /api/internal/crawler/**
 ```
 
-可选 Worker（**默认不需要**；只跑网站时不要加 `--profile worker`，也不要配置令牌）：
+升级：
 
 ```bash
-# 仅当你要在本机跑采集节点时：后台签发令牌后写入 CRAWLER_WORKER_ID / CRAWLER_WORKER_TOKEN
-mkdir -p data/crawler-worker   # 相对路径 bind mount：./data/crawler-worker
-docker compose --profile worker up -d --build
+docker compose pull app && docker compose up -d --no-build app
 ```
 
-预构建镜像：设置 `DOCKERHUB_USERNAME` 后  
-`docker compose pull app && docker compose up -d --no-build app`。
-
-**完整步骤、环境变量表、Nginx/Caddy、迁移 0001–0016、检查清单与排错 → [docs/deployment.md](./docs/deployment.md)**
+可选 Worker **默认不需要**。细节 → [deploy/README.md](./deploy/README.md) · [docs/deployment.md](./docs/deployment.md)
 
 ## 文档索引
 

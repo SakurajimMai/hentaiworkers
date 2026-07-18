@@ -20,12 +20,14 @@ Internet → 反向代理 (HTTPS) → 127.0.0.1:${APP_PORT:-3000} → app 容器
 app ←—— Compose 内网 ——→ crawler-worker（可选 profile）
 ```
 
-镜像名：
+镜像名（由 GitHub Actions 推到 Docker Hub）：
 
 - App：`{DOCKERHUB_USERNAME}/hentaiworkers-app:{APP_IMAGE_TAG}`
 - Worker：`{DOCKERHUB_USERNAME}/hentaiworkers-worker:{WORKER_IMAGE_TAG}`
 
-本地未设置 `DOCKERHUB_USERNAME` 时前缀为 `local/`，走 `build:` 构建。
+**生产推荐**：服务器只 `docker compose pull`，使用 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml)（无 `build:`）。  
+仓库 Secrets（仅 CI）：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`。  
+根目录 `docker-compose.yml` 仍保留 `build:`，供本地开发或无 Hub 时构建；未设置 `DOCKERHUB_USERNAME` 时前缀为 `local/`。
 
 ---
 
@@ -99,7 +101,7 @@ APP_ENCRYPTION_CURRENT_KEY_ID=primary
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `DOCKERHUB_USERNAME` | `local` | Hub 命名空间；本地构建可省略 |
+| `DOCKERHUB_USERNAME` | 生产必填 / 本地 `local` | Hub 命名空间，拼镜像名。`deploy/` 清单必填；根 compose 本地构建可省略 |
 | `APP_IMAGE_TAG` | `latest` | App 镜像标签 |
 | `WORKER_IMAGE_TAG` | `latest` | Worker 镜像标签 |
 | `APP_HOST_BIND` | `127.0.0.1` | 宿主机绑定地址；**勿**改为 `0.0.0.0` 除非已有防火墙与反代策略 |
@@ -183,55 +185,60 @@ docker run --rm -it \
 
 ---
 
-## 5. Docker Compose 部署（推荐）
+## 5. Docker Compose 部署（推荐：Docker Hub）
 
-根目录 [`docker-compose.yml`](../docker-compose.yml)：
+| 清单 | 路径 | 场景 |
+|------|------|------|
+| **生产（推荐）** | [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) | 只拉 Hub 镜像，服务器不 build、不必完整 git 仓库 |
+| 通用 / 本地构建 | 根目录 [`docker-compose.yml`](../docker-compose.yml) | 开发机或 `docker compose up --build` |
 
 - **`app`**：主站（默认启动）
-- **`crawler-worker`**：profile `worker`，默认不启动
+- **`crawler-worker`**：profile `worker`，**默认不启动**，网站业务不需要
 
-### 5.1 首次上线（服务器本地构建）
+简版步骤也见 [`deploy/README.md`](../deploy/README.md)。
+
+### 5.1 首次上线（Docker Hub 拉取）
 
 ```bash
-cd /path/to/anime-web
+# 服务器只需 deploy 目录中的 compose + .env（可用 raw 下载，无需 git 部署业务）
+mkdir -p /opt/anime-web && cd /opt/anime-web
+# 放入 deploy/docker-compose.yml 与 deploy/.env.example
+cp .env.example .env && chmod 600 .env
 
-cp .env.example .env
-chmod 600 .env
-# 编辑 DATABASE_URL / SESSION_SECRET / APP_ENCRYPTION_* / SITE_URL / ADMIN_BOOTSTRAP_*
+# .env 至少包含：
+#   DOCKERHUB_USERNAME=与 CI Secret 相同的 Hub 命名空间
+#   APP_IMAGE_TAG=latest          # 或 main / sha / semver
+#   DATABASE_URL / DATABASE_TLS_MODE=required
+#   SITE_URL / SESSION_SECRET / APP_ENCRYPTION_KEYRING / APP_ENCRYPTION_CURRENT_KEY_ID
+#   APP_HOST_BIND=127.0.0.1
+#   APP_PORT=13000                # 宿主机端口，可按需改
+# 首次 seed 临时：ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSWORD
+# 不要填 CRAWLER_WORKER_*（除非你要跑 worker profile）
 
 # 1) 远程 MySQL：放行本机出口 IP；建好空库与账号
+# 2) 迁移 + 管理员（见第 4 节；生产镜像不含迁移脚本）
+# 3) 拉镜像并启动（不要 --build）
+docker compose pull app
+docker compose up -d app
 
-# 2) 迁移 + 管理员（见第 4 节方式 A 或 B）
-# CRAWLER_MIGRATE_CONFIRM=yes npm run db:setup:crawler   # 或 db:migrate:crawler
-# npm run seed:admin
-
-# 3) 构建并启动 app
-# 可选：.env 中设置 APP_PORT=13000 将宿主机端口改为 13000（容器内仍 3000）
-docker compose up -d --build app
-
-# 4) 健康检查（端口与 APP_PORT 一致，默认 3000）
+# 4) 健康检查（端口 = APP_PORT）
 docker compose ps
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
-# live → 进程 OK；ready → 含 DB SELECT 1，应 ok: true
 ```
 
-### 5.2 使用预构建镜像（Docker Hub / CI）
+CI 在 `main` 推送与 `v*` 标签时构建并推送（`.github/workflows/docker-publish.yml`）。  
+公开镜像服务器通常**不必** `docker login`；私有库才需要。
 
-CI 推送标签：`latest` / `main` / commit sha（见 `.github/workflows/docker-publish.yml`）。
+### 5.2 备用：服务器本地构建
+
+仅在无法访问 Hub 或调试 Dockerfile 时使用根目录 compose：
 
 ```bash
-# .env
-DOCKERHUB_USERNAME=yourhubuser
-APP_IMAGE_TAG=latest          # 或 main / 具体 sha
-# WORKER_IMAGE_TAG=latest
-
-docker login                  # 私有库需要
-docker compose pull app
-docker compose up -d --no-build app
+cd /path/to/full-repo
+cp .env.example .env   # 可不设 DOCKERHUB_USERNAME，将使用 local/ 前缀
+docker compose up -d --build app
 ```
-
-未配置 Hub 时 Compose 仍可用 `build:` 本地构建。
 
 ### 5.3 可选：爬虫 Worker
 
@@ -252,9 +259,9 @@ CRAWLER_WORKER_TOKEN=一次性令牌明文
 
 ```bash
 mkdir -p data/crawler-worker
-docker compose --profile worker up -d --build
-# 或仅 worker：
-docker compose --profile worker up -d crawler-worker
+docker compose --profile worker pull
+docker compose --profile worker up -d
+# 根目录 compose 本地构建时才用：docker compose --profile worker up -d --build
 ```
 
 Worker 环境：
@@ -279,8 +286,8 @@ docker compose logs -f crawler-worker   # 若启用
 docker compose ps
 docker compose restart app
 docker compose down                     # 停容器；远程库数据保留
-docker compose up -d --build app        # 拉代码后重建升级
-docker compose pull app && docker compose up -d --no-build app
+docker compose pull app && docker compose up -d --no-build app   # Hub 升级（推荐）
+docker compose up -d --build app                                  # 仅本地构建清单
 ```
 
 ### 5.5 资源与安全（Compose 已部分加固）
@@ -366,7 +373,12 @@ anime.example.com {
 
 `Dockerfile.worker`：Python + Chromium 运行时，**无**数据库客户端；Hanime 为 **MP4 直传**，镜像**不含** ffmpeg。
 
-GitHub Actions Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`。
+GitHub Actions Secrets（**仅 CI 推镜像用**，不是服务器业务 `.env` 里的数据库密码）：
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+服务器 `.env` 的 `DOCKERHUB_USERNAME` 只用于拼镜像名 `用户名/hentaiworkers-app`；与 Token 无关。
 
 ---
 
@@ -386,22 +398,24 @@ NODE_ENV=production npm run start
 ## 9. 升级与回滚
 
 ```bash
-git pull   # 或拉取新镜像 tag
+cd /opt/anime-web   # 或你的 deploy 目录
 
-# 有新 SQL 时（先 dry-run 再确认）
-node scripts/apply-crawler-migration.mjs --dry-run
-CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
+# 有新 SQL 时：在运维机/一次性 node 容器先迁移（见第 4 节），再换镜像
+# node scripts/apply-crawler-migration.mjs --dry-run
+# CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
 
-docker compose up -d --build app
-# 或
-docker compose pull app && docker compose up -d --no-build app
+# 推荐：只拉 Hub 镜像（可把 APP_IMAGE_TAG 固定为 main / sha / semver）
+docker compose pull app
+docker compose up -d --no-build app
 
-# Worker 同步升级（若使用）
-docker compose --profile worker up -d --build crawler-worker
+# Worker 同步升级（仅在使用 profile worker 时）
+docker compose --profile worker pull
+docker compose --profile worker up -d --no-build
 ```
 
-回滚：切换到上一 Git 标签或镜像 tag 后重新 `up`。  
-**数据在远程 MySQL**，回滚应用**不会**自动回滚 schema；破坏性迁移前务必备份。
+回滚：`.env` 中把 `APP_IMAGE_TAG` 改回上一 tag（或 sha）后 `pull` + `up -d --no-build`。  
+**数据在远程 MySQL**，回滚应用**不会**自动回滚 schema；破坏性迁移前务必备份。  
+生产升级**不依赖**服务器 `git pull` 业务代码。
 
 ---
 
