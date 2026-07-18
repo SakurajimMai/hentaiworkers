@@ -25,6 +25,7 @@
 services:
   app:
     image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Hub namespace}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
     ports:
       # Host publish only: APP_HOST_BIND:APP_PORT -> container 3000
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
@@ -51,6 +52,7 @@ services:
   crawler-worker:
     profiles: ["worker"]
     image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Hub namespace}/hentaiworkers-worker:${WORKER_IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       app:

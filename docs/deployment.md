@@ -25,9 +25,11 @@ app ←—— Compose 内网 ——→ crawler-worker（可选 profile）
 - App：`{DOCKERHUB_USERNAME}/hentaiworkers-app:{APP_IMAGE_TAG}`
 - Worker：`{DOCKERHUB_USERNAME}/hentaiworkers-worker:{WORKER_IMAGE_TAG}`
 
-**生产推荐**：服务器只 `docker compose pull`，使用 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml)（无 `build:`）。  
-仓库 Secrets（仅 CI）：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`。  
-根目录 `docker-compose.yml` 仍保留 `build:`，供本地开发或无 Hub 时构建；未设置 `DOCKERHUB_USERNAME` 时前缀为 `local/`。
+服务器只执行 `docker compose pull`，两个 Compose 清单均**不包含** `build:`。
+
+仓库 Secrets（仅 CI）：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`；GitHub Actions 使用 Dockerfile 构建并推送。
+
+服务器 `.env` 必须设置 `DOCKERHUB_USERNAME` 以定位 CI 发布的镜像，不需要 `DOCKERHUB_TOKEN`（公开镜像无需登录）。
 
 ---
 
@@ -101,7 +103,7 @@ APP_ENCRYPTION_CURRENT_KEY_ID=primary
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `DOCKERHUB_USERNAME` | 生产必填 / 本地 `local` | Hub 命名空间，拼镜像名。`deploy/` 清单必填；根 compose 本地构建可省略 |
+| `DOCKERHUB_USERNAME` | 必填 | Hub 命名空间，必须与 GitHub Actions Secret 同值，用于拉取 `用户名/hentaiworkers-app` |
 | `APP_IMAGE_TAG` | `latest` | App 镜像标签 |
 | `WORKER_IMAGE_TAG` | `latest` | Worker 镜像标签 |
 | `APP_HOST_BIND` | `127.0.0.1` | 宿主机绑定地址；**勿**改为 `0.0.0.0` 除非已有防火墙与反代策略 |
@@ -189,8 +191,10 @@ docker run --rm -it \
 
 | 清单 | 路径 | 场景 |
 |------|------|------|
-| **生产（推荐）** | [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) | 只拉 Hub 镜像，服务器不 build、不必完整 git 仓库 |
-| 通用 / 本地构建 | 根目录 [`docker-compose.yml`](../docker-compose.yml) | 开发机或 `docker compose up --build` |
+| **精简生产清单** | [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) | 可单独复制到服务器，不必完整 git 仓库 |
+| 根目录清单 | 根目录 [`docker-compose.yml`](../docker-compose.yml) | 在仓库根运行；同样只拉 Hub 镜像 |
+
+两个清单都没有 `build:`，都要求 `DOCKERHUB_USERNAME`，并为服务设置 `pull_policy: always`。`Dockerfile*` 仅供 GitHub Actions 构建镜像。
 
 - **`app`**：主站（默认启动）
 - **`crawler-worker`**：profile `worker`，**默认不启动**，网站业务不需要
@@ -230,14 +234,16 @@ curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 CI 在 `main` 推送与 `v*` 标签时构建并推送（`.github/workflows/docker-publish.yml`）。  
 公开镜像服务器通常**不必** `docker login`；私有库才需要。
 
-### 5.2 备用：服务器本地构建
+### 5.2 在仓库根目录运行
 
-仅在无法访问 Hub 或调试 Dockerfile 时使用根目录 compose：
+若服务器已有仓库文件，也可直接使用根 Compose；行为仍是拉 Hub 镜像：
 
 ```bash
-cd /path/to/full-repo
-cp .env.example .env   # 可不设 DOCKERHUB_USERNAME，将使用 local/ 前缀
-docker compose up -d --build app
+cd /path/to/repo
+cp .env.example .env
+# 必填 DOCKERHUB_USERNAME；不会在服务器执行 Dockerfile
+docker compose pull app
+docker compose up -d app
 ```
 
 ### 5.3 可选：爬虫 Worker
@@ -261,7 +267,6 @@ CRAWLER_WORKER_TOKEN=一次性令牌明文
 mkdir -p data/crawler-worker
 docker compose --profile worker pull
 docker compose --profile worker up -d
-# 根目录 compose 本地构建时才用：docker compose --profile worker up -d --build
 ```
 
 Worker 环境：
@@ -286,8 +291,7 @@ docker compose logs -f crawler-worker   # 若启用
 docker compose ps
 docker compose restart app
 docker compose down                     # 停容器；远程库数据保留
-docker compose pull app && docker compose up -d --no-build app   # Hub 升级（推荐）
-docker compose up -d --build app                                  # 仅本地构建清单
+docker compose pull app && docker compose up -d --no-build app   # Hub 升级
 ```
 
 ### 5.5 资源与安全（Compose 已部分加固）

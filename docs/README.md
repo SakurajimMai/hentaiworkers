@@ -21,8 +21,8 @@
 - 本地后台：`http://localhost:3000/admin`
 - 存活探针：`GET /api/live` · 就绪（含 DB）：`GET /api/ready` · 兼容：`GET /api/health`
 - 环境模板：[`.env.example`](../.env.example) · 生产精简：[deploy/.env.example](../deploy/.env.example)
-- Compose（Hub）：[deploy/docker-compose.yml](../deploy/docker-compose.yml)
-- Compose（本地 build）：[docker-compose.yml](../docker-compose.yml)
+- Compose（精简生产）：[deploy/docker-compose.yml](../deploy/docker-compose.yml)
+- Compose（仓库根）：[docker-compose.yml](../docker-compose.yml)（同样仅拉 Hub 镜像）
 - 主 README：[../README.md](../README.md)
 
 ## 上线最短路径（Docker Hub）

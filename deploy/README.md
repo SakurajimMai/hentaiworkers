@@ -94,7 +94,7 @@ docker run --rm --env-file .env -v "$PWD":/app -w /app node:22-bookworm \
 ```bash
 cd /opt/anime-web
 docker compose pull app
-docker compose up -d app
+docker compose up -d app   # pull_policy: always，也会检查并拉取新镜像
 
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
@@ -130,12 +130,17 @@ docker compose --profile worker up -d
 
 ---
 
-## 与仓库根 `docker-compose.yml` 的区别
+## 与仓库根 `docker-compose.yml` 的关系
+
+两个清单都只拉 Docker Hub 镜像，均**没有** `build:`：
 
 | | `deploy/docker-compose.yml` | 根目录 `docker-compose.yml` |
 |--|-----------------------------|------------------------------|
-| 用途 | **生产 Hub 拉取** | 开发/可本地 build 的通用文件 |
-| `build:` | 无 | 有（可 `--build`） |
-| `DOCKERHUB_USERNAME` | **必填** | 默认 `local` 可本地构建 |
+| 用途 | 可单独复制到生产服务器 | 仓库根目录直接运行 |
+| 镜像来源 | Docker Hub | Docker Hub |
+| `DOCKERHUB_USERNAME` | 必填 | 必填 |
+| 宿主机构建 | 不支持 | 不支持 |
+
+`Dockerfile` / `Dockerfile.worker` 仅由 GitHub Actions 用于构建并推送镜像，不在生产服务器执行。
 
 完整变量表与反代示例见 [docs/deployment.md](../docs/deployment.md)。

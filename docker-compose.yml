@@ -1,22 +1,19 @@
-# AnimeStream Compose (dev / generic)
-# Production servers should prefer deploy/docker-compose.yml (Hub pull only).
+# AnimeStream Docker Hub Compose (image pull only; no host-side build)
+#
+# GitHub Actions builds Dockerfile / Dockerfile.worker and pushes images.
+# The server only pulls the published image and starts it.
 #
 # - App: container :3000; host APP_HOST_BIND:APP_PORT (e.g. 13000)
 # - DB: remote MySQL only
 # - Worker: optional profile "worker" (not required for website-only)
 #
-# Production (Docker Hub — recommended):
-#   cd deploy && cp .env.example .env   # set DOCKERHUB_USERNAME + app secrets
-#   docker compose pull app && docker compose up -d app
-#   See deploy/README.md and docs/deployment.md
+# Start:
+#   cp .env.example .env   # set DOCKERHUB_USERNAME + required app secrets
+#   docker compose pull app
+#   docker compose up -d app
 #
-# Local build fallback (this file):
-#   cp .env.example .env
-#   docker compose up -d --build app
-#
-# Hub pull with this file:
-#   DOCKERHUB_USERNAME=yourhubuser docker compose pull app
-#   docker compose up -d --no-build app
+# Upgrade:
+#   docker compose pull app && docker compose up -d --no-build app
 #
 # Storage uses relative host bind mounts (no named Compose volumes):
 #   ./data/crawler-worker -> /var/tmp/crawler-worker
@@ -25,10 +22,8 @@
 
 services:
   app:
-    image: ${DOCKERHUB_USERNAME:-local}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Docker Hub namespace}/hentaiworkers-app:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
     # Host publish: <APP_HOST_BIND>:<APP_PORT> -> container 3000
     # APP_PORT only changes the host-side port (e.g. 13000); leave container at 3000.
     ports:
@@ -59,10 +54,8 @@ services:
 
   crawler-worker:
     profiles: ["worker"]
-    image: ${DOCKERHUB_USERNAME:-local}/hentaiworkers-worker:${WORKER_IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Docker Hub namespace}/hentaiworkers-worker:${WORKER_IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       app:
