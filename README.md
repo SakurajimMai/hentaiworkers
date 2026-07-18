@@ -60,10 +60,10 @@ curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 # 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，并禁止公网访问 /api/internal/crawler/**
 ```
 
-可选 Worker：
+可选 Worker（**默认不需要**；只跑网站时不要加 `--profile worker`，也不要配置令牌）：
 
 ```bash
-# 后台签发令牌后写入 CRAWLER_WORKER_ID / CRAWLER_WORKER_TOKEN
+# 仅当你要在本机跑采集节点时：后台签发令牌后写入 CRAWLER_WORKER_ID / CRAWLER_WORKER_TOKEN
 mkdir -p data/crawler-worker   # 相对路径 bind mount：./data/crawler-worker
 docker compose --profile worker up -d --build
 ```

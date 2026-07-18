@@ -105,12 +105,15 @@ APP_ENCRYPTION_CURRENT_KEY_ID=primary
 | `APP_HOST_BIND` | `127.0.0.1` | 宿主机绑定地址；**勿**改为 `0.0.0.0` 除非已有防火墙与反代策略 |
 | `APP_PORT` | `3000` | **仅宿主机**发布端口。容器内仍为 `3000`。可设为 `13000` 等任意空闲端口；反代/健康检查请对齐该值 |
 
-### 3.4 可选 Worker
+### 3.4 可选 Worker（默认不需要）
+
+> **只部署自己的前台/后台网站时，完全不需要 crawler Worker，也不需要任何 Worker API 钥匙。**  
+> 下面变量仅在你主动执行 `docker compose --profile worker ...` 时才有意义。
 
 | 变量 | 说明 |
 |------|------|
-| `CRAWLER_WORKER_ID` | 后台签发的 Worker 节点 ID（默认 `1`） |
-| `CRAWLER_WORKER_TOKEN` | 机器令牌**明文**（服务端只存哈希；启用 profile 时必填） |
+| `CRAWLER_WORKER_ID` | **仅启用 worker 时需要**。后台签发的 Worker 节点 ID（默认 `1`） |
+| `CRAWLER_WORKER_TOKEN` | **仅启用 worker 时需要**。机器令牌明文（服务端只存哈希）。**只部署网站时不要填、也不需要** |
 
 Hanime 上传到 S3/SFTP 时，密钥**只放 Worker 环境**，不入库：
 
@@ -231,6 +234,10 @@ docker compose up -d --no-build app
 未配置 Hub 时 Compose 仍可用 `build:` 本地构建。
 
 ### 5.3 可选：爬虫 Worker
+
+**默认跳过本节。** 只部署自己的网站业务时，不要配置 Worker，也不要执行 `--profile worker`。
+
+仅当你**明确要在本机跑独立采集进程**时：
 
 1. 先保证 **app 健康**。
 2. 浏览器登录 `/admin` → **爬虫 → Worker** → 创建节点，复制**一次性**机器令牌。
@@ -453,7 +460,8 @@ MacCMS 写入 `anime_works`（外链 only）；Hanime 写入 `animes` 并上传 
 | `SESSION_SECRET must be set` | 过短或未设置 | ≥ 32 字符 |
 | 加密 / keyring 报错 | `APP_ENCRYPTION_*` 非法 | 用 `openssl rand -base64 32` 生成 32 字节密钥 |
 | 登录后 Cookie 丢失 | 生产用 HTTP | 上 HTTPS；检查 `X-Forwarded-Proto` |
-| `CRAWLER_WORKER_TOKEN` 报错 | 开了 worker profile 未设令牌 | 写入 `.env` 或不要 `--profile worker` |
+| 误以为必须配置 Worker 令牌 | 把可选 crawler 当成站点必填 | **只跑网站不需要任何 `CRAWLER_WORKER_*`**；令牌仅在 `--profile worker` 时使用 |
+| Worker 启动后鉴权失败 | 启用了 worker 但令牌为空/伪造 | 后台签发真实令牌写入 `.env`，或不要 `--profile worker` |
 | Worker 临时目录权限错误 | 相对 bind mount 目录不存在或不可写 | `mkdir -p data/crawler-worker`；检查宿主机目录属主/权限 |
 | Hub pull 失败 | 未 login / 用户名错 | `docker login`；核对 `DOCKERHUB_USERNAME` |
 | 动漫 m3u8 证书错误 | 源站证书过期 | 配置线路解析或 ArtPlayer 代理回退 |
