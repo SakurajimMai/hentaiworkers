@@ -48,7 +48,7 @@ CI 在每次 `main` 推送后把镜像发到 Docker Hub（仓库 Secrets：`DOCK
 ```bash
 # 1) 远程数据库由你独立维护：schema 与管理员账号须提前就绪
 # 2) 服务器只准备 deploy 清单，不必完整 clone
-mkdir -p /opt/anime-web/certificates && cd /opt/anime-web
+mkdir -p /opt/anime-web && cd /opt/anime-web
 # 放入 deploy/docker-compose.yml 与 deploy/.env.example → .env
 cp .env.example .env && chmod 600 .env
 # 必填：DOCKERHUB_USERNAME、DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL

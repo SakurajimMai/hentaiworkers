@@ -27,7 +27,8 @@ for (const relativePath of composePaths) {
     assert.match(app.image ?? '', /^\$\{DOCKERHUB_USERNAME:\?/);
     assert.match(app.image ?? '', /hentaiworkers-app/);
     assert.equal(app.pull_policy, 'always');
-    assert.ok(app.volumes?.includes('./certificates:/app/certificates:ro'));
+    assert.equal(app.volumes, undefined);
+    assert.doesNotMatch(source, /DATABASE_TLS_CA_FILE|certificates/);
     assert.doesNotMatch(source, /hentaiworkers-(?:ops|worker)/);
     assert.doesNotMatch(source, /profiles:/);
   });

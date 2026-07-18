@@ -42,7 +42,7 @@ Nginx / Caddy
 1. 与目标 app 镜像版本兼容的完整表结构
 2. 可登录后台的管理员账号
 3. 允许生产服务器出口 IP 连接
-4. 有效的 TLS 证书链，或提供私有 CA
+4. 使用系统可信证书链提供 TLS
 5. 与 `APP_ENCRYPTION_KEYRING` 匹配的加密数据密钥
 
 数据库 schema、管理员账号、备份和迁移由远程数据库侧自行维护，不属于 Docker Compose 部署流程。
@@ -62,7 +62,7 @@ Nginx / Caddy
 创建目录：
 
 ```bash
-mkdir -p /opt/anime-web/certificates
+mkdir -p /opt/anime-web
 cd /opt/anime-web
 ```
 
@@ -71,8 +71,7 @@ cd /opt/anime-web
 ```text
 /opt/anime-web/
 ├── docker-compose.yml
-├── .env
-└── certificates/       # 可选：私有数据库 CA
+└── .env
 ```
 
 可直接使用 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) 和 [`deploy/.env.example`](../deploy/.env.example)，无需完整仓库。
@@ -133,19 +132,7 @@ mysql://USER:PASSWORD@HOST:3306/DATABASE
 DATABASE_TLS_MODE=required
 ```
 
-### 4.2 私有数据库 CA（可选）
-
-```bash
-cp /安全路径/mariadb-ca.pem /opt/anime-web/certificates/
-```
-
-```env
-DATABASE_TLS_CA_FILE=certificates/mariadb-ca.pem
-```
-
-Compose 将 `./certificates` 只读挂载到容器 `/app/certificates`。
-
-### 4.3 生成密钥
+### 4.2 生成密钥
 
 ```bash
 openssl rand -base64 48   # SESSION_SECRET
@@ -154,7 +141,7 @@ openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
 
 如果远程数据库已经保存了 SMTP、Turnstile、爬虫存储等加密配置，必须使用原有 keyring；随意更换会导致旧密文无法解密。
 
-### 4.4 不需要的变量
+### 4.3 不需要的变量
 
 app-only 部署不需要：
 

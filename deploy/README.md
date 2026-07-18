@@ -16,14 +16,14 @@
 1. 与当前应用版本匹配的表结构
 2. 可用的管理员账号
 3. 已放行服务器出口 IP
-4. 可用的 TLS 证书链或自定义 CA
+4. 使用系统可信证书链提供 TLS
 
 数据库结构和管理员账号由你在远程数据库侧独立维护，不属于 Compose 启动流程。
 
 ## 1. 准备目录
 
 ```bash
-mkdir -p /opt/anime-web/certificates
+mkdir -p /opt/anime-web
 cd /opt/anime-web
 ```
 
@@ -32,7 +32,6 @@ cd /opt/anime-web
 ```text
 docker-compose.yml
 .env
-certificates/       # 可选，私有数据库 CA
 ```
 
 ## 2. 配置 `.env`
@@ -51,16 +50,6 @@ SITE_URL=https://你的域名
 SESSION_SECRET=使用-openssl-rand-base64-48-生成
 APP_ENCRYPTION_KEYRING={"primary":"使用-openssl-rand-base64-32-生成"}
 APP_ENCRYPTION_CURRENT_KEY_ID=primary
-```
-
-如果数据库使用私有 CA：
-
-```bash
-cp /安全路径/mariadb-ca.pem certificates/
-```
-
-```env
-DATABASE_TLS_CA_FILE=certificates/mariadb-ca.pem
 ```
 
 `DOCKERHUB_TOKEN` 只保存在 GitHub Actions Secrets，用来推送镜像；公开镜像部署时不写入服务器 `.env`。

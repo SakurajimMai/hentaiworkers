@@ -13,9 +13,6 @@ services:
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
-    volumes:
-      # Optional custom DB CA: DATABASE_TLS_CA_FILE=certificates/mariadb-ca.pem
-      - ./certificates:/app/certificates:ro
     environment:
       NODE_ENV: production
       PORT: "3000"
