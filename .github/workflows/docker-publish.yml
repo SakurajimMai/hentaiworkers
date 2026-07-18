@@ -11,6 +11,7 @@ permissions:
 
 env:
   APP_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hentaiworkers-app
+  OPS_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hentaiworkers-ops
   WORKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/hentaiworkers-worker
 
 jobs:
@@ -34,6 +35,9 @@ jobs:
       - name: Check worker requirements lock
         run: npm run check:worker-requirements
 
+      - name: Check ops requirements lock
+        run: npm ci --omit=dev --ignore-scripts --prefix ops
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -48,6 +52,18 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.APP_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Docker metadata (ops)
+        id: meta-ops
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.OPS_IMAGE }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -77,6 +93,18 @@ jobs:
           labels: ${{ steps.meta-app.outputs.labels }}
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
+          provenance: false
+
+      - name: Build and push ops image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.ops
+          push: true
+          tags: ${{ steps.meta-ops.outputs.tags }}
+          labels: ${{ steps.meta-ops.outputs.labels }}
+          cache-from: type=gha,scope=ops
+          cache-to: type=gha,mode=max,scope=ops
           provenance: false
 
       - name: Build and push worker image

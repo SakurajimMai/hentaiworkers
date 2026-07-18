@@ -31,6 +31,9 @@ services:
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
+    volumes:
+      # Optional custom database CA: DATABASE_TLS_CA_FILE=certificates/mariadb-ca.pem
+      - ./certificates:/app/certificates:ro
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -48,6 +51,26 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
+
+  ops:
+    profiles: ["ops"]
+    image: ${DOCKERHUB_USERNAME:?set DOCKERHUB_USERNAME to your Hub namespace}/hentaiworkers-ops:${OPS_IMAGE_TAG:-latest}
+    pull_policy: always
+    env_file:
+      - .env
+    volumes:
+      - ./certificates:/ops/certificates:ro
+    environment:
+      NODE_ENV: production
+    command: ["migrate"]
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   crawler-worker:
     profiles: ["worker"]

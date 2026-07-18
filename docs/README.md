@@ -29,7 +29,7 @@
 
 1. CI 已配置 Secrets：`DOCKERHUB_USERNAME`、`DOCKERHUB_TOKEN`（推 `main` 自动发镜像）
 2. 服务器只用 `deploy/` 清单：配置 `.env`（含 `DOCKERHUB_USERNAME`、`DATABASE_URL`、`SESSION_SECRET`、`APP_ENCRYPTION_*`、`SITE_URL`、`APP_PORT`）
-3. 运维侧迁移 + `seed:admin`（见 deployment.md §4）
+3. 拉取 ops 镜像并运行迁移/管理员引导（无需源码）：`docker compose --profile ops pull ops`（见 deployment.md §4）
 4. `docker compose pull app && docker compose up -d app`
 5. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截 `/api/internal/crawler/**`
 

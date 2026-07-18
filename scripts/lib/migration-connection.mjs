@@ -119,6 +119,9 @@ export function buildDatabaseConnectionSettings(environment, repositoryDirectory
   }
 
   const tlsRequired = tlsMode === 'required';
+  if (!tlsRequired && !isLocalDatabaseHost(hostname)) {
+    throw new Error('仅允许本地数据库禁用 TLS');
+  }
   if (tlsRequired && isIP(hostname) !== 0 && !isLoopbackIpLiteral(hostname)) {
     throw new Error('远程数据库必须使用证书匹配的 DNS 主机名');
   }
