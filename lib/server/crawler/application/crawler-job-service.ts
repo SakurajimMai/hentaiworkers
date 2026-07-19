@@ -24,6 +24,7 @@ import type {
   JobRecord,
 } from '../ports/crawler-unit-of-work';
 import { CrawlerScheduleService } from './crawler-schedule-service';
+import { requireEnabledCrawlerProfile } from './crawler-profile-lifecycle';
 import { assertValidLease, isExpiredAt, type LeaseBinding } from './lease-guard';
 import { withOperationReceipt } from './operation-receipts';
 
@@ -57,22 +58,36 @@ export class CrawlerJobService {
 
   async enqueueManual(input: {
     kind?: CrawlerJobKind;
-    profileId: number;
+    profileId: number | null;
     profileVersionId: number;
     storageProfileVersionId?: number | null;
     configSnapshotJson: string;
     maxAttempts?: number;
   }): Promise<JobRecord> {
-    return this.uow.runInTransaction((repos) =>
-      repos.jobs.create({
-        kind: input.kind ?? 'crawl',
-        profileId: input.profileId,
+    const kind = input.kind ?? 'crawl';
+    return this.uow.runInTransaction(async (repos) => {
+      let profileId: number | null = null;
+      if (kind === 'crawl') {
+        const candidateProfileId = input.profileId;
+        if (
+          candidateProfileId == null
+          || !Number.isSafeInteger(candidateProfileId)
+          || candidateProfileId <= 0
+        ) {
+          throw new AppError('RESULT_INVALID', '无效模板 ID', 400);
+        }
+        await requireEnabledCrawlerProfile(repos, candidateProfileId);
+        profileId = candidateProfileId;
+      }
+      return repos.jobs.create({
+        kind,
+        profileId,
         profileVersionId: input.profileVersionId,
         storageProfileVersionId: input.storageProfileVersionId,
         configSnapshotJson: input.configSnapshotJson,
         maxAttempts: input.maxAttempts,
-      }),
-    );
+      });
+    });
   }
 
   /**
@@ -614,9 +629,22 @@ export class CrawlerJobService {
         maxAttempts: job.maxAttempts,
         jobId: job.id,
       });
+      let profileId: number | null = null;
+      if (job.kind === 'crawl') {
+        const candidateProfileId = job.profileId;
+        if (
+          candidateProfileId == null
+          || !Number.isSafeInteger(candidateProfileId)
+          || candidateProfileId <= 0
+        ) {
+          throw new AppError('RESULT_INVALID', '模板不存在或已删除', 404);
+        }
+        await requireEnabledCrawlerProfile(repos, candidateProfileId);
+        profileId = candidateProfileId;
+      }
       return repos.jobs.create({
         kind: seed.kind,
-        profileId: job.profileId,
+        profileId,
         profileVersionId: seed.profileVersionId,
         storageProfileVersionId: job.storageProfileVersionId,
         configSnapshotJson: seed.configSnapshotJson,

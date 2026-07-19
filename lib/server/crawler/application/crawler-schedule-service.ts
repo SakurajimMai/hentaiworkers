@@ -12,6 +12,7 @@ import {
   type ScheduleKind,
 } from '../domain/schedule';
 import { isTerminalJobStatus } from '../domain/job';
+import { requireEnabledCrawlerProfile } from './crawler-profile-lifecycle';
 import type {
   CrawlerRepositories,
   CrawlerUnitOfWork,
@@ -48,6 +49,15 @@ const EXECUTING: ReadonlySet<string> = new Set([
 export class CrawlerScheduleService {
   constructor(private readonly uow: CrawlerUnitOfWork) {}
 
+  async disableByProfileId(profileId: number): Promise<number> {
+    if (!Number.isSafeInteger(profileId) || profileId <= 0) {
+      throw new AppError('RESULT_INVALID', '无效模板 ID', 400);
+    }
+    return this.uow.runInTransaction((repos) =>
+      repos.schedules.disableByProfileId(profileId),
+    );
+  }
+
   async create(input: CreateScheduleInput): Promise<ScheduleRecord> {
     const errors = validateScheduleDefinition(input);
     if (errors.length) {
@@ -71,8 +81,9 @@ export class CrawlerScheduleService {
           from: new Date(),
         })?.toISOString() ?? null);
 
-    return this.uow.runInTransaction(async (repos) =>
-      repos.schedules.create({
+    return this.uow.runInTransaction(async (repos) => {
+      await requireEnabledCrawlerProfile(repos, input.profileId);
+      return repos.schedules.create({
         profileId: input.profileId,
         profileVersionId: input.profileVersionId,
         storageProfileVersionId: input.storageProfileVersionId ?? null,
@@ -88,8 +99,8 @@ export class CrawlerScheduleService {
         isEnabled: input.isEnabled ?? true,
         nextRunAt: initialNext,
         configSnapshotJson: input.configSnapshotJson,
-      }),
-    );
+      });
+    });
   }
 
   async listOverdue(now: Date = new Date()): Promise<ReadonlyArray<OverdueScheduleView>> {
@@ -129,7 +140,13 @@ export class CrawlerScheduleService {
     const due = await repos.schedules.listEnabledDue(now.toISOString());
 
     for (const schedule of due) {
-      const profileJobs = await repos.jobs.listByProfile(schedule.profileId);
+      const profile = await repos.profiles.getForUpdate(schedule.profileId);
+      if (!profile?.isEnabled) {
+        await repos.schedules.update(schedule.id, { isEnabled: false });
+        continue;
+      }
+      const profileJobs = (await repos.jobs.listByProfile(schedule.profileId))
+        .filter((job) => job.kind === 'crawl');
       const nonTerminal = profileJobs.filter((j) => !isTerminalJobStatus(j.status));
       const executing = nonTerminal.filter((j) => EXECUTING.has(j.status));
 
@@ -153,11 +170,16 @@ export class CrawlerScheduleService {
       for (const scheduledFor of points) {
         const decision = shouldMaterializeOccurrence({
           executingJobs: executing.length + created.filter(
-            (j) => j.profileId === schedule.profileId && EXECUTING.has(j.status),
+            (j) =>
+              j.kind === 'crawl'
+              && j.profileId === schedule.profileId
+              && EXECUTING.has(j.status),
           ).length,
           nonTerminalJobs:
             nonTerminal.length
-            + created.filter((j) => j.profileId === schedule.profileId).length,
+            + created.filter(
+              (j) => j.kind === 'crawl' && j.profileId === schedule.profileId,
+            ).length,
           maxActiveJobs: schedule.maxActiveJobs,
           overlapPolicy: schedule.overlapPolicy,
         });

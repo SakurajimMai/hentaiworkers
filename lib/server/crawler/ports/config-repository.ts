@@ -53,8 +53,14 @@ export type SecretVersionRecord = Readonly<{
 
 export interface CrawlerConfigRepository {
   listProfiles(): Promise<ReadonlyArray<ProfileSummary>>;
+  getProfile(profileId: number): Promise<ProfileSummary | null>;
   createProfile(name: string, config: CrawlerProfileConfig): Promise<ProfileVersionRecord>;
-  appendProfileVersion(profileId: number, config: CrawlerProfileConfig): Promise<ProfileVersionRecord>;
+  updateProfile(
+    profileId: number,
+    name: string,
+    config: CrawlerProfileConfig,
+  ): Promise<ProfileVersionRecord>;
+  disableProfile(profileId: number): Promise<void>;
   getProfileVersion(versionId: number): Promise<ProfileVersionRecord | null>;
   listProfileVersions(profileId: number): Promise<ReadonlyArray<ProfileVersionRecord>>;
 }

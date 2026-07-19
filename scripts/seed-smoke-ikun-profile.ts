@@ -53,7 +53,7 @@ async function main() {
   let versionId: number;
   if (existing) {
     const repo = new MariaDbCrawlerConfigRepository();
-    const v = await repo.appendProfileVersion(existing.id, config);
+    const v = await repo.updateProfile(existing.id, name, config);
     versionId = v.id;
   } else {
     const v = await service.createProfileFromParsed(name, config);

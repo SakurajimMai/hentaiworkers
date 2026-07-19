@@ -29,7 +29,7 @@ export type JobRecord = Readonly<{
   id: number;
   kind: CrawlerJobKind;
   status: CrawlerJobStatus;
-  profileId: number;
+  profileId: number | null;
   profileVersionId: number;
   storageProfileVersionId: number | null;
   scheduleId: number | null;
@@ -123,11 +123,22 @@ export type SkippedOccurrenceRecord = Readonly<{
   createdAt: string;
 }>;
 
+export type CrawlerProfileLifecycleRecord = Readonly<{
+  id: number;
+  isEnabled: boolean;
+}>;
+
+export interface CrawlerProfileLifecycleRepository {
+  getForUpdate(profileId: number): Promise<CrawlerProfileLifecycleRecord | null>;
+  disable(profileId: number): Promise<void>;
+}
+
 export interface CrawlerScheduleRepository {
   create(input: Omit<ScheduleRecord, 'id' | 'lastMaterializedAt'> & {
     lastMaterializedAt?: string | null;
   }): Promise<ScheduleRecord>;
   update(scheduleId: number, patch: Partial<ScheduleRecord>): Promise<ScheduleRecord>;
+  disableByProfileId(profileId: number): Promise<number>;
   get(scheduleId: number): Promise<ScheduleRecord | null>;
   listEnabledDue(nowIso: string): Promise<ReadonlyArray<ScheduleRecord>>;
   listEnabled(): Promise<ReadonlyArray<ScheduleRecord>>;
@@ -142,7 +153,7 @@ export interface CrawlerScheduleRepository {
 export interface CrawlerJobRepository {
   create(input: {
     kind: CrawlerJobKind;
-    profileId: number;
+    profileId: number | null;
     profileVersionId: number;
     storageProfileVersionId?: number | null;
     scheduleId?: number | null;
@@ -274,6 +285,7 @@ export interface CrawlerUnitOfWork {
 }
 
 export type CrawlerRepositories = Readonly<{
+  profiles: CrawlerProfileLifecycleRepository;
   schedules: CrawlerScheduleRepository;
   jobs: CrawlerJobRepository;
   receipts: OperationReceiptRepository;

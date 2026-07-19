@@ -10,32 +10,78 @@ import type {
   StorageVersionRecord,
 } from '../ports/config-repository';
 
+export type InMemoryCrawlerProfileState = Readonly<{
+  profiles: Map<number, { name: string; isEnabled: boolean }>;
+}>;
+
+export function createInMemoryCrawlerProfileState(): InMemoryCrawlerProfileState {
+  return { profiles: new Map() };
+}
+
 export class InMemoryCrawlerConfigRepository implements CrawlerConfigRepository {
   private profileSeq = 1;
   private versionSeq = 1;
   private readonly versions = new Map<number, ProfileVersionRecord>();
   private readonly profileCurrent = new Map<number, number>();
-  private readonly profileNames = new Map<number, string>();
+
+  constructor(
+    readonly profileState: InMemoryCrawlerProfileState = createInMemoryCrawlerProfileState(),
+  ) {}
 
   async listProfiles() {
-    return [...this.profileNames.entries()].map(([id, name]) => ({
-      id,
-      name,
-      currentVersionId: this.profileCurrent.get(id) ?? null,
-      isEnabled: true,
-    }));
+    return [...this.profileState.profiles.entries()]
+      .filter(([, profile]) => profile.isEnabled)
+      .map(([id, profile]) => ({
+        id,
+        name: profile.name,
+        currentVersionId: this.profileCurrent.get(id) ?? null,
+        isEnabled: profile.isEnabled,
+      }));
+  }
+
+  async getProfile(profileId: number) {
+    const profile = this.profileState.profiles.get(profileId);
+    return profile
+      ? {
+          id: profileId,
+          name: profile.name,
+          currentVersionId: this.profileCurrent.get(profileId) ?? null,
+          isEnabled: profile.isEnabled,
+        }
+      : null;
   }
 
   async createProfile(name: string, config: CrawlerProfileConfig): Promise<ProfileVersionRecord> {
     const profileId = this.profileSeq++;
-    this.profileNames.set(profileId, name);
-    return this.appendProfileVersion(profileId, config);
+    this.profileState.profiles.set(profileId, { name, isEnabled: true });
+    return this.appendVersion(profileId, config);
   }
 
-  async appendProfileVersion(
+  async updateProfile(
     profileId: number,
+    name: string,
     config: CrawlerProfileConfig,
   ): Promise<ProfileVersionRecord> {
+    const profile = this.profileState.profiles.get(profileId);
+    if (!profile?.isEnabled) {
+      throw new AppError('RESULT_INVALID', '模板不存在', 404);
+    }
+    this.profileState.profiles.set(profileId, { ...profile, name });
+    return this.appendVersion(profileId, config);
+  }
+
+  async disableProfile(profileId: number): Promise<void> {
+    const profile = this.profileState.profiles.get(profileId);
+    if (!profile) throw new AppError('RESULT_INVALID', '模板不存在', 404);
+    if (profile.isEnabled) {
+      this.profileState.profiles.set(profileId, { ...profile, isEnabled: false });
+    }
+  }
+
+  private appendVersion(
+    profileId: number,
+    config: CrawlerProfileConfig,
+  ): ProfileVersionRecord {
     const existing = [...this.versions.values()].filter((v) => v.profileId === profileId);
     const version = existing.length + 1;
     const record: ProfileVersionRecord = {

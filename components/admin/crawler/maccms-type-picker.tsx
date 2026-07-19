@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type FlatClass = {
   typeId: number;
@@ -9,6 +9,29 @@ type FlatClass = {
 };
 
 type TreeNode = FlatClass & { children: TreeNode[] };
+
+export function reconcileTypeIdsAfterLoad({
+  selected,
+  availableTypeIds,
+  suggestedTypeIds,
+  initialTypeIds,
+  preserveCurrent,
+}: {
+  selected: ReadonlySet<number>;
+  availableTypeIds: readonly number[];
+  suggestedTypeIds: readonly number[];
+  initialTypeIds: readonly number[];
+  preserveCurrent: boolean;
+}): Set<number> {
+  if (preserveCurrent) return new Set(selected);
+  if (selected.size > 0) {
+    const available = new Set(availableTypeIds);
+    const valid = new Set([...selected].filter((id) => available.has(id)));
+    if (valid.size > 0) return valid;
+  }
+  if (suggestedTypeIds.length > 0) return new Set(suggestedTypeIds);
+  return new Set(initialTypeIds);
+}
 
 function buildTree(flat: FlatClass[]): TreeNode[] {
   const map = new Map<number, TreeNode>();
@@ -28,10 +51,14 @@ export function MacCmsTypePicker({
   provider,
   baseUrl,
   initialTypeIds,
+  preserveCurrentTypeIds = false,
+  autoDetectTypes = false,
 }: {
   provider: string;
   baseUrl: string;
   initialTypeIds: number[];
+  preserveCurrentTypeIds?: boolean;
+  autoDetectTypes?: boolean;
 }) {
   const [flat, setFlat] = useState<FlatClass[]>([]);
   const [selected, setSelected] = useState<Set<number>>(
@@ -40,7 +67,8 @@ export function MacCmsTypePicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [loadedFor, setLoadedFor] = useState('');
+  const [autoDetect, setAutoDetect] = useState(autoDetectTypes);
+  const autoLoadedProvider = useRef('');
 
   const tree = useMemo(() => buildTree(flat), [flat]);
   const typeIdsValue = useMemo(
@@ -78,20 +106,15 @@ export function MacCmsTypePicker({
       }
       const nextFlat = body.data?.flat ?? [];
       setFlat(nextFlat);
-      setLoadedFor(`${provider}|${baseUrl}`);
       if (body.data?.note) setNotice(body.data.note);
       // Keep prior selection if still valid; else suggest JP anime ids.
-      setSelected((prev) => {
-        if (prev.size > 0) {
-          const valid = new Set(
-            [...prev].filter((id) => nextFlat.some((c) => c.typeId === id)),
-          );
-          if (valid.size) return valid;
-        }
-        const suggested = body.data?.suggestedTypeIds ?? [];
-        if (suggested.length) return new Set(suggested);
-        return new Set(initialTypeIds);
-      });
+      setSelected((prev) => reconcileTypeIdsAfterLoad({
+        selected: prev,
+        availableTypeIds: nextFlat.map((item) => item.typeId),
+        suggestedTypeIds: body.data?.suggestedTypeIds ?? [],
+        initialTypeIds,
+        preserveCurrent: preserveCurrentTypeIds,
+      }));
     } catch (e) {
       const raw = e instanceof Error ? e.message : '加载失败';
       // font-meta uppercases text — keep a human sentence in normal case.
@@ -103,17 +126,17 @@ export function MacCmsTypePicker({
     } finally {
       setLoading(false);
     }
-  }, [baseUrl, provider, initialTypeIds]);
+  }, [baseUrl, provider, initialTypeIds, preserveCurrentTypeIds]);
 
   useEffect(() => {
-    // Auto-load when provider/base changes and we have a URL.
     if (!baseUrl.trim()) return;
-    const key = `${provider}|${baseUrl}`;
-    if (key === loadedFor) return;
+    if (provider === autoLoadedProvider.current) return;
+    autoLoadedProvider.current = provider;
     void load();
-  }, [provider, baseUrl, loadedFor, load]);
+  }, [provider, baseUrl, load]);
 
   const toggle = (id: number) => {
+    setAutoDetect(false);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -123,6 +146,7 @@ export function MacCmsTypePicker({
   };
 
   const toggleBranch = (node: TreeNode, on: boolean) => {
+    setAutoDetect(false);
     setSelected((prev) => {
       const next = new Set(prev);
       const walk = (n: TreeNode) => {
@@ -136,6 +160,7 @@ export function MacCmsTypePicker({
   };
 
   const selectByNameHint = (hints: string[]) => {
+    setAutoDetect(false);
     setSelected(() => {
       const next = new Set<number>();
       for (const row of flat) {
@@ -147,40 +172,42 @@ export function MacCmsTypePicker({
 
   const renderNode = (node: TreeNode, depth: number) => (
     <div key={node.typeId} className="space-y-1">
-      <label
-        className="flex items-center gap-2 font-ui text-[12px] text-[#333]"
+      <div
+        className="flex min-h-9 items-center gap-2 font-ui text-[12px] text-[#333]"
         style={{ paddingLeft: depth * 14 }}
       >
-        <input
-          type="checkbox"
-          checked={selected.has(node.typeId)}
-          onChange={() => toggle(node.typeId)}
-        />
-        <span className="min-w-0">
-          <span className="font-medium">{node.typeName}</span>
-          <span className="ml-1 font-mono text-[11px] text-[#787774]">
-            #{node.typeId}
+        <label className="flex min-w-0 flex-1 items-center gap-2">
+          <input
+            type="checkbox"
+            checked={selected.has(node.typeId)}
+            onChange={() => toggle(node.typeId)}
+          />
+          <span className="min-w-0">
+            <span className="font-medium">{node.typeName}</span>
+            <span className="ml-1 font-mono text-[11px] text-[#787774]">
+              #{node.typeId}
+            </span>
           </span>
-        </span>
+        </label>
         {node.children.length > 0 && (
           <span className="ml-auto flex gap-1 shrink-0">
             <button
               type="button"
-              className="text-[11px] text-[#0B57D0] underline"
+              className="min-h-8 px-1 text-[11px] text-[#0B57D0] underline"
               onClick={() => toggleBranch(node, true)}
             >
               全选
             </button>
             <button
               type="button"
-              className="text-[11px] text-[#787774] underline"
+              className="min-h-8 px-1 text-[11px] text-[#787774] underline"
               onClick={() => toggleBranch(node, false)}
             >
               清空
             </button>
           </span>
         )}
-      </label>
+      </div>
       {node.children.map((child) => renderNode(child, depth + 1))}
     </div>
   );
@@ -214,7 +241,10 @@ export function MacCmsTypePicker({
               <button
                 type="button"
                 className="btn-ghost !py-1.5 !px-2.5 !text-[11px]"
-                onClick={() => setSelected(new Set())}
+                onClick={() => {
+                  setAutoDetect(false);
+                  setSelected(new Set());
+                }}
               >
                 清空勾选
               </button>
@@ -231,17 +261,15 @@ export function MacCmsTypePicker({
         </div>
       </div>
 
-      {/* Submitted to form-config as typeIds */}
       <input type="hidden" name="typeIds" value={typeIdsValue} />
-      {/* When user has explicitly selected types, disable auto-detect */}
       <input
         type="hidden"
         name="autoDetectTypes"
-        value={selected.size > 0 ? '0' : '0'}
+        value={autoDetect ? '1' : '0'}
       />
 
       {error && (
-        <p className="font-ui text-[12px] text-[#C5221F] normal-case tracking-normal">
+        <p role="alert" className="font-ui text-[12px] text-[#C5221F] normal-case tracking-normal">
           加载失败：{error}
         </p>
       )}
@@ -263,8 +291,22 @@ export function MacCmsTypePicker({
 
       <p className="font-meta text-[11px] text-[#787774]">
         已选 {selected.size} 项
-        {typeIdsValue ? `：${typeIdsValue}` : '（空 = 不采集任何分类）'}
+        {typeIdsValue
+          ? `：${typeIdsValue}`
+          : autoDetect
+            ? '（空 = Worker 自动识别分类）'
+            : '（空 = 不采集任何分类）'}
       </p>
+      {autoDetect ? (
+        <label className="field-check text-[12px]">
+          <input
+            type="checkbox"
+            checked={autoDetect}
+            onChange={(event) => setAutoDetect(event.target.checked)}
+          />
+          保留旧模板的自动识别分类策略
+        </label>
+      ) : null}
     </div>
   );
 }

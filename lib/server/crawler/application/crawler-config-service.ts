@@ -5,8 +5,15 @@ import {
 } from '../domain/config';
 import type {
   CrawlerConfigRepository,
+  ProfileSummary,
   ProfileVersionRecord,
 } from '../ports/config-repository';
+
+function requirePositiveProfileId(profileId: number): void {
+  if (!Number.isSafeInteger(profileId) || profileId <= 0) {
+    throw new AppError('RESULT_INVALID', '无效模板 ID', 400);
+  }
+}
 
 export class CrawlerConfigService {
   constructor(private readonly repository: CrawlerConfigRepository) {}
@@ -22,9 +29,26 @@ export class CrawlerConfigService {
     return this.repository.createProfile(trimmed, config);
   }
 
-  async updateProfile(profileId: number, configInput: unknown): Promise<ProfileVersionRecord> {
+  async getProfile(profileId: number): Promise<ProfileSummary | null> {
+    requirePositiveProfileId(profileId);
+    return this.repository.getProfile(profileId);
+  }
+
+  async editProfile(
+    profileId: number,
+    name: string,
+    configInput: unknown,
+  ): Promise<ProfileVersionRecord> {
+    requirePositiveProfileId(profileId);
+    const trimmed = name.trim();
+    if (!trimmed) throw new AppError('RESULT_INVALID', '模板名称必填', 400);
     const config = parseCrawlerProfileConfig(configInput);
-    return this.repository.appendProfileVersion(profileId, config);
+    return this.repository.updateProfile(profileId, trimmed, config);
+  }
+
+  async disableProfile(profileId: number): Promise<void> {
+    requirePositiveProfileId(profileId);
+    await this.repository.disableProfile(profileId);
   }
 
   getVersion(versionId: number): Promise<ProfileVersionRecord | null> {

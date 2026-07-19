@@ -311,6 +311,27 @@ test('manual retry creates linked job from terminal status', async () => {
   assert.notEqual(retry.id, claimed.job.id);
 });
 
+test('manual retry keeps non-crawl maintenance jobs independent from profile lifecycle', async () => {
+  const uow = new InMemoryCrawlerUnitOfWork();
+  const jobs = new CrawlerJobService(uow);
+
+  for (const kind of ['storage_test', 'cleanup'] as const) {
+    const job = await jobs.enqueueManual({
+      kind,
+      profileId: 7,
+      profileVersionId: 0,
+      configSnapshotJson: JSON.stringify({ kind }),
+    });
+    assert.equal(job.profileId, null);
+    const terminal = await jobs.cancel(job.id);
+    assert.equal(terminal.status, 'cancelled');
+    const retry = await jobs.manualRetry(job.id);
+    assert.equal(retry.kind, kind);
+    assert.equal(retry.profileId, null);
+    assert.equal(retry.retryOfJobId, job.id);
+  }
+});
+
 test('deleteJob only allows terminal jobs and removes all control-plane children', async () => {
   const { jobs, claimed, workerId, uow } = await seedClaimed();
   await assert.rejects(() => jobs.deleteJob(claimed.job.id), /仅可删除已结束/);

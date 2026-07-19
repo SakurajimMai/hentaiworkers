@@ -57,7 +57,7 @@ const sampleSftp = (): StorageConfig =>
     organizeByDate: false,
   });
 
-test('crawler profile versions are immutable snapshots', async () => {
+test('in-memory profile editing keeps independent snapshots for domain tests', async () => {
   const repo = new InMemoryCrawlerConfigRepository();
   const service = new CrawlerConfigService(repo);
 
@@ -65,12 +65,17 @@ test('crawler profile versions are immutable snapshots', async () => {
   assert.equal(v1.version, 1);
   assert.equal(v1.config.source.baseUrl, 'https://hanime.example');
 
-  const v2 = await service.updateProfile(v1.profileId, {
-    ...sampleProfile(),
-    concurrency: { download: 4, parse: 3 },
-  });
+  const v2 = await service.editProfile(
+    v1.profileId,
+    '  updated  ',
+    {
+      ...sampleProfile(),
+      concurrency: { download: 4, parse: 3 },
+    },
+  );
   assert.equal(v2.version, 2);
   assert.equal(v2.config.concurrency.download, 4);
+  assert.equal((await service.getProfile(v1.profileId))?.name, 'updated');
 
   // original version unchanged
   const stillV1 = await service.getVersion(v1.id);
@@ -88,6 +93,65 @@ test('crawler profile versions are immutable snapshots', async () => {
       assert.equal(error.status, 409);
       return true;
     },
+  );
+});
+
+test('in-memory soft delete hides the profile while test snapshots remain readable', async () => {
+  const service = new CrawlerConfigService(new InMemoryCrawlerConfigRepository());
+  const v1 = await service.createProfile('default', sampleProfile());
+  const v2 = await service.editProfile(v1.profileId, 'updated', {
+    ...sampleProfile(),
+    concurrency: { download: 4, parse: 3 },
+  });
+
+  await service.disableProfile(v1.profileId);
+  await service.disableProfile(v1.profileId);
+
+  assert.deepEqual(await service.listProfiles(), []);
+  const disabled = await service.getProfile(v1.profileId);
+  assert.ok(disabled);
+  assert.equal(disabled.isEnabled, false);
+  assert.equal(disabled.currentVersionId, v2.id);
+  assert.equal((await service.getVersion(v1.id))?.version, 1);
+  assert.equal((await service.getVersion(v2.id))?.version, 2);
+  assert.deepEqual(
+    (await service.listVersions(v1.profileId)).map((version) => version.version),
+    [1, 2],
+  );
+});
+
+test('crawler profile operations reject invalid and unknown IDs', async () => {
+  const service = new CrawlerConfigService(new InMemoryCrawlerConfigRepository());
+
+  for (const profileId of [0, -1, 1.5, Number.NaN]) {
+    await assert.rejects(
+      () => service.getProfile(profileId),
+      (error: unknown) => error instanceof AppError && error.status === 400,
+    );
+    await assert.rejects(
+      () => service.editProfile(profileId, 'updated', sampleProfile()),
+      (error: unknown) => error instanceof AppError && error.status === 400,
+    );
+    await assert.rejects(
+      () => service.disableProfile(profileId),
+      (error: unknown) => error instanceof AppError && error.status === 400,
+    );
+  }
+
+  await assert.rejects(
+    () => service.editProfile(999, 'updated', sampleProfile()),
+    (error: unknown) => error instanceof AppError && error.status === 404,
+  );
+  await assert.rejects(
+    () => service.disableProfile(999),
+    (error: unknown) => error instanceof AppError && error.status === 404,
+  );
+  await assert.rejects(
+    () => service.editProfile(1, '   ', sampleProfile()),
+    (error: unknown) => error instanceof AppError && error.status === 400,
+  );
+  await assert.rejects(
+    () => service.editProfile(1, 'updated', { ...sampleProfile(), source: { baseUrl: 'bad' } }),
   );
 });
 

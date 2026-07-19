@@ -249,7 +249,6 @@ export default async function CrawlerStoragePage({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <form action={actionStartStorageTest}>
-                          <input type="hidden" name="profileId" value={profile.id} />
                           <input type="hidden" name="storageProfileVersionId" value={v.id} />
                           <button type="submit" className="btn-ghost text-[12px]">
                             入队 storage_test

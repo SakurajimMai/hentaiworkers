@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { animeTags, animes, tags } from '@/lib/schema';
+import { AutoGrowTextarea } from '@/components/admin/auto-grow-textarea';
 import { actionSaveAnime } from '../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -13,8 +14,9 @@ export default async function AdminAnimeEditPage({
 }) {
   const { id: idStr } = await params;
   const isNew = idStr === 'new';
-  const id = isNew ? null : parseInt(idStr, 10);
-  if (!isNew && !Number.isFinite(id)) notFound();
+  if (!isNew && !/^\d+$/.test(idStr)) notFound();
+  const id = isNew ? null : Number(idStr);
+  if (!isNew && (!Number.isSafeInteger(id) || (id ?? 0) <= 0)) notFound();
 
   let anime: typeof animes.$inferSelect | null = null;
   let selectedTagIds: number[] = [];
@@ -45,21 +47,23 @@ export default async function AdminAnimeEditPage({
       <form action={actionSaveAnime} className="surface-card p-6 space-y-4">
         {anime && <input type="hidden" name="id" value={anime.id} />}
         <div>
-          <label className="admin-label">标题 *</label>
-          <input name="title" className="admin-input" required defaultValue={anime?.title || ''} />
+          <label htmlFor="title" className="admin-label">标题 *</label>
+          <input id="title" name="title" className="admin-input" required defaultValue={anime?.title || ''} />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <label className="admin-label">日文标题</label>
+            <label htmlFor="titleJapanese" className="admin-label">日文标题</label>
             <input
+              id="titleJapanese"
               name="titleJapanese"
               className="admin-input"
               defaultValue={anime?.titleJapanese || ''}
             />
           </div>
           <div>
-            <label className="admin-label">英文标题</label>
+            <label htmlFor="titleEnglish" className="admin-label">英文标题</label>
             <input
+              id="titleEnglish"
               name="titleEnglish"
               className="admin-input"
               defaultValue={anime?.titleEnglish || ''}
@@ -67,37 +71,49 @@ export default async function AdminAnimeEditPage({
           </div>
         </div>
         <div>
-          <label className="admin-label">视频地址 *</label>
-          <input
+          <label htmlFor="videoUrl" className="admin-label">视频地址 *</label>
+          <AutoGrowTextarea
+            id="videoUrl"
             name="videoUrl"
-            className="admin-input"
+            rows={2}
             required
+            singleLine
             defaultValue={anime?.videoUrl || ''}
           />
         </div>
         <div>
-          <label className="admin-label">封面 URL</label>
-          <input name="cover" className="admin-input" defaultValue={anime?.cover || ''} />
+          <label htmlFor="cover" className="admin-label">封面 URL</label>
+          <AutoGrowTextarea
+            id="cover"
+            name="cover"
+            rows={2}
+            singleLine
+            defaultValue={anime?.cover || ''}
+          />
         </div>
         <div>
-          <label className="admin-label">剧照（逗号分隔 URL）</label>
-          <textarea
+          <label htmlFor="fanart" className="admin-label">剧照（逗号分隔 URL）</label>
+          <AutoGrowTextarea
+            id="fanart"
             name="fanart"
-            className="admin-input min-h-[80px]"
+            rows={4}
+            singleLine
             defaultValue={anime?.fanart || ''}
           />
         </div>
         <div>
-          <label className="admin-label">简介</label>
-          <textarea
+          <label htmlFor="description" className="admin-label">简介</label>
+          <AutoGrowTextarea
+            id="description"
             name="description"
-            className="admin-input min-h-[120px]"
+            rows={6}
             defaultValue={anime?.description || ''}
           />
         </div>
         <div>
-          <label className="admin-label">标签（按住 Ctrl 多选）</label>
+          <label htmlFor="tagIds" className="admin-label">标签（按住 Ctrl 多选）</label>
           <select
+            id="tagIds"
             name="tagIds"
             multiple
             className="admin-input min-h-[160px]"

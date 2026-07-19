@@ -8,7 +8,6 @@ import {
   type CrawlerProfileConfig,
   type StorageConfig,
 } from '../domain/config';
-import type { CrawlerJobKind } from '../domain/job';
 import type {
   JobRecord,
   ScheduleRecord,
@@ -184,6 +183,10 @@ export class AdminCrawlerService {
     return this.deps.profiles.listProfiles();
   }
 
+  async getProfile(profileId: number) {
+    return this.deps.profiles.getProfile(profileId);
+  }
+
   async getProfileVersion(versionId: number) {
     return this.deps.profiles.getVersion(versionId);
   }
@@ -192,23 +195,34 @@ export class AdminCrawlerService {
     return this.deps.profiles.createProfile(name, config);
   }
 
+  async updateProfile(profileId: number, name: string, config: unknown) {
+    return this.deps.profiles.editProfile(profileId, name, config);
+  }
+
+  async deleteProfile(profileId: number): Promise<void> {
+    if (!Number.isSafeInteger(profileId) || profileId <= 0) {
+      throw new AppError('RESULT_INVALID', '无效模板 ID', 400);
+    }
+    await this.deps.uow.runInTransaction(async (repos) => {
+      const profile = await repos.profiles.getForUpdate(profileId);
+      if (!profile) throw new AppError('RESULT_INVALID', '模板不存在', 404);
+      await repos.schedules.disableByProfileId(profileId);
+      await repos.profiles.disable(profileId);
+    });
+  }
+
   async createProfileFromParsed(name: string, config: CrawlerProfileConfig) {
     return this.deps.profiles.createProfile(name, config);
   }
 
-  async startManualJob(input: {
-    profileId: number;
-    profileVersionId: number;
-    configSnapshotJson: string;
-    kind?: CrawlerJobKind;
-    storageProfileVersionId?: number | null;
-  }): Promise<JobRecord> {
+  async startManualJob(input: { profileVersionId: number }): Promise<JobRecord> {
+    const resolved = await this.resolveProfileSnapshot(input.profileVersionId);
     return this.deps.jobs.enqueueManual({
-      kind: input.kind ?? 'crawl',
-      profileId: input.profileId,
-      profileVersionId: input.profileVersionId,
-      storageProfileVersionId: input.storageProfileVersionId,
-      configSnapshotJson: input.configSnapshotJson,
+      kind: 'crawl',
+      profileId: resolved.version.profileId,
+      profileVersionId: resolved.version.id,
+      storageProfileVersionId: resolved.storageProfileVersionId,
+      configSnapshotJson: resolved.configSnapshotJson,
     });
   }
 
@@ -218,6 +232,10 @@ export class AdminCrawlerService {
     }
     const version = await this.deps.profiles.getVersion(profileVersionId);
     if (!version) throw new AppError('RESULT_INVALID', '模板版本不存在', 404);
+    const profile = await this.deps.profiles.getProfile(version.profileId);
+    if (!profile?.isEnabled) {
+      throw new AppError('RESULT_INVALID', '模板不存在或已删除', 404);
+    }
 
     let storageProfileVersionId: number | null = null;
     let configSnapshot: Record<string, unknown> = {
@@ -250,20 +268,11 @@ export class AdminCrawlerService {
   }
 
   async startProfileJob(profileVersionId: number): Promise<JobRecord> {
-    const resolved = await this.resolveProfileSnapshot(profileVersionId);
-    return this.deps.jobs.enqueueManual({
-      kind: 'crawl',
-      profileId: resolved.version.profileId,
-      profileVersionId: resolved.version.id,
-      storageProfileVersionId: resolved.storageProfileVersionId,
-      configSnapshotJson: resolved.configSnapshotJson,
-    });
+    return this.startManualJob({ profileVersionId });
   }
 
   async startStorageTestJob(input: {
-    profileId: number;
     storageProfileVersionId: number;
-    configSnapshotJson: string;
   }): Promise<JobRecord> {
     const version = await this.requireStorage().getVersion(input.storageProfileVersionId);
     if (!version) {
@@ -276,7 +285,7 @@ export class AdminCrawlerService {
     };
     return this.deps.jobs.enqueueManual({
       kind: 'storage_test',
-      profileId: input.profileId,
+      profileId: null,
       profileVersionId: 0,
       storageProfileVersionId: input.storageProfileVersionId,
       configSnapshotJson: JSON.stringify(snapshot),
@@ -287,7 +296,6 @@ export class AdminCrawlerService {
     input: Omit<Parameters<CrawlerScheduleService['create']>[0],
       'profileId' | 'storageProfileVersionId' | 'configSnapshotJson'> & {
         profileId?: number;
-        configSnapshotJson?: string;
       },
   ): Promise<ScheduleRecord> {
     const resolved = await this.resolveProfileSnapshot(input.profileVersionId);

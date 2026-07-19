@@ -3,6 +3,7 @@ import type { CrawlerJobStatus } from '../domain/job';
 import type {
   AttemptRecord,
   CrawlerJobRepository,
+  CrawlerProfileLifecycleRepository,
   CrawlerRepositories,
   CrawlerScheduleRepository,
   CrawlerUnitOfWork,
@@ -19,6 +20,7 @@ import type {
   SkippedOccurrenceRecord,
 } from '../ports/crawler-unit-of-work';
 import { hashesEqual } from '../domain/hashing';
+import type { InMemoryCrawlerProfileState } from './in-memory-config-repos';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -26,6 +28,28 @@ function nowIso(): string {
 
 function cloneJob(job: JobRecord): JobRecord {
   return { ...job };
+}
+
+class InMemoryCrawlerProfileLifecycleRepository
+  implements CrawlerProfileLifecycleRepository {
+  constructor(
+    private readonly state?: InMemoryCrawlerProfileState,
+  ) {}
+
+  async getForUpdate(profileId: number) {
+    if (!this.state) return { id: profileId, isEnabled: true };
+    const profile = this.state.profiles.get(profileId);
+    return profile ? { id: profileId, isEnabled: profile.isEnabled } : null;
+  }
+
+  async disable(profileId: number): Promise<void> {
+    if (!this.state) return;
+    const profile = this.state.profiles.get(profileId);
+    if (!profile) throw new AppError('RESULT_INVALID', '模板不存在', 404);
+    if (profile.isEnabled) {
+      this.state.profiles.set(profileId, { ...profile, isEnabled: false });
+    }
+  }
 }
 
 export class InMemoryCrawlerScheduleRepository implements CrawlerScheduleRepository {
@@ -54,6 +78,16 @@ export class InMemoryCrawlerScheduleRepository implements CrawlerScheduleReposit
     const next = { ...current, ...patch, id: scheduleId };
     this.rows.set(scheduleId, next);
     return next;
+  }
+
+  async disableByProfileId(profileId: number): Promise<number> {
+    let disabled = 0;
+    for (const [scheduleId, schedule] of this.rows) {
+      if (schedule.profileId !== profileId || !schedule.isEnabled) continue;
+      this.rows.set(scheduleId, { ...schedule, isEnabled: false });
+      disabled += 1;
+    }
+    return disabled;
   }
 
   async get(scheduleId: number): Promise<ScheduleRecord | null> {
@@ -103,7 +137,7 @@ export class InMemoryCrawlerJobRepository implements CrawlerJobRepository {
 
   async create(input: {
     kind: JobRecord['kind'];
-    profileId: number;
+    profileId: number | null;
     profileVersionId: number;
     storageProfileVersionId?: number | null;
     scheduleId?: number | null;
@@ -531,6 +565,7 @@ export class InMemoryMediaUploadRepository implements MediaUploadRepository {
 }
 
 export class InMemoryCrawlerUnitOfWork implements CrawlerUnitOfWork {
+  readonly profiles: InMemoryCrawlerProfileLifecycleRepository;
   readonly schedules = new InMemoryCrawlerScheduleRepository();
   readonly receipts = new InMemoryOperationReceiptRepository();
   readonly items = new InMemoryJobItemRepository();
@@ -548,10 +583,15 @@ export class InMemoryCrawlerUnitOfWork implements CrawlerUnitOfWork {
     this.events.deleteByJob(jobId);
   });
 
+  constructor(profileState?: InMemoryCrawlerProfileState) {
+    this.profiles = new InMemoryCrawlerProfileLifecycleRepository(profileState);
+  }
+
   private chain: Promise<unknown> = Promise.resolve();
 
   get repos(): CrawlerRepositories {
     return {
+      profiles: this.profiles,
       schedules: this.schedules,
       jobs: this.jobs,
       receipts: this.receipts,

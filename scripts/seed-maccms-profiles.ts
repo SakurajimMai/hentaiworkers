@@ -68,7 +68,7 @@ async function main() {
       continue;
     }
     if (found && force) {
-      await repo.appendProfileVersion(found.id, config);
+      await repo.updateProfile(found.id, name, config);
       updated.push(name);
       continue;
     }

@@ -6,16 +6,34 @@ import {
   getMacCmsPreset,
 } from '@/lib/server/crawler/domain/maccms-presets';
 import { MacCmsTypePicker } from '@/components/admin/crawler/maccms-type-picker';
+import type { ProfileFormDefaults } from '@/app/admin/crawler/form-config';
 
 const HANIME_BASE = 'https://hanime1.me';
 
-export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
-  const [source, setSource] = useState('ikun');
+type ProfileSourceFieldsProps = Readonly<{
+  defaultYear: number;
+  defaults?: ProfileFormDefaults;
+}>;
+
+export function ProfileSourceFields({
+  defaultYear,
+  defaults,
+}: ProfileSourceFieldsProps) {
+  const [source, setSource] = useState(() => defaults?.requiredSource ?? 'ikun');
   const [baseUrl, setBaseUrl] = useState(
-    () => getMacCmsPreset('ikun')?.baseUrl ?? '',
+    () => defaults?.baseUrl ?? getMacCmsPreset('ikun')?.baseUrl ?? '',
   );
+  const [provider, setProvider] = useState(
+    () => defaults?.provider || defaults?.requiredSource || 'ikun',
+  );
+  const [sourceChanged, setSourceChanged] = useState(false);
   const preset = useMemo(() => getMacCmsPreset(source), [source]);
   const isMac = source !== 'hanime';
+  const initialTypeIds = sourceChanged
+    ? [...(preset?.typeIds ?? [])]
+    : defaults
+      ? defaults.typeIds.split(',').map(Number).filter(Number.isSafeInteger)
+      : [...(preset?.typeIds ?? [])];
 
   return (
     <>
@@ -23,7 +41,13 @@ export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
         <h2 className="font-ui text-sm font-semibold">基本</h2>
         <label className="block font-meta text-[12px]">
           模板名称 *
-          <input name="name" required className="admin-input mt-1" placeholder="例如：iKun 日本动漫" />
+          <input
+            name="name"
+            required
+            className="admin-input mt-1"
+            defaultValue={defaults?.name ?? ''}
+            placeholder="例如：iKun 日本动漫"
+          />
         </label>
         <label className="block font-meta text-[12px]">
           来源适配器
@@ -33,7 +57,9 @@ export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
             value={source}
             onChange={(e) => {
               const next = e.target.value;
+              setSourceChanged(true);
               setSource(next);
+              setProvider(next);
               if (next !== 'hanime') {
                 setBaseUrl(getMacCmsPreset(next)?.baseUrl ?? '');
               } else {
@@ -86,11 +112,14 @@ export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
 
         {isMac ? (
           <>
+            <input type="hidden" name="provider" value={provider} />
             <MacCmsTypePicker
-              key={`${source}-${baseUrl}`}
-              provider={source}
+              key={source}
+              provider={sourceChanged ? provider : defaults?.provider || provider}
               baseUrl={baseUrl}
-              initialTypeIds={[...(preset?.typeIds ?? [])]}
+              initialTypeIds={initialTypeIds}
+              preserveCurrentTypeIds={Boolean(defaults) && !sourceChanged}
+              autoDetectTypes={!sourceChanged && (defaults?.autoDetectTypes ?? false)}
             />
 
             <div className="grid sm:grid-cols-3 gap-3">
@@ -100,51 +129,58 @@ export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
                   key={`${source}-play`}
                   name="playFrom"
                   className="admin-input mt-1"
-                  defaultValue={preset?.playFrom ?? ''}
+                  defaultValue={sourceChanged ? preset?.playFrom ?? '' : defaults?.playFrom ?? preset?.playFrom ?? ''}
                   placeholder="ikm3u8 / wjm3u8…"
                 />
               </label>
               <label className="block font-meta text-[12px]">
                 最近 N 小时（可选）
-                <input name="hours" type="number" min={1} className="admin-input mt-1" placeholder="如 24" />
+                <input name="hours" type="number" min={1} className="admin-input mt-1" defaultValue={defaults?.hours} placeholder="如 24" />
               </label>
               <label className="block font-meta text-[12px]">
                 Type 单值（可选覆盖）
-                <input name="type" className="admin-input mt-1" placeholder="一般留空" />
+                <input name="type" className="admin-input mt-1" defaultValue={defaults?.type} placeholder="一般留空" />
               </label>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="block font-meta text-[12px]">
+                Genre（可选）
+                <input
+                  name="genre"
+                  className="admin-input mt-1"
+                  defaultValue={defaults?.genre}
+                />
+              </label>
+              <label className="block font-meta text-[12px]">
+                Sort（可选）
+                <input
+                  name="sort"
+                  className="admin-input mt-1"
+                  defaultValue={defaults?.sort}
+                />
+              </label>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
               <label className="block font-meta text-[12px]">
                 最大页数
-                <input name="maxPages" type="number" min={1} max={200} className="admin-input mt-1" defaultValue={3} />
+                <input name="maxPages" type="number" min={1} max={200} className="admin-input mt-1" defaultValue={defaults?.maxPages ?? 3} />
               </label>
               <label className="block font-meta text-[12px]">
                 最大条目
-                <input name="maxItems" type="number" min={1} max={5000} className="admin-input mt-1" defaultValue={100} />
+                <input name="maxItems" type="number" min={1} max={5000} className="admin-input mt-1" defaultValue={defaults ? defaults.maxItems : 100} />
               </label>
               <label className="block font-meta text-[12px]">
                 采集页顺序
-                <select name="pageOrder" className="admin-input mt-1" defaultValue="reverse">
+                <select name="pageOrder" className="admin-input mt-1" defaultValue={defaults?.pageOrder ?? 'reverse'}>
                   <option value="reverse">倒序（最新页优先，page 1→N）</option>
                   <option value="from_end">从末页往前（pagecount→…）</option>
                   <option value="forward">正序（page 1→N，同倒序但不反转条目）</option>
                 </select>
               </label>
-              <label className="block font-meta text-[12px]">
-                翻页线程数
-                <input
-                  name="pageConcurrency"
-                  type="number"
-                  min={1}
-                  max={16}
-                  defaultValue={2}
-                  className="admin-input mt-1"
-                />
-              </label>
             </div>
             <div className="flex flex-wrap gap-4">
               <label className="field-check text-[12px]">
-                <input type="checkbox" name="filterJpKr" value="1" />
+                <input type="checkbox" name="filterJpKr" value="1" defaultChecked={defaults?.filterJpKr ?? false} />
                 额外过滤非日本/韩国条目（可选）
               </label>
             </div>
@@ -160,43 +196,43 @@ export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
             <div className="grid sm:grid-cols-3 gap-3">
               <label className="block font-meta text-[12px]">
                 Genre
-                <input name="genre" className="admin-input mt-1" defaultValue="裏番" />
+                <input name="genre" className="admin-input mt-1" defaultValue={defaults?.genre ?? '裏番'} />
               </label>
               <label className="block font-meta text-[12px]">
                 Sort（可选）
-                <input name="sort" className="admin-input mt-1" />
+                <input name="sort" className="admin-input mt-1" defaultValue={defaults?.sort} />
               </label>
               <label className="block font-meta text-[12px]">
                 Type（可选）
-                <input name="type" className="admin-input mt-1" />
+                <input name="type" className="admin-input mt-1" defaultValue={defaults?.type} />
               </label>
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               <label className="block font-meta text-[12px]">
                 每次最大条目（空 = 不限）
-                <input name="maxItems" type="number" min={1} max={2000} className="admin-input mt-1" />
+                <input name="maxItems" type="number" min={1} max={2000} className="admin-input mt-1" defaultValue={defaults?.maxItems} />
               </label>
               <label className="block font-meta text-[12px]">
                 条目间隔（秒）
-                <input name="requestDelaySeconds" type="number" min={0} max={30} step="0.5" defaultValue={1} className="admin-input mt-1" />
+                <input name="requestDelaySeconds" type="number" min={0} max={30} step="0.5" defaultValue={defaults?.requestDelaySeconds ?? 1} className="admin-input mt-1" />
               </label>
               <label className="block font-meta text-[12px]">
                 Getchu 剧照上限
-                <input name="maxFanartImages" type="number" min={1} max={50} defaultValue={50} className="admin-input mt-1" />
+                <input name="maxFanartImages" type="number" min={1} max={50} defaultValue={defaults?.maxFanartImages ?? 50} className="admin-input mt-1" />
               </label>
             </div>
             <div className="flex flex-wrap gap-4 items-center">
               <label className="field-check text-[12px]">
-                <input type="checkbox" name="skipExisting" value="1" defaultChecked />
+                <input type="checkbox" name="skipExisting" value="1" defaultChecked={defaults?.skipExisting ?? true} />
                 跳过已入库来源（避免重复下载）
               </label>
               <span className="font-ui text-[12px] text-[#6f6d68]">视频固定上传到所选 S3/SFTP</span>
               <label className="field-check text-[12px]">
-                <input type="checkbox" name="enableCover" value="1" defaultChecked />
+                <input type="checkbox" name="enableCover" value="1" defaultChecked={defaults?.enableCover ?? true} />
                 上传封面
               </label>
               <label className="field-check text-[12px]">
-                <input type="checkbox" name="enableFanart" value="1" defaultChecked />
+                <input type="checkbox" name="enableFanart" value="1" defaultChecked={defaults?.enableFanart ?? true} />
                 Getchu 剧照
               </label>
             </div>
@@ -209,14 +245,14 @@ export function ProfileSourceFields({ defaultYear }: { defaultYear: number }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block font-meta text-[12px]">
             年份（逗号分隔）*
-            <input name="years" className="admin-input mt-1" defaultValue={String(defaultYear)} required />
+            <input name="years" className="admin-input mt-1" defaultValue={defaults?.years ?? String(defaultYear)} required />
           </label>
           <label className="block font-meta text-[12px]">
             月份 1–12（逗号分隔）*
             <input
               name="months"
               className="admin-input mt-1"
-              defaultValue="1,2,3,4,5,6,7,8,9,10,11,12"
+              defaultValue={defaults?.months ?? '1,2,3,4,5,6,7,8,9,10,11,12'}
               required
             />
           </label>

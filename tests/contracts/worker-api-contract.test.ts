@@ -539,7 +539,7 @@ test('successful storage_test completion automatically marks its version passed'
   );
   await api.deps.jobs.enqueueManual({
     kind: 'storage_test',
-    profileId: draft.profileId,
+    profileId: null,
     profileVersionId: 0,
     storageProfileVersionId: draft.id,
     configSnapshotJson: JSON.stringify({ kind: 'storage_test', storageDriver: 's3' }),

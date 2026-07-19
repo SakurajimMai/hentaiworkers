@@ -23,6 +23,7 @@ import type {
 import type {
   AttemptRecord,
   CrawlerJobRepository,
+  CrawlerProfileLifecycleRepository,
   CrawlerRepositories,
   CrawlerScheduleRepository,
   CrawlerUnitOfWork,
@@ -120,7 +121,7 @@ function mapJob(row: RowDataPacket): JobRecord {
     id: Number(row.id),
     kind: row.kind as CrawlerJobKind,
     status: row.status as CrawlerJobStatus,
-    profileId: Number(row.profile_id ?? 0),
+    profileId: row.profile_id == null ? null : Number(row.profile_id),
     profileVersionId: Number(row.profile_version_id ?? 0),
     storageProfileVersionId: row.storage_profile_version_id == null
       ? null
@@ -166,10 +167,32 @@ function mapSchedule(row: RowDataPacket): ScheduleRecord {
   };
 }
 
+class MariaDbCrawlerProfileLifecycleRepo implements CrawlerProfileLifecycleRepository {
+  async getForUpdate(profileId: number) {
+    const rows = await q<RowDataPacket[]>(
+      'SELECT id, is_enabled FROM crawler_profiles WHERE id = ? LIMIT 1 FOR UPDATE',
+      [profileId],
+    );
+    const row = rows[0];
+    return row
+      ? { id: Number(row.id), isEnabled: Number(row.is_enabled) === 1 }
+      : null;
+  }
+
+  async disable(profileId: number): Promise<void> {
+    await exec(
+      `UPDATE crawler_profiles
+       SET is_enabled = 0, updated_at = UTC_TIMESTAMP()
+       WHERE id = ? AND is_enabled = 1`,
+      [profileId],
+    );
+  }
+}
+
 export class MariaDbCrawlerConfigRepository implements CrawlerConfigRepository {
   async listProfiles() {
     const rows = await q<RowDataPacket[]>(
-      'SELECT id, name, is_enabled FROM crawler_profiles ORDER BY id DESC',
+      'SELECT id, name, is_enabled FROM crawler_profiles WHERE is_enabled = 1 ORDER BY id DESC',
     );
     return rows.map((row) => ({
       id: Number(row.id),
@@ -177,6 +200,22 @@ export class MariaDbCrawlerConfigRepository implements CrawlerConfigRepository {
       currentVersionId: Number(row.id),
       isEnabled: Number(row.is_enabled) === 1,
     }));
+  }
+
+  async getProfile(profileId: number) {
+    const rows = await q<RowDataPacket[]>(
+      'SELECT id, name, is_enabled FROM crawler_profiles WHERE id = ? LIMIT 1',
+      [profileId],
+    );
+    const row = rows[0];
+    return row
+      ? {
+          id: Number(row.id),
+          name: String(row.name),
+          currentVersionId: Number(row.id),
+          isEnabled: Number(row.is_enabled) === 1,
+        }
+      : null;
   }
 
   async createProfile(name: string, config: CrawlerProfileConfig): Promise<ProfileVersionRecord> {
@@ -189,20 +228,34 @@ export class MariaDbCrawlerConfigRepository implements CrawlerConfigRepository {
     return (await this.getProfileVersion(Number(ins.insertId)))!;
   }
 
-  async appendProfileVersion(
+  async updateProfile(
     profileId: number,
+    name: string,
     config: CrawlerProfileConfig,
   ): Promise<ProfileVersionRecord> {
     const result = await exec(
       `UPDATE crawler_profiles
-       SET version = version + 1, schema_version = ?, config_json = ?, updated_at = UTC_TIMESTAMP()
-       WHERE id = ?`,
-      [config.schemaVersion, JSON.stringify(config), profileId],
+       SET name = ?, version = version + 1, schema_version = ?,
+           config_json = ?, updated_at = UTC_TIMESTAMP()
+       WHERE id = ? AND is_enabled = 1`,
+      [name, config.schemaVersion, JSON.stringify(config), profileId],
     );
     if (result.affectedRows === 0) {
       throw new AppError('RESULT_INVALID', '模板不存在', 404);
     }
     return (await this.getProfileVersion(profileId))!;
+  }
+
+  async disableProfile(profileId: number): Promise<void> {
+    const profile = await this.getProfile(profileId);
+    if (!profile) throw new AppError('RESULT_INVALID', '模板不存在', 404);
+    if (!profile.isEnabled) return;
+    await exec(
+      `UPDATE crawler_profiles
+       SET is_enabled = 0, updated_at = UTC_TIMESTAMP()
+       WHERE id = ? AND is_enabled = 1`,
+      [profileId],
+    );
   }
 
   async getProfileVersion(profileId: number): Promise<ProfileVersionRecord | null> {
@@ -644,6 +697,16 @@ class MariaDbScheduleRepo implements CrawlerScheduleRepository {
     return mapSchedule(rows[0]);
   }
 
+  async disableByProfileId(profileId: number): Promise<number> {
+    const result = await exec(
+      `UPDATE crawler_schedules
+       SET is_enabled = 0, updated_at = UTC_TIMESTAMP()
+       WHERE profile_id = ? AND is_enabled = 1`,
+      [profileId],
+    );
+    return result.affectedRows;
+  }
+
   async get(scheduleId: number): Promise<ScheduleRecord | null> {
     const rows = await q<RowDataPacket[]>(
       'SELECT * FROM crawler_schedules WHERE id = ? LIMIT 1',
@@ -691,7 +754,7 @@ class MariaDbScheduleRepo implements CrawlerScheduleRepository {
 class MariaDbJobRepo implements CrawlerJobRepository {
   async create(input: {
     kind: CrawlerJobKind;
-    profileId: number;
+    profileId: number | null;
     profileVersionId: number;
     storageProfileVersionId?: number | null;
     scheduleId?: number | null;
@@ -1313,6 +1376,7 @@ class DisabledMediaUploadRepository implements MediaUploadRepository {
 
 export class MariaDbCrawlerUnitOfWork implements CrawlerUnitOfWork {
   readonly repos: CrawlerRepositories = {
+    profiles: new MariaDbCrawlerProfileLifecycleRepo(),
     schedules: new MariaDbScheduleRepo(),
     jobs: new MariaDbJobRepo(),
     receipts: new MariaDbReceiptRepo(),

@@ -104,6 +104,51 @@ test('overdue display works without Worker', async () => {
   assert.ok(overdue[0].nextRunAt <= new Date().toISOString());
 });
 
+test('disableByProfileId disables only matching enabled schedules idempotently', async () => {
+  const uow = new InMemoryCrawlerUnitOfWork();
+  const service = new CrawlerScheduleService(uow);
+  const input = {
+    profileVersionId: 1,
+    name: 'hourly',
+    kind: 'interval' as const,
+    intervalSeconds: 3600,
+    timezone: 'UTC',
+    overlapPolicy: 'skip' as const,
+    misfirePolicy: 'latest_only' as const,
+    maxActiveJobs: 1,
+    catchUpLimit: 3,
+    configSnapshotJson: '{}',
+  };
+  await service.create({ ...input, profileId: 7 });
+  await service.create({ ...input, profileId: 7, name: 'disabled', isEnabled: false });
+  await service.create({ ...input, profileId: 8, name: 'other' });
+
+  assert.equal(await service.disableByProfileId(7), 1);
+  assert.equal(await service.disableByProfileId(7), 0);
+  assert.deepEqual(
+    (await uow.schedules.listEnabled()).map((schedule) => schedule.profileId),
+    [8],
+  );
+});
+
+test('disableByProfileId rejects invalid profile IDs before opening a transaction', async () => {
+  let transactionCalled = false;
+  const service = new CrawlerScheduleService({
+    async runInTransaction<T>(): Promise<T> {
+      transactionCalled = true;
+      throw new Error('不应开启事务');
+    },
+  });
+
+  for (const profileId of [0, -1, 1.5, Number.NaN]) {
+    await assert.rejects(
+      () => service.disableByProfileId(profileId),
+      (error: unknown) => error instanceof AppError && error.status === 400,
+    );
+  }
+  assert.equal(transactionCalled, false);
+});
+
 test('catch_up materializes up to 3 interval points and advances next_run_at', async () => {
   const uow = new InMemoryCrawlerUnitOfWork();
   const service = new CrawlerScheduleService(uow);
@@ -179,6 +224,43 @@ test('skip overlap records skipped event instead of job', async () => {
   );
   assert.equal(result.created.length, 0);
   assert.equal(result.skipped.length, 1);
+});
+
+test('queued storage_test with the same numeric id does not consume crawl overlap capacity', async () => {
+  const uow = new InMemoryCrawlerUnitOfWork();
+  const service = new CrawlerScheduleService(uow);
+  const now = new Date();
+  const past = new Date(now.getTime() - 60_000).toISOString();
+
+  await service.create({
+    profileId: 3,
+    profileVersionId: 1,
+    name: 'crawl-after-storage-test',
+    kind: 'interval',
+    intervalSeconds: 120,
+    timezone: 'UTC',
+    overlapPolicy: 'skip',
+    misfirePolicy: 'latest_only',
+    maxActiveJobs: 1,
+    catchUpLimit: 3,
+    configSnapshotJson: '{}',
+    nextRunAt: past,
+  });
+  await uow.jobs.create({
+    kind: 'storage_test',
+    profileId: 3,
+    profileVersionId: 0,
+    storageProfileVersionId: 3,
+    configSnapshotJson: '{"kind":"storage_test"}',
+  });
+
+  const result = await uow.runInTransaction((repos) =>
+    service.materializeDueSchedules(repos, now),
+  );
+
+  assert.equal(result.created.length, 1);
+  assert.equal(result.created[0].kind, 'crawl');
+  assert.equal(result.skipped.length, 0);
 });
 
 test('invalid schedule definition is rejected', async () => {

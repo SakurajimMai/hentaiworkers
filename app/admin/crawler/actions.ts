@@ -10,6 +10,7 @@ import {
   adminConfirmYamlImport,
   adminCreateProfile,
   adminCreateStorageDraft,
+  adminDeleteProfile,
   adminDeleteJob,
   adminMarkStorageTestPassed,
   adminProvisionWorker,
@@ -19,6 +20,7 @@ import {
   adminSaveSchedule,
   adminStartProfileJob,
   adminStartStorageTest,
+  adminUpdateProfile,
   type AdminActionContext,
 } from '@/lib/server/crawler/interfaces/admin-crawler-actions';
 import { AppError } from '@/lib/server/shared/errors';
@@ -38,12 +40,34 @@ export type WorkerProvisionState = Readonly<{
   error?: string;
 }>;
 
+export type ProfileActionState = Readonly<{
+  error?: string;
+}>;
+
+function profileActionError(error: unknown): ProfileActionState | null {
+  if (error instanceof AppError) return { error: error.message };
+  if (error instanceof Error && error.name === 'ZodError') {
+    return { error: '配置无效，请检查必填项和数值范围' };
+  }
+  return null;
+}
+
 function parsePositiveJobId(formData: FormData): number {
   const raw = String(formData.get('jobId') ?? '').trim();
   if (!/^\d+$/.test(raw)) throw new AppError('RESULT_INVALID', '无效任务 ID', 400);
   const id = Number(raw);
   if (!Number.isSafeInteger(id) || id <= 0) {
     throw new AppError('RESULT_INVALID', '无效任务 ID', 400);
+  }
+  return id;
+}
+
+function parsePositiveProfileId(formData: FormData): number {
+  const raw = String(formData.get('profileId') ?? '').trim();
+  if (!/^\d+$/.test(raw)) throw new AppError('RESULT_INVALID', '无效模板 ID', 400);
+  const id = Number(raw);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new AppError('RESULT_INVALID', '无效模板 ID', 400);
   }
   return id;
 }
@@ -92,7 +116,10 @@ function revalidateCrawler() {
   revalidatePath('/admin/crawler/import');
 }
 
-export async function actionCreateProfile(formData: FormData): Promise<void> {
+export async function actionCreateProfile(
+  _previous: ProfileActionState,
+  formData: FormData,
+): Promise<ProfileActionState> {
   try {
     const configJson = formData.get('configJson')
       ? String(formData.get('configJson'))
@@ -101,10 +128,54 @@ export async function actionCreateProfile(formData: FormData): Promise<void> {
       name: String(formData.get('name') || ''),
       configJson,
     });
-    revalidateCrawler();
-    redirect('/admin/crawler/profiles?ok=1');
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/profiles?error=1');
+    const state = profileActionError(error);
+    if (state) return state;
+    throw error;
+  }
+  revalidateCrawler();
+  redirect('/admin/crawler/profiles?ok=1');
+}
+
+export async function actionUpdateProfile(
+  _previous: ProfileActionState,
+  formData: FormData,
+): Promise<ProfileActionState> {
+  try {
+    const profileId = parsePositiveProfileId(formData);
+    const actionContext = ctx();
+    await actionContext.identity.requireAdmin();
+    const profile = await actionContext.crawler.getProfile(profileId);
+    if (!profile?.isEnabled || !profile.currentVersionId) {
+      throw new AppError('RESULT_INVALID', '模板不存在或已删除', 404);
+    }
+    const currentVersion = await actionContext.crawler.getProfileVersion(
+      profile.currentVersionId,
+    );
+    if (!currentVersion) {
+      throw new AppError('RESULT_INVALID', '模板版本不存在', 404);
+    }
+    await adminUpdateProfile(actionContext, {
+      profileId,
+      name: String(formData.get('name') || ''),
+      configJson: profileConfigFromForm(formData, currentVersion.config),
+    });
+  } catch (error) {
+    const state = profileActionError(error);
+    if (state) return state;
+    throw error;
+  }
+  revalidateCrawler();
+  redirect('/admin/crawler/profiles?ok=updated');
+}
+
+export async function actionDeleteProfile(formData: FormData): Promise<void> {
+  try {
+    await adminDeleteProfile(ctx(), parsePositiveProfileId(formData));
+    revalidateCrawler();
+    redirect('/admin/crawler/profiles?ok=deleted');
+  } catch (error) {
+    if (error instanceof AppError) redirect('/admin/crawler/profiles?error=delete');
     throw error;
   }
 }
@@ -270,15 +341,12 @@ export async function actionCreateStorageDraft(formData: FormData): Promise<void
 
 export async function actionStartStorageTest(formData: FormData): Promise<void> {
   try {
-    const profileId = parseInt(String(formData.get('profileId') || ''), 10);
     const storageProfileVersionId = parseInt(
       String(formData.get('storageProfileVersionId') || ''),
       10,
     );
     await adminStartStorageTest(ctx(), {
-      profileId,
       storageProfileVersionId,
-      configSnapshotJson: JSON.stringify({ kind: 'storage_test' }),
     });
     revalidateCrawler();
     redirect('/admin/crawler/storage?ok=job');

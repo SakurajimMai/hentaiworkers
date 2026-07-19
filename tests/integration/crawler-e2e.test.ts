@@ -95,13 +95,7 @@ download:
   assert.equal(revealed.cacheControl, 'no-store');
 
   const job = await adminStartManualJob(ctx, {
-    profileId: 1,
     profileVersionId: imported.version.id,
-    configSnapshotJson: JSON.stringify({
-      requiredSource: 'hanime',
-      schemaVersion: 1,
-      storageDriver: 's3',
-    }),
   });
 
   const { token, workerId } = await workerApi.provisionWorker();

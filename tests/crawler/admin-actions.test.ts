@@ -7,6 +7,7 @@ import {
   adminCreateProfile,
   adminCreateSecret,
   adminCreateStorageDraft,
+  adminDeleteProfile,
   adminDeleteJob,
   adminPurgeTerminalJobs,
   adminMarkStorageTestPassed,
@@ -14,7 +15,9 @@ import {
   adminRetryJob,
   adminSaveSchedule,
   adminStartManualJob,
+  adminStartProfileJob,
   adminStartStorageTest,
+  adminUpdateProfile,
   type AdminActionContext,
 } from '../../lib/server/crawler/interfaces/admin-crawler-actions';
 import {
@@ -23,8 +26,10 @@ import {
 } from '../../lib/server/crawler/interfaces/admin-crawler-deps';
 import { AppError } from '../../lib/server/shared/errors';
 
-function makeCtx(isAdmin = true): AdminActionContext {
-  const deps = createInMemoryAdminDeps();
+function makeCtxFromCrawler(
+  crawler: ReturnType<typeof createAdminCrawlerService>,
+  isAdmin = true,
+): AdminActionContext {
   return {
     identity: {
       async requireAdmin() {
@@ -42,8 +47,12 @@ function makeCtx(isAdmin = true): AdminActionContext {
         };
       },
     },
-    crawler: createAdminCrawlerService(deps),
+    crawler,
   };
+}
+
+function makeCtx(isAdmin = true): AdminActionContext {
+  return makeCtxFromCrawler(createAdminCrawlerService(createInMemoryAdminDeps()), isAdmin);
 }
 
 const validProfile = {
@@ -67,6 +76,18 @@ test('admin actions require authorization', async () => {
       }),
     (e: unknown) => e instanceof AppError && e.status === 403,
   );
+  await assert.rejects(
+    () => adminUpdateProfile(ctx, {
+      profileId: 1,
+      name: 'updated',
+      configJson: JSON.stringify(validProfile),
+    }),
+    (e: unknown) => e instanceof AppError && e.status === 403,
+  );
+  await assert.rejects(
+    () => adminDeleteProfile(ctx, 1),
+    (e: unknown) => e instanceof AppError && e.status === 403,
+  );
 });
 
 test('create profile validates JSON and Zod config', async () => {
@@ -79,18 +100,32 @@ test('create profile validates JSON and Zod config', async () => {
 
   await assert.rejects(
     () => adminCreateProfile(ctx, { name: 'bad', configJson: '{not json' }),
-    AppError,
+    (error: unknown) =>
+      error instanceof AppError
+      && error.status === 400
+      && error.message === '配置 JSON 无效',
   );
 });
 
-test('manual start, cancel, retry job lifecycle', async () => {
+test('manual crawl start ignores forged job fields and uses the canonical profile snapshot', async () => {
   const ctx = makeCtx();
-  const job = await adminStartManualJob(ctx, {
-    profileId: 1,
-    profileVersionId: 1,
-    configSnapshotJson: JSON.stringify(validProfile),
+  const version = await adminCreateProfile(ctx, {
+    name: 'manual',
+    configJson: JSON.stringify(validProfile),
   });
+  const job = await adminStartManualJob(ctx, {
+    profileVersionId: version.id,
+    profileId: 999,
+    kind: 'storage_test',
+    storageProfileVersionId: 999,
+    configSnapshotJson: '{"forged":true}',
+  } as Parameters<typeof adminStartManualJob>[1]);
   assert.equal(job.status, 'queued');
+  assert.equal(job.kind, 'crawl');
+  assert.equal(job.profileId, version.profileId);
+  assert.equal(job.profileVersionId, version.id);
+  assert.equal(job.storageProfileVersionId, null);
+  assert.deepEqual(JSON.parse(job.configSnapshotJson), version.config);
 
   const cancelled = await adminCancelJob(ctx, job.id);
   assert.equal(cancelled.status, 'cancelled');
@@ -98,6 +133,58 @@ test('manual start, cancel, retry job lifecycle', async () => {
   const retry = await adminRetryJob(ctx, job.id);
   assert.equal(retry.retryOfJobId, job.id);
   assert.equal(retry.status, 'queued');
+});
+
+test('profile update action parses JSON and updates metadata', async () => {
+  const ctx = makeCtx();
+  const v1 = await adminCreateProfile(ctx, {
+    name: 'old',
+    configJson: JSON.stringify(validProfile),
+  });
+  const v2 = await adminUpdateProfile(ctx, {
+    profileId: v1.profileId,
+    name: '  updated  ',
+    configJson: JSON.stringify({
+      ...validProfile,
+      concurrency: { download: 4, parse: 3 },
+    }),
+  });
+
+  assert.equal(v2.version, 2);
+  assert.equal(v2.config.concurrency.download, 4);
+  assert.equal((await ctx.crawler.getProfile(v1.profileId))?.name, 'updated');
+  await assert.rejects(
+    () => adminUpdateProfile(ctx, {
+      profileId: v1.profileId,
+      name: 'bad-json',
+      configJson: '{not json',
+    }),
+    (error: unknown) =>
+      error instanceof AppError
+      && error.status === 400
+      && error.message === '配置 JSON 无效',
+  );
+});
+
+test('crawl retry is rejected after its profile is disabled', async () => {
+  const deps = createInMemoryAdminDeps();
+  const crawler = createAdminCrawlerService(deps);
+  const ctx = makeCtxFromCrawler(crawler);
+  const version = await adminCreateProfile(ctx, {
+    name: 'retry-delete',
+    configJson: JSON.stringify(validProfile),
+  });
+  const job = await adminStartProfileJob(ctx, version.id);
+  await adminCancelJob(ctx, job.id);
+  await adminDeleteProfile(ctx, version.profileId);
+
+  await assert.rejects(
+    () => adminRetryJob(ctx, job.id),
+    (error: unknown) =>
+      error instanceof AppError
+      && error.code === 'RESULT_INVALID'
+      && error.status === 404,
+  );
 });
 
 test('job actions reject invalid IDs before calling crawler service', async () => {
@@ -164,7 +251,6 @@ test('schedule save validates definition', async () => {
     misfirePolicy: 'latest_only',
     maxActiveJobs: 1,
     catchUpLimit: 3,
-    configSnapshotJson: '{}',
   });
   assert.ok(schedule.id > 0);
 
@@ -181,9 +267,121 @@ test('schedule save validates definition', async () => {
         misfirePolicy: 'latest_only',
         maxActiveJobs: 1,
         catchUpLimit: 3,
-        configSnapshotJson: '{}',
       }),
     AppError,
+  );
+});
+
+test('claim does not materialize a stale enabled schedule for a disabled profile', async () => {
+  const deps = createInMemoryAdminDeps();
+  const crawler = createAdminCrawlerService(deps);
+  const ctx = makeCtxFromCrawler(crawler);
+  const version = await adminCreateProfile(ctx, {
+    name: 'stale-schedule',
+    configJson: JSON.stringify(validProfile),
+  });
+  const schedule = await adminSaveSchedule(ctx, {
+    profileVersionId: version.id,
+    name: 'stale',
+    kind: 'interval',
+    intervalSeconds: 3600,
+    timezone: 'UTC',
+    overlapPolicy: 'queue',
+    misfirePolicy: 'latest_only',
+    maxActiveJobs: 1,
+    catchUpLimit: 3,
+    nextRunAt: new Date(Date.now() - 3_600_000).toISOString(),
+  });
+  await deps.profiles.disableProfile(version.profileId);
+
+  assert.equal(await deps.jobs.claimForWorker({ workerId: 1, now: new Date() }), null);
+  assert.equal(
+    (await deps.uow.runInTransaction((repos) => repos.schedules.get(schedule.id)))?.isEnabled,
+    false,
+  );
+});
+
+test('soft deleting a profile disables schedules and rejects every new crawl path', async () => {
+  const deps = createInMemoryAdminDeps();
+  const crawler = createAdminCrawlerService(deps);
+  const ctx = makeCtxFromCrawler(crawler);
+  const v1 = await adminCreateProfile(ctx, {
+    name: 'to-delete',
+    configJson: JSON.stringify(validProfile),
+  });
+  const historicalJob = await adminStartManualJob(ctx, {
+    profileVersionId: v1.id,
+  });
+  await adminCancelJob(ctx, historicalJob.id);
+  const v2 = await adminUpdateProfile(ctx, {
+    profileId: v1.profileId,
+    name: 'to-delete-v2',
+    configJson: JSON.stringify({
+      ...validProfile,
+      concurrency: { download: 3, parse: 2 },
+    }),
+  });
+  const historicalSchedule = await adminSaveSchedule(ctx, {
+    profileId: v2.profileId,
+    profileVersionId: v2.id,
+    name: 'hourly',
+    kind: 'interval',
+    intervalSeconds: 3600,
+    timezone: 'Asia/Shanghai',
+    overlapPolicy: 'skip',
+    misfirePolicy: 'latest_only',
+    maxActiveJobs: 1,
+    catchUpLimit: 3,
+  });
+
+  await adminDeleteProfile(ctx, v2.profileId);
+  await adminDeleteProfile(ctx, v2.profileId);
+  await assert.rejects(
+    () => adminDeleteProfile(ctx, 999),
+    (error: unknown) =>
+      error instanceof AppError
+      && error.code === 'RESULT_INVALID'
+      && error.status === 404,
+  );
+
+  assert.equal((await deps.uow.runInTransaction((repos) => repos.schedules.listEnabled())).length, 0);
+  const disabled = await crawler.getProfile(v2.profileId);
+  assert.ok(disabled);
+  assert.equal(disabled.isEnabled, false);
+  assert.equal(
+    JSON.parse((await crawler.getJob(historicalJob.id))!.configSnapshotJson).concurrency.download,
+    2,
+  );
+  assert.equal(
+    JSON.parse((await deps.uow.runInTransaction((repos) =>
+      repos.schedules.get(historicalSchedule.id)))!.configSnapshotJson).concurrency.download,
+    3,
+  );
+
+  const assertDeletedProfile = (error: unknown) =>
+    error instanceof AppError
+    && error.code === 'RESULT_INVALID'
+    && error.status === 404;
+  await assert.rejects(() => adminStartProfileJob(ctx, v2.id), assertDeletedProfile);
+  await assert.rejects(
+    () => adminStartManualJob(ctx, { profileVersionId: v2.id }),
+    assertDeletedProfile,
+  );
+  await assert.rejects(() => adminRetryJob(ctx, historicalJob.id), assertDeletedProfile);
+  await assert.rejects(
+    () => adminSaveSchedule(ctx, {
+      profileId: v2.profileId,
+      profileVersionId: v2.id,
+      name: 'forged',
+      kind: 'interval',
+      intervalSeconds: 3600,
+      timezone: 'Asia/Shanghai',
+      overlapPolicy: 'skip',
+      misfirePolicy: 'latest_only',
+      maxActiveJobs: 1,
+      catchUpLimit: 3,
+    }),
+    assertDeletedProfile,
   );
 });
 
@@ -237,15 +435,29 @@ test('storage test job and activate gate', async () => {
   await assert.rejects(() => adminActivateStorage(ctx, draft.id), AppError);
 
   const testJob = await adminStartStorageTest(ctx, {
-    profileId: 1,
     storageProfileVersionId: draft.id,
-    configSnapshotJson: '{}',
   });
   assert.equal(testJob.kind, 'storage_test');
+  assert.equal(testJob.profileId, null);
+  await adminCancelJob(ctx, testJob.id);
+  const retry = await adminRetryJob(ctx, testJob.id);
+  assert.equal(retry.kind, 'storage_test');
+  assert.equal(retry.retryOfJobId, testJob.id);
 
   await assert.rejects(() => adminMarkStorageTestPassed(ctx, draft.id), AppError);
   await adminMarkStorageTestPassed(ctx, draft.id, { allowBreakGlass: true });
   await adminActivateStorage(ctx, draft.id);
+});
+
+test('storage config JSON errors keep their exact admin message', async () => {
+  const ctx = makeCtx();
+  await assert.rejects(
+    () => adminCreateStorageDraft(ctx, { name: 'bad', configJson: '{not json' }),
+    (error: unknown) =>
+      error instanceof AppError
+      && error.status === 400
+      && error.message === '存储配置 JSON 无效',
+  );
 });
 
 test('Hanime profile start binds activated storage version', async () => {

@@ -11,6 +11,14 @@ async function requireAdmin(ctx: AdminActionContext) {
   return ctx.identity.requireAdmin();
 }
 
+function parseJson(raw: string, message = '配置 JSON 无效'): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new AppError('RESULT_INVALID', message, 400);
+  }
+}
+
 export async function adminProvisionWorker(
   ctx: AdminActionContext,
   name: string,
@@ -32,23 +40,32 @@ export async function adminCreateProfile(
   input: { name: string; configJson: string },
 ) {
   await requireAdmin(ctx);
-  let config: unknown;
-  try {
-    config = JSON.parse(input.configJson);
-  } catch {
-    throw new AppError('RESULT_INVALID', '配置 JSON 无效', 400);
-  }
-  return ctx.crawler.createProfile(input.name, config);
+  return ctx.crawler.createProfile(input.name, parseJson(input.configJson));
+}
+
+export async function adminUpdateProfile(
+  ctx: AdminActionContext,
+  input: { profileId: number; name: string; configJson: string },
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.updateProfile(
+    input.profileId,
+    input.name,
+    parseJson(input.configJson),
+  );
+}
+
+export async function adminDeleteProfile(
+  ctx: AdminActionContext,
+  profileId: number,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.deleteProfile(profileId);
 }
 
 export async function adminStartManualJob(
   ctx: AdminActionContext,
-  input: {
-    profileId: number;
-    profileVersionId: number;
-    configSnapshotJson: string;
-    kind?: 'crawl' | 'storage_test' | 'cleanup';
-  },
+  input: { profileVersionId: number },
 ) {
   await requireAdmin(ctx);
   return ctx.crawler.startManualJob(input);
@@ -151,21 +168,16 @@ export async function adminCreateStorageDraft(
   input: { name: string; configJson: string },
 ) {
   await requireAdmin(ctx);
-  let config: unknown;
-  try {
-    config = JSON.parse(input.configJson);
-  } catch {
-    throw new AppError('RESULT_INVALID', '存储配置 JSON 无效', 400);
-  }
-  return ctx.crawler.createStorageDraft(input.name, config);
+  return ctx.crawler.createStorageDraft(
+    input.name,
+    parseJson(input.configJson, '存储配置 JSON 无效'),
+  );
 }
 
 export async function adminStartStorageTest(
   ctx: AdminActionContext,
   input: {
-    profileId: number;
     storageProfileVersionId: number;
-    configSnapshotJson: string;
   },
 ) {
   await requireAdmin(ctx);

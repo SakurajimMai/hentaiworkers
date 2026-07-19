@@ -14,6 +14,7 @@ import {
   InMemoryCrawlerConfigRepository,
   InMemorySecretRepository,
   InMemoryStorageConfigRepository,
+  createInMemoryCrawlerProfileState,
 } from '../testing/in-memory-config-repos';
 import { InMemoryCrawlerUnitOfWork } from '../testing/in-memory-crawler-uow';
 import { InMemoryWorkerRepository } from '../testing/in-memory-worker-repository';
@@ -66,14 +67,16 @@ function getOrCreateMariaDbAdminCrawler(): AdminCrawlerService {
 
 /** Test-only in-memory deps — never used by getAdminCrawlerService in app runtime. */
 export function createInMemoryAdminDeps(): AdminCrawlerDeps {
-  const uow = new InMemoryCrawlerUnitOfWork();
+  const profileState = createInMemoryCrawlerProfileState();
+  const profiles = new InMemoryCrawlerConfigRepository(profileState);
+  const uow = new InMemoryCrawlerUnitOfWork(profileState);
   const key = randomBytes(32);
   const cipher = new AesGcmSecretCipher(keyringViewFromRecord('k1', { k1: key }));
   return {
     uow,
     jobs: new CrawlerJobService(uow),
     schedules: new CrawlerScheduleService(uow),
-    profiles: new CrawlerConfigService(new InMemoryCrawlerConfigRepository()),
+    profiles: new CrawlerConfigService(profiles),
     storage: new StorageConfigService(new InMemoryStorageConfigRepository()),
     secrets: new SecretService(new InMemorySecretRepository(), cipher),
     yaml: new YamlImportService(),

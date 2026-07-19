@@ -98,6 +98,8 @@ export { assertValidLease } from './application/lease-guard';
 export type {
   AttemptRecord,
   CrawlerJobRepository,
+  CrawlerProfileLifecycleRecord,
+  CrawlerProfileLifecycleRepository,
   CrawlerRepositories,
   CrawlerScheduleRepository,
   CrawlerUnitOfWork,
