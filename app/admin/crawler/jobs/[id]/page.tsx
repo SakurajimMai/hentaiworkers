@@ -6,6 +6,7 @@ import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import { actionCancelJob, actionDeleteJob, actionRetryJob } from '../../actions';
 import { getAdminCrawlerService } from '@/lib/server/crawler/interfaces/admin-crawler-deps';
 import { isTerminalJobStatus } from '@/lib/server/crawler/domain/job';
+import { readClaimSkipReason } from '@/lib/server/crawler/application/job-progress';
 import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,7 @@ export default async function CrawlerJobDetailPage({
   const detail = await getAdminCrawlerService().listJobDetail(jobId);
   if (!detail) notFound();
   const { job, attempt, items, events } = detail;
+  const claimSkipReason = readClaimSkipReason(job.progressJson);
 
   return (
     <div className="space-y-6">
@@ -68,6 +70,15 @@ export default async function CrawlerJobDetailPage({
         <p className="font-meta text-[12px] text-[#787774]">
           删除仅移除控制面任务、条目、尝试、事件和操作回执，不会删除已写入的动漫或里番作品。
         </p>
+      )}
+
+      {claimSkipReason && (
+        <div className="border-l-2 border-[#C78B19] bg-[#FFF8E8] px-4 py-3">
+          <p className="font-ui text-sm font-semibold text-[#6B4D12]">领取受阻</p>
+          <p className="mt-1 font-meta text-[12px] text-[#6B4D12] break-words">
+            {claimSkipReason}
+          </p>
+        </div>
       )}
 
       <section className="surface-card p-5 space-y-2">

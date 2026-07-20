@@ -128,6 +128,35 @@ class ControlClientTests(unittest.TestCase):
         client = ControlClient(self.cfg, transport=transport)
         self.assertIsNone(client.claim())
 
+    def test_claim_preserves_control_plane_error_code_and_retryability(self):
+        def forbidden(method, url, data, headers):
+            return 403, json.dumps(
+                {"error": {"code": "WORKER_FORBIDDEN", "message": "disabled", "retryable": False}}
+            ).encode()
+
+        with self.assertRaises(ControlPlaneError) as ctx:
+            ControlClient(self.cfg, transport=forbidden).claim()
+        self.assertEqual(ctx.exception.status, 403)
+        self.assertEqual(ctx.exception.code, "WORKER_FORBIDDEN")
+        self.assertFalse(ctx.exception.retryable)
+
+        def unavailable(method, url, data, headers):
+            return 503, json.dumps(
+                {"error": {"code": "SOURCE_UNAVAILABLE", "message": "down", "retryable": True}}
+            ).encode()
+
+        with self.assertRaises(ControlPlaneError) as transient:
+            ControlClient(self.cfg, transport=unavailable).claim()
+        self.assertTrue(transient.exception.retryable)
+
+        with self.assertRaises(ControlPlaneError) as empty_transient:
+            ControlClient(
+                self.cfg,
+                transport=lambda method, url, data, headers: (503, b""),
+            ).claim()
+        self.assertEqual(empty_transient.exception.status, 503)
+        self.assertTrue(empty_transient.exception.retryable)
+
     def test_capabilities_have_no_db_fields(self):
         caps = self.cfg.capabilities()
         blob = json.dumps(caps)

@@ -16,6 +16,9 @@ import {
   adminProvisionWorker,
   adminPurgeTerminalJobs,
   adminRevokeWorkerCredential,
+  adminRotateWorkerCredential,
+  adminSetWorkerClaimEnabled,
+  adminSetWorkerEnabled,
   adminRetryJob,
   adminSaveSchedule,
   adminStartProfileJob,
@@ -37,6 +40,13 @@ export type WorkerProvisionState = Readonly<{
   token?: string;
   workerId?: number;
   credentialId?: number;
+  error?: string;
+}>;
+
+export type WorkerActionState = Readonly<{
+  workerId?: number;
+  token?: string;
+  ok?: string;
   error?: string;
 }>;
 
@@ -72,6 +82,26 @@ function parsePositiveProfileId(formData: FormData): number {
   return id;
 }
 
+function parsePositiveWorkerId(formData: FormData): number {
+  const raw = String(formData.get('workerId') ?? '').trim();
+  if (!/^\d+$/.test(raw)) throw new AppError('RESULT_INVALID', '无效 Worker ID', 400);
+  const id = Number(raw);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new AppError('RESULT_INVALID', '无效 Worker ID', 400);
+  }
+  return id;
+}
+
+function parsePositiveCredentialId(formData: FormData): number {
+  const raw = String(formData.get('credentialId') ?? '').trim();
+  if (!/^\d+$/.test(raw)) throw new AppError('RESULT_INVALID', '无效凭据 ID', 400);
+  const id = Number(raw);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new AppError('RESULT_INVALID', '无效凭据 ID', 400);
+  }
+  return id;
+}
+
 export async function actionProvisionWorker(
   _previous: WorkerProvisionState,
   formData: FormData,
@@ -93,17 +123,36 @@ export async function actionProvisionWorker(
   }
 }
 
-export async function actionRevokeWorkerCredential(formData: FormData): Promise<void> {
+export async function actionManageWorker(
+  _previous: WorkerActionState,
+  formData: FormData,
+): Promise<WorkerActionState> {
   try {
-    await adminRevokeWorkerCredential(
-      ctx(),
-      parseInt(String(formData.get('credentialId') || ''), 10),
-    );
+    const workerId = parsePositiveWorkerId(formData);
+    const operation = String(formData.get('operation') ?? '');
+    let token: string | undefined;
+
+    if (operation === 'pause' || operation === 'resume') {
+      await adminSetWorkerClaimEnabled(ctx(), workerId, operation === 'resume');
+    } else if (operation === 'rotate') {
+      token = (await adminRotateWorkerCredential(ctx(), workerId)).token;
+    } else if (operation === 'revoke') {
+      await adminRevokeWorkerCredential(
+        ctx(),
+        workerId,
+        parsePositiveCredentialId(formData),
+      );
+    } else if (operation === 'disable' || operation === 'enable') {
+      await adminSetWorkerEnabled(ctx(), workerId, operation === 'enable');
+    } else {
+      throw new AppError('RESULT_INVALID', '无效 Worker 操作', 400);
+    }
+
     revalidatePath('/admin/crawler/workers');
-    redirect('/admin/crawler/workers?ok=revoked');
+    return { workerId, token, ok: operation };
   } catch (error) {
-    if (error instanceof AppError) redirect('/admin/crawler/workers?error=revoke');
-    throw error;
+    if (error instanceof AppError) return { error: error.message };
+    return { error: 'Worker 操作失败' };
   }
 }
 

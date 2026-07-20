@@ -29,10 +29,37 @@ export async function adminProvisionWorker(
 
 export async function adminRevokeWorkerCredential(
   ctx: AdminActionContext,
+  workerId: number,
   credentialId: number,
 ) {
   await requireAdmin(ctx);
-  return ctx.crawler.revokeWorkerCredential(credentialId);
+  return ctx.crawler.revokeWorkerCredential(workerId, credentialId);
+}
+
+export async function adminSetWorkerClaimEnabled(
+  ctx: AdminActionContext,
+  workerId: number,
+  enabled: boolean,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.setWorkerClaimEnabled(workerId, enabled);
+}
+
+export async function adminRotateWorkerCredential(
+  ctx: AdminActionContext,
+  workerId: number,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.rotateWorkerCredential(workerId);
+}
+
+export async function adminSetWorkerEnabled(
+  ctx: AdminActionContext,
+  workerId: number,
+  enabled: boolean,
+) {
+  await requireAdmin(ctx);
+  return ctx.crawler.setWorkerEnabled(workerId, enabled);
 }
 
 export async function adminCreateProfile(

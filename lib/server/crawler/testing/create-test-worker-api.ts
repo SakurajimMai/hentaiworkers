@@ -34,8 +34,8 @@ export function createTestWorkerApi(options?: {
   catalog?: CatalogIngestionPort;
   storage?: StorageConfigService;
 }): TestWorkerApi {
-  const uow = new InMemoryCrawlerUnitOfWork();
   const workers = new InMemoryWorkerRepository();
+  const uow = new InMemoryCrawlerUnitOfWork(undefined, workers);
   const deps: WorkerApiDeps = {
     auth: new WorkerAuthService(workers),
     registry: new WorkerRegistryService(workers),

@@ -174,6 +174,7 @@ export const crawlerWorkers = mysqlTable(
     capabilitiesJson: text('capabilities_json').notNull(),
     lastHeartbeatAt: datetime('last_heartbeat_at', { mode: 'string' }),
     isEnabled: tinyint('is_enabled').notNull().default(1),
+    claimEnabled: tinyint('claim_enabled').notNull().default(1),
     tokenHash: binary('token_hash', { length: 32 }),
     scopeJson: text('scope_json').notNull(),
     tokenRevoked: tinyint('token_revoked').notNull().default(0),

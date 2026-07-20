@@ -1,18 +1,14 @@
 import { CrawlerNav } from '@/components/admin/crawler/crawler-nav';
 import { WorkerProvisionForm } from '@/components/admin/crawler/worker-provision-form';
+import { WorkerActions } from '@/components/admin/crawler/worker-actions';
+import { deriveWorkerDisplayState } from '@/lib/server/crawler/application/worker-display-state';
 import { getAdminCrawlerService } from '@/lib/server/crawler/interfaces/admin-crawler-deps';
 import { requireAdmin } from '@/lib/auth';
-import { actionRevokeWorkerCredential } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CrawlerWorkersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ ok?: string; error?: string }>;
-}) {
+export default async function CrawlerWorkersPage() {
   await requireAdmin();
-  const sp = await searchParams;
   const service = getAdminCrawlerService();
   const workers = await service.listWorkers();
   const credentials = new Map(
@@ -20,7 +16,7 @@ export default async function CrawlerWorkersPage({
       workers.map(async (worker) => [worker.id, await service.listWorkerCredentials(worker.id)] as const),
     ),
   );
-  const threshold = Date.now() - 90_000;
+  const nowMs = Date.now();
 
   return (
     <div className="space-y-6">
@@ -29,21 +25,13 @@ export default async function CrawlerWorkersPage({
         <h1 className="font-serif text-3xl">Worker 节点</h1>
       </div>
       <CrawlerNav current="/admin/crawler/workers" />
-      {sp.ok === 'revoked' && (
-        <p className="font-meta text-[13px] text-[#137333]">凭据已撤销</p>
-      )}
-      {sp.error && (
-        <p className="font-meta text-[13px] text-[#C5221F]">操作失败</p>
-      )}
-
       <WorkerProvisionForm />
 
       <ul className="divide-y divide-[#EAEAEA] border-y border-[#EAEAEA] bg-white">
         {workers.map((worker) => {
-          const online =
-            worker.lastHeartbeatAt != null
-            && new Date(worker.lastHeartbeatAt).getTime() >= threshold;
+          const state = deriveWorkerDisplayState(worker, nowMs);
           const workerCredentials = credentials.get(worker.id) ?? [];
+          const credential = workerCredentials[0] ?? null;
           return (
             <li key={worker.id} className="py-5 px-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -57,14 +45,18 @@ export default async function CrawlerWorkersPage({
                 </div>
                 <span
                   className={
-                    online
+                    state.connection === 'online'
                       ? 'font-meta text-[11px] text-[#137333]'
                       : 'font-meta text-[11px] text-[#787774]'
                   }
                 >
-                  {online ? 'online' : 'offline'}
+                  {state.connection} · {state.lifecycle}
                 </span>
               </div>
+              <p className="font-meta text-[12px] text-[#5F6368]">
+                当前负载 {state.currentLoad} · 来源{' '}
+                {state.sources.length > 0 ? state.sources.join(', ') : '尚未上报'}
+              </p>
               <pre className="font-mono text-[11px] overflow-auto max-h-24 text-[#787774]">
                 {worker.capabilitiesJson}
               </pre>
@@ -79,17 +71,16 @@ export default async function CrawlerWorkersPage({
                       #{credential.id} · {credential.isRevoked ? 'revoked' : 'active'} ·{' '}
                       {credential.createdAt}
                     </span>
-                    {!credential.isRevoked && (
-                      <form action={actionRevokeWorkerCredential}>
-                        <input type="hidden" name="credentialId" value={credential.id} />
-                        <button type="submit" className="font-ui text-[#9F2F2D] underline">
-                          撤销
-                        </button>
-                      </form>
-                    )}
                   </div>
                 ))}
               </div>
+              <WorkerActions
+                workerId={worker.id}
+                claimEnabled={worker.claimEnabled}
+                isEnabled={worker.isEnabled}
+                credentialId={credential?.id ?? null}
+                credentialRevoked={credential?.isRevoked ?? true}
+              />
             </li>
           );
         })}

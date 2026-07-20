@@ -21,11 +21,23 @@ MAX_EVENT_BYTES = 256 * 1024
 
 
 class ControlPlaneError(Exception):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        *,
+        retryable: Optional[bool] = None,
+    ) -> None:
         super().__init__(f"{code}: {message}")
         self.status = status
         self.code = code
         self.message = message
+        self.retryable = (
+            retryable
+            if retryable is not None
+            else status in (408, 425, 429) or status >= 500
+        )
 
 
 class ControlClient:
@@ -67,7 +79,12 @@ class ControlClient:
                 "waitSeconds": wait_seconds if wait_seconds is not None else self._config.claim_wait_seconds,
             },
         )
-        if status == 204 or not body:
+        if status == 204:
+            return None
+        if status >= 400:
+            payload = self._decode_payload(body)
+            self._raise_response_error(status, payload)
+        if not body:
             return None
         payload = json.loads(body.decode("utf-8"))
         return ClaimedJob.from_payload(payload["data"])
@@ -304,17 +321,37 @@ class ControlClient:
         lease: Optional[str] = None,
     ) -> dict[str, Any]:
         status, raw = self._request(method, path, body, lease=lease)
+        if status >= 400:
+            payload = self._decode_payload(raw)
+            self._raise_response_error(status, payload)
         if status == 204:
             return {}
         payload = json.loads(raw.decode("utf-8"))
-        if status >= 400:
-            err = payload.get("error") or {}
-            raise ControlPlaneError(
-                status,
-                str(err.get("code", "INTERNAL_ERROR")),
-                str(err.get("message", "error")),
-            )
         return payload.get("data") or payload
+
+    @staticmethod
+    def _decode_payload(raw: bytes) -> dict[str, Any]:
+        if not raw:
+            return {}
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            return payload if isinstance(payload, dict) else {}
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return {}
+
+    @staticmethod
+    def _raise_response_error(status: int, payload: dict[str, Any]) -> None:
+        err = payload.get("error") or {}
+        raise ControlPlaneError(
+            status,
+            str(err.get("code", "INTERNAL_ERROR")),
+            str(err.get("message", "error")),
+            retryable=(
+                bool(err["retryable"])
+                if "retryable" in err
+                else None
+            ),
+        )
 
     def _request(
         self,
@@ -347,4 +384,9 @@ class ControlClient:
         except HTTPError as exc:
             return exc.code, exc.read()
         except URLError as exc:
-            raise ControlPlaneError(502, "SOURCE_UNAVAILABLE", str(exc.reason)) from exc
+            raise ControlPlaneError(
+                502,
+                "SOURCE_UNAVAILABLE",
+                str(exc.reason),
+                retryable=True,
+            ) from exc

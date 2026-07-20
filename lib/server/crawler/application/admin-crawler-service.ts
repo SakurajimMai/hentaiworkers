@@ -157,6 +157,9 @@ export class AdminCrawlerService {
     if (!normalizedName) {
       throw new AppError('RESULT_INVALID', 'Worker 名称必填', 400);
     }
+    if (normalizedName.length > 128) {
+      throw new AppError('RESULT_INVALID', 'Worker 名称最多 128 个字符', 400);
+    }
     const token = randomBytes(32).toString('base64url');
     const created = await this.deps.workers.createWorkerWithToken({
       name: normalizedName,
@@ -172,11 +175,59 @@ export class AdminCrawlerService {
     } as const;
   }
 
-  async revokeWorkerCredential(credentialId: number): Promise<void> {
-    if (!Number.isInteger(credentialId) || credentialId <= 0) {
+  async setWorkerClaimEnabled(workerId: number, enabled: boolean): Promise<WorkerRecord> {
+    await this.requireWorker(workerId);
+    return this.deps.workers.setClaimEnabled(workerId, enabled);
+  }
+
+  async rotateWorkerCredential(workerId: number) {
+    this.requireWorkerId(workerId);
+    const token = randomBytes(32).toString('base64url');
+    return this.deps.uow.runInTransaction(async (repos) => {
+      const worker = await repos.workers.getForUpdate(workerId);
+      if (!worker) throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+      const credential = await repos.workers.rotateCredential(
+        workerId,
+        hashOpaqueToken(token),
+        WORKER_SCOPES,
+      );
+      return {
+        workerId,
+        credentialId: credential.id,
+        token,
+        scopes: [...WORKER_SCOPES],
+      } as const;
+    });
+  }
+
+  async setWorkerEnabled(workerId: number, enabled: boolean): Promise<WorkerRecord> {
+    await this.requireWorker(workerId);
+    return this.deps.workers.setEnabled(workerId, enabled);
+  }
+
+  private async requireWorker(workerId: number): Promise<WorkerRecord> {
+    this.requireWorkerId(workerId);
+    const worker = await this.deps.workers.getWorker(workerId);
+    if (!worker) throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    return worker;
+  }
+
+  private requireWorkerId(workerId: number): void {
+    if (!Number.isSafeInteger(workerId) || workerId <= 0) {
+      throw new AppError('RESULT_INVALID', '无效 Worker ID', 400);
+    }
+  }
+
+  async revokeWorkerCredential(workerId: number, credentialId: number): Promise<void> {
+    this.requireWorkerId(workerId);
+    if (!Number.isSafeInteger(credentialId) || credentialId <= 0) {
       throw new AppError('RESULT_INVALID', '无效凭据 ID', 400);
     }
-    await this.deps.workers.revokeCredential(credentialId);
+    await this.deps.uow.runInTransaction(async (repos) => {
+      const worker = await repos.workers.getForUpdate(workerId);
+      if (!worker) throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+      await repos.workers.revokeCredentialForWorker(workerId, credentialId);
+    });
   }
 
   async listProfiles() {

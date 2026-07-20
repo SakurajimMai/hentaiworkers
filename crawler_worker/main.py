@@ -10,7 +10,7 @@ from crawler_worker.models.config import WorkerRuntimeConfig
 from crawler_worker.runtime.runner import Runner
 from crawler_worker.sources.hanime import HanimeSource
 from crawler_worker.sources.maccms import build_maccms_sources
-from crawler_worker.transport.control_client import ControlClient
+from crawler_worker.transport.control_client import ControlClient, ControlPlaneError
 
 
 def config_from_env(env: dict[str, str] | None = None) -> WorkerRuntimeConfig:
@@ -66,7 +66,15 @@ def main(argv: list[str] | None = None) -> int:
     client = ControlClient(cfg)
     adapters = {"hanime": HanimeSource(), **build_maccms_sources()}
     runner = Runner(cfg, client, adapters)
-    runner.run_forever()
+    try:
+        runner.run_forever()
+    except ControlPlaneError as exc:
+        print(
+            f"crawler_worker_exit code={exc.code} status={exc.status} message={exc.message}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 2
     return 0
 
 

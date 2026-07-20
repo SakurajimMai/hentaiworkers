@@ -6,6 +6,8 @@ import { MediaReservationService } from '../../lib/server/crawler/application/me
 import { CrawlerLogService } from '../../lib/server/crawler/application/crawler-log-service';
 import { buildMediaObjectKeys } from '../../lib/server/crawler/domain/media-paths';
 import { InMemoryCrawlerUnitOfWork } from '../../lib/server/crawler/testing/in-memory-crawler-uow';
+import { InMemoryWorkerRepository } from '../../lib/server/crawler/testing/in-memory-worker-repository';
+import { hashOpaqueToken } from '../../lib/server/crawler/domain/hashing';
 import { AppError } from '../../lib/server/shared/errors';
 
 async function seedClaimed(workerId = 1) {
@@ -45,6 +47,86 @@ test('concurrent claims: only one worker wins a single job', async () => {
   assert.equal(wins.length, 1);
   assert.equal(wins[0]!.job.status, 'leased');
   assert.equal(wins[0]!.attempt.attemptNo, 1);
+});
+
+test('paused worker leaves queued job and attempt count unchanged, then resumes', async () => {
+  const workers = new InMemoryWorkerRepository();
+  const created = await workers.createWorkerWithToken({
+    name: 'pause-test',
+    tokenHash: hashOpaqueToken('pause-test-token'),
+    scopes: ['jobs:claim'],
+  });
+  const uow = new InMemoryCrawlerUnitOfWork(undefined, workers);
+  const jobs = new CrawlerJobService(uow);
+  const queued = await jobs.enqueueManual({
+    profileId: 1,
+    profileVersionId: 1,
+    configSnapshotJson: '{}',
+  });
+
+  await workers.setClaimEnabled(created.worker.id, false);
+  assert.equal(await jobs.claimForWorker({ workerId: created.worker.id }), null);
+  assert.equal((await uow.jobs.get(queued.id))?.status, 'queued');
+  assert.equal((await uow.jobs.get(queued.id))?.attemptCount, 0);
+
+  await workers.setClaimEnabled(created.worker.id, true);
+  assert.ok(await jobs.claimForWorker({ workerId: created.worker.id }));
+  assert.equal((await uow.jobs.get(queued.id))?.attemptCount, 1);
+});
+
+test('draining worker completes current lease but cannot claim the next job', async () => {
+  const workers = new InMemoryWorkerRepository();
+  const created = await workers.createWorkerWithToken({
+    name: 'drain-test',
+    tokenHash: hashOpaqueToken('drain-test-token'),
+    scopes: ['jobs:claim', 'jobs:write'],
+  });
+  const uow = new InMemoryCrawlerUnitOfWork(undefined, workers);
+  const jobs = new CrawlerJobService(uow);
+  await jobs.enqueueManual({ profileId: 1, profileVersionId: 1, configSnapshotJson: '{}' });
+  const current = await jobs.claimForWorker({ workerId: created.worker.id });
+  assert.ok(current);
+
+  await workers.setClaimEnabled(created.worker.id, false);
+  await jobs.start({
+    jobId: current!.job.id,
+    attemptId: current!.attempt.id,
+    workerId: created.worker.id,
+    leaseToken: current!.leaseToken,
+  });
+  await jobs.complete({
+    jobId: current!.job.id,
+    attemptId: current!.attempt.id,
+    workerId: created.worker.id,
+    leaseToken: current!.leaseToken,
+    outcome: 'succeeded',
+    idempotencyKey: 'drain-complete',
+  });
+  await jobs.enqueueManual({ profileId: 1, profileVersionId: 1, configSnapshotJson: '{}' });
+  assert.equal(await jobs.claimForWorker({ workerId: created.worker.id }), null);
+});
+
+test('claim rejects unknown and hard-disabled workers', async () => {
+  const workers = new InMemoryWorkerRepository();
+  const uow = new InMemoryCrawlerUnitOfWork(undefined, workers);
+  const jobs = new CrawlerJobService(uow);
+  await jobs.enqueueManual({ profileId: 1, profileVersionId: 1, configSnapshotJson: '{}' });
+
+  await assert.rejects(
+    () => jobs.claimForWorker({ workerId: 999 }),
+    (error: unknown) => error instanceof AppError && error.code === 'WORKER_FORBIDDEN',
+  );
+
+  const created = await workers.createWorkerWithToken({
+    name: 'disabled-test',
+    tokenHash: hashOpaqueToken('disabled-test-token'),
+    scopes: ['jobs:claim'],
+  });
+  await workers.setEnabled(created.worker.id, false);
+  await assert.rejects(
+    () => jobs.claimForWorker({ workerId: created.worker.id }),
+    (error: unknown) => error instanceof AppError && error.code === 'WORKER_FORBIDDEN',
+  );
 });
 
 test('claim creates attempt with hashed lease binding', async () => {

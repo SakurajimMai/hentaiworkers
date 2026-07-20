@@ -4,6 +4,7 @@ import type {
   OverlapPolicy,
   ScheduleKind,
 } from '../domain/schedule';
+import type { WorkerTransactionalRepository } from './worker-repository';
 
 export type ScheduleRecord = Readonly<{
   id: number;
@@ -285,6 +286,7 @@ export interface CrawlerUnitOfWork {
 }
 
 export type CrawlerRepositories = Readonly<{
+  workers: WorkerTransactionalRepository;
   profiles: CrawlerProfileLifecycleRepository;
   schedules: CrawlerScheduleRepository;
   jobs: CrawlerJobRepository;

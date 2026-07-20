@@ -7,9 +7,29 @@ export type WorkerRecord = Readonly<{
   capabilitiesJson: string;
   lastHeartbeatAt: string | null;
   isEnabled: boolean;
+  claimEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }>;
+
+export type WorkerClaimControlRecord = Readonly<{
+  id: number;
+  isEnabled: boolean;
+  claimEnabled: boolean;
+}>;
+
+export interface WorkerClaimControlRepository {
+  getForUpdate(workerId: number): Promise<WorkerClaimControlRecord | null>;
+}
+
+export interface WorkerTransactionalRepository extends WorkerClaimControlRepository {
+  rotateCredential(
+    workerId: number,
+    tokenHash: Uint8Array,
+    scopes: readonly string[],
+  ): Promise<WorkerCredentialRecord>;
+  revokeCredentialForWorker(workerId: number, credentialId: number): Promise<void>;
+}
 
 export type WorkerCredentialRecord = Readonly<{
   id: number;
@@ -23,7 +43,7 @@ export type WorkerCredentialRecord = Readonly<{
   rotatedAt: string | null;
 }>;
 
-export interface WorkerRepository {
+export interface WorkerRepository extends WorkerTransactionalRepository {
   getWorker(workerId: number): Promise<WorkerRecord | null>;
   listWorkers(): Promise<ReadonlyArray<WorkerRecord>>;
   upsertRegistration(input: {
@@ -49,5 +69,13 @@ export interface WorkerRepository {
     scopes: readonly string[];
     version?: string;
   }): Promise<{ worker: WorkerRecord; credential: WorkerCredentialRecord }>;
+  setClaimEnabled(workerId: number, enabled: boolean): Promise<WorkerRecord>;
+  rotateCredential(
+    workerId: number,
+    tokenHash: Uint8Array,
+    scopes: readonly string[],
+  ): Promise<WorkerCredentialRecord>;
+  setEnabled(workerId: number, enabled: boolean): Promise<WorkerRecord>;
+  /** Low-level test/bootstrap revocation; admin flows use revokeCredentialForWorker. */
   revokeCredential(credentialId: number): Promise<void>;
 }

@@ -509,6 +509,24 @@ export class MariaDbWorkerRepository implements WorkerRepository {
     return rows.map(mapWorker);
   }
 
+  async getForUpdate(workerId: number) {
+    const rows = await q<RowDataPacket[]>(
+      `SELECT id, is_enabled, claim_enabled
+       FROM crawler_workers
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [workerId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      isEnabled: Number(row.is_enabled) === 1,
+      claimEnabled: Number(row.claim_enabled) === 1,
+    };
+  }
+
   async upsertRegistration(input: {
     workerId: number;
     name: string;
@@ -580,8 +598,8 @@ export class MariaDbWorkerRepository implements WorkerRepository {
   }): Promise<{ worker: WorkerRecord; credential: WorkerCredentialRecord }> {
     const ins = await exec(
       `INSERT INTO crawler_workers
-        (name, version, capabilities_json, is_enabled, token_hash, scope_json, token_revoked)
-       VALUES (?, ?, '{}', 1, ?, ?, 0)`,
+        (name, version, capabilities_json, is_enabled, claim_enabled, token_hash, scope_json, token_revoked)
+       VALUES (?, ?, '{}', 1, 1, ?, ?, 0)`,
       [
         input.name,
         input.version ?? '0.0.0',
@@ -594,11 +612,66 @@ export class MariaDbWorkerRepository implements WorkerRepository {
     return { worker, credential };
   }
 
+  async setClaimEnabled(workerId: number, enabled: boolean): Promise<WorkerRecord> {
+    if (!(await this.getWorker(workerId))) {
+      throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    }
+    await exec(
+      'UPDATE crawler_workers SET claim_enabled = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+      [enabled ? 1 : 0, workerId],
+    );
+    return (await this.getWorker(workerId))!;
+  }
+
+  async rotateCredential(
+    workerId: number,
+    tokenHash: Uint8Array,
+    scopes: readonly string[],
+  ): Promise<WorkerCredentialRecord> {
+    if (!(await this.getWorker(workerId))) {
+      throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    }
+    await exec(
+      `UPDATE crawler_workers
+       SET token_hash = ?, scope_json = ?, token_revoked = 0,
+           token_expires_at = NULL, updated_at = UTC_TIMESTAMP()
+       WHERE id = ?`,
+      [Buffer.from(tokenHash), JSON.stringify([...scopes]), workerId],
+    );
+    const credential = (await this.listCredentials(workerId))[0];
+    if (!credential) throw new AppError('RESULT_INVALID', 'Worker 凭据不存在', 404);
+    return credential;
+  }
+
+  async setEnabled(workerId: number, enabled: boolean): Promise<WorkerRecord> {
+    if (!(await this.getWorker(workerId))) {
+      throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    }
+    await exec(
+      'UPDATE crawler_workers SET is_enabled = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+      [enabled ? 1 : 0, workerId],
+    );
+    return (await this.getWorker(workerId))!;
+  }
+
   async revokeCredential(credentialId: number): Promise<void> {
+    if (!(await this.getWorker(credentialId))) {
+      throw new AppError('RESULT_INVALID', 'Worker 凭据不存在', 404);
+    }
     await exec(
       'UPDATE crawler_workers SET token_revoked = 1, updated_at = UTC_TIMESTAMP() WHERE id = ?',
       [credentialId],
     );
+  }
+
+  async revokeCredentialForWorker(workerId: number, credentialId: number): Promise<void> {
+    if (workerId !== credentialId) {
+      throw new AppError('RESULT_INVALID', '凭据不属于该 Worker', 404);
+    }
+    if (!(await this.getWorker(workerId))) {
+      throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    }
+    await this.revokeCredential(credentialId);
   }
 }
 
@@ -610,6 +683,7 @@ function mapWorker(row: RowDataPacket): WorkerRecord {
     capabilitiesJson: String(row.capabilities_json ?? '{}'),
     lastHeartbeatAt: asIsoOrNull(row.last_heartbeat_at),
     isEnabled: Number(row.is_enabled) === 1,
+    claimEnabled: Number(row.claim_enabled) === 1,
     createdAt: asIso(row.created_at),
     updatedAt: asIso(row.updated_at),
   };
@@ -1376,6 +1450,7 @@ class DisabledMediaUploadRepository implements MediaUploadRepository {
 
 export class MariaDbCrawlerUnitOfWork implements CrawlerUnitOfWork {
   readonly repos: CrawlerRepositories = {
+    workers: new MariaDbWorkerRepository(),
     profiles: new MariaDbCrawlerProfileLifecycleRepo(),
     schedules: new MariaDbScheduleRepo(),
     jobs: new MariaDbJobRepo(),

@@ -130,6 +130,12 @@ export class CrawlerJobService {
     const ttl = input.leaseTtlMs ?? this.leaseTtlMs;
 
     return this.uow.runInTransaction(async (repos) => {
+      const worker = await repos.workers.getForUpdate(input.workerId);
+      if (!worker || !worker.isEnabled) {
+        throw new AppError('WORKER_FORBIDDEN', 'Worker 已禁用或不存在', 403);
+      }
+      if (!worker.claimEnabled) return null;
+
       // Nested transaction serialization: expire + promote + materialize + claim.
       await this.expireStaleLeasesInRepos(repos, now);
       await this.promoteReadyRetriesInRepos(repos, now);

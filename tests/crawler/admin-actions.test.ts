@@ -12,6 +12,9 @@ import {
   adminPurgeTerminalJobs,
   adminMarkStorageTestPassed,
   adminRevealSecret,
+  adminRotateWorkerCredential,
+  adminSetWorkerClaimEnabled,
+  adminSetWorkerEnabled,
   adminRetryJob,
   adminSaveSchedule,
   adminStartManualJob,
@@ -87,6 +90,46 @@ test('admin actions require authorization', async () => {
   await assert.rejects(
     () => adminDeleteProfile(ctx, 1),
     (e: unknown) => e instanceof AppError && e.status === 403,
+  );
+});
+
+test('admin worker actions pause, resume, rotate, and hard-disable an existing node', async () => {
+  const deps = createInMemoryAdminDeps();
+  const crawler = createAdminCrawlerService(deps);
+  const ctx = makeCtxFromCrawler(crawler);
+  const provisioned = await crawler.provisionWorker('admin-managed');
+
+  assert.equal(
+    (await adminSetWorkerClaimEnabled(ctx, provisioned.worker.id, false)).claimEnabled,
+    false,
+  );
+  assert.equal(
+    (await adminSetWorkerClaimEnabled(ctx, provisioned.worker.id, true)).claimEnabled,
+    true,
+  );
+
+  const rotated = await adminRotateWorkerCredential(ctx, provisioned.worker.id);
+  assert.ok(rotated.token.length >= 32);
+  assert.notEqual(rotated.token, provisioned.token);
+
+  assert.equal(
+    (await adminSetWorkerEnabled(ctx, provisioned.worker.id, false)).isEnabled,
+    false,
+  );
+  assert.equal(
+    (await adminSetWorkerEnabled(ctx, provisioned.worker.id, true)).isEnabled,
+    true,
+  );
+
+  for (const invalidId of [0, -1, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(
+      () => adminSetWorkerClaimEnabled(ctx, invalidId, false),
+      (error: unknown) => error instanceof AppError && error.status === 400,
+    );
+  }
+  await assert.rejects(
+    () => adminSetWorkerEnabled(ctx, 999, false),
+    (error: unknown) => error instanceof AppError && error.status === 404,
   );
 });
 
@@ -276,6 +319,7 @@ test('claim does not materialize a stale enabled schedule for a disabled profile
   const deps = createInMemoryAdminDeps();
   const crawler = createAdminCrawlerService(deps);
   const ctx = makeCtxFromCrawler(crawler);
+  const worker = await crawler.provisionWorker('schedule-test-worker');
   const version = await adminCreateProfile(ctx, {
     name: 'stale-schedule',
     configJson: JSON.stringify(validProfile),
@@ -294,7 +338,10 @@ test('claim does not materialize a stale enabled schedule for a disabled profile
   });
   await deps.profiles.disableProfile(version.profileId);
 
-  assert.equal(await deps.jobs.claimForWorker({ workerId: 1, now: new Date() }), null);
+  assert.equal(
+    await deps.jobs.claimForWorker({ workerId: worker.worker.id, now: new Date() }),
+    null,
+  );
   assert.equal(
     (await deps.uow.runInTransaction((repos) => repos.schedules.get(schedule.id)))?.isEnabled,
     false,

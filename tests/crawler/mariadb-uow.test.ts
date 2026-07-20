@@ -341,6 +341,35 @@ test('MariaDB crawler unit of work routes every repository query through its tra
   assert.deepEqual(calls.slice(-2), ['COMMIT', 'RELEASE']);
 });
 
+test('MariaDB worker claim control locks the worker row inside the transaction', async () => {
+  const calls: string[] = [];
+  const connection: CrawlerTransactionConnection = {
+    async query(sql: string) {
+      const normalized = sql.replace(/\s+/g, ' ').trim();
+      calls.push(normalized);
+      if (normalized === 'SELECT id, is_enabled, claim_enabled FROM crawler_workers WHERE id = ? LIMIT 1 FOR UPDATE') {
+        return [[{ id: 7, is_enabled: 1, claim_enabled: 0 }], []];
+      }
+      throw new Error(`unexpected SQL: ${normalized}`);
+    },
+    async beginTransaction() { calls.push('BEGIN'); },
+    async commit() { calls.push('COMMIT'); },
+    async rollback() { calls.push('ROLLBACK'); },
+    release() { calls.push('RELEASE'); },
+  };
+  const uow = createMariaDbCrawlerUnitOfWork(async () => connection);
+
+  const worker = await uow.runInTransaction((repos) => repos.workers.getForUpdate(7));
+
+  assert.deepEqual(worker, { id: 7, isEnabled: true, claimEnabled: false });
+  assert.deepEqual(calls, [
+    'BEGIN',
+    'SELECT id, is_enabled, claim_enabled FROM crawler_workers WHERE id = ? LIMIT 1 FOR UPDATE',
+    'COMMIT',
+    'RELEASE',
+  ]);
+});
+
 test('MariaDB crawler unit of work rolls back repository writes on failure', async () => {
   const calls: string[] = [];
   const connection = {

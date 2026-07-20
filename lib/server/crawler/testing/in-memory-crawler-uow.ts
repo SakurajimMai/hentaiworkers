@@ -19,6 +19,7 @@ import type {
   ScheduleRecord,
   SkippedOccurrenceRecord,
 } from '../ports/crawler-unit-of-work';
+import type { WorkerTransactionalRepository } from '../ports/worker-repository';
 import { hashesEqual } from '../domain/hashing';
 import type { InMemoryCrawlerProfileState } from './in-memory-config-repos';
 
@@ -565,6 +566,7 @@ export class InMemoryMediaUploadRepository implements MediaUploadRepository {
 }
 
 export class InMemoryCrawlerUnitOfWork implements CrawlerUnitOfWork {
+  readonly workers: WorkerTransactionalRepository;
   readonly profiles: InMemoryCrawlerProfileLifecycleRepository;
   readonly schedules = new InMemoryCrawlerScheduleRepository();
   readonly receipts = new InMemoryOperationReceiptRepository();
@@ -583,14 +585,29 @@ export class InMemoryCrawlerUnitOfWork implements CrawlerUnitOfWork {
     this.events.deleteByJob(jobId);
   });
 
-  constructor(profileState?: InMemoryCrawlerProfileState) {
+  constructor(
+    profileState?: InMemoryCrawlerProfileState,
+    workers: WorkerTransactionalRepository = {
+      async getForUpdate(workerId: number) {
+        return { id: workerId, isEnabled: true, claimEnabled: true };
+      },
+      async rotateCredential() {
+        throw new AppError('RESULT_INVALID', '测试 UOW 未配置 Worker 仓储', 500);
+      },
+      async revokeCredentialForWorker() {
+        throw new AppError('RESULT_INVALID', '测试 UOW 未配置 Worker 仓储', 500);
+      },
+    },
+  ) {
     this.profiles = new InMemoryCrawlerProfileLifecycleRepository(profileState);
+    this.workers = workers;
   }
 
   private chain: Promise<unknown> = Promise.resolve();
 
   get repos(): CrawlerRepositories {
     return {
+      workers: this.workers,
       profiles: this.profiles,
       schedules: this.schedules,
       jobs: this.jobs,

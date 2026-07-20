@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `crawler_workers` (
   `capabilities_json` TEXT NOT NULL,
   `last_heartbeat_at` DATETIME NULL,
   `is_enabled` TINYINT NOT NULL DEFAULT 1,
+  `claim_enabled` TINYINT NOT NULL DEFAULT 1,
   `token_hash` BINARY(32) NULL,
   `scope_json` TEXT NOT NULL,
   `token_revoked` TINYINT NOT NULL DEFAULT 0,

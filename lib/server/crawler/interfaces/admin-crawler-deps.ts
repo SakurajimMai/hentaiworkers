@@ -69,7 +69,8 @@ function getOrCreateMariaDbAdminCrawler(): AdminCrawlerService {
 export function createInMemoryAdminDeps(): AdminCrawlerDeps {
   const profileState = createInMemoryCrawlerProfileState();
   const profiles = new InMemoryCrawlerConfigRepository(profileState);
-  const uow = new InMemoryCrawlerUnitOfWork(profileState);
+  const workers = new InMemoryWorkerRepository();
+  const uow = new InMemoryCrawlerUnitOfWork(profileState, workers);
   const key = randomBytes(32);
   const cipher = new AesGcmSecretCipher(keyringViewFromRecord('k1', { k1: key }));
   return {
@@ -80,7 +81,7 @@ export function createInMemoryAdminDeps(): AdminCrawlerDeps {
     storage: new StorageConfigService(new InMemoryStorageConfigRepository()),
     secrets: new SecretService(new InMemorySecretRepository(), cipher),
     yaml: new YamlImportService(),
-    workers: new InMemoryWorkerRepository(),
+    workers,
   };
 }
 

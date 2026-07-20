@@ -21,6 +21,16 @@ export class InMemoryWorkerRepository implements WorkerRepository {
     return this.workers.get(workerId) ?? null;
   }
 
+  async getForUpdate(workerId: number) {
+    const worker = this.workers.get(workerId);
+    if (!worker) return null;
+    return {
+      id: worker.id,
+      isEnabled: worker.isEnabled,
+      claimEnabled: worker.claimEnabled,
+    };
+  }
+
   async listWorkers(): Promise<ReadonlyArray<WorkerRecord>> {
     return [...this.workers.values()];
   }
@@ -113,6 +123,7 @@ export class InMemoryWorkerRepository implements WorkerRepository {
       capabilitiesJson: '{}',
       lastHeartbeatAt: null,
       isEnabled: true,
+      claimEnabled: true,
       createdAt: ts,
       updatedAt: ts,
     };
@@ -137,13 +148,57 @@ export class InMemoryWorkerRepository implements WorkerRepository {
 
   async revokeCredential(credentialId: number): Promise<void> {
     const current = this.credentials.get(credentialId);
-    if (!current) return;
+    if (!current) throw new AppError('RESULT_INVALID', 'Worker 凭据不存在', 404);
     this.credentials.set(credentialId, { ...current, isRevoked: true });
   }
 
-  setEnabled(workerId: number, isEnabled: boolean): void {
+  async revokeCredentialForWorker(workerId: number, credentialId: number): Promise<void> {
+    if (!this.workers.has(workerId)) {
+      throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    }
+    const credential = this.credentials.get(credentialId);
+    if (!credential || credential.workerId !== workerId) {
+      throw new AppError('RESULT_INVALID', '凭据不属于该 Worker', 404);
+    }
+    await this.revokeCredential(credentialId);
+  }
+
+  async setClaimEnabled(workerId: number, claimEnabled: boolean): Promise<WorkerRecord> {
     const current = this.workers.get(workerId);
-    if (!current) return;
-    this.workers.set(workerId, { ...current, isEnabled, updatedAt: nowIso() });
+    if (!current) throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    const next = { ...current, claimEnabled, updatedAt: nowIso() };
+    this.workers.set(workerId, next);
+    return next;
+  }
+
+  async rotateCredential(
+    workerId: number,
+    tokenHash: Uint8Array,
+    scopes: readonly string[],
+  ): Promise<WorkerCredentialRecord> {
+    if (!this.workers.has(workerId)) {
+      throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    }
+    const current = [...this.credentials.values()].find((row) => row.workerId === workerId);
+    if (!current) throw new AppError('RESULT_INVALID', 'Worker 凭据不存在', 404);
+    const rotatedAt = nowIso();
+    const next: WorkerCredentialRecord = {
+      ...current,
+      tokenHash: new Uint8Array(tokenHash),
+      scopeJson: JSON.stringify([...scopes]),
+      isRevoked: false,
+      expiresAt: null,
+      rotatedAt,
+    };
+    this.credentials.set(current.id, next);
+    return { ...next, tokenHash: new Uint8Array(next.tokenHash) };
+  }
+
+  async setEnabled(workerId: number, isEnabled: boolean): Promise<WorkerRecord> {
+    const current = this.workers.get(workerId);
+    if (!current) throw new AppError('RESULT_INVALID', 'Worker 不存在', 404);
+    const next = { ...current, isEnabled, updatedAt: nowIso() };
+    this.workers.set(workerId, next);
+    return next;
   }
 }

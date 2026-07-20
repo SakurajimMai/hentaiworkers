@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 import tempfile
 import uuid
 from dataclasses import replace
@@ -26,6 +27,8 @@ from crawler_worker.transport.control_client import ControlClient, ControlPlaneE
 
 
 class Runner:
+    _CONTROL_BACKOFF_MAX_SECONDS = 30.0
+
     def __init__(
         self,
         config: WorkerRuntimeConfig,
@@ -50,22 +53,64 @@ class Runner:
         self._cancel = True
 
     def run_forever(self, max_iterations: Optional[int] = None) -> None:
-        self._client.register()
+        register_delay = 1.0
+        while True:
+            try:
+                self._client.register()
+                break
+            except ControlPlaneError as exc:
+                if not exc.retryable:
+                    raise
+                self._report_control_retry("register", exc, register_delay)
+                self._sleep(register_delay)
+                register_delay = min(
+                    register_delay * 2,
+                    self._CONTROL_BACKOFF_MAX_SECONDS,
+                )
+
         self._hb.start_idle()
         iterations = 0
+        control_delay = 1.0
         try:
             while max_iterations is None or iterations < max_iterations:
                 iterations += 1
                 self._cancel = False
-                job = self._client.claim()
+                try:
+                    job = self._client.claim()
+                    if job is None:
+                        self._client.worker_heartbeat(current_load=0)
+                except ControlPlaneError as exc:
+                    if not exc.retryable:
+                        raise
+                    self._report_control_retry("claim", exc, control_delay)
+                    self._sleep(control_delay)
+                    control_delay = min(
+                        control_delay * 2,
+                        self._CONTROL_BACKOFF_MAX_SECONDS,
+                    )
+                    continue
+
+                control_delay = 1.0
                 if job is None:
-                    self._client.worker_heartbeat(current_load=0)
                     self._sleep(1.0)
                     continue
                 self._run_job(job)
                 self._hb.start_idle()
         finally:
             self._hb.stop()
+
+    @staticmethod
+    def _report_control_retry(
+        operation: str,
+        error: ControlPlaneError,
+        delay: float,
+    ) -> None:
+        print(
+            f"control_plane_retry operation={operation} code={error.code} "
+            f"status={error.status} delay={delay:.1f}s",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def _run_job(self, job: ClaimedJob) -> None:
         workdir = Path(tempfile.mkdtemp(prefix=f"job-{job.job_id}-", dir=self._config.temp_dir if Path(self._config.temp_dir).exists() else None))

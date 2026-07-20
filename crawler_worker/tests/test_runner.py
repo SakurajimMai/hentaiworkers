@@ -31,6 +31,92 @@ class FakeSource:
 
 
 class RunnerTests(unittest.TestCase):
+    def test_auth_failure_exits_without_retrying(self):
+        class Client:
+            def __init__(self):
+                self.register_calls = 0
+
+            def register(self):
+                self.register_calls += 1
+                raise ControlPlaneError(403, "WORKER_FORBIDDEN", "disabled")
+
+        sleeps = []
+        client = Client()
+        runner = Runner(
+            WorkerRuntimeConfig("https://control.example", 1, "t"),
+            client,
+            {},
+            sleep=sleeps.append,
+        )
+        with self.assertRaises(ControlPlaneError) as ctx:
+            runner.run_forever(max_iterations=1)
+        self.assertEqual(ctx.exception.code, "WORKER_FORBIDDEN")
+        self.assertEqual(client.register_calls, 1)
+        self.assertEqual(sleeps, [])
+
+    def test_transient_registration_and_claim_failures_use_bounded_backoff(self):
+        class Client:
+            def __init__(self):
+                self.register_calls = 0
+                self.claim_calls = 0
+                self.heartbeat_calls = 0
+
+            def register(self):
+                self.register_calls += 1
+                if self.register_calls < 3:
+                    raise ControlPlaneError(503, "SOURCE_UNAVAILABLE", "down", retryable=True)
+                return {}
+
+            def claim(self):
+                self.claim_calls += 1
+                if self.claim_calls < 3:
+                    raise ControlPlaneError(503, "SOURCE_UNAVAILABLE", "down", retryable=True)
+                return None
+
+            def worker_heartbeat(self, current_load=0):
+                self.heartbeat_calls += 1
+                return {}
+
+        sleeps = []
+        client = Client()
+        runner = Runner(
+            WorkerRuntimeConfig("https://control.example", 1, "t", idle_heartbeat_seconds=3600),
+            client,
+            {},
+            sleep=sleeps.append,
+        )
+        runner.run_forever(max_iterations=3)
+        self.assertEqual(client.register_calls, 3)
+        self.assertEqual(client.claim_calls, 3)
+        self.assertGreaterEqual(client.heartbeat_calls, 1)
+        self.assertEqual(sleeps[:4], [1.0, 2.0, 1.0, 2.0])
+        self.assertLessEqual(max(sleeps), 30.0)
+
+    def test_empty_claim_keeps_idle_heartbeat_running(self):
+        class Client:
+            def __init__(self):
+                self.heartbeat_calls = 0
+
+            def register(self):
+                return {}
+
+            def claim(self):
+                return None
+
+            def worker_heartbeat(self, current_load=0):
+                self.heartbeat_calls += 1
+                return {}
+
+        client = Client()
+        runner = Runner(
+            WorkerRuntimeConfig("https://control.example", 1, "t", idle_heartbeat_seconds=3600),
+            client,
+            {},
+            sleep=lambda _seconds: None,
+        )
+        runner.run_forever(max_iterations=2)
+        self.assertGreaterEqual(client.heartbeat_calls, 2)
+
     def test_run_one_job_with_fixture_source(self):
         cfg = WorkerRuntimeConfig(
             control_base_url="http://app/api/internal/crawler/v1",
