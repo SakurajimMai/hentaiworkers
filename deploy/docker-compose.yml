@@ -1,8 +1,8 @@
-# AnimeStream — Docker Hub app-only production deployment
+# AnimeStream production deployment: App control plane + isolated crawler Worker.
 #
 # The remote database is managed externally and must already contain the
 # required schema and administrator account. This Compose file performs no
-# database setup/migration/seed and starts no crawler/worker node.
+# database setup, migration, or seed operation.
 
 services:
   app:
@@ -30,3 +30,23 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
+
+  worker:
+    image: sakurajiamai/hentaiworkers-worker:latest
+    pull_policy: always
+    env_file:
+      - worker.env
+    environment:
+      CRAWLER_CONTROL_URL: http://app:3000/api/internal/crawler/v1
+      CRAWLER_TEMP_DIR: /tmp/crawler-worker
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp/crawler-worker
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

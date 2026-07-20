@@ -7,7 +7,7 @@
 | [架构说明](./architecture.md) | 系统结构、数据流、权限模型、目录职责 |
 | [API 参考](./api/README.md) | 公开 REST 接口说明与示例 |
 | [OpenAPI 规范](./api/openapi.yaml) | OpenAPI 3.0 机读规格 |
-| [**部署指南**](./deployment.md) | **app-only Docker Hub 部署**：远程数据库、稳定 env、TLS、升级 |
+| [**部署指南**](./deployment.md) | **App + Worker Docker Hub 部署**：远程数据库、隔离 env、TLS、升级 |
 | [Hub 部署清单](../deploy/README.md) | 服务器只拉镜像的 compose / `.env` 模板 |
 | [开发指南](./development.md) | 本地启动、脚本、测试与约定 |
 | [前台使用](./user-guide.md) | 双片库、ArtPlayer / 解析播放、进度、片单、广告体验 |
@@ -20,7 +20,7 @@
 - 本地前台：`http://localhost:3000`
 - 本地后台：`http://localhost:3000/admin`
 - 存活探针：`GET /api/live` · 就绪（含 DB）：`GET /api/ready` · 兼容：`GET /api/health`
-- 环境模板：[`.env.example`](../.env.example) · 生产精简：[deploy/.env.example](../deploy/.env.example)
+- 环境模板：[`.env.example`](../.env.example) · [worker.env.example](../worker.env.example) · 生产精简：[deploy/.env.example](../deploy/.env.example)
 - Compose（精简生产）：[deploy/docker-compose.yml](../deploy/docker-compose.yml)
 - Compose（仓库根）：[docker-compose.yml](../docker-compose.yml)（同样仅拉 Hub 镜像）
 - 主 README：[../README.md](../README.md)
@@ -28,10 +28,11 @@
 ## 上线最短路径（Docker Hub）
 
 1. 远程数据库 schema 和管理员账号由你提前维护
-2. CI 自动发布公开镜像 `sakurajiamai/hentaiworkers-app:latest`
-3. 服务器只用 `deploy/` 清单和稳定 `.env`，无需 Docker Hub 登录
-4. `docker compose pull app && docker compose up -d app`
-5. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截 `/api/internal/**`
+2. CI 自动发布公开 App 与 Worker 镜像
+3. 服务器使用 `deploy/` 清单、`.env` 和独立 `worker.env`，无需 Docker Hub 登录
+4. 启动 App，在后台创建 Worker 身份并写入一次性令牌，再启动 Worker
+5. `docker compose pull app worker && docker compose up -d`
+6. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截公网 `/api/internal/**`
 
 细节见 [deployment.md](./deployment.md) 与 [deploy/README.md](../deploy/README.md)。
 

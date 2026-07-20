@@ -14,6 +14,8 @@ crawler_worker/tests
 .env
 .env.*
 !.env.example
+worker.env
+**/worker.env
 scripts/production_config.yml
 production_config.yml
 config.yml

@@ -10,7 +10,7 @@ Next.js 全栈动漫视频站：公网站点 + 管理后台 + REST API，对接*
 - **Drizzle ORM** + **MySQL / MariaDB**
 - **iron-session** + bcrypt 鉴权；AES-GCM 密钥环保护后台密钥字段
 - **ArtPlayer**（里番 MP4 + 可选广告）/ 线路解析 iframe（动漫）
-- **Docker Compose**：app-only，从 Docker Hub 拉镜像并直连外部维护的远程数据库
+- **Docker Compose**：独立 App + Worker 容器，从 Docker Hub 拉取镜像；只有 App 连接远程数据库
 
 ## 功能一览
 
@@ -42,7 +42,10 @@ npm run dev
 
 ## 服务器部署（Docker Hub，推荐）
 
-CI 在每次 `main` 推送后把镜像发布为公开镜像 `sakurajiamai/hentaiworkers-app:latest`。
+CI 在每次 `main` 推送后发布两个公开镜像：
+
+- `sakurajiamai/hentaiworkers-app:latest`
+- `sakurajiamai/hentaiworkers-worker:latest`
 
 **生产机直接拉取该镜像**，不需要 Docker Hub 登录、git 源码或服务器本地 build。
 
@@ -50,27 +53,33 @@ CI 在每次 `main` 推送后把镜像发布为公开镜像 `sakurajiamai/hentai
 # 1) 远程数据库由你独立维护：schema 与管理员账号须提前就绪
 # 2) 服务器只准备 deploy 清单，不必完整 clone
 mkdir -p /opt/anime-web && cd /opt/anime-web
-# 放入 deploy/docker-compose.yml 与 deploy/.env.example → .env
-cp .env.example .env && chmod 600 .env
+# 放入 deploy/docker-compose.yml、.env.example 和 worker.env.example
+cp .env.example .env
+cp worker.env.example worker.env
+chmod 600 .env worker.env
 # 必填：DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL
 # 端口示例：APP_PORT=13000
 
-# 3) 只拉 app 镜像并启动；不迁移、不 seed、不启动其它节点
-docker compose pull app
+# 3) 先通过受控迁移流程应用 0017，再启动 App
+docker compose pull app worker
 docker compose up -d app
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 
-# 4) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，禁止公网 /api/internal/**
+# 4) 登录 /admin/crawler/workers 创建节点，将一次性 ID/令牌写入 worker.env
+# 填写 CRAWLER_WORKER_ID 与 CRAWLER_WORKER_TOKEN 后启动 Worker
+docker compose up -d worker
+
+# 5) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，禁止公网 /api/internal/**
 ```
 
 升级：
 
 ```bash
-docker compose pull app && docker compose up -d --no-build app
+docker compose pull app worker && docker compose up -d --no-build
 ```
 
-生产 Compose 只包含 `app`，没有 `build:`、ops 或 worker 服务。细节 → [deploy/README.md](./deploy/README.md) · [docs/deployment.md](./docs/deployment.md)
+生产 Compose 只包含 `app`、`worker`，不包含数据库、迁移或 Docker Socket。细节 → [deploy/README.md](./deploy/README.md) · [docs/deployment.md](./docs/deployment.md)
 
 ## 文档索引
 
@@ -94,7 +103,7 @@ npm run seed:maccms-profiles
 npm run worker:provision    # 本地 Worker 令牌
 npm run worker:start
 npm run db:setup:crawler    # 全新核心表（需 CRAWLER_MIGRATE_CONFIRM=yes）
-npm run db:migrate:crawler  # 加法迁移 0001–0016
+npm run db:migrate:crawler  # 加法迁移 0001–0017
 npm run test                # 测试入口
 ```
 
@@ -107,7 +116,7 @@ app/                 # Next 路由（site + admin + api）
 components/          # UI / ArtPlayer / 播放面板
 lib/                 # db、领域服务、系统设置、爬虫控制面
 crawler_worker/      # Python Worker（无 DATABASE_URL）
-drizzle/migrations/  # 0001–0016
+drizzle/migrations/  # 0001–0017
 scripts/             # seed、迁移、worker 运维
 docs/                # 项目文档
 Dockerfile           # app

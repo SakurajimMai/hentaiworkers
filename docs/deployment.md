@@ -1,6 +1,6 @@
 # Docker Hub 生产部署
 
-生产环境采用 **app-only Docker Compose**：服务器只从 Docker Hub 拉取网站镜像，直接连接你独立维护的远程 MySQL / MariaDB。
+生产环境采用 **App + Worker 双容器 Docker Compose**：服务器从 Docker Hub 拉取两个镜像，只有 App 连接你独立维护的远程 MySQL / MariaDB，Worker 只访问内部控制面 API。
 
 部署过程不会：
 
@@ -8,7 +8,7 @@
 - 在服务器执行 `docker build`
 - 启动数据库容器
 - 执行数据库初始化、迁移或 seed
-- 启动 ops、crawler-worker 或其它节点
+- 启动数据库、ops 或迁移节点
 
 ---
 
@@ -25,13 +25,16 @@ Nginx / Caddy
                               │
                               ▼
                    externally managed remote DB
+
+hentaiworkers-worker ──► http://app:3000/api/internal/crawler/v1
 ```
 
 | 组件 | 说明 |
 |------|------|
 | `app` | Next.js standalone：前台、后台和 API |
+| `worker` | Python 采集运行时；无数据库凭据，不发布端口 |
 | 远程数据库 | 由你独立维护；Compose 只连接，不修改 schema |
-| Docker Hub | 公开镜像 `sakurajiamai/hentaiworkers-app:latest` |
+| Docker Hub | 公开 App 与 Worker 镜像，使用相同版本标签 |
 
 ---
 
@@ -145,13 +148,22 @@ openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
 
 ```bash
 cd /opt/anime-web
-chmod 600 .env
+chmod 600 .env worker.env
 
-docker compose pull app
+docker compose pull app worker
 docker compose up -d app
 ```
 
 Compose 中没有 `build:`，并设置 `pull_policy: always`。
+
+App 健康后，在 `/admin/crawler/workers` 创建节点，将本次显示的一次性 ID 和令牌写入独立 `worker.env`，再启动 Worker：
+
+```bash
+docker compose up -d worker
+docker compose logs --tail=100 worker
+```
+
+`worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。
 
 检查：
 
@@ -221,11 +233,11 @@ anime.example.com {
 
 ```bash
 cd /opt/anime-web
-docker compose pull app
-docker compose up -d --no-build app
+docker compose pull app worker
+docker compose up -d --no-build
 ```
 
-Compose 固定使用 `sakurajiamai/hentaiworkers-app:latest`。每次升级执行 `pull` 后重新创建 app 容器即可。
+Compose 固定使用 App 与 Worker 的公开 `latest` 镜像。升级前先应用目标版本要求的受控迁移，再执行 `pull` 和重建。
 
 应用镜像更新不会改变远程数据库 schema。
 
@@ -273,7 +285,8 @@ sakurajiamai/hentaiworkers-app:<commit-sha>
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| Hub pull 失败 | 网络或 Docker Hub 临时故障 | 检查服务器网络后重试 `docker compose pull app` |
+| Hub pull 失败 | 网络或 Docker Hub 临时故障 | 检查服务器网络后重试 `docker compose pull app worker` |
+| 任务长期 queued 且 attempts=0 | Worker 未启动、令牌无效、节点暂停或能力不匹配 | 查看 Worker 日志、后台节点状态和任务的 `claimSkipReason` |
 | `/api/ready` 失败 | DB URL、TLS、IP 白名单或 schema 有问题 | 检查远程数据库连接与表结构 |
 | 后台无法登录 | 远程数据库没有管理员或密码不匹配 | 在远程数据库侧维护管理员账号 |
 | 宿主机端口冲突 | `APP_PORT` 已占用 | 改为 `13000` 等空闲端口 |

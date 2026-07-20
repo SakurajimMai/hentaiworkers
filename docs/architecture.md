@@ -9,7 +9,7 @@ AnimeStream 是单进程 **Next.js 15（App Router）** 应用，同时提供：
 - 公开 REST API（`/api/*`，供 Web 与移动端）
 - Worker 控制面（`/api/internal/crawler/v1/**`，仅内网）
 
-业务数据存放在外部维护的**远程 MySQL / MariaDB**。生产 Docker Compose 为 app-only，不包含数据库、ops 或 crawler-worker 容器。
+业务数据存放在外部维护的**远程 MySQL / MariaDB**。生产 Docker Compose 包含独立 App 与 Worker；不包含数据库、ops 或迁移容器。
 
 ```mermaid
 flowchart TB
@@ -21,6 +21,7 @@ flowchart TB
 
   subgraph DockerHost["生产服务器 Docker"]
     App["Next.js app :3000<br/>Site + Admin + Public API"]
+    Worker["Python crawler worker<br/>No DB credentials"]
   end
 
   subgraph Data
@@ -31,11 +32,12 @@ flowchart TB
   Mobile -->|GET /api/*| App
   AdminUser -->|/admin + Session Cookie| App
   App -->|DATABASE_URL<br/>mysql2 + Drizzle| MySQL
+  Worker -->|Internal crawler API| App
 ```
 
 ## 1.1 爬虫控制面
 
-> 生产 app-only Compose 不启动爬虫执行进程；控制面代码仍存在，但没有外部 Worker 时不会执行采集任务。
+> 生产 Compose 启动独立 Worker。Worker 只持有机器身份，通过内部 API 领取任务，不连接数据库。
 
 - 后台：`/admin/crawler/**`（模板、调度、任务、Worker、YAML 导入）
 - Worker API：`/api/internal/crawler/v1/**`（见 `docs/api/crawler-internal-openapi.yaml`）
@@ -163,7 +165,7 @@ erDiagram
 | `storage_profiles` / `storage_profile_versions` | S3/SFTP 非密钥配置与激活版本 |
 | `crawler_media_uploads` | 媒体预留 / 上传生命周期 |
 
-定义见 `lib/schema.ts` 与 `drizzle/migrations/`（`0001`–`0016`）。管理员初始化见 `scripts/seed-admin.ts`。
+定义见 `lib/schema.ts` 与 `drizzle/migrations/`（`0001`–`0017`）。管理员初始化见 `scripts/seed-admin.ts`。
 
 ## 5. 鉴权与安全
 
@@ -201,14 +203,15 @@ Internet
 [反向代理 必须 TLS：nginx/Caddy]
    │  屏蔽 /api/internal/crawler/**
    ▼
-docker compose（app-only）:
+docker compose:
   app  Next standalone :3000
    │
    └── DATABASE_URL ──► 外部维护的远程 MySQL / MariaDB
+  worker  Python crawler ──► app:3000/api/internal/crawler/v1
 ```
 
 - 见 `docker-compose.yml` / `deploy/docker-compose.yml`；完整步骤 [deployment.md](./deployment.md)
-- GitHub Actions 只发布 App 镜像：`Dockerfile`（standalone）
+- GitHub Actions 分别发布 App 镜像（`Dockerfile`）和 Worker 镜像（`Dockerfile.worker`）
 
 ## 8. 仓库结构（生产路径）
 
@@ -218,13 +221,14 @@ anime-web/
 ├── components/          # UI / ArtPlayer / 播放面板
 ├── lib/                 # 领域服务、db、系统设置、爬虫控制面
 ├── crawler_worker/      # Python Worker（无 DATABASE_URL）
-├── drizzle/             # core + migrations 0001–0016
+├── drizzle/             # core + migrations 0001–0017
 ├── scripts/             # seed、迁移、worker 运维
 ├── mobile/              # Expo 客户端（独立构建）
 ├── docs/                # 本套文档
 ├── Dockerfile
 ├── Dockerfile.worker
 ├── docker-compose.yml
+├── worker.env.example
 └── .env.example
 ```
 

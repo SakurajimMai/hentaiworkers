@@ -1,22 +1,21 @@
-# Hardened crawler Worker — no database client, non-root, Chromium for Selenium.
+# Hardened crawler Worker: no database client, non-root, Chromium for Selenium.
 FROM python:3.12.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    CRAWLER_TEMP_DIR=/var/tmp/crawler-worker
+    CRAWLER_TEMP_DIR=/tmp/crawler-worker
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         chromium \
         chromium-driver \
         ca-certificates \
-        curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 crawler \
     && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin crawler \
-    && mkdir -p /app /var/tmp/crawler-worker \
-    && chown -R crawler:crawler /app /var/tmp/crawler-worker
+    && mkdir -p /app /tmp/crawler-worker \
+    && chown -R crawler:crawler /app /tmp/crawler-worker
 
 WORKDIR /app
 
@@ -27,8 +26,8 @@ COPY crawler_worker /app/crawler_worker
 
 USER crawler:crawler
 
-# No ports exposed — Worker dials out to control plane only.
+# No ports exposed: Worker only connects to the control plane.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import crawler_worker; print('ok')" || exit 1
 
-ENTRYPOINT ["python", "-m", "crawler_worker.main"]
+CMD ["python", "-u", "-m", "crawler_worker.main"]

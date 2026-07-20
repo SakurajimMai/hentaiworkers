@@ -140,7 +140,7 @@ Session：Cookie 最长 7 天（`SESSION_MAX_AGE_SECONDS`）；未单独做服�
 
 ### Hanime + 对象存储步骤
 
-1. 部署迁移：`CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler`（`0014` 存储配置、`0015` 媒体预留、`0016` 调度存储绑定）。
+1. 部署迁移：`CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler`（`0014` 存储配置、`0015` 媒体预留、`0016` 调度存储绑定、`0017` Worker 领取控制）。
 2. 打开 **爬虫 → 存储**，填写 S3 或 SFTP 表单保存草稿。
 3. 运行 `storage_test` 并激活通过的版本；测试会执行上传、发布和删除探针对象。
 4. **爬虫 → 模板**：来源选 Hanime，媒体存储模式选 S3/SFTP 并保存。
