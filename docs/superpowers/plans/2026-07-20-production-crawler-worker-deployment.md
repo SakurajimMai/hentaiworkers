@@ -31,8 +31,8 @@ environment:
 env_file:
   - worker.env
 read_only: true
-tmpfs:
-  - /tmp/crawler-worker
+volumes:
+  - ./crawler-worker-tmp:/tmp/crawler-worker
 cap_drop:
   - ALL
 security_opt:

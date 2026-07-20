@@ -70,7 +70,7 @@ Worker 安全约束：
 
 - `env_file` 只引用 `worker.env`，不得引用 App 的 `.env`。
 - `read_only: true`。
-- `/tmp/crawler-worker` 使用 `tmpfs`。
+- 宿主机相对目录 `./crawler-worker-tmp` 绑定到 `/tmp/crawler-worker`，目录归 Worker 的 UID/GID `10001:10001` 所有。
 - `cap_drop: [ALL]`。
 - `security_opt: [no-new-privileges:true]`。
 - 不发布宿主机端口。
@@ -216,7 +216,7 @@ sakurajiamai/hentaiworkers-worker
 - 两份 Compose 都必须包含且仅包含 `app`、`worker` 两个服务。
 - App 使用 App 镜像，Worker 使用 Worker 镜像。
 - Worker 不得引用 `.env`、`DATABASE_URL`、数据库配置或 Docker Socket。
-- Worker 必须启用只读根文件系统、tmpfs、cap drop 和 no-new-privileges。
+- Worker 必须启用只读根文件系统、相对路径工作目录绑定挂载、cap drop 和 no-new-privileges。
 - Worker 必须等待 App 健康。
 - Docker 发布工作流必须构建并发布两个固定镜像。
 

@@ -149,6 +149,9 @@ openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
 ```bash
 cd /opt/anime-web
 chmod 600 .env worker.env
+mkdir -p crawler-worker-tmp
+chown 10001:10001 crawler-worker-tmp
+chmod 700 crawler-worker-tmp
 
 docker compose pull app worker
 docker compose up -d app
@@ -163,7 +166,7 @@ docker compose up -d worker
 docker compose logs --tail=100 worker
 ```
 
-`worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。
+`worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。宿主机相对目录 `./crawler-worker-tmp` 会绑定到容器内 `/tmp/crawler-worker`，必须归 UID/GID `10001:10001` 所有；非 root 账号执行 `chown` 时加 `sudo`。
 
 检查：
 

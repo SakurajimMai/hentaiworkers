@@ -51,13 +51,15 @@ for (const relativePath of composePaths) {
     );
     assert.equal(worker.environment?.CRAWLER_TEMP_DIR, '/tmp/crawler-worker');
     assert.equal(worker.read_only, true);
-    assert.deepEqual(worker.tmpfs, ['/tmp/crawler-worker']);
+    assert.equal(worker.tmpfs, undefined);
+    assert.deepEqual(worker.volumes, [
+      './crawler-worker-tmp:/tmp/crawler-worker',
+    ]);
     assert.deepEqual(worker.cap_drop, ['ALL']);
     assert.deepEqual(worker.security_opt, ['no-new-privileges:true']);
     assert.equal(worker.depends_on?.app?.condition, 'service_healthy');
     assert.equal(worker.restart, 'unless-stopped');
     assert.equal(worker.ports, undefined);
-    assert.equal(worker.volumes, undefined);
 
     assert.doesNotMatch(source, /DATABASE_TLS_CA_FILE|certificates/);
     assert.doesNotMatch(source, /docker\.sock/);
@@ -103,6 +105,9 @@ test('worker environment examples contain identity only and real files stay igno
     );
   }
   assert.match(gitIgnore, /^worker\.env$/m);
+  assert.match(gitIgnore, /^crawler-worker-tmp\/$/m);
   assert.match(dockerIgnore, /^worker\.env$/m);
   assert.match(dockerIgnore, /^\*\*\/worker\.env$/m);
+  assert.match(dockerIgnore, /^crawler-worker-tmp$/m);
+  assert.match(dockerIgnore, /^\*\*\/crawler-worker-tmp$/m);
 });

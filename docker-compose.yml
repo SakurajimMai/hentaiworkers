@@ -42,8 +42,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
     read_only: true
-    tmpfs:
-      - /tmp/crawler-worker
+    volumes:
+      - ./crawler-worker-tmp:/tmp/crawler-worker
     cap_drop:
       - ALL
     security_opt:

@@ -57,6 +57,9 @@ mkdir -p /opt/anime-web && cd /opt/anime-web
 cp .env.example .env
 cp worker.env.example worker.env
 chmod 600 .env worker.env
+mkdir -p crawler-worker-tmp
+chown 10001:10001 crawler-worker-tmp
+chmod 700 crawler-worker-tmp
 # 必填：DATABASE_URL、SESSION_SECRET、APP_ENCRYPTION_*、SITE_URL
 # 端口示例：APP_PORT=13000
 
@@ -68,6 +71,7 @@ curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 
 # 4) 登录 /admin/crawler/workers 创建节点，将一次性 ID/令牌写入 worker.env
 # 填写 CRAWLER_WORKER_ID 与 CRAWLER_WORKER_TOKEN 后启动 Worker
+# ./crawler-worker-tmp 会绑定到容器内 /tmp/crawler-worker
 docker compose up -d worker
 
 # 5) 反代 HTTPS → 127.0.0.1:${APP_PORT:-3000}，禁止公网 /api/internal/**

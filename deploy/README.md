@@ -32,7 +32,12 @@ worker.env
 cp .env.example .env
 cp worker.env.example worker.env
 chmod 600 .env worker.env
+mkdir -p crawler-worker-tmp
+chown 10001:10001 crawler-worker-tmp
+chmod 700 crawler-worker-tmp
 ```
+
+`crawler-worker-tmp` 是相对于本 Compose 目录的 Worker 工作目录，会绑定到容器内 `/tmp/crawler-worker`。容器使用 UID/GID `10001:10001` 运行，因此启动前必须设置上述所有权；非 root 账号执行 `chown` 时加 `sudo`。
 
 `.env` 只配置 App：
 
