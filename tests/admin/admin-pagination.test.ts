@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildAdminPaginationHref,
   getAdminPaginationModel,
@@ -57,5 +59,46 @@ test('后台分页链接保留筛选条件并覆盖 page', () => {
       empty: undefined,
     }),
     '/admin/tags?q=%E5%8A%A8%E7%94%BB&scope=used&page=4',
+  );
+});
+
+test('后台分页渲染数字链接、当前页和禁用边界箭头', async () => {
+  (globalThis as typeof globalThis & { React: typeof React }).React = React;
+  const { AdminPagination } = await import(
+    '../../components/admin/admin-pagination'
+  );
+  const firstPage = renderToStaticMarkup(
+    React.createElement(AdminPagination, {
+      page: 1,
+      totalPages: 10,
+      total: 96,
+      basePath: '/admin/users',
+      query: { q: 'sakura' },
+    }),
+  );
+
+  assert.match(firstPage, /aria-label="分页"/);
+  assert.match(
+    firstPage,
+    /aria-label="上一页"[^>]*aria-disabled="true"/,
+  );
+  assert.match(firstPage, /aria-current="page"[^>]*>1<\/span>/);
+  assert.match(
+    firstPage,
+    /href="\/admin\/users\?q=sakura&amp;page=2"/,
+  );
+  assert.match(firstPage, />…<\/span>/);
+
+  const lastPage = renderToStaticMarkup(
+    React.createElement(AdminPagination, {
+      page: 10,
+      totalPages: 10,
+      total: 96,
+      basePath: '/admin/users',
+    }),
+  );
+  assert.match(
+    lastPage,
+    /aria-label="下一页"[^>]*aria-disabled="true"/,
   );
 });
