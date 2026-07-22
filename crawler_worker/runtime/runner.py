@@ -186,9 +186,14 @@ class Runner:
             transient_source_failures = 0
             needs_upload = storage_driver_from_snapshot(snapshot) in ("s3", "sftp")
             skip_existing = bool(snapshot.get("skipExisting", True))
+            media_options = (
+                snapshot.get("media") if isinstance(snapshot.get("media"), dict) else {}
+            )
             for item in results:
                 if self._cancel:
                     break
+                if not bool(media_options.get("enableCover", True)):
+                    item = replace(item, cover_url=None)
                 published_handles = ()
                 if (
                     skip_existing
@@ -206,9 +211,6 @@ class Runner:
                 elif needs_upload and item.status == "succeeded" and item.video_url:
                     if media_adapter is None:
                         media_adapter = build_media_adapter(snapshot)
-                    media_options = (
-                        snapshot.get("media") if isinstance(snapshot.get("media"), dict) else {}
-                    )
                     if item.source == "hanime" and bool(media_options.get("enableFanart", True)):
                         try:
                             getchu_urls = find_getchu_fanart(

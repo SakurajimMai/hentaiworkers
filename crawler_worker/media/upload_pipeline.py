@@ -393,7 +393,7 @@ def publish_item_media(
     )
     handles.append(video)
 
-    cover_url = item.cover_url
+    cover_url = item.cover_url if enable_cover else None
     if enable_cover and item.cover_url:
         try:
             cover = _publish_remote_asset(

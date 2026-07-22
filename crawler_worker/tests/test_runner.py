@@ -445,6 +445,7 @@ class RunnerTests(unittest.TestCase):
                                 "filterJpKr": True,
                             },
                             "dateFilter": {"years": [2026], "months": [7]},
+                            "media": {"enableCover": False},
                         }
                     ),
                     profile_version_id=1,
@@ -499,6 +500,7 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(client.completed)
         self.assertEqual(len(client.commits), 1)
         self.assertEqual(client.commits[0]["video_url"], "https://cdn.example/e2.m3u8")
+        self.assertIsNone(client.commits[0]["cover_url"])
         self.assertEqual(client.commits[0]["source"], "ikun")
 
 

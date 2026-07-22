@@ -173,7 +173,7 @@ class UploadPipelineTests(unittest.TestCase):
         adapter.cleanup.assert_any_call("final/test")
         adapter.close.assert_called_once()
 
-    def test_disabled_cover_keeps_original_cover_url(self) -> None:
+    def test_disabled_cover_discards_cover_url(self) -> None:
         job = ClaimedJob(3, 1, "t", "2099-01-01T00:00:00Z", "crawl", "running", "{}", 1, 3, 1)
         item = CrawlItemResult(
             source="hanime",
@@ -217,7 +217,7 @@ class UploadPipelineTests(unittest.TestCase):
                 adapter=adapter,
             )
         self.assertEqual(out.item.video_url, "https://media.example/final/v.mp4")
-        self.assertEqual(out.item.cover_url, "https://cdn.example/c.jpg")
+        self.assertIsNone(out.item.cover_url)
         self.assertEqual(client.media_reserve.call_count, 1)
 
     def test_abandon_published_media_cleans_final_and_marks_abandoned(self) -> None:
