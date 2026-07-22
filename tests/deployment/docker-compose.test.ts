@@ -109,11 +109,11 @@ test('worker environment examples contain identity only and real files stay igno
   }
   assert.match(gitIgnore, /^worker\.env$/m);
   assert.match(gitIgnore, /^crawler-worker-tmp\/$/m);
-  assert.match(gitIgnore, /^covers\/$/m);
+  assert.match(gitIgnore, /^\/covers\/$/m);
   assert.match(dockerIgnore, /^worker\.env$/m);
   assert.match(dockerIgnore, /^\*\*\/worker\.env$/m);
   assert.match(dockerIgnore, /^crawler-worker-tmp$/m);
   assert.match(dockerIgnore, /^\*\*\/crawler-worker-tmp$/m);
-  assert.match(dockerIgnore, /^covers$/m);
-  assert.match(dockerIgnore, /^\*\*\/covers$/m);
+  assert.match(dockerIgnore, /^\/covers\/\*\*$/m);
+  assert.doesNotMatch(dockerIgnore, /^\*\*\/covers$/m);
 });
