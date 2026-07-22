@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LOCAL_COVER_PATH_PATTERN } from '../../media/local-cover-path';
 import { workerCapabilitiesSchema } from '../domain/worker-protocol';
 
 export const registerBodySchema = z.object({
@@ -75,6 +76,11 @@ const httpUrlSchema = z
   .url()
   .refine((value) => /^https?:\/\//i.test(value), '必须是 HTTP(S) 地址');
 
+const coverUrlSchema = z.union([
+  httpUrlSchema,
+  z.string().max(1000).regex(LOCAL_COVER_PATH_PATTERN, '本地封面路径格式无效'),
+]);
+
 export const itemExistsBodySchema = z.object({
   attemptId: z.number().int().positive(),
   leaseToken: z.string().min(1).optional(),
@@ -95,7 +101,7 @@ export const itemsCommitBodySchema = z.object({
   titleEnglish: z.string().max(500).nullable().optional(),
   titleJapanese: z.string().max(500).nullable().optional(),
   videoUrl: httpUrlSchema.nullable().optional(),
-  coverUrl: httpUrlSchema.nullable().optional(),
+  coverUrl: coverUrlSchema.nullable().optional(),
   fanartUrls: z.array(httpUrlSchema).max(30).optional(),
   description: z.string().max(50_000).nullable().optional(),
   tags: z.array(z.string().min(1).max(100)).max(100).optional(),

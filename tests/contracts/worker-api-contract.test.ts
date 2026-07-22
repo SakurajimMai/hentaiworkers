@@ -13,6 +13,7 @@ import { AppError } from '../../lib/server/shared/errors';
 import { WORKER_SCOPES } from '../../lib/server/crawler/interfaces/worker-auth';
 import { StorageConfigService } from '../../lib/server/crawler/application/storage-config-service';
 import { InMemoryStorageConfigRepository } from '../../lib/server/crawler/testing/in-memory-config-repos';
+import { itemsCommitBodySchema } from '../../lib/server/crawler/interfaces/worker-request';
 
 function jsonRequest(
   url: string,
@@ -37,6 +38,33 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   if (response.status === 204) return {};
   return (await response.json()) as Record<string, unknown>;
 }
+
+test('item commit accepts only controlled local cover routes', () => {
+  const digest = 'a'.repeat(64);
+  const body = {
+    attemptId: 1,
+    idempotencyKey: 'cover-route',
+    source: 'ikun',
+    sourceId: '77',
+    status: 'succeeded',
+    coverUrl: `/api/media/covers/ikun/${digest}.jpg`,
+  };
+
+  assert.equal(itemsCommitBodySchema.safeParse(body).success, true);
+  for (const coverUrl of [
+    '/api/media/covers/../secret.jpg',
+    '/api/media/covers/ikun/short.jpg',
+    `/api/media/covers/IKUN/${digest}.jpg`,
+    `/api/media/covers/ikun/${digest}.svg`,
+    `/uploads/${digest}.jpg`,
+  ]) {
+    assert.equal(
+      itemsCommitBodySchema.safeParse({ ...body, coverUrl }).success,
+      false,
+      coverUrl,
+    );
+  }
+});
 
 test('401 WORKER_TOKEN_INVALID for missing/invalid machine token', async () => {
   const api = createTestWorkerApi();

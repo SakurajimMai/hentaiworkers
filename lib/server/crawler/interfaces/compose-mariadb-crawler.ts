@@ -119,14 +119,18 @@ export function createMariaDbAdminDeps(
  * Credential issuer is null by default: URL-only crawls do not need real S3/STS.
  * Wire an issuer later only when object upload + short-lived credentials are required.
  */
-export function createMariaDbWorkerApiDeps(): WorkerApiDeps {
+export function createMariaDbWorkerApiDeps(
+  env: EnvironmentSource = getProcessEnvironment(),
+): WorkerApiDeps {
   const uow = new MariaDbCrawlerUnitOfWork();
   const workers = new MariaDbWorkerRepository();
   return {
     auth: new WorkerAuthService(workers),
     registry: new WorkerRegistryService(workers),
     jobs: new CrawlerJobService(uow),
-    results: new CrawlerResultService(uow, new MariaDbCrawlerCatalogIngestion()),
+    results: new CrawlerResultService(uow, new MariaDbCrawlerCatalogIngestion(), {
+      siteUrl: env.SITE_URL,
+    }),
     logs: new CrawlerLogService(uow),
     media: new MediaReservationService(uow),
     credentials: new CredentialRefreshService(uow, null),

@@ -59,7 +59,7 @@ function getOrCreateMariaDbWorkerApiDeps(): WorkerApiDeps {
   }
 
   try {
-    processLocal = createMariaDbWorkerApiDeps();
+    processLocal = createMariaDbWorkerApiDeps(env);
   } catch (error) {
     if (error instanceof AppError) throw error;
     const message = error instanceof Error ? error.message : String(error);

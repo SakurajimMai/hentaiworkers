@@ -62,8 +62,31 @@ test('successful crawler item upserts catalog metadata and links anime id', asyn
 
   assert.equal(catalog.calls.length, 1);
   assert.equal(catalog.calls[0].sourceId, '42');
+  assert.equal(catalog.calls[0].coverUrl, 'https://media.example/cover.jpg');
   assert.equal(result.item.animeId, 73);
   assert.equal(result.catalog?.created, true);
+});
+
+test('local cover route is stored as an absolute SITE_URL cover', async () => {
+  const { uow, binding } = await runningJob();
+  const catalog = new FakeCatalogIngestion();
+  const service = new CrawlerResultService(uow, catalog, {
+    siteUrl: 'https://anime.example',
+  });
+  const localCover = `/api/media/covers/ikun/${'b'.repeat(64)}.webp`;
+
+  await service.commitItem({
+    ...binding,
+    idempotencyKey: 'ikun:local-cover',
+    source: 'ikun',
+    sourceId: '77',
+    status: 'succeeded',
+    title: 'Local cover title',
+    videoUrl: 'https://media.example/77.m3u8',
+    coverUrl: localCover,
+  });
+
+  assert.equal(catalog.calls[0].coverUrl, `https://anime.example${localCover}`);
 });
 
 test('failed and skipped items do not write catalog', async () => {

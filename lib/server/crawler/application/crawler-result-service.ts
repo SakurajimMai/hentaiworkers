@@ -1,4 +1,6 @@
 import { AppError } from '../../shared/errors';
+import { isLocalCoverPath } from '../../media/local-cover-path';
+import { resolveSiteUrl } from '../../../site-url';
 import type {
   CatalogIngestionPort,
   CatalogIngestionResult,
@@ -62,6 +64,23 @@ function optionalHttpUrl(value: string | null | undefined, field: string): void 
   }
 }
 
+function normalizeCoverUrl(
+  value: string | null | undefined,
+  siteUrl: string | undefined,
+): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  if (isHttpUrl(candidate)) return candidate;
+  if (isLocalCoverPath(candidate)) {
+    return `${resolveSiteUrl(siteUrl)}${candidate}`;
+  }
+  throw new AppError(
+    'RESULT_INVALID',
+    'coverUrl 必须是 HTTP(S) 地址或本站封面路径',
+    400,
+  );
+}
+
 /**
  * Sole application entry for crawler item commits. Production composes a
  * catalog ingestion adapter so catalog rows and job state share one DB transaction.
@@ -70,6 +89,7 @@ export class CrawlerResultService {
   constructor(
     private readonly uow: CrawlerUnitOfWork,
     private readonly catalog?: CatalogIngestionPort,
+    private readonly options: { siteUrl?: string } = {},
   ) {}
 
   async findExisting(
@@ -92,12 +112,13 @@ export class CrawlerResultService {
     if (!source || !sourceId) {
       throw new AppError('RESULT_INVALID', 'source 与 source_id 必填', 400);
     }
+    const coverUrl = normalizeCoverUrl(input.coverUrl, this.options.siteUrl);
 
     if (input.status === 'succeeded' && input.animeId == null && this.catalog) {
       if (!input.title?.trim() || !isHttpUrl(input.videoUrl)) {
         throw new AppError('RESULT_INVALID', '成功条目的标题与 HTTP(S) 视频地址必填', 400);
       }
-      optionalHttpUrl(input.coverUrl, 'coverUrl');
+      optionalHttpUrl(coverUrl, 'coverUrl');
       for (const fanartUrl of input.fanartUrls ?? []) {
         optionalHttpUrl(fanartUrl, 'fanartUrl');
       }
@@ -114,7 +135,7 @@ export class CrawlerResultService {
         titleEnglish: input.titleEnglish?.trim() || null,
         titleJapanese: input.titleJapanese?.trim() || null,
         videoUrl: input.videoUrl?.trim() || null,
-        coverUrl: input.coverUrl?.trim() || null,
+        coverUrl,
         fanartUrls: input.fanartUrls ?? [],
         description: input.description?.trim() || null,
         tags: input.tags ?? [],
