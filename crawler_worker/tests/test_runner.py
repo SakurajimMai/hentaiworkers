@@ -31,6 +31,136 @@ class FakeSource:
 
 
 class RunnerTests(unittest.TestCase):
+    def _local_cover_job(self):
+        return ClaimedJob(
+            job_id=20,
+            attempt_id=1,
+            lease_token="lease",
+            lease_expires_at="2099-01-01T00:00:00Z",
+            kind="crawl",
+            status="leased",
+            config_snapshot_json=json.dumps(
+                {
+                    "requiredSource": "ikun",
+                    "skipExisting": False,
+                    "media": {"enableCover": True},
+                }
+            ),
+            profile_version_id=1,
+            max_attempts=3,
+            attempt_no=1,
+        )
+
+    def _local_cover_source(self):
+        class Source:
+            name = "ikun"
+
+            def crawl(self, snapshot, *, workdir, should_stop):
+                return [
+                    CrawlItemResult(
+                        source="ikun",
+                        source_id="77",
+                        title="Local cover",
+                        video_url="https://cdn.example/e1.m3u8",
+                        cover_url="https://img.example/c.jpg",
+                        tags=(),
+                        status="succeeded",
+                        source_page_url="https://source.example/item/77",
+                    )
+                ]
+
+        return Source()
+
+    def _local_cover_client(self):
+        class Client:
+            def __init__(self):
+                self.commit = None
+                self.events = []
+
+            def start(self, job):
+                return None
+
+            def items_commit(self, job, **kwargs):
+                self.commit = kwargs
+                return type("R", (), {"replayed": False, "item_id": 1, "status": kwargs["status"]})()
+
+            def complete(self, *args, **kwargs):
+                return {"status": "succeeded"}
+
+            def fail(self, *args, **kwargs):
+                raise AssertionError("local cover failure must not fail the job")
+
+            def events_batch(self, job, events):
+                self.events.extend(events)
+                return None
+
+            def job_heartbeat(self, job):
+                return type(
+                    "HB",
+                    (),
+                    {"cancel_requested": False, "lease_expires_at": "t", "status": "running"},
+                )()
+
+        return Client()
+
+    def test_local_cover_replaces_upstream_url_without_external_storage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client = self._local_cover_client()
+            cfg = WorkerRuntimeConfig(
+                control_base_url="https://control.example",
+                worker_id=1,
+                machine_token="t",
+                temp_dir=tmp,
+                cover_dir=str(Path(tmp) / "covers"),
+            )
+            local_route = "/api/media/covers/ikun/" + "a" * 64 + ".jpg"
+            with patch(
+                "crawler_worker.runtime.runner.save_cover_locally",
+                return_value=local_route,
+            ) as save:
+                Runner(
+                    cfg,
+                    client,
+                    {"ikun": self._local_cover_source()},
+                    sleep=lambda _s: None,
+                )._run_job(self._local_cover_job())
+
+            self.assertEqual(client.commit["cover_url"], local_route)
+            save.assert_called_once_with(
+                url="https://img.example/c.jpg",
+                source="ikun",
+                referer="https://source.example/item/77",
+                root_dir=Path(cfg.cover_dir),
+            )
+
+    def test_local_cover_failure_preserves_upstream_url_and_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client = self._local_cover_client()
+            cfg = WorkerRuntimeConfig(
+                control_base_url="https://control.example",
+                worker_id=1,
+                machine_token="t",
+                temp_dir=tmp,
+                cover_dir=str(Path(tmp) / "covers"),
+            )
+            with patch(
+                "crawler_worker.runtime.runner.save_cover_locally",
+                side_effect=ValueError("unsupported cover image format"),
+            ):
+                Runner(
+                    cfg,
+                    client,
+                    {"ikun": self._local_cover_source()},
+                    sleep=lambda _s: None,
+                )._run_job(self._local_cover_job())
+
+            self.assertEqual(client.commit["cover_url"], "https://img.example/c.jpg")
+            warning = next(
+                event for event in client.events if event["eventType"] == "cover_download_failed"
+            )
+            self.assertEqual(warning["level"], "warn")
+            self.assertIn("unsupported cover image format", warning["message"])
+
     def test_auth_failure_exits_without_retrying(self):
         class Client:
             def __init__(self):

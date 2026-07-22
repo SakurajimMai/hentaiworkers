@@ -11,6 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Optional
 
+from crawler_worker.media.local_cover_store import save_cover_locally
 from crawler_worker.media.upload_pipeline import (
     abandon_published_media,
     build_media_adapter,
@@ -251,6 +252,23 @@ class Runner:
                             error_code="STORAGE_UPLOAD_FAILED",
                             error_message=str(exc)[:500],
                         )
+                elif not needs_upload and item.status == "succeeded" and item.cover_url:
+                    try:
+                        local_cover_url = save_cover_locally(
+                            url=item.cover_url,
+                            source=item.source,
+                            referer=item.source_page_url,
+                            root_dir=Path(self._config.cover_dir),
+                        )
+                        item = replace(item, cover_url=local_cover_url)
+                    except Exception as exc:
+                        seq = self._log(
+                            job,
+                            seq,
+                            "cover_download_failed",
+                            f"{item.source}:{item.source_id} {str(exc)[:500]}",
+                            level="warn",
+                        )
                 commit_key = f"item-{job.job_id}-{item.source}-{item.source_id}"
                 commit = None
                 for commit_attempt in range(3):
@@ -413,12 +431,20 @@ class Runner:
                     pass
             shutil.rmtree(workdir, ignore_errors=True)
 
-    def _log(self, job: ClaimedJob, seq: int, event_type: str, message: str) -> int:
+    def _log(
+        self,
+        job: ClaimedJob,
+        seq: int,
+        event_type: str,
+        message: str,
+        *,
+        level: str = "info",
+    ) -> int:
         next_seq = seq + 1
         try:
             self._client.events_batch(
                 job,
-                [{"sequence": next_seq, "eventType": event_type, "message": message, "level": "info"}],
+                [{"sequence": next_seq, "eventType": event_type, "message": message, "level": level}],
             )
         except ControlPlaneError:
             pass

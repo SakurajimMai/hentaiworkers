@@ -28,6 +28,8 @@ def config_from_env(env: dict[str, str] | None = None) -> WorkerRuntimeConfig:
             raise SystemExit(f"Worker must not receive {banned}")
     temp = e.get("CRAWLER_TEMP_DIR", "/tmp/crawler-worker")
     Path(temp).mkdir(parents=True, exist_ok=True)
+    cover_dir = e.get("CRAWLER_COVER_DIR", "/data/covers")
+    Path(cover_dir).mkdir(parents=True, exist_ok=True)
     maccms_names = tuple(sorted(build_maccms_sources().keys()))
     sources = ("hanime", *maccms_names)
     # Advertise only storage drivers for which this Worker has real credentials.
@@ -54,6 +56,7 @@ def config_from_env(env: dict[str, str] | None = None) -> WorkerRuntimeConfig:
         worker_id=int(worker_id),
         machine_token=token,
         temp_dir=temp,
+        cover_dir=cover_dir,
         worker_version=e.get("CRAWLER_WORKER_VERSION", "1.0.0"),
         sources=sources,
         storage_drivers=storage_drivers,

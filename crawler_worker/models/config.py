@@ -24,6 +24,7 @@ class WorkerRuntimeConfig:
     job_heartbeat_seconds: int = 10
     claim_wait_seconds: int = 20
     temp_dir: str = "/tmp/crawler-worker"
+    cover_dir: str = "/data/covers"
     browser_version: str | None = "chrome"
 
     def capabilities(self, current_load: int = 0) -> dict[str, Any]:
