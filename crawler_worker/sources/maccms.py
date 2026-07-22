@@ -166,6 +166,16 @@ def parse_play_groups(
     return result
 
 
+def _play_from_matches(flag: str, preferred_from: str) -> bool:
+    flag_value = flag.strip().lower()
+    preferred_value = preferred_from.strip().lower()
+    return bool(
+        flag_value
+        and preferred_value
+        and (preferred_value in flag_value or flag_value in preferred_value)
+    )
+
+
 def pick_video_url(
     play_from: str | None,
     play_url: str | None,
@@ -181,12 +191,11 @@ def pick_video_url(
 
     ordered = groups
     if preferred_from:
-        preferred = preferred_from.lower()
         ordered = sorted(
             groups,
             key=lambda g: (
                 0
-                if preferred in g[0].lower() or g[0].lower() in preferred
+                if _play_from_matches(g[0], preferred_from)
                 else 1
                 if (prefer_m3u8 and "m3u8" in g[0].lower())
                 else 2
@@ -216,6 +225,9 @@ def pick_video_url(
 def play_lines_payload(
     play_from: str | None,
     play_url: str | None,
+    *,
+    source_play_from: str | None = None,
+    local_play_from: str | None = None,
 ) -> tuple[dict[str, object], ...]:
     """Serialize all play lines for catalog storage (tabs + episode grid)."""
     lines: list[dict[str, object]] = []
@@ -229,7 +241,16 @@ def play_lines_payload(
                 continue
             safe_eps.append({"name": name, "url": u})
         if safe_eps:
-            lines.append({"name": flag, "flag": flag, "episodes": safe_eps})
+            stored_flag = flag
+            if (
+                source_play_from
+                and local_play_from
+                and _play_from_matches(flag, source_play_from)
+            ):
+                stored_flag = local_play_from.strip()
+            lines.append(
+                {"name": stored_flag, "flag": stored_flag, "episodes": safe_eps}
+            )
     return tuple(lines)
 
 
@@ -409,9 +430,17 @@ class MacCmsSource(SourceAdapter):
             ]
 
         max_pages = max(1, min(200, int(cfg.get("maxPages") or 3)))
-        max_items = max(1, min(5000, int(cfg.get("maxItems") or 100)))
+        configured_max_items = int(
+            cfg.get("maxItems") if cfg.get("maxItems") is not None else 100
+        )
+        max_items = (
+            None
+            if configured_max_items == 0
+            else max(1, min(5000, configured_max_items))
+        )
         hours = cfg.get("hours")
-        preferred_from = cfg.get("playFrom")
+        source_play_from = cfg.get("sourcePlayFrom")
+        local_play_from = cfg.get("playFrom")
         skip_keywords = list(cfg.get("skipKeywords") or [])
         years = set(int(y) for y in (cfg.get("years") or []) if str(y).isdigit() or isinstance(y, int))
         filter_jp_kr = bool(cfg.get("filterJpKr", True))
@@ -424,7 +453,9 @@ class MacCmsSource(SourceAdapter):
         seen_ids: set[str] = set()
 
         for type_id in type_ids:
-            if should_stop() or len(results) >= max_items:
+            if should_stop() or (
+                max_items is not None and len(results) >= max_items
+            ):
                 break
 
             pages = self._plan_pages(
@@ -450,7 +481,10 @@ class MacCmsSource(SourceAdapter):
             # Preserve planned page order when merging (newest-first for reverse).
             ordered_raw_items: list[dict[str, Any]] = []
             for page in pages:
-                if should_stop() or len(results) + len(ordered_raw_items) >= max_items * 2:
+                if should_stop() or (
+                    max_items is not None
+                    and len(results) + len(ordered_raw_items) >= max_items * 2
+                ):
                     break
                 payload = page_payloads.get(page)
                 if payload is None:
@@ -486,11 +520,14 @@ class MacCmsSource(SourceAdapter):
                 )
 
             for raw in ordered_raw_items:
-                if should_stop() or len(results) >= max_items:
+                if should_stop() or (
+                    max_items is not None and len(results) >= max_items
+                ):
                     break
                 item = self._item_from_raw(
                     raw,
-                    preferred_from=preferred_from,
+                    preferred_from=source_play_from,
+                    local_play_from=local_play_from,
                     skip_keywords=skip_keywords,
                     years=years,
                     filter_jp_kr=filter_jp_kr,
@@ -626,6 +663,7 @@ class MacCmsSource(SourceAdapter):
         raw: dict[str, Any],
         *,
         preferred_from: Any,
+        local_play_from: Any,
         skip_keywords: Sequence[str],
         years: set[int],
         filter_jp_kr: bool,
@@ -707,7 +745,12 @@ class MacCmsSource(SourceAdapter):
                 title,
             )
 
-        lines = play_lines_payload(play_from_raw, play_url_raw)
+        lines = play_lines_payload(
+            play_from_raw,
+            play_url_raw,
+            source_play_from=str(preferred_from) if preferred_from else None,
+            local_play_from=str(local_play_from) if local_play_from else None,
+        )
         return CrawlItemResult(
             source=self.name,
             source_id=vod_id,
@@ -770,12 +813,29 @@ class MacCmsSource(SourceAdapter):
         if page_order not in {"reverse", "forward", "from_end"}:
             page_order = "reverse"
 
+        has_source_play_from = source.get("sourcePlayFrom") not in (None, "")
+        source_play_from = (
+            source.get("sourcePlayFrom")
+            if has_source_play_from
+            else source.get("playFrom") or preset.get("playFrom")
+        )
+        local_play_from = source.get("playFrom") if has_source_play_from else None
+        source_max_items = source.get("maxItems")
+        snapshot_max_items = snapshot.get("maxItems")
+
         return {
             "baseUrl": base_url,
             "typeIds": parsed_ids,
-            "playFrom": source.get("playFrom") or preset.get("playFrom"),
+            "sourcePlayFrom": source_play_from,
+            "playFrom": local_play_from,
             "maxPages": source.get("maxPages") or snapshot.get("maxPages") or 3,
-            "maxItems": source.get("maxItems") or snapshot.get("maxItems") or 100,
+            "maxItems": (
+                source_max_items
+                if source_max_items is not None
+                else snapshot_max_items
+                if snapshot_max_items is not None
+                else 100
+            ),
             "hours": source.get("hours") if source.get("hours") not in (None, "") else None,
             "autoDetectTypes": source.get("autoDetectTypes", not parsed_ids),
             "filterJpKr": source.get("filterJpKr", True),

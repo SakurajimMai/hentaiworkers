@@ -42,6 +42,110 @@ class MacCmsUnitTests(unittest.TestCase):
         )
         self.assertEqual(url, "https://cdn.example/e2.m3u8")
 
+    def test_crawl_uses_source_line_and_stores_custom_line_id(self):
+        pages = {
+            "https://api.example/provide/vod/?ac=detail&t=37&pg=1": {
+                "code": 1,
+                "list": [
+                    {
+                        "vod_id": 88,
+                        "vod_name": "线路标识测试",
+                        "type_name": "日本动漫",
+                        "vod_area": "日本",
+                        "vod_year": "2026",
+                        "vod_play_from": "cloud$$$ikm3u8",
+                        "vod_play_url": (
+                            "HD$https://cdn.example/old.mp4$$$"
+                            "第1集$https://cdn.example/e1.m3u8#"
+                            "第2集$https://cdn.example/e2.m3u8"
+                        ),
+                    }
+                ],
+            }
+        }
+        source = MacCmsSource(
+            "ikun",
+            fetch_json=lambda url: pages[url],
+            default_preset=None,
+        )
+        items = source.crawl(
+            {
+                "requiredSource": "ikun",
+                "source": {
+                    "baseUrl": "https://api.example/provide/vod/",
+                    "typeIds": [37],
+                    "sourcePlayFrom": "ikm3u8",
+                    "playFrom": "ik",
+                    "maxPages": 1,
+                    "maxItems": 10,
+                    "filterJpKr": False,
+                },
+                "dateFilter": {"years": [2026], "months": [7]},
+                "skipKeywords": [],
+            },
+            workdir=Path(tempfile.mkdtemp()),
+            should_stop=lambda: False,
+        )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].video_url, "https://cdn.example/e2.m3u8")
+        self.assertEqual(items[0].play_lines[0]["name"], "cloud")
+        self.assertEqual(items[0].play_lines[1]["name"], "ik")
+        self.assertEqual(items[0].play_lines[1]["flag"], "ik")
+
+    def test_zero_max_items_collects_every_item_in_configured_pages(self):
+        def row(vod_id: int) -> dict[str, object]:
+            return {
+                "vod_id": vod_id,
+                "vod_name": f"番剧 {vod_id}",
+                "type_name": "日本动漫",
+                "vod_area": "日本",
+                "vod_year": "2026",
+                "vod_play_from": "ikm3u8",
+                "vod_play_url": f"HD$https://cdn.example/{vod_id}.m3u8",
+            }
+
+        pages = {
+            "https://api.example/provide/vod/?ac=detail&t=37&pg=1": {
+                "code": 1,
+                "pagecount": 2,
+                "list": [row(vod_id) for vod_id in range(1, 61)],
+            },
+            "https://api.example/provide/vod/?ac=detail&t=37&pg=2": {
+                "code": 1,
+                "pagecount": 2,
+                "list": [row(vod_id) for vod_id in range(61, 121)],
+            },
+        }
+        source = MacCmsSource(
+            "ikun",
+            fetch_json=lambda url: pages[url],
+            default_preset=None,
+        )
+        items = source.crawl(
+            {
+                "requiredSource": "ikun",
+                "source": {
+                    "baseUrl": "https://api.example/provide/vod/",
+                    "typeIds": [37],
+                    "sourcePlayFrom": "ikm3u8",
+                    "playFrom": "ik",
+                    "maxPages": 2,
+                    "maxItems": 0,
+                    "filterJpKr": False,
+                },
+                "dateFilter": {"years": [2026], "months": [7]},
+                "skipKeywords": [],
+            },
+            workdir=Path(tempfile.mkdtemp()),
+            should_stop=lambda: False,
+        )
+
+        succeeded = [item for item in items if item.status == "succeeded"]
+        self.assertEqual(len(succeeded), 120)
+        self.assertEqual(succeeded[0].source_id, "120")
+        self.assertEqual(succeeded[-1].source_id, "1")
+
     
     def test_tags_from_item_uses_genre_only(self):
         src = MacCmsSource(name="ikun")
