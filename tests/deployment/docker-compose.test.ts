@@ -9,6 +9,8 @@ const composePaths = ['docker-compose.yml', 'deploy/docker-compose.yml'] as cons
 const workflow = readFileSync(join(root, '.github/workflows/docker-publish.yml'), 'utf8');
 const dockerIgnore = readFileSync(join(root, '.dockerignore'), 'utf8');
 const gitIgnore = readFileSync(join(root, '.gitignore'), 'utf8');
+const deploymentGuide = readFileSync(join(root, 'docs/deployment.md'), 'utf8');
+const deployReadme = readFileSync(join(root, 'deploy/README.md'), 'utf8');
 
 for (const relativePath of composePaths) {
   test(`${relativePath} runs isolated app and crawler worker services`, () => {
@@ -116,4 +118,15 @@ test('worker environment examples contain identity only and real files stay igno
   assert.match(dockerIgnore, /^\*\*\/crawler-worker-tmp$/m);
   assert.match(dockerIgnore, /^\/covers\/\*\*$/m);
   assert.doesNotMatch(dockerIgnore, /^\*\*\/covers$/m);
+});
+
+test('deployment docs prepare and preserve shared local cover storage', () => {
+  for (const source of [deploymentGuide, deployReadme]) {
+    assert.match(source, /mkdir -p[^\n]*covers/);
+    assert.match(source, /chown 10001:10001[^\n]*covers/);
+    assert.match(source, /chmod 755[^\n]*covers/);
+    assert.match(source, /\.\/covers:\/data\/covers/);
+    assert.match(source, /SITE_URL[^\n]*完整[^\n]*封面/);
+    assert.match(source, /升级[^\n]*不会删除[^\n]*covers/);
+  }
 });

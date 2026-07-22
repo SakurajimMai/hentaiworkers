@@ -32,12 +32,15 @@ worker.env
 cp .env.example .env
 cp worker.env.example worker.env
 chmod 600 .env worker.env
-mkdir -p crawler-worker-tmp
-chown 10001:10001 crawler-worker-tmp
+mkdir -p crawler-worker-tmp covers
+chown 10001:10001 crawler-worker-tmp covers
 chmod 700 crawler-worker-tmp
+chmod 755 covers
 ```
 
 `crawler-worker-tmp` 是相对于本 Compose 目录的 Worker 工作目录，会绑定到容器内 `/tmp/crawler-worker`。容器使用 UID/GID `10001:10001` 运行，因此启动前必须设置上述所有权；非 root 账号执行 `chown` 时加 `sudo`。
+
+本地封面由 Worker 通过 `./covers:/data/covers` 写入，App 通过 `./covers:/data/covers:ro` 只读。勾选“下载并保存封面”后，图片由 `/api/media/covers/...` 路由提供；`SITE_URL` 用于生成数据库中的完整封面 URL，必须填写用户实际访问的 HTTPS 域名。`covers` 使用 `755` 是为了让 App 的非 root 用户能够读取 Worker 以 `644` 创建的图片。
 
 `.env` 只配置 App：
 
@@ -106,5 +109,7 @@ docker compose up -d --force-recreate worker
 docker compose pull app worker
 docker compose up -d --no-build
 ```
+
+升级和容器重建不会删除宿主机 `./covers`；该目录是持久数据，不要随镜像或临时目录一起清理。
 
 反向代理只指向 `127.0.0.1:${APP_PORT}`。必须使用 HTTPS，并阻止公网访问 `/api/internal/crawler/**`；Worker 通过 Compose 内网地址 `http://app:3000` 访问该路径。

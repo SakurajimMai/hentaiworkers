@@ -149,9 +149,10 @@ openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
 ```bash
 cd /opt/anime-web
 chmod 600 .env worker.env
-mkdir -p crawler-worker-tmp
-chown 10001:10001 crawler-worker-tmp
+mkdir -p crawler-worker-tmp covers
+chown 10001:10001 crawler-worker-tmp covers
 chmod 700 crawler-worker-tmp
+chmod 755 covers
 
 docker compose pull app worker
 docker compose up -d app
@@ -167,6 +168,8 @@ docker compose logs --tail=100 worker
 ```
 
 `worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。宿主机相对目录 `./crawler-worker-tmp` 会绑定到容器内 `/tmp/crawler-worker`，必须归 UID/GID `10001:10001` 所有；非 root 账号执行 `chown` 时加 `sudo`。
+
+本地封面使用同一宿主机相对目录映射：Worker 通过 `./covers:/data/covers` 读写，App 通过 `./covers:/data/covers:ro` 只读。勾选“下载并保存封面”后，Worker 会把图片写入该目录，App 通过 `/api/media/covers/...` 返回图片；`SITE_URL` 用于生成写入数据库的完整封面 URL，因此必须配置为用户实际访问的 HTTPS 域名。不要把 `/api/media/covers/**` 加入反向代理的内部 API 拦截规则。
 
 检查：
 
@@ -243,6 +246,8 @@ docker compose up -d --no-build
 Compose 固定使用 App 与 Worker 的公开 `latest` 镜像。升级前先应用目标版本要求的受控迁移，再执行 `pull` 和重建。
 
 应用镜像更新不会改变远程数据库 schema。
+
+升级和容器重建不会删除宿主机 `./covers`；不要在清理旧镜像或临时文件时删除该目录，否则数据库中已有的本地封面 URL 会返回 404。
 
 ---
 
