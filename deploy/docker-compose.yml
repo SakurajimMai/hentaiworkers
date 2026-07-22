@@ -17,6 +17,9 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      CRAWLER_COVER_DIR: /data/covers
+    volumes:
+      - ./covers:/data/covers:ro
     restart: unless-stopped
     healthcheck:
       test:
@@ -39,6 +42,7 @@ services:
     environment:
       CRAWLER_CONTROL_URL: http://app:3000/api/internal/crawler/v1
       CRAWLER_TEMP_DIR: /tmp/crawler-worker
+      CRAWLER_COVER_DIR: /data/covers
     depends_on:
       app:
         condition: service_healthy
@@ -46,6 +50,7 @@ services:
     read_only: true
     volumes:
       - ./crawler-worker-tmp:/tmp/crawler-worker
+      - ./covers:/data/covers
     cap_drop:
       - ALL
     security_opt:

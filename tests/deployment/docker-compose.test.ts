@@ -37,7 +37,8 @@ for (const relativePath of composePaths) {
     assert.equal('build' in app, false);
     assert.equal(app.image, 'sakurajiamai/hentaiworkers-app:latest');
     assert.equal(app.pull_policy, 'always');
-    assert.equal(app.volumes, undefined);
+    assert.equal(app.environment?.CRAWLER_COVER_DIR, '/data/covers');
+    assert.deepEqual(app.volumes, ['./covers:/data/covers:ro']);
 
     const worker = compose.services.worker;
     assert.ok(worker);
@@ -50,10 +51,12 @@ for (const relativePath of composePaths) {
       'http://app:3000/api/internal/crawler/v1',
     );
     assert.equal(worker.environment?.CRAWLER_TEMP_DIR, '/tmp/crawler-worker');
+    assert.equal(worker.environment?.CRAWLER_COVER_DIR, '/data/covers');
     assert.equal(worker.read_only, true);
     assert.equal(worker.tmpfs, undefined);
     assert.deepEqual(worker.volumes, [
       './crawler-worker-tmp:/tmp/crawler-worker',
+      './covers:/data/covers',
     ]);
     assert.deepEqual(worker.cap_drop, ['ALL']);
     assert.deepEqual(worker.security_opt, ['no-new-privileges:true']);
@@ -106,8 +109,11 @@ test('worker environment examples contain identity only and real files stay igno
   }
   assert.match(gitIgnore, /^worker\.env$/m);
   assert.match(gitIgnore, /^crawler-worker-tmp\/$/m);
+  assert.match(gitIgnore, /^covers\/$/m);
   assert.match(dockerIgnore, /^worker\.env$/m);
   assert.match(dockerIgnore, /^\*\*\/worker\.env$/m);
   assert.match(dockerIgnore, /^crawler-worker-tmp$/m);
   assert.match(dockerIgnore, /^\*\*\/crawler-worker-tmp$/m);
+  assert.match(dockerIgnore, /^covers$/m);
+  assert.match(dockerIgnore, /^\*\*\/covers$/m);
 });

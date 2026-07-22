@@ -30,6 +30,7 @@ worker.env
 .crawler-worker.env
 .crawler-worker-tmp/
 crawler-worker-tmp/
+covers/
 
 # Database
 *.db
