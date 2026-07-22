@@ -37,7 +37,11 @@ export function profileFormDefaults(
     provider: config.source.provider ?? '',
     baseUrl: config.source.baseUrl,
     typeIds: config.source.typeIds?.join(',') ?? '',
-    playFrom: config.source.playFrom ?? '',
+    sourcePlayFrom: config.source.sourcePlayFrom ?? config.source.playFrom ?? '',
+    playFrom:
+      config.source.sourcePlayFrom === undefined
+        ? ''
+        : config.source.playFrom ?? '',
     hours: config.source.hours ?? '',
     type: config.source.type ?? '',
     genre: config.source.genre ?? '',
@@ -97,7 +101,7 @@ export function profileConfigFromForm(
   const normalizedMaxPages =
     Number.isFinite(maxPages) && maxPages > 0 ? Math.min(200, maxPages) : undefined;
   const normalizedSourceMaxItems =
-    Number.isFinite(maxItems) && maxItems > 0 ? Math.min(5000, maxItems) : undefined;
+    Number.isFinite(maxItems) && maxItems >= 0 ? Math.min(5000, maxItems) : undefined;
   const displayedBaseMaxItems = baseConfig
     ? baseConfig.source.maxItems ?? baseConfig.maxItems
     : undefined;
@@ -107,6 +111,22 @@ export function profileConfigFromForm(
     && displayedBaseMaxItems === normalizedSourceMaxItems
       ? undefined
       : normalizedSourceMaxItems;
+  const sourcePlayFrom = String(formData.get('sourcePlayFrom') || '').trim() || undefined;
+  const playFrom = String(formData.get('playFrom') || '').trim() || undefined;
+  const preserveLegacyPlayFrom = Boolean(
+    isMacCms
+    && playFrom === undefined
+    && sourcePlayFrom
+    && baseConfig?.source.sourcePlayFrom === undefined
+    && (
+      baseConfig === undefined
+      || (
+        sameSource
+        && baseConfig.source.playFrom
+        && sourcePlayFrom === baseConfig.source.playFrom
+      )
+    )
+  );
   const pageConcurrency = Math.max(
     1,
     Math.min(
@@ -146,7 +166,9 @@ export function profileConfigFromForm(
               && typeIds.length === 0
                 ? undefined
                 : typeIds,
-            playFrom: String(formData.get('playFrom') || '').trim() || undefined,
+            ...(preserveLegacyPlayFrom
+              ? { playFrom: baseConfig?.source.playFrom ?? sourcePlayFrom }
+              : { sourcePlayFrom, playFrom }),
             maxPages:
               sameSource
               && baseConfig?.source.maxPages === undefined
@@ -198,16 +220,23 @@ export function profileConfigFromForm(
     continueOnError: formData.get('continueOnError') === '1',
     maxActiveJobs: Math.max(1, parseInt(String(formData.get('maxActiveJobs') || '1'), 10) || 1),
     ...(isMacCms
-      ? baseConfig
-        ? {
-            maxItems: baseConfig.maxItems,
-            skipExisting: baseConfig.skipExisting,
-            requestDelaySeconds: baseConfig.requestDelaySeconds,
-            media: baseConfig.media,
-          }
-        : {}
+      ? {
+          ...(baseConfig
+            ? {
+                maxItems: baseConfig.maxItems,
+                skipExisting: baseConfig.skipExisting,
+                requestDelaySeconds: baseConfig.requestDelaySeconds,
+              }
+            : {}),
+          media: {
+            enableVideo: baseConfig?.media.enableVideo ?? true,
+            enableCover: formData.get('enableCover') === '1',
+            enableFanart: baseConfig?.media.enableFanart ?? true,
+            maxFanartImages: baseConfig?.media.maxFanartImages ?? 50,
+          },
+        }
       : {
-          maxItems: Number.isFinite(maxItems) && maxItems > 0 ? maxItems : undefined,
+          maxItems: Number.isFinite(maxItems) && maxItems >= 0 ? maxItems : undefined,
           skipExisting: formData.get('skipExisting') === '1',
           requestDelaySeconds: Math.max(
             0,

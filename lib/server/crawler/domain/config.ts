@@ -11,9 +11,12 @@ export const crawlerProfileConfigSchema = z.object({
     provider: z.string().min(1).optional(),
     /** Explicit MacCMS type ids (t=). */
     typeIds: z.array(z.number().int().positive()).optional(),
+    /** MacCMS upstream vod_play_from selector. */
+    sourcePlayFrom: z.string().optional(),
+    /** Local line name/flag stored for playback and parser matching. */
     playFrom: z.string().optional(),
     maxPages: z.number().int().min(1).max(200).optional(),
-    maxItems: z.number().int().min(1).max(5000).optional(),
+    maxItems: z.number().int().min(0).max(5000).optional(),
     hours: z.number().int().min(1).max(24 * 30).optional(),
     autoDetectTypes: z.boolean().optional(),
     filterJpKr: z.boolean().optional(),
@@ -41,7 +44,7 @@ export const crawlerProfileConfigSchema = z.object({
   continueOnError: z.boolean().default(true),
   maxActiveJobs: z.number().int().min(1).max(16).default(1),
   /** Legacy Hanime strategy/media options, now targeting object storage. */
-  maxItems: z.number().int().min(1).max(2000).optional(),
+  maxItems: z.number().int().min(0).max(2000).optional(),
   skipExisting: z.boolean().default(true),
   requestDelaySeconds: z.number().min(0).max(30).default(1),
   media: z.object({

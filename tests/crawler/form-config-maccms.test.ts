@@ -73,6 +73,69 @@ test('profileConfigFromForm builds ikun MacCMS config with typeIds and filters',
   assert.deepEqual(config.dateFilter.years, [2026]);
 });
 
+test('profileConfigFromForm separates source and local line ids and keeps zero unlimited', () => {
+  const json = profileConfigFromForm(
+    form({
+      name: 'ikun-unlimited',
+      requiredSource: 'ikun',
+      baseUrl: 'https://ikunzyapi.com/api.php/provide/vod/',
+      typeIds: '37',
+      sourcePlayFrom: 'ikm3u8',
+      playFrom: 'ik',
+      maxPages: '62',
+      maxItems: '0',
+      years: '2026',
+      months: '7',
+      qualityPriority: '1080',
+      enableCover: '1',
+      continueOnError: '1',
+      downloadConcurrency: '2',
+      parseConcurrency: '2',
+      pageConcurrency: '2',
+      maxActiveJobs: '1',
+    }),
+  );
+  const config = parseCrawlerProfileConfig(JSON.parse(json));
+  assert.equal(config.source.sourcePlayFrom, 'ikm3u8');
+  assert.equal(config.source.playFrom, 'ik');
+  assert.equal(config.source.maxItems, 0);
+  assert.equal(config.media.enableCover, true);
+});
+
+test('editing a MacCMS profile applies the current cover checkbox state', () => {
+  const original = parseCrawlerProfileConfig({
+    schemaVersion: 1,
+    source: {
+      baseUrl: 'https://ikunzyapi.com/api.php/provide/vod/',
+      provider: 'ikun',
+      typeIds: [37],
+      playFrom: 'ikm3u8',
+    },
+    dateFilter: { years: [2026], months: [7] },
+    qualityPriority: ['1080'],
+    skipKeywords: [],
+    concurrency: { download: 2, parse: 2 },
+    continueOnError: true,
+    maxActiveJobs: 1,
+    media: {
+      enableVideo: true,
+      enableCover: true,
+      enableFanart: false,
+      maxFanartImages: 9,
+    },
+    requiredSource: 'ikun',
+  });
+  const fd = defaultsForm(profileFormDefaults('ikun', original));
+  fd.delete('enableCover');
+
+  const config = parseCrawlerProfileConfig(
+    JSON.parse(profileConfigFromForm(fd, original)),
+  );
+  assert.equal(config.media.enableCover, false);
+  assert.equal(config.media.enableFanart, false);
+  assert.equal(config.media.maxFanartImages, 9);
+});
+
 test('profileConfigFromForm hanime omits MacCMS-only fields', () => {
   const json = profileConfigFromForm(
     form({
@@ -147,7 +210,8 @@ test('profileFormDefaults maps every editable MacCMS field and round-trips it', 
     provider: 'custom-provider',
     baseUrl: 'https://custom.example/api.php/provide/vod/',
     typeIds: '59,37',
-    playFrom: 'customm3u8',
+    sourcePlayFrom: 'customm3u8',
+    playFrom: '',
     hours: 36,
     type: 'anime',
     genre: '动画',
