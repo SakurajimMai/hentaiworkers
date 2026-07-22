@@ -122,15 +122,25 @@ export function ProfileSourceFields({
               autoDetectTypes={!sourceChanged && (defaults?.autoDetectTypes ?? false)}
             />
 
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
               <label className="block font-meta text-[12px]">
-                播放标识 playFrom（可选，优先线路）
+                源播放标识（用于匹配资源站）
                 <input
-                  key={`${source}-play`}
+                  key={`${source}-source-play`}
+                  name="sourcePlayFrom"
+                  className="admin-input mt-1"
+                  defaultValue={sourceChanged ? preset?.playFrom ?? '' : defaults?.sourcePlayFrom ?? preset?.playFrom ?? ''}
+                  placeholder="例如 ikm3u8"
+                />
+              </label>
+              <label className="block font-meta text-[12px]">
+                站内线路标识（播放器显示与解析）
+                <input
+                  key={`${source}-local-play`}
                   name="playFrom"
                   className="admin-input mt-1"
-                  defaultValue={sourceChanged ? preset?.playFrom ?? '' : defaults?.playFrom ?? preset?.playFrom ?? ''}
-                  placeholder="ikm3u8 / wjm3u8…"
+                  defaultValue={sourceChanged ? '' : defaults?.playFrom ?? ''}
+                  placeholder="例如 ik"
                 />
               </label>
               <label className="block font-meta text-[12px]">
@@ -166,8 +176,8 @@ export function ProfileSourceFields({
                 <input name="maxPages" type="number" min={1} max={200} className="admin-input mt-1" defaultValue={defaults?.maxPages ?? 3} />
               </label>
               <label className="block font-meta text-[12px]">
-                最大条目
-                <input name="maxItems" type="number" min={1} max={5000} className="admin-input mt-1" defaultValue={defaults ? defaults.maxItems : 100} />
+                最大条目（0 = 本次已配置页数全部条目）
+                <input name="maxItems" type="number" min={0} max={5000} className="admin-input mt-1" defaultValue={defaults ? defaults.maxItems : 100} />
               </label>
               <label className="block font-meta text-[12px]">
                 采集页顺序
@@ -182,6 +192,10 @@ export function ProfileSourceFields({
               <label className="field-check text-[12px]">
                 <input type="checkbox" name="filterJpKr" value="1" defaultChecked={defaults?.filterJpKr ?? false} />
                 额外过滤非日本/韩国条目（可选）
+              </label>
+              <label className="field-check text-[12px]">
+                <input type="checkbox" name="enableCover" value="1" defaultChecked={defaults?.enableCover ?? true} />
+                下载并保存封面
               </label>
             </div>
             <p className="font-meta text-[11px] text-[#787774]">
@@ -229,7 +243,7 @@ export function ProfileSourceFields({
               <span className="font-ui text-[12px] text-[#6f6d68]">视频固定上传到所选 S3/SFTP</span>
               <label className="field-check text-[12px]">
                 <input type="checkbox" name="enableCover" value="1" defaultChecked={defaults?.enableCover ?? true} />
-                上传封面
+                下载并保存封面
               </label>
               <label className="field-check text-[12px]">
                 <input type="checkbox" name="enableFanart" value="1" defaultChecked={defaults?.enableFanart ?? true} />

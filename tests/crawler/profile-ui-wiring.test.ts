@@ -51,6 +51,24 @@ test('shared crawler profile form owns create and edit defaults wiring', () => {
   assert.doesNotMatch(listPage, /<form action=\{actionCreateProfile\}/);
 });
 
+test('MacCMS profile fields separate line ids and expose unlimited and cover controls', () => {
+  const sourceFields = source(
+    '../../components/admin/crawler/profile-source-fields.tsx',
+  );
+
+  assert.match(sourceFields, /name="sourcePlayFrom"/);
+  assert.match(sourceFields, /name="playFrom"/);
+  assert.match(sourceFields, /源播放标识（用于匹配资源站）/);
+  assert.match(sourceFields, /站内线路标识（播放器显示与解析）/);
+  assert.match(
+    sourceFields,
+    /name="maxItems" type="number" min=\{0\} max=\{5000\}/,
+  );
+  assert.match(sourceFields, /0 = 本次已配置页数全部条目/);
+  assert.equal(sourceFields.match(/name="enableCover"/g)?.length, 2);
+  assert.match(sourceFields, /下载并保存封面/);
+});
+
 test('profile edit route validates and loads the enabled current snapshot', () => {
   const editPage = source('../../app/admin/crawler/profiles/[id]/page.tsx');
 
