@@ -67,6 +67,9 @@ test('MacCMS profile fields separate line ids and expose unlimited and cover con
   assert.match(sourceFields, /0 = 本次已配置页数全部条目/);
   assert.equal(sourceFields.match(/name="enableCover"/g)?.length, 2);
   assert.match(sourceFields, /下载并保存封面/);
+  assert.match(sourceFields, /name="collectMetadata"/);
+  assert.match(sourceFields, /采集详情资料（主资料源）/);
+  assert.match(sourceFields, /未勾选时只向已有作品补充当前线路/);
 });
 
 test('profile edit route validates and loads the enabled current snapshot', () => {

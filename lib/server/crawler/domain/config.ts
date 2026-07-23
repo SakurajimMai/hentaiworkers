@@ -55,12 +55,22 @@ export const crawlerProfileConfigSchema = z.object({
   }).default({}),
   /** Capability hints for Worker claim matching. */
   requiredSource: z.string().min(1).optional(),
+  /** Controls whether MacCMS writes full metadata or only merges play lines. */
+  ingestionMode: z.enum(['full', 'playback_only']).optional(),
   storageDriver: z.enum(['s3', 'sftp']).optional(),
   /** Deprecated YAML fields mapped for import warnings. */
   deprecated: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CrawlerProfileConfig = z.infer<typeof crawlerProfileConfigSchema>;
+export type CrawlerIngestionMode = 'full' | 'playback_only';
+
+export function resolveCrawlerIngestionMode(
+  config: Pick<CrawlerProfileConfig, 'requiredSource' | 'ingestionMode'>,
+): CrawlerIngestionMode {
+  if (config.requiredSource === 'hanime') return 'full';
+  return config.ingestionMode ?? 'full';
+}
 
 export const storageConfigSchema = z.discriminatedUnion('driver', [
   z.object({

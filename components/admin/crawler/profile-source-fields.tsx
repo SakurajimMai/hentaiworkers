@@ -190,6 +190,16 @@ export function ProfileSourceFields({
             </div>
             <div className="flex flex-wrap gap-4">
               <label className="field-check text-[12px]">
+                <input
+                  key={`${source}-collect-metadata`}
+                  type="checkbox"
+                  name="collectMetadata"
+                  value="1"
+                  defaultChecked={sourceChanged ? true : defaults?.collectMetadata ?? true}
+                />
+                采集详情资料（主资料源）
+              </label>
+              <label className="field-check text-[12px]">
                 <input type="checkbox" name="filterJpKr" value="1" defaultChecked={defaults?.filterJpKr ?? false} />
                 额外过滤非日本/韩国条目（可选）
               </label>
@@ -198,6 +208,9 @@ export function ProfileSourceFields({
                 下载并保存封面
               </label>
             </div>
+            <p className="font-meta text-[11px] text-[#787774]">
+              勾选时更新详情、封面、标签和当前线路；未勾选时只向已有作品补充当前线路。
+            </p>
             <p className="font-meta text-[11px] text-[#787774]">
               默认<strong>倒序</strong>：先采最新列表页；条目按 <code className="font-mono">vod_id</code> 从大到小。
               「从末页往前」会先探测 <code className="font-mono">pagecount</code> 再采最后 N 页。

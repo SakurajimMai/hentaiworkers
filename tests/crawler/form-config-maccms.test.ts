@@ -32,6 +32,27 @@ test('generic MacCMS preset requires an explicit API URL', () => {
   assert.equal(getMacCmsPreset('maccms')?.baseUrl, '');
 });
 
+test('MacCMS profile checkbox selects full or playback-only ingestion', () => {
+  const full = parseCrawlerProfileConfig(JSON.parse(profileConfigFromForm(form({
+    requiredSource: 'ikun',
+    baseUrl: 'https://ikunzyapi.com/api.php/provide/vod/',
+    years: '2026',
+    months: '7',
+    qualityPriority: '1080',
+    collectMetadata: '1',
+  }))));
+  const lines = parseCrawlerProfileConfig(JSON.parse(profileConfigFromForm(form({
+    requiredSource: 'hongniu',
+    baseUrl: 'https://www.hongniuzy2.com/api.php/provide/vod/',
+    years: '2026',
+    months: '7',
+    qualityPriority: '1080',
+  }))));
+
+  assert.equal(full.ingestionMode, 'full');
+  assert.equal(lines.ingestionMode, 'playback_only');
+});
+
 test('profileConfigFromForm builds ikun MacCMS config with typeIds and filters', () => {
   const json = profileConfigFromForm(
     form({
@@ -157,6 +178,7 @@ test('profileConfigFromForm hanime omits MacCMS-only fields', () => {
   assert.equal(config.source.typeIds, undefined);
   assert.equal(config.storageDriver, 's3');
   assert.equal(config.source.pageOrder, undefined);
+  assert.equal(config.ingestionMode, undefined);
 });
 
 test('profileConfigFromForm filterJpKr false when checkbox omitted', () => {
@@ -236,6 +258,7 @@ test('profileFormDefaults maps every editable MacCMS field and round-trips it', 
     enableFanart: true,
     maxFanartImages: 50,
     storageDriver: 'external',
+    collectMetadata: true,
   });
 
   const roundTrip = parseCrawlerProfileConfig(
@@ -382,6 +405,7 @@ test('editing preserves legacy profiles without an explicit requiredSource', () 
   const macDefaults = profileFormDefaults('旧 MacCMS', legacyMacCms);
   assert.equal(macDefaults.requiredSource, 'maccms');
   assert.equal(macDefaults.provider, 'custom-provider');
+  assert.equal(macDefaults.collectMetadata, true);
   const macRoundTrip = parseCrawlerProfileConfig(
     JSON.parse(profileConfigFromForm(defaultsForm(macDefaults), legacyMacCms)),
   );

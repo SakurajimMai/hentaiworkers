@@ -1,7 +1,10 @@
 /** Form → config helpers (not Server Actions). */
 
 import { MACCMS_SOURCE_KEYS } from '@/lib/server/crawler/domain/maccms-presets';
-import type { CrawlerProfileConfig } from '@/lib/server/crawler/domain/config';
+import {
+  resolveCrawlerIngestionMode,
+  type CrawlerProfileConfig,
+} from '@/lib/server/crawler/domain/config';
 
 function parseCsvList(raw: string): string[] {
   return raw
@@ -66,6 +69,11 @@ export function profileFormDefaults(
     enableFanart: config.media?.enableFanart ?? true,
     maxFanartImages: config.media?.maxFanartImages ?? 50,
     storageDriver: config.storageDriver ?? 'external',
+    collectMetadata:
+      resolveCrawlerIngestionMode({
+        requiredSource: inferRequiredSource(config),
+        ingestionMode: config.ingestionMode,
+      }) === 'full',
   } as const;
 }
 
@@ -95,6 +103,7 @@ export function profileConfigFromForm(
       ? pageOrderRaw
       : 'reverse';
   const isMacCms = MACCMS_SOURCES.has(requiredSource);
+  const collectMetadata = formData.get('collectMetadata') === '1';
   const sameSource = baseConfig
     ? inferRequiredSource(baseConfig) === requiredSource
     : false;
@@ -256,6 +265,14 @@ export function profileConfigFromForm(
       sameSource && baseConfig?.requiredSource === undefined
         ? undefined
         : requiredSource,
+    ...(isMacCms
+      && !(
+        sameSource
+        && baseConfig?.ingestionMode === undefined
+        && collectMetadata
+      )
+      ? { ingestionMode: collectMetadata ? 'full' as const : 'playback_only' as const }
+      : {}),
     ...(String(formData.get('storageDriver') || 'external') === 's3'
       ? { storageDriver: 's3' as const }
       : String(formData.get('storageDriver') || 'external') === 'sftp'
