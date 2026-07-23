@@ -31,7 +31,14 @@ class FakeSource:
 
 
 class RunnerTests(unittest.TestCase):
-    def _local_cover_job(self):
+    def _local_cover_job(self, ingestion_mode=None):
+        snapshot = {
+            "requiredSource": "ikun",
+            "skipExisting": False,
+            "media": {"enableCover": True},
+        }
+        if ingestion_mode:
+            snapshot["ingestionMode"] = ingestion_mode
         return ClaimedJob(
             job_id=20,
             attempt_id=1,
@@ -39,13 +46,7 @@ class RunnerTests(unittest.TestCase):
             lease_expires_at="2099-01-01T00:00:00Z",
             kind="crawl",
             status="leased",
-            config_snapshot_json=json.dumps(
-                {
-                    "requiredSource": "ikun",
-                    "skipExisting": False,
-                    "media": {"enableCover": True},
-                }
-            ),
+            config_snapshot_json=json.dumps(snapshot),
             profile_version_id=1,
             max_attempts=3,
             attempt_no=1,
@@ -63,9 +64,30 @@ class RunnerTests(unittest.TestCase):
                         title="Local cover",
                         video_url="https://cdn.example/e1.m3u8",
                         cover_url="https://img.example/c.jpg",
-                        tags=(),
+                        tags=("日本动漫",),
                         status="succeeded",
+                        title_english="Local Cover",
+                        title_japanese="ローカルカバー",
+                        description="Full description",
+                        fanart_urls=("https://img.example/fanart.jpg",),
+                        release_year=2026,
+                        release_date="2026-07-23",
+                        remarks="更新至1集",
+                        actors="Actor",
+                        directors="Director",
+                        aliases="Cover Alias",
+                        area="日本",
+                        lang="日语",
+                        source_updated_at="2026-07-23 12:00:00",
                         source_page_url="https://source.example/item/77",
+                        play_lines=({
+                            "name": "ik",
+                            "flag": "ik",
+                            "episodes": [{
+                                "name": "第1集",
+                                "url": "https://cdn.example/e1.m3u8",
+                            }],
+                        },),
                     )
                 ]
 
@@ -160,6 +182,44 @@ class RunnerTests(unittest.TestCase):
             )
             self.assertEqual(warning["level"], "warn")
             self.assertIn("unsupported cover image format", warning["message"])
+
+    def test_playback_only_skips_cover_download_and_trims_non_matching_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            client = self._local_cover_client()
+            cfg = WorkerRuntimeConfig(
+                control_base_url="https://control.example",
+                worker_id=1,
+                machine_token="t",
+                temp_dir=tmp,
+                cover_dir=str(Path(tmp) / "covers"),
+            )
+            with patch("crawler_worker.runtime.runner.save_cover_locally") as save:
+                Runner(
+                    cfg,
+                    client,
+                    {"ikun": self._local_cover_source()},
+                    sleep=lambda _s: None,
+                )._run_job(self._local_cover_job("playback_only"))
+
+            save.assert_not_called()
+            commit = client.commit
+            self.assertEqual(commit["title"], "Local cover")
+            self.assertEqual(commit["title_english"], "Local Cover")
+            self.assertEqual(commit["title_japanese"], "ローカルカバー")
+            self.assertEqual(commit["aliases"], "Cover Alias")
+            self.assertEqual(commit["release_year"], 2026)
+            self.assertEqual(commit["video_url"], "https://cdn.example/e1.m3u8")
+            self.assertEqual(commit["play_lines"][0]["flag"], "ik")
+            self.assertIsNone(commit["cover_url"])
+            self.assertIsNone(commit["description"])
+            self.assertEqual(commit["tags"], ())
+            self.assertEqual(commit["fanart_urls"], ())
+            self.assertIsNone(commit["remarks"])
+            self.assertIsNone(commit["actors"])
+            self.assertIsNone(commit["directors"])
+            self.assertIsNone(commit["area"])
+            self.assertIsNone(commit["lang"])
+            self.assertIsNone(commit["source_updated_at"])
 
     def test_auth_failure_exits_without_retrying(self):
         class Client:

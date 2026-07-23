@@ -151,6 +151,10 @@ class Runner:
                 or (source_field.get("provider") if isinstance(source_field, dict) else None)
                 or "hanime"
             )
+            playback_only = (
+                source_name != "hanime"
+                and snapshot.get("ingestionMode") == "playback_only"
+            )
             adapter = self._sources.get(source_name)
             if adapter is None:
                 self._client.fail(
@@ -185,7 +189,10 @@ class Runner:
             failed = 0
             skipped = 0
             transient_source_failures = 0
-            needs_upload = storage_driver_from_snapshot(snapshot) in ("s3", "sftp")
+            needs_upload = (
+                not playback_only
+                and storage_driver_from_snapshot(snapshot) in ("s3", "sftp")
+            )
             skip_existing = bool(snapshot.get("skipExisting", True))
             media_options = (
                 snapshot.get("media") if isinstance(snapshot.get("media"), dict) else {}
@@ -193,7 +200,22 @@ class Runner:
             for item in results:
                 if self._cancel:
                     break
-                if not bool(media_options.get("enableCover", True)):
+                if playback_only and item.status == "succeeded":
+                    item = replace(
+                        item,
+                        cover_url=None,
+                        tags=(),
+                        description=None,
+                        fanart_urls=(),
+                        release_date=None,
+                        remarks=None,
+                        actors=None,
+                        directors=None,
+                        area=None,
+                        lang=None,
+                        source_updated_at=None,
+                    )
+                elif not bool(media_options.get("enableCover", True)):
                     item = replace(item, cover_url=None)
                 published_handles = ()
                 if (
