@@ -36,6 +36,7 @@ test('MacCMS ikun source writes anime_works not animes', async () => {
 
   const result = await uow.runInTransaction(() =>
     new MariaDbCrawlerCatalogIngestion().upsertFromCrawler({
+      ingestionMode: 'full',
       source: 'ikun',
       sourceId: '69403',
       title: 'JP anime title',
@@ -46,6 +47,7 @@ test('MacCMS ikun source writes anime_works not animes', async () => {
   );
 
   assert.deepEqual(result, {
+    kind: 'upserted',
     animeId: 55,
     workId: 55,
     created: true,
@@ -98,6 +100,7 @@ test('MacCMS concurrent source mapping deletes orphan work row', async () => {
 
   const result = await uow.runInTransaction(() =>
     new MariaDbCrawlerCatalogIngestion().upsertFromCrawler({
+      ingestionMode: 'full',
       source: 'wujin',
       sourceId: '1',
       title: 'race',
@@ -106,6 +109,7 @@ test('MacCMS concurrent source mapping deletes orphan work row', async () => {
   );
 
   assert.deepEqual(result, {
+    kind: 'upserted',
     animeId: 88,
     workId: 88,
     created: false,

@@ -411,7 +411,12 @@ test('item exists is lease-protected and returns catalog source mapping', async 
     catalog: {
       async findExistingBySource(source, sourceId) {
         return source === 'hanime' && sourceId === '42'
-          ? { animeId: 77, created: false, target: 'legacy_animes' as const }
+          ? {
+              kind: 'upserted' as const,
+              animeId: 77,
+              created: false,
+              target: 'legacy_animes' as const,
+            }
           : null;
       },
       async upsertFromCrawler() {

@@ -386,7 +386,7 @@ export function createWorkerHandlers(deps: WorkerApiDeps) {
           replayed: result.replayed,
           itemId: result.item.id,
           animeId: result.item.animeId,
-          created: result.catalog?.created ?? false,
+          created: result.catalog?.kind === 'upserted' ? result.catalog.created : false,
           status: result.item.status,
         });
       } catch (error) {

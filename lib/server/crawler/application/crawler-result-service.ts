@@ -3,8 +3,13 @@ import { isLocalCoverPath } from '../../media/local-cover-path';
 import { resolveSiteUrl } from '../../../site-url';
 import type {
   CatalogIngestionPort,
+  CatalogIngestionOutcome,
   CatalogIngestionResult,
 } from '../ports/catalog-ingestion-port';
+import {
+  resolveCrawlerIngestionMode,
+  type CrawlerIngestionMode,
+} from '../domain/config';
 import type { CrawlerUnitOfWork, JobItemRecord } from '../ports/crawler-unit-of-work';
 import { assertValidLease, type LeaseBinding } from './lease-guard';
 import { withOperationReceipt } from './operation-receipts';
@@ -45,8 +50,32 @@ export type CommitItemInput = LeaseBinding & Readonly<{
 export type CommitItemResult = Readonly<{
   replayed: boolean;
   item: JobItemRecord;
-  catalog?: CatalogIngestionResult;
+  catalog?: CatalogIngestionOutcome;
 }>;
+
+function ingestionModeFromJobSnapshot(
+  source: string,
+  configSnapshotJson: string,
+): CrawlerIngestionMode {
+  try {
+    const parsed = JSON.parse(configSnapshotJson) as {
+      requiredSource?: unknown;
+      ingestionMode?: unknown;
+    };
+    return resolveCrawlerIngestionMode({
+      requiredSource:
+        source === 'hanime' || parsed.requiredSource === 'hanime'
+          ? 'hanime'
+          : undefined,
+      ingestionMode:
+        parsed.ingestionMode === 'full' || parsed.ingestionMode === 'playback_only'
+          ? parsed.ingestionMode
+          : undefined,
+    });
+  } catch {
+    return 'full';
+  }
+}
 
 function isHttpUrl(value: string | null | undefined): value is string {
   if (!value) return false;
@@ -162,10 +191,18 @@ export class CrawlerResultService {
         execute: async () => {
           await assertValidLease(repos, input);
 
-          let catalog: CatalogIngestionResult | undefined;
+          let catalog: CatalogIngestionOutcome | undefined;
           let animeId = input.animeId ?? null;
+          let itemStatus = input.status;
+          let errorCode = input.errorCode;
+          let errorMessage = input.errorMessage;
           if (input.status === 'succeeded' && animeId == null && this.catalog) {
+            const job = await repos.jobs.get(input.jobId);
+            if (!job) {
+              throw new AppError('RESULT_INVALID', '任务不存在', 404);
+            }
             catalog = await this.catalog.upsertFromCrawler({
+              ingestionMode: ingestionModeFromJobSnapshot(source, job.configSnapshotJson),
               source,
               sourceId,
               title: requestBody.title!,
@@ -187,7 +224,14 @@ export class CrawlerResultService {
               sourceUpdatedAt: requestBody.sourceUpdatedAt,
               playLines: requestBody.playLines,
             });
-            animeId = catalog.animeId;
+            if (catalog.kind === 'upserted') {
+              animeId = catalog.animeId;
+            } else {
+              animeId = null;
+              itemStatus = 'skipped';
+              errorCode = catalog.code;
+              errorMessage = catalog.message;
+            }
           }
 
           const item = await repos.items.upsert({
@@ -195,10 +239,10 @@ export class CrawlerResultService {
             source,
             sourceId,
             stage: input.stage ?? 'done',
-            status: input.status,
+            status: itemStatus,
             animeId,
-            errorCode: input.errorCode,
-            errorMessage: input.errorMessage,
+            errorCode,
+            errorMessage,
           });
           return { item, ...(catalog ? { catalog } : {}) };
         },

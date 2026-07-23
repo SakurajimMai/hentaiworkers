@@ -16,6 +16,7 @@ class FakeCatalogIngestion implements CatalogIngestionPort {
   async upsertFromCrawler(input: CatalogIngestionInput) {
     this.calls.push(input);
     return {
+      kind: 'upserted' as const,
       animeId: 73,
       created: this.calls.length === 1,
       target: 'legacy_animes' as const,
@@ -23,10 +24,10 @@ class FakeCatalogIngestion implements CatalogIngestionPort {
   }
 }
 
-async function runningJob() {
+async function runningJob(configSnapshotJson = '{}') {
   const uow = new InMemoryCrawlerUnitOfWork();
   const jobs = new CrawlerJobService(uow);
-  await jobs.enqueueManual({ profileId: 1, profileVersionId: 1, configSnapshotJson: '{}' });
+  await jobs.enqueueManual({ profileId: 1, profileVersionId: 1, configSnapshotJson });
   const claimed = await jobs.claimForWorker({ workerId: 1 });
   assert.ok(claimed);
   const binding = {
@@ -38,6 +39,65 @@ async function runningJob() {
   await jobs.start(binding);
   return { uow, binding };
 }
+
+test('catalog ingestion mode comes from the immutable job snapshot', async () => {
+  for (const ingestionMode of ['full', 'playback_only'] as const) {
+    const { uow, binding } = await runningJob(JSON.stringify({
+      requiredSource: 'ikun',
+      ingestionMode,
+    }));
+    const catalog = new FakeCatalogIngestion();
+    const service = new CrawlerResultService(uow, catalog);
+
+    await service.commitItem({
+      ...binding,
+      idempotencyKey: `ikun:${ingestionMode}`,
+      source: 'ikun',
+      sourceId: ingestionMode,
+      status: 'succeeded',
+      title: 'Snapshot title',
+      videoUrl: 'https://media.example/video.m3u8',
+    });
+
+    assert.equal(catalog.calls[0].ingestionMode, ingestionMode);
+  }
+});
+
+test('catalog skip outcome stores a skipped job item without an anime id', async () => {
+  const { uow, binding } = await runningJob(JSON.stringify({
+    requiredSource: 'hongniu',
+    ingestionMode: 'playback_only',
+  }));
+  const catalog: CatalogIngestionPort = {
+    async upsertFromCrawler() {
+      return {
+        kind: 'skipped',
+        code: 'CATALOG_MATCH_NOT_FOUND',
+        message: '没有唯一匹配的主资料作品',
+      } as never;
+    },
+  };
+  const service = new CrawlerResultService(uow, catalog);
+
+  const result = await service.commitItem({
+    ...binding,
+    idempotencyKey: 'hongniu:missing',
+    source: 'hongniu',
+    sourceId: 'missing',
+    status: 'succeeded',
+    title: 'Missing title',
+    videoUrl: 'https://media.example/missing.m3u8',
+    playLines: [{
+      name: 'hongniu',
+      flag: 'hongniu',
+      episodes: [{ name: '第1集', url: 'https://media.example/missing.m3u8' }],
+    }],
+  });
+
+  assert.equal(result.item.status, 'skipped');
+  assert.equal(result.item.animeId, null);
+  assert.equal(result.item.errorCode, 'CATALOG_MATCH_NOT_FOUND');
+});
 
 test('successful crawler item upserts catalog metadata and links anime id', async () => {
   const { uow, binding } = await runningJob();
@@ -64,7 +124,8 @@ test('successful crawler item upserts catalog metadata and links anime id', asyn
   assert.equal(catalog.calls[0].sourceId, '42');
   assert.equal(catalog.calls[0].coverUrl, 'https://media.example/cover.jpg');
   assert.equal(result.item.animeId, 73);
-  assert.equal(result.catalog?.created, true);
+  assert.equal(result.catalog?.kind, 'upserted');
+  assert.equal(result.catalog?.kind === 'upserted' ? result.catalog.created : null, true);
 });
 
 test('local cover route is stored as an absolute SITE_URL cover', async () => {

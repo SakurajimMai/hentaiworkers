@@ -37,6 +37,7 @@ test('catalog ingestion resolves a concurrent source mapping without leaving a d
 
   const result = await uow.runInTransaction(() =>
     new MariaDbCrawlerCatalogIngestion().upsertFromCrawler({
+      ingestionMode: 'full',
       source: 'hanime',
       sourceId: '42',
       title: 'Concurrent title',
@@ -44,7 +45,12 @@ test('catalog ingestion resolves a concurrent source mapping without leaving a d
     }),
   );
 
-  assert.deepEqual(result, { animeId: 73, created: false, target: 'legacy_animes' });
+  assert.deepEqual(result, {
+    kind: 'upserted',
+    animeId: 73,
+    created: false,
+    target: 'legacy_animes',
+  });
   assert.ok(
     calls.some(({ sql, params }) => sql.includes('DELETE FROM animes') && params[0] === 99),
   );
@@ -72,6 +78,7 @@ test('Hanime ingestion assigns the legacy 里番 category', async () => {
 
   const result = await uow.runInTransaction(() =>
     new MariaDbCrawlerCatalogIngestion().upsertFromCrawler({
+      ingestionMode: 'full',
       source: 'hanime',
       sourceId: '88',
       title: 'Category title',
@@ -106,8 +113,14 @@ test('source existence lookup routes Hanime and MacCMS to separate mappings', as
     await ingestion.findExistingBySource('ikun', '21'),
   ]);
 
-  assert.deepEqual(hanime, { animeId: 12, created: false, target: 'legacy_animes' });
+  assert.deepEqual(hanime, {
+    kind: 'upserted',
+    animeId: 12,
+    created: false,
+    target: 'legacy_animes',
+  });
   assert.deepEqual(maccms, {
+    kind: 'upserted',
     animeId: 21,
     workId: 21,
     created: false,
@@ -134,6 +147,7 @@ test('catalog update preserves optional metadata that the latest crawl omitted',
 
   await uow.runInTransaction(() =>
     new MariaDbCrawlerCatalogIngestion().upsertFromCrawler({
+      ingestionMode: 'full',
       source: 'hanime',
       sourceId: '12',
       title: 'Updated title',

@@ -181,7 +181,7 @@ async function upsertLegacyAnimes(
   }
 
   await replaceLegacyTags(executor, animeId, normalizeTags(input.tags));
-  return { animeId, created, target: 'legacy_animes' };
+  return { kind: 'upserted', animeId, created, target: 'legacy_animes' };
 }
 
 async function updateWork(
@@ -351,6 +351,7 @@ async function upsertAnimeWorks(
 
   await replaceWorkTags(executor, workId, normalizeTags(input.tags));
   return {
+    kind: 'upserted',
     animeId: workId,
     workId,
     created,
@@ -372,7 +373,7 @@ export class MariaDbCrawlerCatalogIngestion implements CatalogIngestionPort {
       );
       const workId = Number((rows as RowDataPacket[])[0]?.work_id ?? 0);
       return workId
-        ? { animeId: workId, workId, created: false, target: 'anime_works' }
+        ? { kind: 'upserted', animeId: workId, workId, created: false, target: 'anime_works' }
         : null;
     }
     const [rows] = await executor.query(
@@ -381,7 +382,7 @@ export class MariaDbCrawlerCatalogIngestion implements CatalogIngestionPort {
     );
     const animeId = Number((rows as RowDataPacket[])[0]?.anime_id ?? 0);
     return animeId
-      ? { animeId, created: false, target: 'legacy_animes' }
+      ? { kind: 'upserted', animeId, created: false, target: 'legacy_animes' }
       : null;
   }
 

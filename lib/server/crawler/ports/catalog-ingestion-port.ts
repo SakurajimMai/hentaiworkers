@@ -1,4 +1,8 @@
+import type { CrawlerIngestionMode } from '../domain/config';
+import type { WorkPlayLine } from '../domain/work-ingestion';
+
 export type CatalogIngestionInput = Readonly<{
+  ingestionMode: CrawlerIngestionMode;
   source: string;
   sourceId: string;
   title: string;
@@ -25,14 +29,11 @@ export type CatalogIngestionInput = Readonly<{
   /** 源站更新时间 vod_time 原文 */
   sourceUpdatedAt?: string | null;
   /** Full play lines [{name,flag,episodes:[{name,url}]}] for works UI. */
-  playLines?: ReadonlyArray<{
-    name: string;
-    flag?: string;
-    episodes: ReadonlyArray<{ name: string; url: string }>;
-  }>;
+  playLines?: readonly WorkPlayLine[];
 }>;
 
 export type CatalogIngestionResult = Readonly<{
+  kind: 'upserted';
   /**
    * Catalog entity id written by this commit.
    * - legacy_animes → `animes.id`
@@ -47,9 +48,17 @@ export type CatalogIngestionResult = Readonly<{
   workId?: number;
 }>;
 
+export type CatalogIngestionSkipped = Readonly<{
+  kind: 'skipped';
+  code: 'CATALOG_MATCH_NOT_FOUND' | 'CATALOG_MATCH_AMBIGUOUS' | 'RESULT_INVALID';
+  message: string;
+}>;
+
+export type CatalogIngestionOutcome = CatalogIngestionResult | CatalogIngestionSkipped;
+
 /** Catalog write boundary used inside the crawler transaction. */
 export interface CatalogIngestionPort {
-  upsertFromCrawler(input: CatalogIngestionInput): Promise<CatalogIngestionResult>;
+  upsertFromCrawler(input: CatalogIngestionInput): Promise<CatalogIngestionOutcome>;
   /** Existing source mapping used by legacy skip_existing before large media transfer. */
   findExistingBySource?(
     source: string,
