@@ -9,9 +9,36 @@ import {
 } from '../actions';
 import { getAdminCrawlerService } from '@/lib/server/crawler/interfaces/admin-crawler-deps';
 import { isTerminalJobStatus } from '@/lib/server/crawler/domain/job';
+import {
+  resolveCrawlerIngestionMode,
+  type CrawlerIngestionMode,
+} from '@/lib/server/crawler/domain/config';
 import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
+
+function ingestionModeFromSnapshot(configSnapshotJson: string): CrawlerIngestionMode {
+  try {
+    const parsed = JSON.parse(configSnapshotJson) as {
+      requiredSource?: unknown;
+      ingestionMode?: unknown;
+    };
+    return resolveCrawlerIngestionMode({
+      requiredSource:
+        typeof parsed.requiredSource === 'string' ? parsed.requiredSource : undefined,
+      ingestionMode:
+        parsed.ingestionMode === 'full' || parsed.ingestionMode === 'playback_only'
+          ? parsed.ingestionMode
+          : undefined,
+    });
+  } catch {
+    return 'full';
+  }
+}
+
+function ingestionModeLabel(mode: CrawlerIngestionMode): string {
+  return mode === 'playback_only' ? '仅线路' : '主资料';
+}
 
 export default async function CrawlerJobsPage({
   searchParams,
@@ -44,6 +71,9 @@ export default async function CrawlerJobsPage({
               name: profile.name,
               versionId,
               requiredSource: source,
+              ingestionMode: version
+                ? resolveCrawlerIngestionMode(version.config)
+                : 'full' as const,
             };
           } catch {
             return {
@@ -51,6 +81,7 @@ export default async function CrawlerJobsPage({
               name: profile.name,
               versionId,
               requiredSource: undefined as string | undefined,
+              ingestionMode: 'full' as const,
             };
           }
         }),
@@ -112,6 +143,7 @@ export default async function CrawlerJobsPage({
                   <option key={profile.id} value={profile.versionId}>
                     {profile.name}
                     {profile.requiredSource ? ` · ${profile.requiredSource}` : ''}（#{profile.id}）
+                    {' · '}{ingestionModeLabel(profile.ingestionMode)}
                   </option>
                 ))}
               </select>
@@ -173,6 +205,9 @@ export default async function CrawlerJobsPage({
       <ul className="divide-y divide-[#EAEAEA] border-y border-[#EAEAEA] bg-white">
         {jobs.map((job) => {
           const canDelete = isTerminalJobStatus(job.status);
+          const ingestionMode = job.kind === 'crawl'
+            ? ingestionModeFromSnapshot(job.configSnapshotJson)
+            : null;
           return (
             <li
               key={job.id}
@@ -182,6 +217,11 @@ export default async function CrawlerJobsPage({
                 <span className="font-mono text-sm">#{job.id}</span>
                 <StatusBadge status={job.status} />
                 <span className="font-meta text-[12px]">{job.kind}</span>
+                {ingestionMode ? (
+                  <span className="font-meta text-[12px] text-[#787774]">
+                    {ingestionModeLabel(ingestionMode)}
+                  </span>
+                ) : null}
                 <span className="font-meta text-[12px] text-[#787774]">{job.createdAt}</span>
                 {job.finishedAt && (
                   <span className="font-meta text-[12px] text-[#787774]">

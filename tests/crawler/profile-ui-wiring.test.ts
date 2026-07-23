@@ -90,6 +90,7 @@ test('profile edit route validates and loads the enabled current snapshot', () =
 
 test('profile list exposes compact edit and confirmed delete actions', () => {
   const listPage = source('../../app/admin/crawler/profiles/page.tsx');
+  const jobsPage = source('../../app/admin/crawler/jobs/page.tsx');
 
   assert.match(listPage, /href=\{`\/admin\/crawler\/profiles\/\$\{row\.id\}`\}/);
   assert.match(listPage, /action=\{actionDeleteProfile\}/);
@@ -102,6 +103,13 @@ test('profile list exposes compact edit and confirmed delete actions', () => {
   assert.match(listPage, /sp\.ok === 'updated'/);
   assert.match(listPage, /sp\.ok === 'deleted'/);
   assert.match(listPage, /sp\.error === 'delete'/);
+  assert.match(listPage, /resolveCrawlerIngestionMode/);
+  assert.match(listPage, /主资料/);
+  assert.match(listPage, /仅线路/);
+  assert.match(jobsPage, /resolveCrawlerIngestionMode/);
+  assert.match(jobsPage, /configSnapshotJson/);
+  assert.match(jobsPage, /主资料/);
+  assert.match(jobsPage, /仅线路/);
 });
 
 test('profile server actions use strict ids, preserve validation failures, and route successes', () => {

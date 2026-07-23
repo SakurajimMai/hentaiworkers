@@ -5,6 +5,7 @@ import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import { actionCreateProfile, actionDeleteProfile } from '../actions';
 import { requireAdmin } from '@/lib/auth';
 import { getAdminCrawlerService } from '@/lib/server/crawler/interfaces/admin-crawler-deps';
+import { resolveCrawlerIngestionMode } from '@/lib/server/crawler/domain/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,9 @@ export default async function CrawlerProfilesPage({
           isEnabled: profile.isEnabled,
           versionId,
           requiredSource: version?.config?.requiredSource,
+          ingestionMode: version
+            ? resolveCrawlerIngestionMode(version.config)
+            : 'full' as const,
           baseUrl: version?.config?.source?.baseUrl,
           typeIds: version?.config?.source?.typeIds
             ? [...version.config.source.typeIds]
@@ -97,6 +101,7 @@ export default async function CrawlerProfilesPage({
                   <p className="font-meta text-[12px] text-[#787774] mt-0.5 break-all">
                     #{row.id}
                     {row.requiredSource ? ` · source=${row.requiredSource}` : ''}
+                    {row.ingestionMode === 'playback_only' ? ' · 仅线路' : ' · 主资料'}
                     {row.baseUrl ? ` · ${row.baseUrl}` : ''}
                     {row.typeIds?.length ? ` · t=${row.typeIds.join(',')}` : ''}
                     {!row.isEnabled ? ' · 已禁用' : ''}
