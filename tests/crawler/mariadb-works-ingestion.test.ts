@@ -182,6 +182,15 @@ test('playback-only source uniquely matches and binds an existing work, then upd
     async query(sql: string, params: unknown[] = []) {
       calls.push({ sql, params });
       if (sql.includes('SELECT work_id FROM anime_work_sources')) return [[], []];
+      if (sql.includes('SELECT play_lines_json FROM anime_works')) {
+        return [[{
+          play_lines_json: JSON.stringify([{
+            name: 'ik',
+            flag: 'ik',
+            episodes: [{ name: '第1集', url: 'https://ik.example/1.m3u8' }],
+          }]),
+        }], []];
+      }
       if (sql.includes('FROM anime_works') && sql.includes('is_active = 1')) {
         return [[{
           id: 21,
@@ -242,6 +251,13 @@ test('playback-only source uniquely matches and binds an existing work, then upd
   assert.equal(calls.some(({ sql }) => sql.includes('INSERT INTO anime_works')), false);
   assert.equal(calls.some(({ sql }) => sql.includes('anime_work_tags')), false);
   assert.equal(calls.some(({ sql }) => sql.includes('work_tags')), false);
+  const candidateRead = calls.find(({ sql }) => sql.includes('is_active = 1'));
+  assert.ok(candidateRead);
+  assert.doesNotMatch(candidateRead.sql, /FOR UPDATE/);
+  assert.equal(
+    calls.some(({ sql }) => sql.includes('SELECT play_lines_json FROM anime_works') && sql.includes('FOR UPDATE')),
+    true,
+  );
 });
 
 test('playback-only source skips missing, ambiguous, and empty-line matches without writes', async () => {

@@ -299,8 +299,7 @@ async function matchPlaybackWork(
   const [rows] = await executor.query(
     `SELECT id, title, title_english, title_japanese, aliases, release_year, play_lines_json
        FROM anime_works
-      WHERE is_active = 1${hasYear ? ' AND (release_year = ? OR release_year IS NULL)' : ''}
-      FOR UPDATE`,
+      WHERE is_active = 1${hasYear ? ' AND (release_year = ? OR release_year IS NULL)' : ''}`,
     hasYear ? [input.releaseYear] : [],
   );
   const candidates = Array.isArray(rows)
@@ -369,11 +368,8 @@ async function upsertPlaybackOnlyWork(
       };
     }
 
-    existingLinesJson = match.candidate.playLinesJson;
     const boundWorkId = await bindWorkSource(executor, match.candidate.id, input);
-    if (boundWorkId !== match.candidate.id) {
-      existingLinesJson = await findWorkLinesForUpdate(executor, boundWorkId);
-    }
+    existingLinesJson = await findWorkLinesForUpdate(executor, boundWorkId);
     workId = boundWorkId;
   }
 
