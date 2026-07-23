@@ -2,11 +2,17 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { getCrawlerSqlExecutor, type CrawlerSqlExecutor } from './mariadb-crawler-repositories';
 import type {
   CatalogIngestionInput,
+  CatalogIngestionOutcome,
   CatalogIngestionPort,
   CatalogIngestionResult,
 } from '../../crawler/ports/catalog-ingestion-port';
 import { catalogTargetForSource } from '../../crawler/domain/catalog-target';
 import { sha256Bytes } from '../../crawler/domain/hashing';
+import {
+  matchUniqueWork,
+  mergeWorkPlayLines,
+  type WorkCandidate,
+} from '../../crawler/domain/work-ingestion';
 
 function normalizeTags(tags: readonly string[] | undefined): string[] {
   return [...new Set((tags ?? []).map((tag) => tag.trim()).filter(Boolean))].slice(0, 100);
@@ -190,6 +196,7 @@ async function updateWork(
   input: CatalogIngestionInput,
   fanart: string | null,
   streamFormat: string,
+  playLinesJson: string | null,
 ): Promise<void> {
   await executor.query(
     `UPDATE anime_works SET
@@ -223,7 +230,7 @@ async function updateWork(
       fanart,
       input.videoUrl,
       streamFormat,
-      input.playLines?.length ? JSON.stringify(input.playLines) : null,
+      playLinesJson,
       input.releaseYear ?? null,
       input.releaseDate ?? null,
       input.remarks ?? null,
@@ -248,6 +255,144 @@ async function findWorkMapping(
     [source, sourceId],
   );
   return Number((rows as RowDataPacket[])[0]?.work_id ?? 0);
+}
+
+async function findWorkLinesForUpdate(
+  executor: CrawlerSqlExecutor,
+  workId: number,
+): Promise<string | null> {
+  const [rows] = await executor.query(
+    'SELECT play_lines_json FROM anime_works WHERE id = ? LIMIT 1 FOR UPDATE',
+    [workId],
+  );
+  const row = Array.isArray(rows) ? (rows as RowDataPacket[])[0] : undefined;
+  return row?.play_lines_json == null ? null : String(row.play_lines_json);
+}
+
+function mergedPlayLinesJson(
+  existingJson: string | null,
+  input: CatalogIngestionInput,
+): string | null {
+  if (!input.playLines?.length) return null;
+  const merged = mergeWorkPlayLines(existingJson, input.playLines);
+  return merged.length ? JSON.stringify(merged) : null;
+}
+
+function workCandidateFromRow(row: RowDataPacket): WorkCandidate {
+  const releaseYear = Number(row.release_year ?? 0);
+  return {
+    id: Number(row.id),
+    title: String(row.title ?? ''),
+    titleEnglish: row.title_english == null ? null : String(row.title_english),
+    titleJapanese: row.title_japanese == null ? null : String(row.title_japanese),
+    aliases: row.aliases == null ? null : String(row.aliases),
+    releaseYear: releaseYear > 0 ? releaseYear : null,
+    playLinesJson: row.play_lines_json == null ? null : String(row.play_lines_json),
+  };
+}
+
+async function matchPlaybackWork(
+  executor: CrawlerSqlExecutor,
+  input: CatalogIngestionInput,
+) {
+  const hasYear = input.releaseYear != null;
+  const [rows] = await executor.query(
+    `SELECT id, title, title_english, title_japanese, aliases, release_year, play_lines_json
+       FROM anime_works
+      WHERE is_active = 1${hasYear ? ' AND (release_year = ? OR release_year IS NULL)' : ''}
+      FOR UPDATE`,
+    hasYear ? [input.releaseYear] : [],
+  );
+  const candidates = Array.isArray(rows)
+    ? (rows as RowDataPacket[]).map(workCandidateFromRow)
+    : [];
+  return matchUniqueWork(input, candidates);
+}
+
+async function bindWorkSource(
+  executor: CrawlerSqlExecutor,
+  workId: number,
+  input: CatalogIngestionInput,
+): Promise<number> {
+  try {
+    await executor.query(
+      `INSERT INTO anime_work_sources (work_id, source, source_id, source_key_hash)
+       VALUES (?, ?, ?, ?)`,
+      [
+        workId,
+        input.source,
+        input.sourceId,
+        Buffer.from(sha256Bytes(`${input.source}\0${input.sourceId}`)),
+      ],
+    );
+    return workId;
+  } catch (error) {
+    if (!isDuplicateEntry(error)) throw error;
+    const concurrentWorkId = await findWorkMapping(executor, input.source, input.sourceId);
+    if (!concurrentWorkId) throw error;
+    return concurrentWorkId;
+  }
+}
+
+async function upsertPlaybackOnlyWork(
+  executor: CrawlerSqlExecutor,
+  input: CatalogIngestionInput,
+): Promise<CatalogIngestionOutcome> {
+  const incomingLines = mergeWorkPlayLines(null, input.playLines ?? []);
+  if (!incomingLines.length) {
+    return {
+      kind: 'skipped',
+      code: 'RESULT_INVALID',
+      message: '补充线路条目没有有效播放线路',
+    };
+  }
+
+  let workId = await findWorkMapping(executor, input.source, input.sourceId);
+  let existingLinesJson: string | null = null;
+
+  if (workId) {
+    existingLinesJson = await findWorkLinesForUpdate(executor, workId);
+  } else {
+    const match = await matchPlaybackWork(executor, input);
+    if (match.kind === 'not_found') {
+      return {
+        kind: 'skipped',
+        code: 'CATALOG_MATCH_NOT_FOUND',
+        message: '没有匹配到主资料作品',
+      };
+    }
+    if (match.kind === 'ambiguous') {
+      return {
+        kind: 'skipped',
+        code: 'CATALOG_MATCH_AMBIGUOUS',
+        message: `匹配到多个主资料作品: ${match.candidateIds.join(',')}`,
+      };
+    }
+
+    existingLinesJson = match.candidate.playLinesJson;
+    const boundWorkId = await bindWorkSource(executor, match.candidate.id, input);
+    if (boundWorkId !== match.candidate.id) {
+      existingLinesJson = await findWorkLinesForUpdate(executor, boundWorkId);
+    }
+    workId = boundWorkId;
+  }
+
+  const mergedLines = mergeWorkPlayLines(existingLinesJson, incomingLines);
+  await executor.query(
+    `UPDATE anime_works SET
+       play_lines_json = ?,
+       updated_at = UTC_TIMESTAMP()
+     WHERE id = ?`,
+    [JSON.stringify(mergedLines), workId],
+  );
+
+  return {
+    kind: 'upserted',
+    animeId: workId,
+    workId,
+    created: false,
+    target: 'anime_works',
+  };
 }
 
 async function replaceWorkTags(
@@ -287,14 +432,28 @@ async function replaceWorkTags(
 async function upsertAnimeWorks(
   executor: CrawlerSqlExecutor,
   input: CatalogIngestionInput,
-): Promise<CatalogIngestionResult> {
+): Promise<CatalogIngestionOutcome> {
+  if (input.ingestionMode === 'playback_only') {
+    return upsertPlaybackOnlyWork(executor, input);
+  }
+
   const fanart = normalizeFanart(input.fanartUrls);
   const streamFormat = streamFormatFromUrl(input.videoUrl);
   let workId = await findWorkMapping(executor, input.source, input.sourceId);
   let created = false;
 
   if (workId > 0) {
-    await updateWork(executor, workId, input, fanart, streamFormat);
+    const existingLinesJson = input.playLines?.length
+      ? await findWorkLinesForUpdate(executor, workId)
+      : null;
+    await updateWork(
+      executor,
+      workId,
+      input,
+      fanart,
+      streamFormat,
+      mergedPlayLinesJson(existingLinesJson, input),
+    );
   } else {
     const [insertResult] = await executor.query(
       `INSERT INTO anime_works (
@@ -345,7 +504,17 @@ async function upsertAnimeWorks(
       await executor.query('DELETE FROM anime_works WHERE id = ?', [insertedWorkId]);
       workId = await findWorkMapping(executor, input.source, input.sourceId);
       if (!workId) throw error;
-      await updateWork(executor, workId, input, fanart, streamFormat);
+      const existingLinesJson = input.playLines?.length
+        ? await findWorkLinesForUpdate(executor, workId)
+        : null;
+      await updateWork(
+        executor,
+        workId,
+        input,
+        fanart,
+        streamFormat,
+        mergedPlayLinesJson(existingLinesJson, input),
+      );
     }
   }
 
@@ -386,7 +555,7 @@ export class MariaDbCrawlerCatalogIngestion implements CatalogIngestionPort {
       : null;
   }
 
-  async upsertFromCrawler(input: CatalogIngestionInput): Promise<CatalogIngestionResult> {
+  async upsertFromCrawler(input: CatalogIngestionInput): Promise<CatalogIngestionOutcome> {
     const executor = getCrawlerSqlExecutor();
     const target = catalogTargetForSource(input.source);
     if (target === 'anime_works') {

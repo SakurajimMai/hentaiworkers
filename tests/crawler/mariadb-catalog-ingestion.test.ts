@@ -86,7 +86,8 @@ test('Hanime ingestion assigns the legacy 里番 category', async () => {
     }),
   );
 
-  assert.equal(result.animeId, 88);
+  assert.equal(result.kind, 'upserted');
+  assert.equal(result.kind === 'upserted' ? result.animeId : null, 88);
   assert.ok(calls.some(({ sql, params }) =>
     sql.includes('SELECT id FROM categories') && params[0] === '里番'));
   const insert = calls.find(({ sql }) => sql.includes('INSERT INTO animes'));
