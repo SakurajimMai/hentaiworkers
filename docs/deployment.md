@@ -74,7 +74,8 @@ cd /opt/anime-web
 ```text
 /opt/anime-web/
 ├── docker-compose.yml
-└── .env
+├── .env
+└── worker.env
 ```
 
 可直接使用 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) 和 [`deploy/.env.example`](../deploy/.env.example)，无需完整仓库。
@@ -148,37 +149,32 @@ openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
 
 ```bash
 cd /opt/anime-web
-chmod 600 .env worker.env
-mkdir -p crawler-worker-tmp covers
-chown 10001:10001 crawler-worker-tmp covers
-chmod 700 crawler-worker-tmp
-chmod 755 covers
-
-docker compose pull app worker
-docker compose up -d app
+docker compose up -d
 ```
 
-Compose 中没有 `build:`，并设置 `pull_policy: always`。
+Compose 中没有 `build:`，并设置 `pull_policy: always`，因此上述命令会自动拉取最新的 App 和 Worker 镜像。`storage-init` 会自动创建并修正挂载目录的所有权和权限：`crawler-worker-tmp` 使用 `0700`，`covers` 使用 `0755`，两者均归 UID/GID `10001:10001` 所有。初始化成功后它会正常退出，随后 App 和 Worker 依次启动。
 
-App 健康后，在 `/admin/crawler/workers` 创建节点，将本次显示的一次性 ID 和令牌写入独立 `worker.env`，再启动 Worker：
+正常部署前应已准备好 `.env` 和有效的 `worker.env`。首次部署尚未签发 Worker 令牌时，先执行同一条 `docker compose up -d` 让 App 可用，然后在 `/admin/crawler/workers` 创建节点，将本次显示的一次性 ID 和令牌写入 `worker.env`，再次执行：
 
 ```bash
-docker compose up -d worker
-docker compose logs --tail=100 worker
+docker compose up -d
 ```
 
-`worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。宿主机相对目录 `./crawler-worker-tmp` 会绑定到容器内 `/tmp/crawler-worker`，必须归 UID/GID `10001:10001` 所有；非 root 账号执行 `chown` 时加 `sudo`。
+`worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。宿主机相对目录 `./crawler-worker-tmp` 会绑定到容器内 `/tmp/crawler-worker`。
 
 本地封面使用同一宿主机相对目录映射：Worker 通过 `./covers:/data/covers` 读写，App 通过 `./covers:/data/covers:ro` 只读。勾选“下载并保存封面”后，Worker 会把图片写入该目录，App 通过 `/api/media/covers/...` 返回图片；`SITE_URL` 用于生成写入数据库的完整封面 URL，因此必须配置为用户实际访问的 HTTPS 域名。不要把 `/api/media/covers/**` 加入反向代理的内部 API 拦截规则。
 
 检查：
 
 ```bash
-docker compose ps
+docker compose ps -a
 docker compose logs -f app
+docker compose logs --tail=100 worker
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
 curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
 ```
+
+`storage-init` 显示 `Exited (0)` 是正常状态。若 App 或 Worker 因初始化失败而未启动，使用 `docker compose logs storage-init` 查看目录权限错误。
 
 - `/api/live`：进程存活，不检查数据库
 - `/api/ready`：连接远程数据库并执行就绪检查
@@ -239,11 +235,10 @@ anime.example.com {
 
 ```bash
 cd /opt/anime-web
-docker compose pull app worker
-docker compose up -d --no-build
+docker compose up -d
 ```
 
-Compose 固定使用 App 与 Worker 的公开 `latest` 镜像。升级前先应用目标版本要求的受控迁移，再执行 `pull` 和重建。
+Compose 固定使用 App 与 Worker 的公开 `latest` 镜像，`pull_policy: always` 会在上述启动命令中自动拉取。升级前先应用目标版本要求的受控迁移。
 
 应用镜像更新不会改变远程数据库 schema。
 
@@ -293,7 +288,7 @@ sakurajiamai/hentaiworkers-app:<commit-sha>
 
 | 现象 | 原因 | 处理 |
 |------|------|------|
-| Hub pull 失败 | 网络或 Docker Hub 临时故障 | 检查服务器网络后重试 `docker compose pull app worker` |
+| Hub pull 失败 | 网络或 Docker Hub 临时故障 | 检查服务器网络后重试 `docker compose up -d` |
 | 任务长期 queued 且 attempts=0 | Worker 未启动、令牌无效、节点暂停或能力不匹配 | 查看 Worker 日志、后台节点状态和任务的 `claimSkipReason` |
 | `/api/ready` 失败 | DB URL、TLS、IP 白名单或 schema 有问题 | 检查远程数据库连接与表结构 |
 | 后台无法登录 | 远程数据库没有管理员或密码不匹配 | 在远程数据库侧维护管理员账号 |

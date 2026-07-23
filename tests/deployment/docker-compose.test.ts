@@ -158,11 +158,15 @@ test('worker environment examples contain identity only and real files stay igno
   assert.doesNotMatch(dockerIgnore, /^\*\*\/covers$/m);
 });
 
-test('deployment docs prepare and preserve shared local cover storage', () => {
+test('deployment docs use one command and automatic storage initialization', () => {
   for (const source of [deploymentGuide, deployReadme]) {
-    assert.match(source, /mkdir -p[^\n]*covers/);
-    assert.match(source, /chown 10001:10001[^\n]*covers/);
-    assert.match(source, /chmod 755[^\n]*covers/);
+    assert.match(source, /docker compose up -d/);
+    assert.match(source, /storage-init/);
+    assert.match(source, /自动[^\n]*(?:权限|所有权)/);
+    assert.doesNotMatch(source, /^mkdir -p crawler-worker-tmp covers$/m);
+    assert.doesNotMatch(source, /^chown 10001:10001 crawler-worker-tmp covers$/m);
+    assert.doesNotMatch(source, /^chmod 700 crawler-worker-tmp$/m);
+    assert.doesNotMatch(source, /^chmod 755 covers$/m);
     assert.match(source, /\.\/covers:\/data\/covers/);
     assert.match(source, /SITE_URL[^\n]*完整[^\n]*封面/);
     assert.match(source, /升级[^\n]*不会删除[^\n]*covers/);
