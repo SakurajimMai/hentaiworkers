@@ -33,17 +33,12 @@ export type ArtPlayerProps = {
   theme?: string;
   /**
    * Force media kind when the URL has no reliable extension
-   * (common for some MacCMS CDN links).
+   * (common for some CDN links).
    */
   mediaKind?: 'auto' | 'hls' | 'progressive';
   /**
-   * Route HLS (and optionally progressive) through the same-origin media proxy.
-   * Required for many MacCMS CDNs with expired TLS certs that browsers reject.
-   */
-  useProxy?: boolean;
-  /**
    * Admin-configured player behaviour (ads, context menu, theme).
-   * ArtPlayer is primarily for 里番; works pages may also fall back here.
+   * ArtPlayer is the main-site playback surface.
    */
   playerConfig?: ClientPlayerConfig;
   /** Called once after ArtPlayer is constructed. */
@@ -72,11 +67,6 @@ function detectHls(url: string): boolean {
   if (lower.includes('m3u8')) return true;
   if (/[?&](type|format|file)=(hls|m3u8)\b/i.test(lower)) return true;
   return false;
-}
-
-function toProxyUrl(url: string): string {
-  if (url.startsWith('/api/media/proxy')) return url;
-  return `/api/media/proxy?url=${encodeURIComponent(url)}`;
 }
 
 function resolveHlsConstructor(mod: unknown): HlsConstructor | null {
@@ -115,7 +105,7 @@ function attachHlsSync(
 ): string | null {
   destroyHls(art);
 
-  const preferHlsJs = url.startsWith('/') || url.includes('/api/media/proxy');
+  const preferHlsJs = url.startsWith('/');
 
   if (!preferHlsJs && video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = url;
@@ -400,7 +390,7 @@ function mountPauseAd(
 
 /**
  * Thin ArtPlayer host. Dimensions come from the parent (must be non-zero).
- * Primarily used for 里番 progressive MP4; works pages may fall back here.
+ * Used for main-site media playback.
  */
 export function ArtPlayer({
   url,
@@ -412,7 +402,6 @@ export function ArtPlayer({
   className,
   theme,
   mediaKind = 'auto',
-  useProxy = false,
   playerConfig,
   onReady,
 }: ArtPlayerProps) {
@@ -454,11 +443,6 @@ export function ArtPlayer({
         mediaKind === 'hls'
         || (mediaKind === 'auto' && detectHls(mediaUrl));
 
-      // External MacCMS HLS almost always needs the proxy (expired certs / CORS).
-      // 里番 hosted MP4 should stay direct (useProxy=false).
-      const shouldProxy = useProxy || (wantsHls && /^https?:\/\//i.test(mediaUrl));
-      const playUrl = shouldProxy ? toProxyUrl(mediaUrl) : mediaUrl;
-
       const preRoll = config.preRollAd;
       const wantsAdsPlugin = shouldEnablePreRollPlugin(preRoll);
       let preRollActive = wantsAdsPlugin;
@@ -499,7 +483,7 @@ export function ArtPlayer({
 
       art = new ArtplayerCtor({
         container,
-        url: playUrl,
+        url: mediaUrl,
         poster: poster || undefined,
         // Stable id powers built-in autoPlayback memory across sessions.
         id: id || mediaUrl,
@@ -643,11 +627,7 @@ export function ArtPlayer({
         hls.on(HlsCtor.Events.ERROR, (_event, data) => {
           if (!data?.fatal || cancelled) return;
           if (data.type === HlsCtor.ErrorTypes.NETWORK_ERROR) {
-            setError(
-              shouldProxy
-                ? 'HLS 网络错误：代理拉取播放列表失败（源站不可达）'
-                : 'HLS 网络错误：无法拉取播放列表（源站证书过期、防盗链或跨域限制）',
-            );
+            setError('HLS 网络错误：无法拉取播放列表（源站、防盗链或跨域限制）');
             try {
               hls.startLoad();
             } catch {
@@ -703,7 +683,7 @@ export function ArtPlayer({
       artRef.current = null;
       art = null;
     };
-  }, [url, poster, id, autoPlayback, autoplay, effectiveTheme, mediaKind, useProxy, config, playerConfig]);
+  }, [url, poster, id, autoPlayback, autoplay, effectiveTheme, mediaKind, config, playerConfig]);
 
   return (
     <div className={className ?? 'relative h-full w-full bg-black'} data-player="artplayer">

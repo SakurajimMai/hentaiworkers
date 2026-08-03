@@ -40,7 +40,7 @@ Close the user loop: browse → play → progress → continue watching → retu
 ### user_events
 
 - user_id nullable, anonymous_id nullable, event_type, anime_id, episode_id, session_id, properties_json, created_at
-- Separate from crawler job events and admin audit
+- Separate from administrative audit events
 
 ## Write policy
 

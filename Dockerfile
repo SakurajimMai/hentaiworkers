@@ -10,9 +10,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# Build-time placeholders; runtime uses real env
-ENV DATABASE_URL=mysql://user:pass@127.0.0.1:3306/db
-ENV SESSION_SECRET=build-time-session-secret-min-32-chars
 RUN npm run build
 
 FROM node:22-alpine AS runner

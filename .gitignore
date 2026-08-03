@@ -26,12 +26,6 @@ dist-ssr
 # Environment files
 .env*
 !.env.example
-worker.env
-.crawler-worker.env
-.crawler-worker-tmp/
-crawler-worker-tmp/
-/covers/
-
 # Database
 *.db
 *.sqlite
@@ -48,10 +42,8 @@ out/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 
-# Local tooling and crawler configuration
+# Local tooling and configuration
 .playwright-mcp/
-__pycache__/
-*.py[cod]
 scripts/production_config.yml
 production_config.yml
 config.yml

@@ -259,9 +259,8 @@ export function WatchPlayer({
       autoplay
       // Progress is owned by WatchPlayer (server/local merge); avoid dual resume UI.
       autoPlayback={false}
-      // 里番资源是 progressive MP4，不走 HLS/代理。
+      // The catalog currently serves progressive MP4.
       mediaKind="progressive"
-      useProxy={false}
       playerConfig={playerConfig}
       onReady={handleReady}
       className="h-full w-full bg-black"

@@ -1,5 +1,4 @@
 -- Additive: watch progress, media sources foundation, product analytics events.
--- Does not DROP or mutate crawler control tables.
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';

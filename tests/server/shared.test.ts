@@ -26,24 +26,11 @@ import {
 
 const ERROR_CODES = [
   'CONFIG_INVALID',
-  'SOURCE_AUTH_FAILED',
   'SOURCE_RATE_LIMITED',
-  'SOURCE_UNAVAILABLE',
-  'STORAGE_AUTH_FAILED',
-  'STORAGE_AUTH_EXPIRED',
-  'STORAGE_UNAVAILABLE',
   'SECRET_REVOKED',
   'RESULT_INVALID',
   'RESULT_CONFLICT',
-  'LEASE_LOST',
-  'WORKER_INCOMPATIBLE',
-  'WORKER_TOKEN_INVALID',
-  'WORKER_TOKEN_REVOKED',
-  'WORKER_FORBIDDEN',
   'AUTH_REQUIRED',
-  'BATCH_TOO_LARGE',
-  'DATABASE_TRANSIENT',
-  'CANCELLED',
   'INTERNAL_ERROR',
 ] as const satisfies readonly AppErrorCode[];
 
@@ -95,7 +82,7 @@ test('AppError 使用正式规格中的完整稳定错误码并保留安全元�
   assert.deepEqual(APP_ERROR_CODES, ERROR_CODES);
 
   const error = new AppError(
-    'DATABASE_TRANSIENT',
+    'INTERNAL_ERROR',
     '数据库暂时不可用',
     503,
     true,
@@ -103,7 +90,7 @@ test('AppError 使用正式规格中的完整稳定错误码并保留安全元�
   );
 
   assert.equal(error.name, 'AppError');
-  assert.equal(error.code, 'DATABASE_TRANSIENT');
+  assert.equal(error.code, 'INTERNAL_ERROR');
   assert.equal(error.status, 503);
   assert.equal(error.retryable, true);
   assert.deepEqual(error.details, { requestId: 'request-1' });

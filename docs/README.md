@@ -1,45 +1,13 @@
-# AnimeStream 文档中心
+# 文档索引
 
-面向运维、开发与内容运营的统一文档入口。内容与当前 **Next.js 全栈 + 远程 MySQL + Docker Compose** 实现对齐。
-
-| 文档 | 说明 |
+| 文档 | 内容 |
 |------|------|
-| [架构说明](./architecture.md) | 系统结构、数据流、权限模型、目录职责 |
-| [API 参考](./api/README.md) | 公开 REST 接口说明与示例 |
-| [OpenAPI 规范](./api/openapi.yaml) | OpenAPI 3.0 机读规格 |
-| [**部署指南**](./deployment.md) | **App + Worker Docker Hub 部署**：远程数据库、隔离 env、TLS、升级 |
-| [Hub 部署清单](../deploy/README.md) | 服务器只拉镜像的 compose / `.env` 模板 |
-| [开发指南](./development.md) | 本地启动、脚本、测试与约定 |
-| [前台使用](./user-guide.md) | 双片库、ArtPlayer / 解析播放、进度、片单、广告体验 |
-| [后台管理](./admin-guide.md) | 采集、存储、播放器广告、用户与系统设置 |
-| [设计规格](./superpowers/specs/2026-07-12-nextjs-mysql-admin-design.md) | 重构设计原文 |
-| [实现计划](./superpowers/plans/2026-07-12-nextjs-mysql-admin.md) | 实现任务拆分 |
+| [架构](./architecture.md) | 主站边界、分层、数据与安全 |
+| [开发](./development.md) | 本地环境、数据库、命令与约束 |
+| [部署](./deployment.md) | App-only Docker 部署、升级与回滚 |
+| [后台手册](./admin-guide.md) | 内容、标签、用户、导入与系统设置 |
+| [用户指南](./user-guide.md) | 浏览、播放、账号、片单与历史 |
+| [API](./api/README.md) | 公开 API 与 OpenAPI |
+| [变更记录](./CHANGELOG.md) | 产品范围和运维影响 |
 
-## 快速链接
-
-- 本地前台：`http://localhost:3000`
-- 本地后台：`http://localhost:3000/admin`
-- 存活探针：`GET /api/live` · 就绪（含 DB）：`GET /api/ready` · 兼容：`GET /api/health`
-- 环境模板：[`.env.example`](../.env.example) · [worker.env.example](../worker.env.example) · 生产精简：[deploy/.env.example](../deploy/.env.example)
-- Compose（精简生产）：[deploy/docker-compose.yml](../deploy/docker-compose.yml)
-- Compose（仓库根）：[docker-compose.yml](../docker-compose.yml)（同样仅拉 Hub 镜像）
-- 主 README：[../README.md](../README.md)
-
-## 上线最短路径（Docker Hub）
-
-1. 远程数据库 schema 和管理员账号由你提前维护
-2. CI 自动发布公开 App 与 Worker 镜像
-3. 服务器使用 `deploy/` 清单、`.env` 和独立 `worker.env`，无需 Docker Hub 登录
-4. 启动 App，在后台创建 Worker 身份并写入一次性令牌，再启动 Worker
-5. `docker compose pull app worker && docker compose up -d`
-6. HTTPS 反代到 `127.0.0.1:${APP_PORT}`，拦截公网 `/api/internal/**`
-
-细节见 [deployment.md](./deployment.md) 与 [deploy/README.md](../deploy/README.md)。
-
-## 文档维护约定
-
-1. 变更公开 API 时同步更新 `docs/api/openapi.yaml` 与 `docs/api/README.md`。
-2. 变更环境变量时同步 `.env.example` 与 `docs/deployment.md`。
-3. 变更后台能力时同步 `docs/admin-guide.md`。
-4. 变更前台播放 / 进度 / 片单体验时同步 `docs/user-guide.md`。
-5. 架构级调整先更新 `docs/architecture.md`，再改实现文档。
+环境模板位于 [`.env.example`](../.env.example)，生产精简模板位于 [`deploy/.env.example`](../deploy/.env.example)。

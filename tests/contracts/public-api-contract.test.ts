@@ -111,12 +111,12 @@ function assertSchemaRequired(
   }
 }
 
-test('TypeScript 测试脚本使用跨平台带引号递归 glob', () => {
+test('TypeScript 测试脚本使用跨平台递归测试入口', () => {
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
     scripts?: Record<string, string>;
   };
 
-  assert.equal(packageJson.scripts?.['test:ts'], 'tsx --test "tests/**/*.test.ts"');
+  assert.equal(packageJson.scripts?.['test:ts'], 'node scripts/run-tests.mjs');
 });
 
 test('五个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {

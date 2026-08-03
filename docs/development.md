@@ -1,152 +1,71 @@
 # 开发指南
 
-## 1. 环境要求
+## 1. 环境
 
-- Node.js 22+（推荐与 Docker 基础镜像一致）
-- npm 10+
-- 可访问的 MySQL（本地或远程）
-- 可选：Python 3（仅采集脚本 / 部分测试）
-
-## 2. 本地启动
+- Node.js 22+
+- npm
+- MySQL 8+ 或 MariaDB 10.6+
 
 ```bash
+npm ci
 cp .env.example .env
-# 编辑 DATABASE_URL / SESSION_SECRET / APP_ENCRYPTION_* / SITE_URL 等
-# 密钥：openssl rand -base64 48 与 openssl rand -base64 32（见 docs/deployment.md）
-
-npm install
-# 空库：CRAWLER_MIGRATE_CONFIRM=yes npm run db:setup:crawler
-# 已有库：CRAWLER_MIGRATE_CONFIRM=yes npm run db:migrate:crawler
-npm run seed:admin   # 首次
-npm run dev          # http://localhost:3000
 ```
+
+本地数据库可设置 `DATABASE_TLS_MODE=disabled`，但仅允许 `localhost`、`127.0.0.1` 或 `::1`。远程数据库必须启用 TLS。
+
+## 2. 启动
+
+```bash
+npm run dev
+```
+
+常用入口：
 
 | 地址 | 用途 |
 |------|------|
-| http://localhost:3000 | 前台 |
-| http://localhost:3000/admin | 后台 |
-| http://localhost:3000/api/live | 存活 |
-| http://localhost:3000/api/ready | 就绪（DB） |
-| http://localhost:3000/api/health | 兼容健康检查 |
-| http://localhost:3000/admin/crawler | 爬虫控制面 |
+| `http://localhost:3000` | 公开站点 |
+| `http://localhost:3000/admin` | 管理后台 |
+| `http://localhost:3000/api/live` | 进程存活检查 |
+| `http://localhost:3000/api/ready` | 数据库就绪检查 |
 
-## 3. 常用脚本
+## 3. 数据库
 
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | Next 开发服务器 |
-| `npm run build` | 生产构建 |
-| `npm run start` | 生产模式启动 |
-| `npm run lint` | ESLint |
-| `npm run test` | TS + Python 测试入口 |
-| `npm run test:ts` | `tsx --test tests/**/*.test.ts` |
-| `npm run test:python` | `scripts/tests` + `crawler_worker/tests` |
-| `npm run seed:admin` | 引导管理员 |
-| `npm run seed:maccms-profiles` | 种子 6 个日韩 MacCMS 模板 |
-| `npm run worker:provision` | 签发本地 Worker 令牌 → `.crawler-worker.env` |
-| `npm run worker:start` | 启动 Python crawler worker |
-| `npm run db:setup:crawler` | 全新库创建爬虫核心表（需 `CRAWLER_MIGRATE_CONFIRM=yes`） |
-| `npm run db:migrate:crawler` | 应用 `drizzle/migrations` 加法迁移（需确认变量） |
-| `npm run db:compact:crawler` | 旧爬虫表审计 / 可选收敛 |
-| `npm run db:push` | **已禁用**；生产只用审查过的 SQL |
-| `npm run db:studio` | Drizzle Studio |
-| `npm run check:legacy` | 检查是否误引入废弃路径 |
+- `drizzle/baseline/0000-production-schema.sql`：核心表基线。
+- `drizzle/migrations/0003–0009`：当前主站能力的增量迁移。
+- `drizzle/migrations/0010–0013`：历史兼容迁移，主站不读写其 works 表。
+- `npm run db:baseline`：从指定数据库导出核心表结构基线。
+- `npm run db:push`：明确禁用，防止未经审核直接修改数据库。
+- `npm run db:studio`：启动 Drizzle Studio。
 
-生产 Compose 与服务器清单见 [deployment.md](./deployment.md)。
+生产变更应审核 SQL、备份数据库、在维护窗口执行并验证 `/api/ready`。迁移不会由 App 容器自动运行。
 
-## 4. 代码约定
+## 4. 管理员
 
-### 路径别名
+在本机 `.env` 增加：
 
-- `@/*` → 仓库根目录（见 `tsconfig.json`）
-
-### 分层
-
-| 目录 | 约定 |
-|------|------|
-| `app/(site)` | 前台页面，优先 Server Components |
-| `app/admin` | 后台页面 + `actions.ts` Server Actions |
-| `app/api` | 公开 Route Handlers，保持 JSON 契约稳定 |
-| `lib` | 无 UI 的业务与基础设施 |
-| `components` | 可复用 UI；Client 组件需 `'use client'` |
-
-### 鉴权
-
-- 页面门禁：`middleware.ts`（`/admin/*`）
-- 写操作：`requireAdmin()`（`lib/auth.ts`）
-- 勿在客户端暴露 `SESSION_SECRET` 或数据库凭据
-
-### 数据库
-
-- Schema：`lib/schema.ts`
-- 连接与重试：`lib/db.ts`
-- 列表/相似逻辑：`lib/anime-service.ts`
-
-修改表结构时：
-
-1. 更新 `lib/schema.ts`
-2. 评估远程库是否已有列（生产库多为既有表）
-3. 需要时使用 `drizzle-kit` / 手工 `ALTER`
-4. 同步 `docs/architecture.md` 与 API 文档
-
-## 5. 测试建议
-
-```bash
-npm run test:ts
-npm run lint
-npm run build
+```dotenv
+ADMIN_BOOTSTRAP_USER=admin@example.com
+ADMIN_BOOTSTRAP_PASSWORD=replace-with-at-least-12-characters
 ```
 
-手动冒烟：
+然后执行 `npm run seed:admin`。命令不会提供默认凭据。
 
-1. 首页是否出热门/最新
-2. `/browse?search=` 搜索
-3. `/watch/{id}` 播放器与标签
-4. `/admin` 登录后改一条作品上下架，前台是否反映
-5. `GET /api/animes?limit=2` 契约字段
+## 5. 检查命令
 
-## 6. 采集脚本（可选）
-
-`scripts/` 下 Python 采集工具向 **MySQL 直写**，不经过 Next：
-
-- 运行时：`crawler_worker/`（无数据库）
-- YAML 导入模板：`scripts/production_config.yml.example`（不含 MySQL 凭据）
-- 遗留直写脚本已删除；撤销独立爬虫库账号：`node scripts/revoke-legacy-crawler-db.mjs`
-
-采集与 Web 进程解耦：Web 只读库展示。
-
-## 7. 移动端
-
-`mobile/` 为 Expo 工程，独立安装依赖与构建。**不内置任何业务域名**；必须显式配置 API 基址：
-
-```bash
-cd mobile
-# 二选一（绝对 HTTP(S) 源站，无路径）
-export EXPO_PUBLIC_API_BASE_URL=https://your-domain.example
-# 或写入 app.json → expo.extra.apiBaseUrl
-npm install
-npx expo start
-```
-
-本地 Metro 的 `/api` 代理读取同一环境变量（或 `MOBILE_DEV_API_BASE_URL`）。未配置时原生端启动会失败，代理返回 503。
-
-契约文档：`docs/api/README.md`。
-
-## 8. 提交与文档同步
-
-涉及以下变更时请同步文档（`docs/`）：
-
-| 变更 | 文档 |
+| 命令 | 作用 |
 |------|------|
-| 新 API / 改参数 | `docs/api/*` |
-| 新环境变量 | `.env.example` + `docs/deployment.md` |
-| 后台功能 | `docs/admin-guide.md` |
-| 架构/部署方式 | `docs/architecture.md` |
+| `npm run lint` | ESLint，禁止 warning |
+| `npm run typecheck` | TypeScript 静态类型检查 |
+| `npm run test` | 运行全部 TypeScript 测试 |
+| `npm run check:legacy` | 阻止旧 Web/SQLite 栈回流 |
+| `npm run check:boundaries` | 验证仓库和部署保持 App-only |
+| `npm run build` | Next.js 生产构建与类型检查 |
 
-## 9. 已知历史路径
+提交前至少运行以上检查，并补充与改动对应的聚焦测试。
 
-| 路径 | 状态 |
-|------|------|
-| `functions/` | 旧 Cloudflare Functions，非当前生产入口 |
-| `legacy/` | 旧 Vite 前端存档（若存在） |
-| `server/` | 早期 Express 草稿，勿与 Next 混用 |
+## 6. 约束
+
+- 新后端逻辑放入现有 `catalog`、`identity` 或 `system` 模块。
+- Route Handler 和 Server Action 只负责协议转换、鉴权与调用应用服务。
+- 不在主站加入数据抓取、下载、媒体搬运或对应调度代码。
+- 不恢复 MacCMS、works 页面、流代理或线路解析播放器设置。

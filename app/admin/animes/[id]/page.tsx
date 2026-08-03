@@ -40,7 +40,7 @@ export default async function AdminAnimeEditPage({
         <p className="font-meta mb-2">里番 · animes / tags</p>
         <h1 className="font-serif text-3xl">{isNew ? '新建里番' : '编辑里番'}</h1>
         <p className="mt-2 font-ui text-sm text-[#787774]">
-          使用里番标签字典 tags；动漫标签在 work_tags，互不通用。
+          使用里番标签字典 tags。
         </p>
       </div>
 

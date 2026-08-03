@@ -1,39 +1,10 @@
-# AnimeStream production deployment: App control plane + isolated crawler Worker.
-#
-# The database remains externally managed. Compose does not run migrations or seeds.
+# AnimeStream application deployment. The database is managed separately.
 
 services:
-  storage-init:
-    image: sakurajiamai/hentaiworkers-worker:latest
-    pull_policy: always
-    user: "0:0"
-    entrypoint: ["/bin/sh", "-ec"]
-    command:
-      - |
-        mkdir -p /tmp/crawler-worker /data/covers
-        chown 10001:10001 /tmp/crawler-worker /data/covers
-        chmod 0700 /tmp/crawler-worker
-        chmod 0755 /data/covers
-    volumes:
-      - ./crawler-worker-tmp:/tmp/crawler-worker
-      - ./covers:/data/covers
-    read_only: true
-    network_mode: none
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - FOWNER
-      - DAC_OVERRIDE
-    security_opt:
-      - no-new-privileges:true
-    restart: "no"
-
   app:
     image: sakurajiamai/hentaiworkers-app:latest
     pull_policy: always
     ports:
-      # Host publish only: APP_HOST_BIND:APP_PORT -> container 3000
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:
       - .env
@@ -41,12 +12,6 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
-      CRAWLER_COVER_DIR: /data/covers
-    volumes:
-      - ./covers:/data/covers:ro
-    depends_on:
-      storage-init:
-        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test:
@@ -60,25 +25,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 40s
-
-  worker:
-    image: sakurajiamai/hentaiworkers-worker:latest
-    pull_policy: always
-    env_file:
-      - worker.env
-    environment:
-      CRAWLER_CONTROL_URL: http://app:3000/api/internal/crawler/v1
-      CRAWLER_TEMP_DIR: /tmp/crawler-worker
-      CRAWLER_COVER_DIR: /data/covers
-    depends_on:
-      app:
-        condition: service_healthy
-    restart: unless-stopped
-    read_only: true
-    volumes:
-      - ./crawler-worker-tmp:/tmp/crawler-worker
-      - ./covers:/data/covers
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true

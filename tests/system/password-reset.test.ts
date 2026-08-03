@@ -17,7 +17,7 @@ import {
 } from '../../lib/server/infrastructure/crypto/aes-gcm-secret-cipher';
 import { defaultSystemSettings } from '../../lib/server/system/domain/settings';
 import { encryptSmtpPassword } from '../../lib/server/system/application/secret-fields';
-import { sha256Bytes } from '../../lib/server/crawler/domain/hashing';
+import { sha256Bytes } from '../../lib/server/shared/hashing';
 import { AppError } from '../../lib/server/shared/errors';
 import { AuthRateLimiter } from '../../lib/server/identity/application/auth-rate-limit';
 

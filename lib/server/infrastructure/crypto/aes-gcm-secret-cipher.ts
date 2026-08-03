@@ -3,7 +3,7 @@ import { AppError } from '../../shared/errors';
 import type {
   EncryptedSecretPayload,
   SecretCipher,
-} from '../../crawler/ports/secret-cipher';
+} from '../../shared/secret-cipher';
 
 export type EncryptionKeyringView = Readonly<{
   currentKeyId: string;

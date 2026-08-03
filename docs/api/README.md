@@ -4,18 +4,22 @@
 
 - 协议：HTTPS（生产）/ HTTP（本地）
 - 格式：JSON，`Content-Type: application/json`
-- 鉴权：公开只读接口**无需**登录
+- 鉴权：公开只读接口**无需**登录；`/api/me/*` 需前台会话 Cookie
+- 范围：**仅里番目录**（`animes` / `tags`）。无独立「动漫 / works」公开 API
 - 机读规范：[openapi.yaml](./openapi.yaml)
 
 ## 端点一览
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/health` | 健康检查 + 数据库连通性 |
-| GET | `/api/animes` | 作品分页列表 |
-| GET | `/api/animes/{id}` | 作品详情（含标签） |
+| GET | `/api/live` | 进程存活（Compose healthcheck） |
+| GET | `/api/ready` | 就绪（含 `SELECT 1`） |
+| GET | `/api/health` | 兼容健康检查 + 数据库连通性 |
+| GET | `/api/animes` | 里番分页列表 |
+| GET | `/api/animes/{id}` | 里番详情（含标签） |
 | GET | `/api/animes/{id}/similar` | 相似推荐 |
-| GET | `/api/tags` | 全部标签 |
+| GET | `/api/tags` | 里番标签字典 |
+| GET/PUT… | `/api/me/watch-progress*` | 登录用户观看进度 |
 
 ## 1. 健康检查
 

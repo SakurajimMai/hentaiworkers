@@ -27,8 +27,7 @@ export function SiteHeaderClient({ accountSlot }: { accountSlot: ReactNode }) {
     if (!query) return;
     pushSearchHistory(query);
     setHistory(readSearchHistory());
-    const target = pathname.startsWith('/works') ? '/works' : '/browse';
-    router.push(`${target}?search=${encodeURIComponent(query)}`);
+    router.push(`/browse?search=${encodeURIComponent(query)}`);
     setFocused(false);
   };
 
@@ -58,9 +57,6 @@ export function SiteHeaderClient({ accountSlot }: { accountSlot: ReactNode }) {
           <Link href="/browse" className={linkClass(pathname.startsWith('/browse'))}>
             里番
           </Link>
-          <Link href="/works" className={linkClass(pathname.startsWith('/works'))}>
-            动漫
-          </Link>
           <Link href="/history" className={linkClass(pathname.startsWith('/history'))}>
             历史
           </Link>
@@ -77,7 +73,7 @@ export function SiteHeaderClient({ accountSlot }: { accountSlot: ReactNode }) {
             />
             <input
               type="search"
-              placeholder={pathname.startsWith('/works') ? '搜索动漫' : '搜索里番'}
+              placeholder="搜索里番"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onFocus={() => {
@@ -120,9 +116,7 @@ export function SiteHeaderClient({ accountSlot }: { accountSlot: ReactNode }) {
                       onClick={() => {
                         setQ(item);
                         pushSearchHistory(item);
-                        router.push(
-                          `${pathname.startsWith('/works') ? '/works' : '/browse'}?search=${encodeURIComponent(item)}`,
-                        );
+                        router.push(`/browse?search=${encodeURIComponent(item)}`);
                         setFocused(false);
                       }}
                     >

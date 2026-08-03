@@ -49,19 +49,13 @@ test('public auth config hides turnstile without secret', () => {
   assert.equal(pub.turnstile.onRegister, false);
 });
 
-test('player settings parse defaults and line parsers', () => {
+test('player settings parse defaults', () => {
   const settings = parseSystemSettings({
     player: {
       enableContextMenu: false,
-      lineParsers: [
-        { match: 'hnm3u8', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=' },
-        { match: '红牛', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=', enabled: false },
-      ],
     },
   });
   assert.equal(settings.player.enableContextMenu, false);
-  assert.equal(settings.player.worksFallbackArtPlayer, true);
-  assert.equal(settings.player.lineParsers.length, 2);
   assert.equal(settings.player.preRollAd.enabled, false);
   assert.equal(settings.player.preRollAd.muted, true);
   assert.equal(settings.player.preRollAd.playDuration, 5);
@@ -121,24 +115,6 @@ test('toPublicPlayerConfig preserves preRoll and pause ad video/muted fields', a
   assert.equal(pub.preRollAd.muted, false);
   assert.equal(pub.pauseAd.videoUrl, 'https://cdn.example/pause.mp4');
   assert.equal(pub.pauseAd.muted, false);
-});
-
-test('resolveLineParser and buildParserPlaybackUrl', async () => {
-  const { resolveLineParser, buildParserPlaybackUrl } = await import(
-    '../../lib/server/system/domain/settings'
-  );
-  const parsers = [
-    { match: 'hnm3u8', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=', enabled: true },
-    { match: '红牛', parserUrl: 'https://www.hnjiexi.com/m3u8/?url=', enabled: true },
-  ];
-  const hit = resolveLineParser({ flag: 'hnm3u8', name: '红牛' }, parsers);
-  assert.ok(hit);
-  assert.equal(hit?.match, 'hnm3u8');
-  const src = buildParserPlaybackUrl(
-    'https://www.hnjiexi.com/m3u8/?url=',
-    'https://cdn.example/a.m3u8',
-  );
-  assert.equal(src, 'https://www.hnjiexi.com/m3u8/?url=https%3A%2F%2Fcdn.example%2Fa.m3u8');
 });
 
 class MemorySettings implements SystemSettingsRepository {

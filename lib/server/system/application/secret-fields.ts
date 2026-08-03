@@ -1,4 +1,4 @@
-import type { SecretCipher } from '../../crawler/ports/secret-cipher';
+import type { SecretCipher } from '../../shared/secret-cipher';
 import type { EncryptedField } from '../domain/settings';
 
 const AAD_SMTP = 'system:smtp:password';

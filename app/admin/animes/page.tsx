@@ -56,7 +56,7 @@ export default async function AdminAnimesPage({
           <p className="font-meta mb-2">里番 · animes / tags</p>
           <h1 className="section-title text-3xl text-[#111]">里番管理</h1>
           <p className="mt-2 font-ui text-sm text-[#6f6d68] leading-relaxed">
-            里番片库与标签（tags）。动漫外链请用「动漫」菜单，勿混用。支持批量上架/下架/删除。
+            里番片库与标签（tags）。支持批量上架/下架/删除。
           </p>
         </div>
         <Link href="/admin/animes/new" className="btn-ink !text-[13px]">

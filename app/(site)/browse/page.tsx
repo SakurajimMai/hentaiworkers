@@ -62,17 +62,10 @@ export default async function BrowsePage({
       <div className="page-shell pt-8 sm:pt-12">
         <div className="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-end gap-5 border-b border-[#ece8e0] pb-6">
           <div className="flex-1 min-w-0">
-            <p className="font-meta mb-2">里番馆</p>
+            <p className="font-meta mb-2">里番</p>
             <h1 className="section-title text-3xl sm:text-4xl text-ink">{heading}</h1>
             <p className="mt-2 font-ui text-sm text-soft leading-relaxed max-w-prose">
-              里番内容与标签独立存储；动漫外链请前往{' '}
-              <Link
-                href="/works"
-                className="text-ink font-medium underline underline-offset-2 decoration-[#d8d4cb] hover:decoration-[#1a1917]"
-              >
-                动漫馆
-              </Link>
-              。
+              按热门或最近更新浏览，也可使用顶栏搜索标题。
             </p>
           </div>
           <div className="inline-flex items-center gap-0.5 rounded-full border border-[#e8e4dc] bg-white p-1 shadow-[0_1px_0_hsla(30,12%,18%,0.03)]">

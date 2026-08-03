@@ -14,7 +14,6 @@ test('parsePlayerSettingsFromForm defaults when fields missing', () => {
   const parsed = parsePlayerSettingsFromForm(form({}));
   assert.equal(parsed.enableContextMenu, false);
   assert.equal(parsed.theme, '#E53935');
-  assert.equal(parsed.worksFallbackArtPlayer, false);
   assert.equal(parsed.preRollAd.enabled, false);
   assert.equal(parsed.preRollAd.videoUrl, '');
   assert.equal(parsed.preRollAd.playDuration, 5);
@@ -23,7 +22,6 @@ test('parsePlayerSettingsFromForm defaults when fields missing', () => {
   assert.equal(parsed.pauseAd.enabled, false);
   assert.equal(parsed.pauseAd.videoUrl, '');
   assert.equal(parsed.pauseAd.muted, false);
-  assert.deepEqual(parsed.lineParsers, []);
 });
 
 test('parsePlayerSettingsFromForm reads pause video url and muted on/off', () => {

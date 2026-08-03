@@ -6,12 +6,10 @@ import { AdminNav } from '@/components/admin/admin-nav';
 const NAV = [
   { href: '/admin', label: '概览', exact: true },
   { href: '/admin/animes', label: '里番' },
-  { href: '/admin/works', label: '动漫' },
   { href: '/admin/tags', label: '标签' },
   { href: '/admin/import', label: '导入' },
   { href: '/admin/users', label: '用户' },
   { href: '/admin/settings', label: '系统' },
-  { href: '/admin/crawler', label: '爬虫' },
   { href: '/admin/account', label: '账户' },
 ] as const;
 

@@ -24,7 +24,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 AnimeStream
               </p>
               <p className="mt-2 font-ui text-[13px] leading-relaxed text-soft">
-                里番与动漫分馆 · 独立片库与标签。托管 MP4 与外链线路分开展示。
+                里番片库 · 托管 MP4 在线观看，进度与片单同步。
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-10 gap-y-6 font-ui text-[13px]">
@@ -33,12 +33,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 <ul className="space-y-1.5 text-soft">
                   <li>
                     <Link href="/browse" className="hover:text-ink transition-colors">
-                      里番馆
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/works" className="hover:text-ink transition-colors">
-                      动漫馆
+                      里番
                     </Link>
                   </li>
                   <li>

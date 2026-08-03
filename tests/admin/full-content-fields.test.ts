@@ -137,7 +137,7 @@ test('自动增高组件在初始值变化时重新同步并透传原始值属�
   assert.match(source, /defaultValue=\{defaultValue\}/);
 });
 
-test('后台动漫编辑页为完整内容字段接入自动增高文本域', () => {
+test('后台里番编辑页为完整内容字段接入自动增高文本域', () => {
   const source = readFileSync('app/admin/animes/[id]/page.tsx', 'utf8');
   const textareas = source.match(/<AutoGrowTextarea\b[\s\S]*?\/>/g) ?? [];
   const expectedRows = new Map([

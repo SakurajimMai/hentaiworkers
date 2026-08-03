@@ -1,32 +1,11 @@
-import type { PlayerLineParser } from './settings';
-
 /**
  * Pure admin form parser for player settings.
  * Kept free of server-only imports so unit tests can call it directly.
  */
 export function parsePlayerSettingsFromForm(formData: FormData) {
-  const parsersRaw = String(formData.get('playerLineParsers') || '');
-  const lineParsers: PlayerLineParser[] = [];
-  for (const line of parsersRaw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    // match|parserUrl   or   match|parserUrl|0 to disable
-    const parts = trimmed.split('|').map((p) => p.trim());
-    if (parts.length < 2) continue;
-    const [match, parserUrl, enabledFlag] = parts;
-    if (!match || !parserUrl) continue;
-    lineParsers.push({
-      match: match.slice(0, 64),
-      parserUrl: parserUrl.slice(0, 500),
-      enabled: enabledFlag === undefined ? true : enabledFlag !== '0' && enabledFlag !== 'false',
-    });
-    if (lineParsers.length >= 50) break;
-  }
-
   return {
     enableContextMenu: formData.get('playerEnableContextMenu') === '1',
     theme: String(formData.get('playerTheme') || '#E53935').slice(0, 32) || '#E53935',
-    worksFallbackArtPlayer: formData.get('playerWorksFallbackArtPlayer') === '1',
     preRollAd: {
       enabled: formData.get('playerPreRollEnabled') === '1',
       videoUrl: String(formData.get('playerPreRollVideoUrl') || '').slice(0, 1000),
@@ -51,6 +30,5 @@ export function parsePlayerSettingsFromForm(formData: FormData) {
       clickUrl: String(formData.get('playerPauseAdClickUrl') || '').slice(0, 1000),
       muted: formData.get('playerPauseAdMuted') === '1',
     },
-    lineParsers,
   };
 }

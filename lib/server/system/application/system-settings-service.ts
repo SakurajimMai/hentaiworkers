@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { resolveSiteUrl } from '@/lib/site-url';
-import type { SecretCipher } from '../../crawler/ports/secret-cipher';
-import { sha256Bytes } from '../../crawler/domain/hashing';
+import type { SecretCipher } from '../../shared/secret-cipher';
+import { sha256Bytes } from '../../shared/hashing';
 import { AppError } from '../../shared/errors';
 import {
   defaultSystemSettings,
@@ -76,7 +76,6 @@ export type SystemSettingsUpdateInput = Readonly<{
   player?: Partial<SystemSettings['player']> & {
     preRollAd?: Partial<SystemSettings['player']['preRollAd']>;
     pauseAd?: Partial<SystemSettings['player']['pauseAd']>;
-    lineParsers?: SystemSettings['player']['lineParsers'];
   };
 }>;
 
@@ -197,7 +196,6 @@ export class SystemSettingsService {
         ...omitUndefined({
           enableContextMenu: input.player?.enableContextMenu,
           theme: input.player?.theme,
-          worksFallbackArtPlayer: input.player?.worksFallbackArtPlayer,
         }),
         preRollAd: {
           ...current.player.preRollAd,
@@ -207,7 +205,6 @@ export class SystemSettingsService {
           ...current.player.pauseAd,
           ...input.player?.pauseAd,
         },
-        lineParsers: input.player?.lineParsers ?? current.player.lineParsers,
       },
     });
 

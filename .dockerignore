@@ -9,23 +9,13 @@ out
 .playwright-mcp
 .wrangler
 **/node_modules
-crawler_worker/tests
-
 .env
 .env.*
 !.env.example
-worker.env
-**/worker.env
-crawler-worker-tmp
-**/crawler-worker-tmp
-/covers/**
 scripts/production_config.yml
 production_config.yml
 config.yml
 scripts/config.yml
-
-**/__pycache__/
-**/*.py[cod]
 *.log
 
 task_plan.md

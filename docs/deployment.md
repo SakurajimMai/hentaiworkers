@@ -1,297 +1,73 @@
-# Docker Hub 生产部署
+# 部署指南
 
-生产环境采用 **App + Worker 双容器 Docker Compose**：服务器从 Docker Hub 拉取两个镜像，只有 App 连接你独立维护的远程 MySQL / MariaDB，Worker 只访问内部控制面 API。
+生产部署只运行 AnimeStream App，并连接外部维护的 MySQL/MariaDB。
 
-部署过程不会：
+## 1. 前置条件
 
-- `git clone` 或 `git pull` 业务源码
-- 在服务器执行 `docker build`
-- 启动数据库容器
-- 执行数据库初始化、迁移或 seed
-- 启动数据库、ops 或迁移节点
+- 支持 Docker Compose v2 的 Linux 主机
+- 已创建并迁移完成的远程 MySQL/MariaDB
+- 数据库出口 IP 白名单和可信 TLS 证书链
+- 指向服务器的域名与 HTTPS 反向代理
 
----
-
-## 1. 架构
-
-```text
-Internet
-   │ HTTPS
-   ▼
-Nginx / Caddy
-   │
-   ▼
-127.0.0.1:${APP_PORT} → hentaiworkers-app:3000
-                              │
-                              ▼
-                   externally managed remote DB
-
-hentaiworkers-worker ──► http://app:3000/api/internal/crawler/v1
-```
-
-| 组件 | 说明 |
-|------|------|
-| `app` | Next.js standalone：前台、后台和 API |
-| `worker` | Python 采集运行时；无数据库凭据，不发布端口 |
-| 远程数据库 | 由你独立维护；Compose 只连接，不修改 schema |
-| Docker Hub | 公开 App 与 Worker 镜像，使用相同版本标签 |
-
----
-
-## 2. 远程数据库前提
-
-启动 app 前，远程数据库必须已经具备：
-
-1. 与目标 app 镜像版本兼容的完整表结构
-2. 可登录后台的管理员账号
-3. 允许生产服务器出口 IP 连接
-4. 使用系统可信证书链提供 TLS
-5. 与 `APP_ENCRYPTION_KEYRING` 匹配的加密数据密钥
-
-数据库 schema、管理员账号、备份和迁移由远程数据库侧自行维护，不属于 Docker Compose 部署流程。
-
----
-
-## 3. 服务器准备
-
-要求：
-
-- Docker Engine 24+
-- Docker Compose v2
-- 可访问 Docker Hub
-- 可访问远程数据库
-- 反向代理与 HTTPS 证书
-
-创建目录：
+## 2. 准备配置
 
 ```bash
-mkdir -p /opt/anime-web
-cd /opt/anime-web
+cp deploy/.env.example deploy/.env
+chmod 600 deploy/.env
 ```
 
-只需准备：
+必须填写 `DATABASE_URL`、`SITE_URL`、`SESSION_SECRET`、`APP_ENCRYPTION_KEYRING` 和 `APP_ENCRYPTION_CURRENT_KEY_ID`。远程数据库保持 `DATABASE_TLS_MODE=required`；如使用私有 CA，再设置仓库内相对路径 `DATABASE_TLS_CA_FILE` 并确保文件在部署目录可读。
 
-```text
-/opt/anime-web/
-├── docker-compose.yml
-├── .env
-└── worker.env
-```
-
-可直接使用 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) 和 [`deploy/.env.example`](../deploy/.env.example)，无需完整仓库。
-
----
-
-## 4. 稳定 `.env`
-
-```env
-# 宿主机端口；容器内固定 3000
-APP_HOST_BIND=127.0.0.1
-APP_PORT=13000
-
-# 远程数据库
-DATABASE_URL=mysql://USER:PASSWORD@HOST:3306/DATABASE
-DATABASE_TLS_MODE=required
-DATABASE_POOL_CONNECTION_LIMIT=8
-DATABASE_POOL_MAX_IDLE=4
-DATABASE_POOL_IDLE_TIMEOUT_MS=30000
-DATABASE_CONNECT_TIMEOUT_MS=20000
-
-# 公网规范地址
-SITE_URL=https://你的域名
-
-# openssl rand -base64 48
-SESSION_SECRET=你的随机会话密钥
-
-# openssl rand -base64 32
-APP_ENCRYPTION_KEYRING={"primary":"你的32字节Base64密钥"}
-APP_ENCRYPTION_CURRENT_KEY_ID=primary
-```
-
-### 4.1 数据库 URL
-
-格式：
-
-```text
-mysql://USER:PASSWORD@HOST:3306/DATABASE
-```
-
-密码中的特殊字符必须 URL 编码：
-
-| 字符 | 编码 |
-|------|------|
-| `@` | `%40` |
-| `#` | `%23` |
-| `:` | `%3A` |
-| `/` | `%2F` |
-| `%` | `%25` |
-
-远程数据库生产环境保持：
-
-```env
-DATABASE_TLS_MODE=required
-```
-
-### 4.2 生成密钥
+## 3. 启动
 
 ```bash
-openssl rand -base64 48   # SESSION_SECRET
-openssl rand -base64 32   # APP_ENCRYPTION_KEYRING.primary
-```
-
-如果远程数据库已经保存了 SMTP、Turnstile、爬虫存储等加密配置，必须使用原有 keyring；随意更换会导致旧密文无法解密。
-
-服务器直接拉取固定公开镜像，不需要任何 Docker Hub 凭据或额外服务变量，也不需要执行 `docker login`。
-
----
-
-## 5. 启动
-
-```bash
-cd /opt/anime-web
+cd deploy
+docker compose pull app
 docker compose up -d
+docker compose ps
 ```
 
-Compose 中没有 `build:`，并设置 `pull_policy: always`，因此上述命令会自动拉取最新的 App 和 Worker 镜像。`storage-init` 会自动创建并修正挂载目录的所有权和权限：`crawler-worker-tmp` 使用 `0700`，`covers` 使用 `0755`，两者均归 UID/GID `10001:10001` 所有。初始化成功后它会正常退出，随后 App 和 Worker 依次启动。
-
-正常部署前应已准备好 `.env` 和有效的 `worker.env`。首次部署尚未签发 Worker 令牌时，先执行同一条 `docker compose up -d` 让 App 可用，然后在 `/admin/crawler/workers` 创建节点，将本次显示的一次性 ID 和令牌写入 `worker.env`，再次执行：
-
-```bash
-docker compose up -d
-```
-
-`worker.env` 只能包含 `CRAWLER_WORKER_ID`、`CRAWLER_WORKER_TOKEN`、版本和所需存储凭据，不得包含数据库、Session 或 App 密钥。宿主机相对目录 `./crawler-worker-tmp` 会绑定到容器内 `/tmp/crawler-worker`。
-
-本地封面使用同一宿主机相对目录映射：Worker 通过 `./covers:/data/covers` 读写，App 通过 `./covers:/data/covers:ro` 只读。勾选“下载并保存封面”后，Worker 会把图片写入该目录，App 通过 `/api/media/covers/...` 返回图片；`SITE_URL` 用于生成写入数据库的完整封面 URL，因此必须配置为用户实际访问的 HTTPS 域名。不要把 `/api/media/covers/**` 加入反向代理的内部 API 拦截规则。
+Compose 拉取 `sakurajiamai/hentaiworkers-app:latest`，不会构建镜像、迁移数据库或创建管理员。
 
 检查：
 
 ```bash
-docker compose ps -a
-docker compose logs -f app
-docker compose logs --tail=100 worker
-curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/live"
-curl -sS "http://127.0.0.1:${APP_PORT:-3000}/api/ready"
+curl -fsS http://127.0.0.1:${APP_PORT:-13000}/api/live
+curl -fsS http://127.0.0.1:${APP_PORT:-13000}/api/ready
+docker compose logs --tail=100 app
 ```
 
-`storage-init` 显示 `Exited (0)` 是正常状态。若 App 或 Worker 因初始化失败而未启动，使用 `docker compose logs storage-init` 查看目录权限错误。
+## 4. 反向代理
 
-- `/api/live`：进程存活，不检查数据库
-- `/api/ready`：连接远程数据库并执行就绪检查
+默认监听 `127.0.0.1:${APP_PORT}`。反向代理应：
 
----
+- 终止 HTTPS，并转发到本地 App 端口。
+- 转发 `Host`、`X-Forwarded-Proto` 和客户端 IP 头。
+- 设置合理的请求体、连接和响应超时。
+- 不直接向公网暴露数据库端口。
 
-## 6. 反向代理
+`SITE_URL` 必须与用户实际访问的 HTTPS 源一致。
 
-假设：
+## 5. 升级与回滚
 
-```env
-APP_PORT=13000
-```
-
-### Nginx
-
-```nginx
-server {
-  listen 443 ssl http2;
-  server_name anime.example.com;
-
-  # ssl_certificate     /path/fullchain.pem;
-  # ssl_certificate_key /path/privkey.pem;
-
-  location /api/internal/ {
-    return 403;
-  }
-
-  location / {
-    proxy_pass http://127.0.0.1:13000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 300s;
-  }
-}
-```
-
-### Caddy
-
-```caddy
-anime.example.com {
-  @internal path /api/internal/*
-  respond @internal 403
-  reverse_proxy 127.0.0.1:13000
-}
-```
-
-生产必须使用 HTTPS；`SITE_URL` 必须与证书域名一致。
-
----
-
-## 7. 升级
-
-先确认远程数据库 schema 已兼容目标镜像，然后：
+升级前先备份数据库并审核目标版本 SQL：
 
 ```bash
-cd /opt/anime-web
-docker compose up -d
+cd deploy
+docker compose pull app
+docker compose up -d --no-build
+docker compose ps
 ```
 
-Compose 固定使用 App 与 Worker 的公开 `latest` 镜像，`pull_policy: always` 会在上述启动命令中自动拉取。升级前先应用目标版本要求的受控迁移。
+升级后验证 `/api/live`、`/api/ready`、登录、目录查询和播放页。回滚时将 Compose 镜像固定到先前可用标签，再执行 `docker compose up -d`；数据库回滚必须使用预先审核的恢复方案，不能依赖容器自动处理。
 
-应用镜像更新不会改变远程数据库 schema。
+## 6. 镜像标签
 
-升级和容器重建不会删除宿主机 `./covers`；不要在清理旧镜像或临时文件时删除该目录，否则数据库中已有的本地封面 URL 会返回 404。
+CI 发布：
 
----
+- `sakurajiamai/hentaiworkers-app:latest`
+- `sakurajiamai/hentaiworkers-app:main`
+- `sakurajiamai/hentaiworkers-app:<commit-sha>`
+- 版本 tag 对应的 SemVer 标签
 
-## 8. GitHub Actions / Docker Hub
-
-仓库 Secrets：
-
-```text
-DOCKERHUB_USERNAME
-DOCKERHUB_TOKEN
-```
-
-CI 在 `main`、`v*` tag 和手动触发时构建并推送：
-
-```text
-sakurajiamai/hentaiworkers-app:latest
-sakurajiamai/hentaiworkers-app:main
-sakurajiamai/hentaiworkers-app:<commit-sha>
-```
-
-`DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN` 仅用于 GitHub Actions 登录；服务器不需要它们。
-
----
-
-## 9. 检查清单
-
-- [ ] 远程数据库 schema 与 app 镜像版本兼容
-- [ ] 远程数据库中已有管理员账号
-- [ ] 数据库已放行服务器出口 IP
-- [ ] `DATABASE_TLS_MODE=required`
-- [ ] `.env` 权限为 `600`，未提交到 Git
-- [ ] `SESSION_SECRET` 为强随机值
-- [ ] `APP_ENCRYPTION_KEYRING` 与远程数据库现有密文匹配
-- [ ] `SITE_URL` 与 HTTPS 域名一致
-- [ ] `/api/live` 正常
-- [ ] `/api/ready` 正常
-- [ ] 公网访问 `/api/internal/**` 返回 403
-- [ ] `/admin/login` 可使用远程数据库现有管理员登录
-
----
-
-## 10. 常见问题
-
-| 现象 | 原因 | 处理 |
-|------|------|------|
-| Hub pull 失败 | 网络或 Docker Hub 临时故障 | 检查服务器网络后重试 `docker compose up -d` |
-| 任务长期 queued 且 attempts=0 | Worker 未启动、令牌无效、节点暂停或能力不匹配 | 查看 Worker 日志、后台节点状态和任务的 `claimSkipReason` |
-| `/api/ready` 失败 | DB URL、TLS、IP 白名单或 schema 有问题 | 检查远程数据库连接与表结构 |
-| 后台无法登录 | 远程数据库没有管理员或密码不匹配 | 在远程数据库侧维护管理员账号 |
-| 宿主机端口冲突 | `APP_PORT` 已占用 | 改为 `13000` 等空闲端口 |
-| Cookie 登录后丢失 | 未启用 HTTPS | 配置 HTTPS 和 `X-Forwarded-Proto` |
-| 加密设置无法读取 | keyring 与数据库密文不匹配 | 恢复原 `APP_ENCRYPTION_KEYRING` |
+生产建议固定版本或 commit SHA，完成验证后再更新。

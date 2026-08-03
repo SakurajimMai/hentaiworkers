@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/08-03-separate-main-crawler/research/current-coupling-audit.md","reason":"Provides the evidence-backed deletion inventory, forbidden dependencies, and validation baseline for final review."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Provides the repository frontend quality-check context for affected admin surfaces."}
+{"file": ".trellis/spec/backend/app-only-boundary.md", "reason": "Verify all removals against the App-only contract and required checks."}
+{"file": ".trellis/tasks/08-03-separate-main-crawler/research/final-verification.md", "reason": "Records completed checks and the intentionally untouched live deployment/database state."}

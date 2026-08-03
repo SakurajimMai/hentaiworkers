@@ -3,22 +3,21 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'AnimeStream · 里番与动漫分馆',
+    default: 'AnimeStream · 里番',
     template: '%s · AnimeStream',
   },
-  description:
-    '里番与动漫独立片库：在线观看、进度同步、片单收藏。支持线路解析与托管 MP4 播放。',
+  description: '里番片库：在线观看、进度同步、片单收藏。托管 MP4 播放。',
   applicationName: 'AnimeStream',
   openGraph: {
-    title: 'AnimeStream · 里番与动漫分馆',
-    description: '双片库浏览与播放，继续上次进度，管理你的片单。',
+    title: 'AnimeStream · 里番',
+    description: '浏览与播放里番，继续上次进度，管理你的片单。',
     type: 'website',
     locale: 'zh_CN',
   },
   twitter: {
     card: 'summary',
     title: 'AnimeStream',
-    description: '里番与动漫独立片库在线观看。',
+    description: '里番片库在线观看。',
   },
   robots: {
     index: true,

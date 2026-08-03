@@ -1,7 +1,11 @@
 import { createRequire } from 'node:module';
-import { resolveSecretCipher } from '../crawler/interfaces/compose-mariadb-crawler';
+import {
+  AesGcmSecretCipher,
+  keyringViewFromRecord,
+} from '../infrastructure/crypto/aes-gcm-secret-cipher';
+import { container } from '../composition/container';
 import { getIdentityService } from '../identity';
-import type { SecretCipher } from '../crawler/ports/secret-cipher';
+import type { SecretCipher } from '../shared/secret-cipher';
 import type { PasswordResetRepository } from '../identity/ports/password-reset-repository';
 import { SystemSettingsService } from './application/system-settings-service';
 import type {
@@ -40,12 +44,19 @@ function defaultPasswordResets(): PasswordResetRepository {
   return new mod.MariaDbPasswordResetRepository();
 }
 
+function defaultSecretCipher(): SecretCipher {
+  const { encryption } = container.getConfig();
+  return new AesGcmSecretCipher(
+    keyringViewFromRecord(encryption.currentKeyId, encryption.keys),
+  );
+}
+
 export function getSystemSettingsService(): SystemSettingsService {
   if (!service) {
     service = new SystemSettingsService(
       overrides.settings ?? defaultSettingsRepo(),
       overrides.tokens ?? defaultTokenRepo(),
-      overrides.cipher ?? resolveSecretCipher(),
+      overrides.cipher ?? defaultSecretCipher(),
       getIdentityService(),
       {
         siteUrl: process.env.SITE_URL,
@@ -74,13 +85,10 @@ export function setSystemSettingsDependenciesForTests(deps?: {
 
 export { SystemSettingsService } from './application/system-settings-service';
 export {
-  buildParserPlaybackUrl,
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
-  resolveLineParser,
   toPublicAuthConfig,
   toPublicPlayerConfig,
-  type PlayerLineParser,
   type PlayerSettings,
   type PublicAuthConfig,
   type PublicPlayerConfig,

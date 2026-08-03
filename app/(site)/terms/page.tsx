@@ -20,7 +20,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">服务性质</h2>
             <p className="text-soft">
-              AnimeStream 提供在线片库浏览、播放与账号相关功能（片单、进度同步等）。部分动漫内容为外链播放，可用性取决于源站与网络环境。
+              AnimeStream 提供在线片库浏览、播放与账号相关功能（片单、进度同步等）。播放可用性取决于媒体地址与网络环境。
             </p>
           </section>
 
@@ -34,7 +34,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">内容与版权</h2>
             <p className="text-soft">
-              站内展示的作品元数据与媒体链接可能来自采集配置或管理员录入。权利归属原作者与发行方。若你是权利人并希望处理特定内容，请联系站点管理员。
+              站内展示的作品元数据与媒体链接由管理员维护。权利归属原作者与发行方。若你是权利人并希望处理特定内容，请联系站点管理员。
             </p>
           </section>
 

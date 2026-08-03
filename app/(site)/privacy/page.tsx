@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">第三方</h2>
             <p className="text-soft">
-              若管理员启用 Cloudflare Turnstile，注册或登录时会与 Turnstile 服务交互以完成人机验证。动漫线路可能跳转至第三方解析播放器，其隐私政策以该服务为准。
+              若管理员启用 Cloudflare Turnstile，注册或登录时会与 Turnstile 服务交互以完成人机验证。
             </p>
           </section>
 
