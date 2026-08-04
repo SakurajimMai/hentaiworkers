@@ -5,8 +5,9 @@
 Apply this contract when changing server modules, route handlers, database schema or
 migrations, root scripts, environment variables, Docker Compose, Dockerfiles, or image CI.
 
-AnimeStream is a single Next.js application. Data acquisition, media downloading, storage
-upload, scheduling, and machine-control protocols belong to a separate future project.
+AnimeStream's deployed product is a single Next.js application. Independent data acquisition
+projects may live under the repository root `crawler/` workspace, but are outside the App
+runtime and deployment boundary.
 
 ## 2. Signatures
 
@@ -41,8 +42,10 @@ Runtime environment keys are App-owned:
 | `APP_ENCRYPTION_KEYRING` | JSON keyring of canonical 32-byte Base64 keys |
 | `APP_ENCRYPTION_CURRENT_KEY_ID` | Must identify a key in the keyring |
 
-The repository must not contain a data-acquisition runtime, machine identity/token API,
-shared media-output filesystem, or a second Compose service. Catalog media fields contain
+The App must not contain or import a data-acquisition runtime, machine identity/token API,
+shared media-output filesystem, or a second Compose service. A root `crawler/` project must
+own its dependencies and tests, remain excluded from the App Docker context, TypeScript and
+ESLint, and keep production configuration ignored. Catalog media fields contain
 browser-accessible URLs.
 
 Pure control-plane tables and `anime_sources` do not belong to active App schema or migration
@@ -60,14 +63,17 @@ automatically.
 | Removed route is requested | Normal Next.js 404; no compatibility handler |
 | Existing database still contains removed tables | Ignore; do not issue destructive SQL |
 | Catalog contains a removed local-media URL | Correct operationally; do not read host files from App |
+| `crawler/**/production_config.yml` exists locally | Keep ignored; commit only a sanitized example |
 
 ## 5. Good / Base / Bad Cases
 
 - Good: add a catalog query through a port and MariaDB repository, then expose it from an App
   route with contract tests.
 - Base: render an absolute `cover` or `video_url` already stored in `animes`.
-- Bad: add a Python process, machine-token endpoint, job table, local media mount, or second
-  service to the root repository/Compose.
+- Good: keep a Python producer under `crawler/` with its own dependencies and ignored runtime
+  configuration.
+- Bad: import crawler code into the App, add a machine-token endpoint, local media mount, or
+  second service to the root Compose.
 
 ## 6. Tests Required
 
@@ -78,6 +84,8 @@ automatically.
   image workflow and secret exclusions.
 - Boundary changes: add the forbidden path/content to `scripts/check-app-boundaries.mjs`, prove
   the check detects it, then verify the clean tree passes.
+- Crawler changes: run its focused tests or syntax checks, verify production configuration is
+  ignored, and confirm only sanitized examples are tracked.
 - Final validation: lint, typecheck, all TypeScript tests, both boundary checks, Next.js build,
   Compose config, Dockerfile check, and `git diff --check`.
 

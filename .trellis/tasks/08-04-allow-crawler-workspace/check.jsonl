@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/index.md","reason":"Provides the full backend quality-check command set."}
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"Verifies crawler isolation, Compose scope, and secret exclusions."}

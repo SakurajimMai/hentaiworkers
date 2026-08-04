@@ -12,8 +12,8 @@
 
 - Read the App-only boundary before changing backend routes, scripts, database files,
   environment variables, Docker, or CI.
-- Identify whether the change belongs to `catalog`, `identity`, `system`, or an external
-  project.
+- Identify whether the change belongs to `catalog`, `identity`, `system`, or the independent
+  root `crawler/` workspace.
 - Do not add a second runtime process to the application deployment.
 
 ## Quality Check

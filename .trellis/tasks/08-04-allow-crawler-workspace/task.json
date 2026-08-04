@@ -1,0 +1,32 @@
+{
+  "id": "allow-crawler-workspace",
+  "name": "allow-crawler-workspace",
+  "title": "建立独立 Hanime crawler 工程",
+  "description": "在 crawler/hanime 下保留与 Next.js 主站隔离的数据采集工程和脱敏配置模板。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": "crawler",
+  "package": "crawler/hanime",
+  "priority": "P2",
+  "creator": "root",
+  "assignee": "root",
+  "createdAt": "2026-08-04",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "fa1f09bebc0035cb2087ddb89188cff3c73d5349",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "crawler/README.md",
+    "crawler/hanime/README.md",
+    "crawler/hanime/production_config.example.yml",
+    "crawler/hanime/requirements.txt",
+    "scripts/check-app-boundaries.mjs"
+  ],
+  "notes": "实现已由 fa1f09b 提交并推送；真实 production_config.yml 保持 ignored，未进入 Git 历史。",
+  "meta": {}
+}
