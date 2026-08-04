@@ -48,6 +48,13 @@ scripts/production_config.yml
 production_config.yml
 config.yml
 
+# Independent crawler runtime files
+**/__pycache__/
+**/.venv/
+*.py[cod]
+crawler/**/production_config.yml
+crawler/**/config.yml
+
 # Agent/session scratch (not product source)
 .worktrees/
 findings.md

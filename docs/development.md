@@ -68,4 +68,5 @@ ADMIN_BOOTSTRAP_PASSWORD=replace-with-at-least-12-characters
 - 新后端逻辑放入现有 `catalog`、`identity` 或 `system` 模块。
 - Route Handler 和 Server Action 只负责协议转换、鉴权与调用应用服务。
 - 不在主站加入数据抓取、下载、媒体搬运或对应调度代码。
+- `crawler/` 使用自己的依赖、配置、测试和部署流程，不导入主站私有模块。
 - 不恢复 MacCMS、works 页面、流代理或线路解析播放器设置。

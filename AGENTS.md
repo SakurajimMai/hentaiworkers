@@ -27,10 +27,9 @@ These notes are for AI assistants and are **not** managed by Trellis.
 ## Product scope
 
 - **里番 only**: catalog tables `animes`, `tags`, `anime_tags`.
-- This repository contains only the Next.js application. Data collection, media download,
-  storage upload, scheduling, and machine-control APIs are out of scope.
-- A future data producer must be designed as a separate project and must not import private
-  application modules or add its runtime/configuration back to this repository.
+- The root Next.js application remains App-only. Independent data producers may live under
+  `crawler/`, but must not import private application modules or enter the App image,
+  TypeScript/ESLint scope, Compose services, runtime configuration, or control-plane APIs.
 - **Do not reintroduce** MacCMS adapters, `anime_works` / `work_tags`, `/works` UI, stream proxy, or line-parser player settings unless the user explicitly requests that product direction.
 - Historical migrations `0010–0013` may still create old works tables on fresh migrate chains; app code must not read/write them. See `docs/CHANGELOG.md`.
 

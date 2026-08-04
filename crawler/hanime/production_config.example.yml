@@ -1,0 +1,112 @@
+app:
+  name: hanime-crawler
+  version: '1.0'
+
+crawl:
+  base_url: https://hanime1.me
+  date_filter:
+    year: null
+    month: null
+  search:
+    genre: 裏番
+    sort: ''
+    type: ''
+  quality_priority:
+    - '1080'
+    - '720'
+    - '480'
+  require_chinese_subtitle: true
+  no_subtitle_markers:
+    - 無字幕
+    - 无字幕
+    - 無中字
+    - 无中字
+    - 無字
+    - 无字
+    - 生肉
+    - RAW
+  skip_keywords:
+    - 中字後補
+    - 简中补字
+    - 中文字幕後補
+    - 後補字幕
+    - 补字
+    - 後補
+  subtitle_positive_markers:
+    - '[中文字幕]'
+    - 中文字幕
+    - 中文配音
+    - 中字
+    - 简中
+    - 繁中
+    - Chinese Sub
+    - CHS
+    - CHT
+
+download:
+  download_dir: downloads
+  temp_dir: temp
+  organize_by_date: true
+  enable_video: false
+  enable_cover: false
+  enable_fanart: false
+  chunk_size: 1048576
+  max_concurrent: 2
+  clean_filename: true
+
+web_access:
+  domain_prefix: https://media.example.com
+  base_path: /hanime
+
+network:
+  proxy:
+    enabled: false
+    http: ''
+    https: ''
+    socks5: ''
+  timeout: 30
+  max_retries: 3
+  retry_delay: 2
+  user_agent: Mozilla/5.0
+
+database:
+  host: 127.0.0.1
+  port: 3306
+  user: crawler
+  password: CHANGE_ME
+  database: hentai
+  charset: utf8mb4
+
+selenium:
+  headless: true
+  no_sandbox: true
+  disable_dev_shm: true
+  implicit_wait: 10
+  page_load_timeout: 30
+
+strategy:
+  mode: full
+  max_videos_per_month: 0
+  start_from_page: 1
+  continue_on_error: true
+  skip_existing: true
+
+getchu:
+  enabled: true
+  search_timeout: 30
+  download_timeout: 60
+  max_images_per_video: 20
+
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: production_crawl.log
+  max_size: 50MB
+  backup_count: 10
+  console_output: true
+
+performance:
+  gc_threshold: 100
+  max_concurrent_downloads: 2
+  request_delay: 1
+  max_memory_mb: 1024

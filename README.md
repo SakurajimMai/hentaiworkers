@@ -2,7 +2,7 @@
 
 AnimeStream 是基于 Next.js 15、React 19、Drizzle ORM 与 MySQL/MariaDB 的里番目录站点，包含公开浏览、播放、账号体系和管理后台。
 
-本仓库当前只包含主站。数据抓取、媒体下载和对象存储搬运不属于主站运行时，也不与主站共享脚本、配置、容器或内部 API。
+本仓库包含主站与 `crawler/` 独立工程空间。数据抓取和媒体下载不属于主站运行时，也不与主站共享依赖、配置、容器或内部 API。
 
 ## 功能
 
@@ -70,6 +70,7 @@ lib/server/          catalog、identity、system 业务模块与基础设施
 drizzle/             数据库基线和历史迁移
 scripts/             主站维护与质量检查脚本
 tests/               TypeScript 测试
+crawler/             独立数据采集工程；不进入主站构建和部署
 deploy/              App-only 生产 Compose 清单
 docs/                架构、开发、部署、管理与 API 文档
 ```

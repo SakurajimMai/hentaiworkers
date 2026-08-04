@@ -5,8 +5,9 @@ import { parse } from 'yaml';
 const root = resolve(import.meta.dirname, '..');
 const failures = [];
 
+// Top-level `crawler/` may exist as an independent scripts folder (not part of the app).
+// Still forbid crawler control-plane / worker integration inside the Next.js app.
 const forbiddenPaths = [
-  'crawler',
   'crawler_worker',
   'app/admin/crawler',
   'app/api/admin/crawler',
