@@ -88,7 +88,7 @@ export default async function AdminUsersPage({
 
       <div className="surface-card overflow-x-auto">
         <table className="w-full text-left font-ui text-sm">
-          <thead className="border-b border-[#EAEAEA] text-[#787774]">
+          <thead className="border-b border-border text-soft">
             <tr>
               <th className="p-3">ID</th>
               <th className="p-3">用户</th>
@@ -97,11 +97,11 @@ export default async function AdminUsersPage({
           </thead>
           <tbody>
             {rows.map((u) => (
-              <tr key={u.id} className="border-b border-[#EAEAEA] last:border-0 align-top">
-                <td className="p-3 tabular text-[#787774]">{u.id}</td>
+              <tr key={u.id} className="border-b border-border last:border-0 align-top">
+                <td className="p-3 tabular text-soft">{u.id}</td>
                 <td className="p-3">
                   <div className="font-medium">{u.username}</div>
-                  <div className="text-[12px] text-[#787774]">{u.displayName || '—'}</div>
+                  <div className="text-[12px] text-soft">{u.displayName || '—'}</div>
                 </td>
                 <td className="p-3">
                   <form action={actionSaveUser} className="flex flex-wrap gap-2 items-center">
@@ -136,7 +136,7 @@ export default async function AdminUsersPage({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="p-6 text-center text-[#787774]">
+                <td colSpan={3} className="p-6 text-center text-soft">
                   暂无用户
                 </td>
               </tr>

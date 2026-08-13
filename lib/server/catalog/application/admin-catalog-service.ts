@@ -11,30 +11,6 @@ export type AdminTagSaveInput = Readonly<{
   description?: string | null;
 }>;
 
-export type ImportAnimeItem = Readonly<{
-  id?: number;
-  title?: unknown;
-  videoUrl?: unknown;
-  video_url?: unknown;
-  titleEnglish?: unknown;
-  title_english?: unknown;
-  titleJapanese?: unknown;
-  title_japanese?: unknown;
-  description?: unknown;
-  cover?: unknown;
-  fanart?: unknown;
-  isActive?: unknown;
-  is_active?: unknown;
-  tags?: unknown;
-}>;
-
-export type ImportResult = Readonly<{
-  created: number;
-  updated: number;
-  skipped: number;
-  errors: ReadonlyArray<{ index: number; message: string }>;
-}>;
-
 export type AdminAnimeListItem = Readonly<{
   id: number;
   title: string;
@@ -54,7 +30,6 @@ export interface AdminCatalogRepository {
   setAnimeActive(id: number, isActive: number): Promise<void>;
   saveTag(input: AdminTagSaveInput): Promise<number>;
   deleteTagIfUnlinked(id: number): Promise<void>;
-  importBatch(items: readonly ImportAnimeItem[]): Promise<ImportResult>;
   searchAnimes(q: string, page: number): Promise<{ data: AdminAnimeListItem[]; total: number }>;
   countTagLinks(tagId: number): Promise<number>;
 }
@@ -102,10 +77,6 @@ export class AdminCatalogService {
       });
     }
     return this.repository.deleteTagIfUnlinked(id);
-  }
-
-  importBatch(items: readonly ImportAnimeItem[]): Promise<ImportResult> {
-    return this.repository.importBatch(items);
   }
 
   searchAnimes(q: string, page: number) {

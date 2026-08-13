@@ -39,8 +39,8 @@ export function AdminBatchToolbar({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="inline-flex items-center rounded-full border border-[#ece8e0] bg-white px-3 py-1.5 font-meta text-[11px] normal-case tracking-normal text-[#6f6d68]">
-        已选 <span className="ml-1 tabular text-[#111] font-medium">{count}</span>
+      <span className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 font-meta text-[11px] normal-case tracking-normal text-soft">
+        已选 <span className="ml-1 tabular text-ink font-medium">{count}</span>
       </span>
 
       <form action={action} className="inline-flex">

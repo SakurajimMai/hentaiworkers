@@ -18,11 +18,14 @@ npm run seed:admin
 |------|------|------|
 | 概览 | `/admin` | 里番、上架、标签和用户统计 |
 | 里番 | `/admin/animes` | 搜索、上下架、批量操作、删除和编辑 |
-| 标签 | `/admin/tags` | 标签创建、编辑和删除 |
-| 导入 | `/admin/import` | JSON 批量创建或更新作品 |
+| 漫画 | `/admin/mangas` | 元数据、章节、页面和相关作品 |
+| 里番标签 | `/admin/tags` | 里番标签创建、编辑和删除 |
+| 漫画标签 | `/admin/manga-tags` | 漫画标签新增、重命名、删除与使用统计 |
 | 用户 | `/admin/users` | 创建、改角色、启停和重置密码 |
-| 系统 | `/admin/settings` | 注册、SMTP、Trust、Turnstile 与播放器 |
+| 系统 | `/admin/settings` | 注册、首页幻灯片、移动端下载、SMTP、Trust、Turnstile、播放器与漫画发布 |
 | 账户 | `/admin/account` | 修改当前管理员密码 |
+
+后台顶栏提供日/夜主题切换。管理员也可以直接在前台 `/login` 登录，前台头像菜单会出现「管理中心」入口。
 
 ## 3. 里番管理
 
@@ -32,33 +35,25 @@ npm run seed:admin
 
 ## 4. 标签管理
 
-标签字典对应 `tags`，作品关系对应 `anime_tags`。
+里番标签字典对应 `tags`，作品关系对应 `anime_tags`。
 
 - 名称必填且必须唯一。
 - 修改后使用行内保存。
 - 仍有关联作品的标签不能删除，应先解除关联。
 
-## 5. JSON 导入
+漫画标签保存在每部漫画记录上（`mangas.tags`），与里番标签互不相通。`/admin/manga-tags` 支持：
 
-`/admin/import` 接收 JSON 数组：
+- 新增「常用标签」（保存在系统设置，未被作品使用也会保留，并作为前台 `/manga` 快捷筛选）。
+- 重命名标签：同步更新所有使用该标签的漫画，重名即合并。
+- 删除标签：从所有漫画与常用标签中移除。
 
-```json
-[
-  {
-    "id": 100,
-    "title": "作品标题",
-    "videoUrl": "https://media.example/video.mp4",
-    "titleJapanese": "タイトル",
-    "description": "简介",
-    "cover": "https://media.example/cover.jpg",
-    "fanart": "https://media.example/a.jpg,https://media.example/b.jpg",
-    "tags": ["标签A", "标签B"],
-    "isActive": 1
-  }
-]
-```
+## 5. 漫画管理
 
-`title` 与 `videoUrl` 必填。已存在的 `id` 会更新，否则创建新记录；不存在的标签会按名称创建。
+`/admin/mangas/:id` 可编辑标题、作者、漫画标签、封面和上架状态，并查看该作的章节、页面和同标签相关漫画。页面内容可在缩略图与链接两种视图间切换。缩略图分页浏览；链接视图一次列出全部地址，可逐条或整批保存。删除章节或单页会同步刷新页数。
+
+漫画由独立发布通道 `POST /api/manga/publish` 写入，请求头携带后台配置的发布密钥（`X-Manga-Publish-Key`）。后台不再提供 JSON 批量导入。
+
+漫画榜单按阅读页产生的浏览事件累计；详情页阅读会记一次去重视图。
 
 ## 6. 用户与账号
 
@@ -71,6 +66,8 @@ npm run seed:admin
 `/admin/settings` 包含：
 
 - 注册开关、邮箱验证与邮箱白名单
+- 首页幻灯片：最多 20 张，可混排「里番作品」（可自定义封面覆盖海报）与「自定义」幻灯片（标题 + 封面图 + 任意跳转链接），支持排序与切换间隔；全部留空时自动展示最近更新作品
+- 移动端下载：填入 APK 或下载页的 `http(s)` 地址后，前台页脚「浏览」栏显示链接；留空则不显示。APK 由 GitHub Actions 打出，见 [移动端文档](./mobile.md)
 - SMTP 主机、TLS、账号和发件人
 - 登录/注册 Turnstile 策略
 - 验证链接有效期

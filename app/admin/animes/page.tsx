@@ -7,6 +7,7 @@ import {
   actionDeleteAnime,
   actionToggleAnime,
 } from '../actions';
+import { AdminPagination } from '@/components/admin/admin-pagination';
 import { AnimesBatchList } from '@/components/admin/animes-batch-list';
 
 export const dynamic = 'force-dynamic';
@@ -54,8 +55,8 @@ export default async function AdminAnimesPage({
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <p className="font-meta mb-2">里番 · animes / tags</p>
-          <h1 className="section-title text-3xl text-[#111]">里番管理</h1>
-          <p className="mt-2 font-ui text-sm text-[#6f6d68] leading-relaxed">
+          <h1 className="section-title text-3xl text-ink">里番管理</h1>
+          <p className="mt-2 font-ui text-sm text-soft leading-relaxed">
             里番片库与标签（tags）。支持批量上架/下架/删除。
           </p>
         </div>
@@ -65,12 +66,12 @@ export default async function AdminAnimesPage({
       </div>
 
       {ok.startsWith('batch_') && (
-        <div className="rounded-xl border border-[#d8ebda] bg-[#edf7ee] px-4 py-3 font-ui text-[13px] text-[#346538]">
+        <div className="notice-success">
           批量操作完成{n ? `（${n} 条）` : ''}
         </div>
       )}
       {err === 'batch_empty' && (
-        <div className="rounded-xl border border-[#f3d4d3] bg-[#fdf2f2] px-4 py-3 font-ui text-[13px] text-[#9F2F2D]">
+        <div className="notice-error">
           请先勾选条目
         </div>
       )}
@@ -99,29 +100,13 @@ export default async function AdminAnimesPage({
         deleteAction={actionDeleteAnime}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-meta text-[12px] normal-case tracking-normal text-[#6f6d68]">
-          第 {page}/{totalPages} 页 · 共 {total} 条
-        </p>
-        <div className="flex gap-2">
-          {page > 1 && (
-            <Link
-              href={`/admin/animes?page=${page - 1}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
-              className="btn-ghost !py-1.5 !px-3 !text-[12px]"
-            >
-              上一页
-            </Link>
-          )}
-          {page < totalPages && (
-            <Link
-              href={`/admin/animes?page=${page + 1}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
-              className="btn-ghost !py-1.5 !px-3 !text-[12px]"
-            >
-              下一页
-            </Link>
-          )}
-        </div>
-      </div>
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        basePath="/admin/animes"
+        query={{ q: q || undefined }}
+      />
     </div>
   );
 }

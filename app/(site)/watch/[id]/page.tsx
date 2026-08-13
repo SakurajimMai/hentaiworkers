@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { AnimeCard } from '@/components/AnimeCard';
 import { FavoriteButton } from '@/components/favorite-button';
 import { IconArrowLeft, IconCalendar, IconEye } from '@/components/icons';
@@ -9,13 +10,45 @@ import { getAnimeById, getSimilarAnimes } from '@/lib/anime-service';
 import {
   getFavoritesService,
   getIdentityService,
-  getListsService,
   getWatchProgressService,
 } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
-import { actionAddToList } from '@/app/(site)/auth/actions';
+import { StructuredData } from '@/components/structured-data';
+import { MediaImage } from '@/components/media-image';
+import { resolveSiteUrl } from '@/lib/site-url';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id: idStr } = await params;
+  const id = parseInt(idStr, 10);
+  if (!Number.isFinite(id)) return { title: '作品不存在' };
+  const anime = await getAnimeById(id);
+  if (!anime) return { title: '作品不存在', robots: { index: false, follow: false } };
+  const description = anime.description?.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim()
+    || `在线观看 ${anime.title}，支持播放进度同步与收藏。`;
+  return {
+    title: anime.title,
+    description: description.slice(0, 160),
+    alternates: { canonical: `/watch/${id}` },
+    openGraph: {
+      title: anime.title,
+      description: description.slice(0, 160),
+      type: 'video.other',
+      url: `/watch/${id}`,
+      images: anime.cover ? [{ url: anime.cover, alt: anime.title }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: anime.title,
+      description: description.slice(0, 160),
+    },
+  };
+}
 
 export default async function WatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: idStr } = await params;
@@ -26,29 +59,41 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   if (!anime) notFound();
 
   const user = await getIdentityService().getCurrentUser();
-  const [similar, favorited, progress, lists, playerConfig] = await Promise.all([
+  const [similar, favorited, progress, playerConfig] = await Promise.all([
     getSimilarAnimes(id),
     getFavoritesService().isFavorite(id),
     user ? getWatchProgressService().getMine(id) : Promise.resolve(null),
-    user ? getListsService().listMine() : Promise.resolve([]),
     getSystemSettingsService().getPublicPlayerConfig(),
   ]);
   const fanartList = anime.fanart
     ? anime.fanart.split(',').map((u) => u.trim()).filter(Boolean)
     : [];
+  const watchUrl = `${resolveSiteUrl(process.env.SITE_URL)}/watch/${id}`;
 
   return (
     <div className="pb-20 sm:pb-24">
+      <StructuredData
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'VideoObject',
+          name: anime.title,
+          description: anime.description?.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim() || `在线观看 ${anime.title}`,
+          thumbnailUrl: anime.cover ? [anime.cover] : undefined,
+          embedUrl: watchUrl,
+          uploadDate: anime.createdAt || undefined,
+          url: watchUrl,
+        }}
+      />
       <div className="page-shell py-5 sm:py-8">
         <Link
           href="/browse"
-          className="inline-flex items-center gap-2 rounded-full px-2.5 py-1.5 font-ui text-sm text-soft hover:bg-white hover:text-ink mb-5 transition"
+          className="inline-flex items-center gap-2 rounded-full px-2.5 py-1.5 font-ui text-sm text-soft hover:bg-card hover:text-ink mb-5 transition"
         >
           <IconArrowLeft size={16} />
           返回里番馆
         </Link>
 
-        <div className="overflow-hidden rounded-2xl border border-[#e8e4dc] bg-[#1a1917] shadow-ink">
+        <div className="overflow-hidden rounded-2xl border border-border bg-ink shadow-ink">
           <AspectRatio ratio={16 / 9}>
             <WatchPlayer
               animeId={id}
@@ -65,7 +110,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {progress && progress.positionSeconds > 5 && !progress.completed && (
-          <p className="mt-3 font-meta text-[11px] normal-case tracking-normal text-[#8a877f]">
+          <p className="mt-3 font-meta text-[11px] normal-case tracking-normal text-muted-foreground">
             云端进度约 {Math.floor(progress.positionSeconds / 60)}:
             {String(Math.floor(progress.positionSeconds % 60)).padStart(2, '0')}
             {progress.durationSeconds > 0
@@ -90,39 +135,14 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
                   favorited={favorited}
                   returnTo={`/watch/${id}`}
                 />
-                {user && lists.some((l) => !(l.listType === 'favorites' && l.isSystem)) && (
-                  <form action={actionAddToList} className="inline-flex items-center gap-1.5">
-                    <input type="hidden" name="animeId" value={id} />
-                    <input type="hidden" name="returnTo" value={`/watch/${id}`} />
-                    <select
-                      name="listId"
-                      className="admin-input !w-auto !rounded-full !py-1.5 !text-[12px] min-w-[8rem]"
-                      defaultValue={
-                        lists.find((l) => l.listType === 'want')?.id
-                        ?? lists.find((l) => !(l.listType === 'favorites' && l.isSystem))?.id
-                      }
-                    >
-                      {lists
-                        .filter((list) => !(list.listType === 'favorites' && list.isSystem))
-                        .map((list) => (
-                          <option key={list.id} value={list.id}>
-                            加入：{list.name}
-                          </option>
-                        ))}
-                    </select>
-                    <button type="submit" className="btn-ghost !py-1.5 !px-3 !text-[12px]">
-                      添加
-                    </button>
-                  </form>
-                )}
                 {anime.viewCount != null && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EDF3EC] px-2.5 py-1 font-ui text-[11px] font-medium text-[#346538] tabular">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--success-soft))] px-2.5 py-1 font-ui text-[11px] font-medium text-[hsl(var(--success))] tabular">
                     <IconEye size={12} />
                     {anime.viewCount.toLocaleString()} 次播放
                   </span>
                 )}
                 {anime.createdAt && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FBF3DB] px-2.5 py-1 font-ui text-[11px] font-medium text-[#956400]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 font-ui text-[11px] font-medium text-accent">
                     <IconCalendar size={12} />
                     {anime.createdAt}
                   </span>
@@ -130,9 +150,9 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
 
-            <section className="border-t border-[#ece8e0] pt-6">
+            <section className="border-t border-border pt-6">
               <h2 className="font-meta mb-3">简介</h2>
-              <p className="font-ui text-[14px] leading-[1.7] text-[#2F3437] whitespace-pre-line max-w-prose">
+              <p className="font-ui text-[14px] leading-[1.7] text-foreground/90 whitespace-pre-line max-w-prose">
                 {anime.description
                   ? anime.description.replace(/\\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
                   : '暂无简介'}
@@ -140,26 +160,25 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
             </section>
 
             {fanartList.length > 0 && (
-              <section className="border-t border-[#ece8e0] pt-6 space-y-4">
+              <section className="border-t border-border pt-6 space-y-4">
                 <h2 className="section-title text-lg text-ink">剧照</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {fanartList.map((url, index) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={index}
-                      src={url}
-                      alt={`${anime.title} 剧照 ${index + 1}`}
-                      className="aspect-video w-full object-cover rounded-xl border border-[#e8e4dc]"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
+                    <div key={index} className="aspect-video overflow-hidden rounded-xl border border-border">
+                      <MediaImage
+                        src={url}
+                        alt={`${anime.title} 剧照 ${index + 1}`}
+                        className="h-full w-full object-cover"
+                        variant="wide"
+                      />
+                    </div>
                   ))}
                 </div>
               </section>
             )}
 
             {similar.length > 0 && (
-              <section className="border-t border-[#ece8e0] pt-6 space-y-4">
+              <section className="border-t border-border pt-6 space-y-4">
                 <h2 className="section-title text-lg text-ink">相关推荐</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                   {similar.map((s) => (
@@ -173,14 +192,14 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
           <aside>
             {anime.tags && anime.tags.length > 0 && (
               <div className="surface-panel p-5 lg:sticky lg:top-20">
-                <h2 className="font-meta mb-3">标签</h2>
+                <h2 className="font-meta mb-3">里番标签</h2>
                 <div className="flex flex-wrap gap-1.5">
                   {anime.tags.map((tag, i) => {
                     const pastels = [
-                      'bg-[#E1F3FE] text-[#1F6C9F]',
-                      'bg-[#EDF3EC] text-[#346538]',
-                      'bg-[#FBF3DB] text-[#956400]',
-                      'bg-[#FDEBEC] text-[#9F2F2D]',
+                      'bg-secondary text-secondary-foreground',
+                      'bg-[hsl(var(--success-soft))] text-[hsl(var(--success))]',
+                      'bg-accent-soft text-accent',
+                      'bg-[hsl(var(--danger-soft))] text-danger',
                     ];
                     return (
                       <Link

@@ -1,8 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  FlatList,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -14,13 +14,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
 import { colors, radius, spacing } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
-import { FavoriteItem, favoritesStore } from '../../services/storage';
+import {
+  FavoriteItem,
+  MangaFavoriteItem,
+  favoritesStore,
+  mangaFavoritesStore,
+} from '../../services/storage';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [animes, setAnimes] = useState<FavoriteItem[]>([]);
+  const [mangas, setMangas] = useState<MangaFavoriteItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -29,14 +35,21 @@ export default function FavoritesScreen() {
   const columns = width >= 600 ? 4 : 3;
   const cardWidth = (width - horizontalPadding * 2 - gridGap * (columns - 1)) / columns;
 
+  const reload = async () => {
+    const [animeItems, mangaItems] = await Promise.all([
+      favoritesStore.list(),
+      mangaFavoritesStore.list(),
+    ]);
+    setAnimes(animeItems);
+    setMangas(mangaItems);
+    setLoaded(true);
+  };
+
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
-      favoritesStore.list().then((items) => {
-        if (mounted) {
-          setFavorites(items);
-          setLoaded(true);
-        }
+      reload().then(() => {
+        if (!mounted) return;
       });
       return () => {
         mounted = false;
@@ -44,11 +57,21 @@ export default function FavoritesScreen() {
     }, []),
   );
 
-  const remove = async (id: number) => {
+  const removeAnime = async (id: number) => {
     await favoritesStore.remove(id);
-    const next = await favoritesStore.list();
-    setFavorites(next);
+    await reload();
   };
+
+  const removeManga = async (id: number) => {
+    await mangaFavoritesStore.remove(id);
+    await reload();
+  };
+
+  const empty = loaded && animes.length === 0 && mangas.length === 0;
+
+  const chunk = useMemo(() => {
+    return { cardWidth, columns, gridGap };
+  }, [cardWidth, columns, gridGap]);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -62,7 +85,7 @@ export default function FavoritesScreen() {
           hitSlop={8}
           style={styles.headerSide}
         >
-          {favorites.length > 0 ? (
+          {!empty ? (
             <Text style={styles.editText}>{editing ? '完成' : '编辑'}</Text>
           ) : null}
         </Pressable>
@@ -70,59 +93,102 @@ export default function FavoritesScreen() {
 
       {!loaded ? (
         <AppState loading title="正在加载收藏" />
-      ) : favorites.length === 0 ? (
+      ) : empty ? (
         <AppState
           title="还没有收藏"
-          description="在详情页点收藏，作品就会出现在这里。"
+          description="在详情页点爱心，里番和漫画都会出现在这里。"
         />
       ) : (
-        <FlatList
-          key={`fav-${columns}`}
-          data={favorites}
-          keyExtractor={(item) => String(item.id)}
-          numColumns={columns}
+        <ScrollView
           contentContainerStyle={{
             paddingHorizontal: horizontalPadding,
             paddingTop: spacing.sm,
             paddingBottom: insets.bottom + spacing.xxl,
-            gap: spacing.lg,
+            gap: spacing.xl,
           }}
-          columnWrapperStyle={columns > 1 ? { gap: gridGap } : undefined}
-          renderItem={({ item }) => {
-            const cover = normalizeMediaUrl(item.cover);
-            return (
-              <View style={{ width: cardWidth }}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`查看 ${item.title}`}
-                  onPress={() => router.push(`/detail/${item.id}`)}
-                  style={({ pressed }) => [styles.cardCover, pressed && styles.cardPressed]}
-                >
-                  {cover ? (
-                    <Image source={{ uri: cover }} style={styles.image} />
-                  ) : (
-                    <View style={[styles.image, styles.imageFallback]} />
-                  )}
-                  {editing ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`移除 ${item.title}`}
-                      onPress={() => remove(item.id)}
-                      style={styles.removeBtn}
-                      hitSlop={10}
-                    >
-                      <Ionicons name="close" size={14} color={colors.white} />
-                    </Pressable>
-                  ) : null}
-                </Pressable>
-                <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                {item.titleJapanese ? (
-                  <Text style={styles.cardSub} numberOfLines={1}>{item.titleJapanese}</Text>
-                ) : null}
+          showsVerticalScrollIndicator={false}
+        >
+          {animes.length > 0 ? (
+            <View>
+              <Text style={styles.sectionTitle}>里番</Text>
+              <View style={[styles.grid, { gap: chunk.gridGap }]}>
+                {animes.map((item) => {
+                  const cover = normalizeMediaUrl(item.cover);
+                  return (
+                    <View key={`anime-${item.id}`} style={{ width: chunk.cardWidth }}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`查看 ${item.title}`}
+                        onPress={() => router.push(`/detail/${item.id}`)}
+                        style={({ pressed }) => [styles.cardCover, pressed && styles.cardPressed]}
+                      >
+                        {cover ? (
+                          <Image source={{ uri: cover }} style={styles.image} />
+                        ) : (
+                          <View style={[styles.image, styles.imageFallback]} />
+                        )}
+                        {editing ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`移除 ${item.title}`}
+                            onPress={() => removeAnime(item.id)}
+                            style={styles.removeBtn}
+                            hitSlop={10}
+                          >
+                            <Ionicons name="close" size={14} color={colors.white} />
+                          </Pressable>
+                        ) : null}
+                      </Pressable>
+                      <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                    </View>
+                  );
+                })}
               </View>
-            );
-          }}
-        />
+            </View>
+          ) : null}
+
+          {mangas.length > 0 ? (
+            <View>
+              <Text style={styles.sectionTitle}>漫画</Text>
+              <View style={[styles.grid, { gap: chunk.gridGap }]}>
+                {mangas.map((item) => {
+                  const cover = normalizeMediaUrl(item.coverUrl);
+                  return (
+                    <View key={`manga-${item.id}`} style={{ width: chunk.cardWidth }}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`阅读 ${item.title}`}
+                        onPress={() => router.push(`/manga-detail/${item.id}`)}
+                        style={({ pressed }) => [styles.cardCover, pressed && styles.cardPressed]}
+                      >
+                        {cover ? (
+                          <Image source={{ uri: cover }} style={styles.image} />
+                        ) : (
+                          <View style={[styles.image, styles.imageFallback]} />
+                        )}
+                        {editing ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`移除 ${item.title}`}
+                            onPress={() => removeManga(item.id)}
+                            style={styles.removeBtn}
+                            hitSlop={10}
+                          >
+                            <Ionicons name="close" size={14} color={colors.white} />
+                          </Pressable>
+                        ) : null}
+                      </Pressable>
+                      <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                      {item.author ? (
+                        <Text style={styles.cardSub} numberOfLines={1}>{item.author}</Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -153,6 +219,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'right',
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: spacing.md,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   cardCover: {
     aspectRatio: 2 / 3,

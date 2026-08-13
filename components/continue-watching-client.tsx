@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
+import { MediaImage } from '@/components/media-image';
 import {
   clearLocalWatchProgress,
   readLocalWatchProgress,
@@ -35,29 +36,21 @@ function ProgressCard({
   return (
     <Link href={href} className="group block space-y-2">
       <div className="poster-frame aspect-[2/3]">
-        {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={cover}
-            alt={title}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center font-meta text-[11px] normal-case tracking-normal text-[#8a877f]">
-            无封面
-          </div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-[#1a1917]/25">
-          <div className="h-full bg-white" style={{ width: `${pct}%` }} />
+        <MediaImage
+          src={cover}
+          alt={title}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          variant="poster"
+        />
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-ink/25">
+          <div className="h-full bg-background" style={{ width: `${pct}%` }} />
         </div>
       </div>
       <div>
         <p className="font-ui text-[13px] font-medium text-ink line-clamp-2 leading-snug">
           {title}
         </p>
-        <p className="font-meta text-[11px] normal-case tracking-normal text-[#8a877f] mt-1">
+        <p className="font-meta text-[11px] normal-case tracking-normal text-soft mt-1">
           {completed ? '已看完' : pct > 0 ? `继续 · ${pct}%` : '继续观看'}
         </p>
       </div>
@@ -79,7 +72,7 @@ export function GuestContinueWatching({ cardWidth }: { cardWidth: string }) {
   if (!rows.length) return null;
 
   return (
-    <HorizontalCarousel title="继续观看" meta="This device" viewAllHref="/history">
+    <HorizontalCarousel title="继续观看" viewAllHref="/history">
       {rows.map((r) => (
         <div key={r.animeId} className={`shrink-0 snap-start ${cardWidth}`}>
           <ProgressCard
@@ -131,28 +124,25 @@ export function GuestHistoryList() {
             className="surface-card p-3.5 sm:p-4 flex items-center gap-4 justify-between"
           >
             <Link href={`/watch/${r.animeId}`} className="flex items-center gap-3 min-w-0 flex-1">
-              {r.cover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+              <div className="h-16 w-12 shrink-0 overflow-hidden rounded-xl border border-border">
+                <MediaImage
                   src={r.cover}
                   alt={r.title || `作品 ${r.animeId}`}
-                  className="h-16 w-12 object-cover rounded-xl border border-[#e8e4dc]"
-                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover"
+                  variant="thumb"
                 />
-              ) : (
-                <div className="h-16 w-12 rounded-xl bg-[#f0eee9]" />
-              )}
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="font-ui text-sm font-medium text-ink truncate">
                   {r.title || `#${r.animeId}`}
                 </p>
-                <p className="mt-0.5 font-meta text-[11px] normal-case tracking-normal text-[#8a877f]">
+                <p className="mt-0.5 font-meta text-[11px] normal-case tracking-normal text-soft">
                   {r.completed ? '已看完' : pct > 0 ? `进度 ${pct}%` : `进度 ${Math.floor(r.positionSeconds)}s`}
                 </p>
                 {(pct > 0 || r.completed) && (
-                  <div className="mt-2 h-1 w-full max-w-[12rem] overflow-hidden rounded-full bg-[#ece8e0]">
+                  <div className="mt-2 h-1 w-full max-w-[12rem] overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full bg-[#1a1917]"
+                      className="h-full rounded-full bg-ink"
                       style={{ width: `${r.completed ? 100 : pct}%` }}
                     />
                   </div>
@@ -161,7 +151,7 @@ export function GuestHistoryList() {
             </Link>
             <button
               type="button"
-              className="rounded-full px-3 py-1.5 font-ui text-[12px] text-[#6f6d68] hover:bg-[#f5f3ee] hover:text-[#9F2F2D] shrink-0 transition"
+              className="rounded-full px-3 py-1.5 font-ui text-[12px] text-soft hover:bg-secondary hover:text-destructive shrink-0 transition"
               onClick={() => {
                 const next = rows.filter((x) => x.animeId !== r.animeId);
                 writeLocalWatchProgress(next);

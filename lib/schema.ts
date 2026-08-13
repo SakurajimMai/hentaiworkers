@@ -34,7 +34,7 @@ export const animes = mysqlTable(
   (t) => [index('animes_is_active_idx').on(t.isActive)]
 );
 
-/** 里番 tag dictionary (shared only with anime_tags). */
+/** 里番 tag dictionary. Never used for manga tags. */
 export const tags = mysqlTable('tags', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
@@ -178,6 +178,78 @@ export const userEvents = mysqlTable(
 );
 
 
+/** Manga catalog (ingested via /api/manga/publish with admin-configured secret). */
+export const mangas = mysqlTable(
+  'mangas',
+  {
+    id: serial('id').primaryKey(),
+    slug: varchar('slug', { length: 200 }).notNull(),
+    title: varchar('title', { length: 500 }).notNull(),
+    author: varchar('author', { length: 255 }),
+    /** Manga-owned tags as JSON string array. Independent of 里番 `tags`. */
+    tags: text('tags'),
+    description: text('description'),
+    coverUrl: varchar('cover_url', { length: 1000 }),
+    sourceChatId: varchar('source_chat_id', { length: 64 }),
+    sourceChatTitle: varchar('source_chat_title', { length: 255 }),
+    chapterCount: int('chapter_count').notNull().default(0),
+    pageCount: int('page_count').notNull().default(0),
+    isPublished: int('is_published').notNull().default(1),
+    createdAt: datetime('created_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: datetime('updated_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    uniqueIndex('mangas_slug_uidx').on(t.slug),
+    index('mangas_is_published_idx').on(t.isPublished),
+    index('mangas_title_idx').on(t.title),
+  ],
+);
+
+export const mangaChapters = mysqlTable(
+  'manga_chapters',
+  {
+    id: serial('id').primaryKey(),
+    mangaId: int('manga_id').notNull(),
+    number: int('number').notNull(),
+    title: varchar('title', { length: 500 }),
+    sourceKey: varchar('source_key', { length: 255 }).notNull(),
+    pageCount: int('page_count').notNull().default(0),
+    isPublished: int('is_published').notNull().default(1),
+    createdAt: datetime('created_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: datetime('updated_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    uniqueIndex('manga_chapters_source_key_uidx').on(t.sourceKey),
+    uniqueIndex('manga_chapters_manga_number_uidx').on(t.mangaId, t.number),
+    index('manga_chapters_manga_id_idx').on(t.mangaId),
+  ],
+);
+
+export const mangaPages = mysqlTable(
+  'manga_pages',
+  {
+    id: serial('id').primaryKey(),
+    chapterId: int('chapter_id').notNull(),
+    index: int('page_index').notNull().default(0),
+    imageUrl: varchar('image_url', { length: 1000 }).notNull(),
+    createdAt: datetime('created_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    uniqueIndex('manga_pages_chapter_index_uidx').on(t.chapterId, t.index),
+    index('manga_pages_chapter_id_idx').on(t.chapterId),
+  ],
+);
+
 export type Anime = typeof animes.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -186,3 +258,6 @@ export type UserFavorite = typeof userFavorites.$inferSelect;
 export type UserWatchProgress = typeof userWatchProgress.$inferSelect;
 export type MediaSource = typeof mediaSources.$inferSelect;
 export type UserEvent = typeof userEvents.$inferSelect;
+export type Manga = typeof mangas.$inferSelect;
+export type MangaChapter = typeof mangaChapters.$inferSelect;
+export type MangaPage = typeof mangaPages.$inferSelect;

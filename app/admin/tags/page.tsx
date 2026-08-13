@@ -15,6 +15,8 @@ export default async function AdminTagsPage({
 }) {
   const sp = await searchParams;
   const q = typeof sp.q === 'string' ? sp.q.trim() : '';
+  const error = typeof sp.error === 'string' ? sp.error : '';
+  const linkedCount = typeof sp.count === 'string' ? sp.count : '';
   const page = Math.max(1, parseInt(String(sp.page || '1'), 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
@@ -49,12 +51,19 @@ export default async function AdminTagsPage({
   return (
     <div className="space-y-8">
       <div>
-        <p className="font-meta mb-2">Tags</p>
-        <h1 className="font-serif text-3xl">标签管理</h1>
-        <p className="mt-2 font-ui text-sm text-[#787774] max-w-2xl">
-          管理里番标签字典 `tags`，并查看关联作品数量。
+        <p className="font-meta mb-2">Anime tags</p>
+        <h1 className="font-serif text-3xl">里番标签</h1>
+        <p className="mt-2 font-ui text-sm text-soft max-w-2xl">
+          管理里番标签字典 `tags`，并查看关联作品数量。漫画标签存在漫画作品上，不会出现在这里。
         </p>
       </div>
+
+      {error === 'name' && <div className="notice-error">标签名不能为空</div>}
+      {error === 'linked' && (
+        <div className="notice-error">
+          该标签仍关联 {linkedCount || '若干'} 部里番，先移除关联再删除。
+        </div>
+      )}
 
       <form className="flex gap-2">
         <input
@@ -87,7 +96,7 @@ export default async function AdminTagsPage({
 
       <div className="surface-card overflow-x-auto">
         <table className="w-full text-left font-ui text-sm">
-          <thead className="border-b border-[#EAEAEA] text-[#787774]">
+          <thead className="border-b border-border text-soft">
             <tr>
               <th className="p-3">ID</th>
               <th className="p-3">名称</th>
@@ -97,8 +106,8 @@ export default async function AdminTagsPage({
           </thead>
           <tbody>
             {rows.map((tag) => (
-              <tr key={tag.id} className="border-b border-[#EAEAEA] last:border-0">
-                <td className="p-3 tabular text-[#787774]">{tag.id}</td>
+              <tr key={tag.id} className="border-b border-border last:border-0">
+                <td className="p-3 tabular text-soft">{tag.id}</td>
                 <td className="p-3">
                   <form action={actionSaveTag} className="flex flex-wrap gap-2 items-center">
                     <input type="hidden" name="id" value={tag.id} />
@@ -122,7 +131,7 @@ export default async function AdminTagsPage({
                 <td className="p-3">
                   <form action={actionDeleteTag}>
                     <input type="hidden" name="id" value={tag.id} />
-                    <button type="submit" className="text-[12px] text-[#9F2F2D] underline">
+                    <button type="submit" className="text-[12px] text-danger underline">
                       删除
                     </button>
                   </form>
@@ -131,7 +140,7 @@ export default async function AdminTagsPage({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-6 text-center text-[#787774]">
+                <td colSpan={4} className="p-6 text-center text-soft">
                   暂无标签
                 </td>
               </tr>

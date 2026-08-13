@@ -1,6 +1,14 @@
 import { and, desc, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm';
 import { db, withDbRetry } from '@/lib/db';
-import { animeTags, animes, tags } from '@/lib/schema';
+import {
+  animeTags,
+  animes,
+  mediaSources,
+  tags,
+  userEvents,
+  userFavorites,
+  userWatchProgress,
+} from '@/lib/schema';
 import type {
   AnimeDetail,
   AnimeSimilarItem,
@@ -328,8 +336,15 @@ export class MariaDbCatalogRepository
 
   async deleteAnime(id: number): Promise<void> {
     return withDbRetry(async () => {
-      await db.delete(animeTags).where(eq(animeTags.animeId, id));
-      await db.delete(animes).where(eq(animes.id, id));
+      await db.transaction(async (tx) => {
+        await tx.delete(animeTags).where(eq(animeTags.animeId, id));
+        await tx.delete(mediaSources).where(eq(mediaSources.animeId, id));
+        await tx.delete(userWatchProgress).where(eq(userWatchProgress.animeId, id));
+        await tx.delete(userFavorites).where(eq(userFavorites.animeId, id));
+        await tx.delete(userEvents).where(eq(userEvents.animeId, id));
+        await tx.execute(sql`DELETE FROM user_list_items WHERE anime_id = ${id}`);
+        await tx.delete(animes).where(eq(animes.id, id));
+      });
     });
   }
 

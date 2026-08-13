@@ -8,6 +8,7 @@ info:
     - 无需鉴权
     - 数据源：远程 MySQL（经 Next.js Route Handlers）
     - 默认仅返回上架作品（`is_active = 1` 或 `NULL`）
+    - 漫画接口仅返回已发布作品；栏目关闭时返回 404
   contact:
     name: AnimeStream
 
@@ -21,6 +22,7 @@ tags:
   - name: System
   - name: Animes
   - name: Tags
+  - name: Mangas
 
 paths:
   /api/health:
@@ -147,6 +149,118 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TagSummary"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/mangas:
+    get:
+      tags: [Mangas]
+      summary: List published mangas
+      operationId: listMangas
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 24
+        - name: q
+          in: query
+          description: Fuzzy match title, author, or manga tag
+          schema:
+            type: string
+        - name: tag
+          in: query
+          description: Manga-owned tag name (not 里番 tag id)
+          schema:
+            type: string
+        - name: rank
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, all]
+      responses:
+        "200":
+          description: Manga list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MangaListResponse"
+        "404":
+          description: Manga section disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/mangas/{id}:
+    get:
+      tags: [Mangas]
+      summary: Manga detail
+      operationId: getManga
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Manga with chapter summaries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MangaDetail"
+        "404":
+          description: Not found or manga disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /api/mangas/{id}/chapters/{number}:
+    get:
+      tags: [Mangas]
+      summary: Chapter pages
+      operationId: getMangaChapter
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: number
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Chapter pages; records one ranked view
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MangaChapterResponse"
+        "404":
+          description: Not found or manga disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -335,6 +449,105 @@ components:
           type: integer
           description: Present when ranked by shared tags
           nullable: true
+
+    MangaSummary:
+      type: object
+      required: [id, slug, title, tags, chapterCount, pageCount]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        author:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+        chapterCount:
+          type: integer
+        pageCount:
+          type: integer
+
+    MangaListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MangaSummary"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    MangaChapterSummary:
+      type: object
+      required: [id, number, pageCount]
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        pageCount:
+          type: integer
+
+    MangaDetail:
+      allOf:
+        - $ref: "#/components/schemas/MangaSummary"
+        - type: object
+          required: [chapters]
+          properties:
+            chapters:
+              type: array
+              items:
+                $ref: "#/components/schemas/MangaChapterSummary"
+
+    MangaPage:
+      type: object
+      required: [index, imageUrl]
+      properties:
+        index:
+          type: integer
+        imageUrl:
+          type: string
+
+    MangaChapterResponse:
+      type: object
+      required: [manga, chapter]
+      properties:
+        manga:
+          type: object
+          required: [id, title]
+          properties:
+            id:
+              type: integer
+            title:
+              type: string
+            coverUrl:
+              type: string
+              nullable: true
+        chapter:
+          allOf:
+            - $ref: "#/components/schemas/MangaChapterSummary"
+            - type: object
+              required: [pages]
+              properties:
+                pages:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/MangaPage"
 
   responses:
     ServerError:

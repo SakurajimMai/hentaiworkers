@@ -33,8 +33,4 @@ export function setAdminCatalogRepositoryFactoryForTests(
 }
 
 export { AdminCatalogService } from './application/admin-catalog-service';
-export type {
-  AdminAnimeSaveInput,
-  ImportAnimeItem,
-  ImportResult,
-} from './application/admin-catalog-service';
+export type { AdminAnimeSaveInput } from './application/admin-catalog-service';

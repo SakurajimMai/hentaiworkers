@@ -45,8 +45,8 @@ export class MariaDbSystemSettingsRepository implements SystemSettingsRepository
       const json = JSON.stringify(settings);
       await pool.query(
         `INSERT INTO system_settings (setting_key, value_json)
-         VALUES (?, CAST(? AS JSON))
-         ON DUPLICATE KEY UPDATE value_json = CAST(? AS JSON)`,
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE value_json = ?`,
         [SYSTEM_SETTINGS_KEY, json, json],
       );
     });

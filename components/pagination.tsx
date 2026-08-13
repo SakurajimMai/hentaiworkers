@@ -44,7 +44,7 @@ export function Pagination({ page, totalPages }: { page: number; totalPages: num
             {it}
           </Button>
         ) : (
-          <span key={`e-${idx}`} className="px-1 font-meta text-[#787774]">
+          <span key={`e-${idx}`} className="px-1 font-meta text-soft">
             ···
           </span>
         )

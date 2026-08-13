@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   ListRenderItemInfo,
+  Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -12,10 +14,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { AnimeCard } from '../../components/AnimeCard';
 import { AppState } from '../../components/AppState';
+import { MangaCard } from '../../components/MangaCard';
 import { SplashScreen } from '../../components/SplashScreen';
 import { colors, spacing } from '../../constants/theme';
-import { animeApi } from '../../services/api';
-import { Anime } from '../../services/types';
+import { animeApi, mangaApi } from '../../services/api';
+import { Anime, MangaSummary } from '../../services/types';
 
 const PAGE_SIZE = 30;
 
@@ -25,6 +28,7 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
 
   const [animes, setAnimes] = useState<Anime[]>([]);
+  const [mangas, setMangas] = useState<MangaSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +45,12 @@ export default function HomeScreen() {
     try {
       setLoading(true);
       setError(null);
-      const response = await animeApi.getAnimeList({ page: 1, limit: PAGE_SIZE, sort: 'popular' });
+      const [response, mangaResponse] = await Promise.all([
+        animeApi.getAnimeList({ page: 1, limit: PAGE_SIZE, sort: 'popular' }),
+        mangaApi.getMangaList({ page: 1, limit: 10 }).catch(() => ({ data: [] as MangaSummary[] })),
+      ]);
       setAnimes(response.data);
+      setMangas(mangaResponse.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
     } finally {
@@ -93,6 +101,34 @@ export default function HomeScreen() {
         keyExtractor={(item) => String(item.id)}
         numColumns={columns}
         renderItem={renderItem}
+        ListHeaderComponent={
+          mangas.length > 0 ? (
+            <View style={styles.mangaBlock}>
+              <View style={styles.mangaHeading}>
+                <Text style={styles.mangaTitle}>漫画</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="查看全部漫画"
+                  onPress={() => router.push('/manga')}
+                  hitSlop={8}
+                >
+                  <Text style={styles.mangaMore}>全部</Text>
+                </Pressable>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.mangaRow}
+              >
+                {mangas.map((item) => (
+                  <View key={item.id} style={{ width: 108 }}>
+                    <MangaCard manga={item} onPress={() => router.push(`/manga-detail/${item.id}`)} />
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null
+        }
         contentContainerStyle={{
           paddingHorizontal: horizontalPadding,
           paddingBottom: insets.bottom + spacing.xxl,
@@ -129,5 +165,27 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  mangaBlock: {
+    marginBottom: spacing.sm,
+  },
+  mangaHeading: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  mangaTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  mangaMore: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mangaRow: {
+    gap: spacing.md,
   },
 });

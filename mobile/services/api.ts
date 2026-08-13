@@ -1,6 +1,14 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { Anime, AnimeListParams, AnimeListResponse } from './types';
+import {
+  Anime,
+  AnimeListParams,
+  AnimeListResponse,
+  MangaChapterResponse,
+  MangaDetail,
+  MangaListParams,
+  MangaListResponse,
+} from './types';
 
 function resolveApiBaseUrl(): string {
   if (Platform.OS === 'web') return '';
@@ -65,48 +73,65 @@ function buildAnimeListQuery(params: AnimeListParams = {}) {
   return query.toString();
 }
 
-class AnimeApiService {
-  private async fetchJson<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        Accept: 'application/json',
-      },
-    });
+function buildMangaListQuery(params: MangaListParams = {}) {
+  const query = new URLSearchParams({
+    page: String(params.page ?? 1),
+    limit: String(params.limit ?? 24),
+  });
 
-    const responseText = await response.text();
-    let payload: any = null;
-    try {
-      payload = responseText ? JSON.parse(responseText) : null;
-    } catch {
-      if (!response.ok) {
-        throw new ApiError(`请求失败：${response.status}`, response.status);
-      }
-      throw new ApiError('响应不是合法 JSON', response.status);
-    }
+  const q = params.q?.trim();
+  if (q) query.set('q', q);
 
+  const tag = params.tag?.trim();
+  if (tag) query.set('tag', tag);
+
+  if (params.rank) query.set('rank', params.rank);
+
+  return query.toString();
+}
+
+async function fetchJson<T>(endpoint: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  const responseText = await response.text();
+  let payload: any = null;
+  try {
+    payload = responseText ? JSON.parse(responseText) : null;
+  } catch {
     if (!response.ok) {
-      const message = payload?.error || `请求失败：${response.status}`;
-      throw new ApiError(message, response.status);
+      throw new ApiError(`请求失败：${response.status}`, response.status);
     }
-
-    return payload as T;
+    throw new ApiError('响应不是合法 JSON', response.status);
   }
 
+  if (!response.ok) {
+    const message = payload?.error || `请求失败：${response.status}`;
+    throw new ApiError(message, response.status);
+  }
+
+  return payload as T;
+}
+
+class AnimeApiService {
   async getAnimeList(params: AnimeListParams = {}): Promise<AnimeListResponse> {
-    return this.fetchJson<AnimeListResponse>(`/api/animes?${buildAnimeListQuery(params)}`);
+    return fetchJson<AnimeListResponse>(`/api/animes?${buildAnimeListQuery(params)}`);
   }
 
   async getAnimeDetail(id: number): Promise<Anime> {
-    return this.fetchJson<Anime>(`/api/animes/${id}`);
+    return fetchJson<Anime>(`/api/animes/${id}`);
   }
 
   async getSimilarAnimes(id: number): Promise<Anime[]> {
-    return this.fetchJson<Anime[]>(`/api/animes/${id}/similar`);
+    return fetchJson<Anime[]>(`/api/animes/${id}/similar`);
   }
 
   async getPopularTags(limit = 20): Promise<{ id: number; name: string; count?: number }[]> {
     try {
-      return await this.fetchJson(`/api/tags?limit=${limit}`);
+      return await fetchJson(`/api/tags?limit=${limit}`);
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
         return this.aggregateTagsFromAnimes(limit);
@@ -140,3 +165,19 @@ class AnimeApiService {
 }
 
 export const animeApi = new AnimeApiService();
+
+class MangaApiService {
+  async getMangaList(params: MangaListParams = {}): Promise<MangaListResponse> {
+    return fetchJson<MangaListResponse>(`/api/mangas?${buildMangaListQuery(params)}`);
+  }
+
+  async getMangaDetail(id: number): Promise<MangaDetail> {
+    return fetchJson<MangaDetail>(`/api/mangas/${id}`);
+  }
+
+  async getChapter(id: number, number: number): Promise<MangaChapterResponse> {
+    return fetchJson<MangaChapterResponse>(`/api/mangas/${id}/chapters/${number}`);
+  }
+}
+
+export const mangaApi = new MangaApiService();

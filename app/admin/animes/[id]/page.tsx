@@ -39,7 +39,7 @@ export default async function AdminAnimeEditPage({
       <div>
         <p className="font-meta mb-2">里番 · animes / tags</p>
         <h1 className="font-serif text-3xl">{isNew ? '新建里番' : '编辑里番'}</h1>
-        <p className="mt-2 font-ui text-sm text-[#787774]">
+        <p className="mt-2 font-ui text-sm text-soft">
           使用里番标签字典 tags。
         </p>
       </div>
@@ -125,7 +125,7 @@ export default async function AdminAnimeEditPage({
               </option>
             ))}
           </select>
-          <p className="mt-1 font-ui text-[11px] text-[#787774]">
+          <p className="mt-1 font-ui text-[11px] text-soft">
             提交时会读取选中项；若浏览器多选有兼容问题，可之后用逗号 ID 字段扩展。
           </p>
         </div>

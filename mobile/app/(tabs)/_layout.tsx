@@ -53,14 +53,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="tags"
+        name="manga"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'pricetags' : 'pricetags-outline'} focused={focused} />
+            <TabIcon name={focused ? 'book' : 'book-outline'} focused={focused} />
           ),
-          tabBarLabel: ({ focused }) => <TabLabel label="标签" focused={focused} />,
+          tabBarLabel: ({ focused }) => <TabLabel label="漫画" focused={focused} />,
         }}
       />
+      <Tabs.Screen name="tags" options={{ href: null }} />
       <Tabs.Screen
         name="history"
         options={{

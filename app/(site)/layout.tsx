@@ -2,12 +2,31 @@ import Link from 'next/link';
 import { SiteHeader } from '@/components/site-header';
 import { WatchProgressMergeOnLogin } from '@/components/watch-progress-merge';
 import { getIdentityService } from '@/lib/server/identity';
+import { getSystemSettingsService } from '@/lib/server/system';
+
+export const dynamic = 'force-dynamic';
+
+const emptySite = {
+  androidDownloadUrl: '',
+  androidDownloadLabel: '下载 App',
+} as const;
+
+async function readPublicSiteConfig() {
+  try {
+    return await getSystemSettingsService().getPublicSiteConfig();
+  } catch {
+    return emptySite;
+  }
+}
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const user = await getIdentityService().getCurrentUser();
+  const [user, site] = await Promise.all([
+    getIdentityService().getCurrentUser(),
+    readPublicSiteConfig(),
+  ]);
 
   return (
-    <div className="min-h-dvh bg-background text-foreground flex flex-col">
+    <div className="site-shell min-h-dvh bg-background text-foreground flex flex-col">
       <a href="#main-content" className="skip-link">
         跳到主要内容
       </a>
@@ -16,15 +35,12 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <main id="main-content" className="flex-1">
         {children}
       </main>
-      <footer className="mt-auto border-t border-[#e8e4dc] bg-[#f3f1ec]/55">
+      <footer className="mt-auto border-t border-border bg-[hsl(var(--surface-2))]">
         <div className="page-shell py-12 sm:py-14 flex flex-col gap-8">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-8">
             <div className="max-w-sm">
               <p className="font-ui text-[15px] font-semibold tracking-tight text-ink">
                 AnimeStream
-              </p>
-              <p className="mt-2 font-ui text-[13px] leading-relaxed text-soft">
-                里番片库 · 托管 MP4 在线观看，进度与片单同步。
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-10 gap-y-6 font-ui text-[13px]">
@@ -37,10 +53,27 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                     </Link>
                   </li>
                   <li>
+                    <Link href="/manga" className="hover:text-ink transition-colors">
+                      漫画
+                    </Link>
+                  </li>
+                  <li>
                     <Link href="/history" className="hover:text-ink transition-colors">
                       历史
                     </Link>
                   </li>
+                  {site.androidDownloadUrl ? (
+                    <li>
+                      <a
+                        href={site.androidDownloadUrl}
+                        className="hover:text-ink transition-colors"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        {site.androidDownloadLabel}
+                      </a>
+                    </li>
+                  ) : null}
                 </ul>
               </div>
               <div>
@@ -48,7 +81,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 <ul className="space-y-1.5 text-soft">
                   <li>
                     <Link href="/favorites" className="hover:text-ink transition-colors">
-                      片单
+                      收藏
                     </Link>
                   </li>
                   <li>
@@ -76,20 +109,15 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                       使用条款
                     </Link>
                   </li>
-                  <li>
-                    <Link href="/admin" className="hover:text-ink transition-colors">
-                      管理入口
-                    </Link>
-                  </li>
                 </ul>
               </div>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#e8e4dc] pt-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border pt-5">
             <p className="font-meta normal-case tracking-normal text-[11px]">
               © {new Date().getFullYear()} AnimeStream
             </p>
-            <p className="font-ui text-[12px] text-[#9a978f]">
+            <p className="font-ui text-[12px] text-soft">
               播放依赖源站与网络环境 · 权利归原作者与发行方
             </p>
           </div>

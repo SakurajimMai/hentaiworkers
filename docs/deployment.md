@@ -71,3 +71,7 @@ CI 发布：
 - 版本 tag 对应的 SemVer 标签
 
 生产建议固定版本或 commit SHA，完成验证后再更新。
+
+## 7. Android APK
+
+APK 不进 App 镜像。推送 `mobile/**` 到 `main`，或手动运行 **Build Android APK**，会在 GitHub Release `build-<run>` 挂上安装包。把资源 URL 填进后台「移动端下载」，前台页脚才会显示。步骤见 [移动端文档](./mobile.md)。

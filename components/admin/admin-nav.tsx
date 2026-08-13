@@ -22,7 +22,7 @@ export function AdminNav({
 
   return (
     <nav
-      className={`flex flex-wrap items-center gap-1 font-ui text-[13px] text-[#6f6d68] ${className}`}
+      className={`flex flex-wrap items-center gap-1 font-ui text-[13px] text-soft ${className}`}
       aria-label="后台导航"
     >
       {items.map((item) => {
@@ -38,8 +38,8 @@ export function AdminNav({
               compact ? 'px-2.5 py-1 text-[12px]' : 'px-2.5 py-1'
             } ${
               active
-                ? 'bg-white text-[#1a1917] font-medium shadow-[0_1px_0_rgba(26,25,23,0.04)]'
-                : 'hover:bg-white hover:text-[#1a1917]'
+                ? 'bg-card text-ink font-medium shadow-[0_1px_0_hsla(30,12%,18%,0.04)]'
+                : 'hover:bg-card hover:text-ink'
             }`}
           >
             {item.label}
@@ -49,7 +49,7 @@ export function AdminNav({
       {!compact && (
         <Link
           href="/"
-          className="rounded-full px-2.5 py-1 transition-colors hover:bg-white hover:text-[#1a1917]"
+          className="rounded-full px-2.5 py-1 transition-colors hover:bg-card hover:text-ink"
         >
           前台
         </Link>

@@ -47,11 +47,20 @@ const tailwindConfig = {
           DEFAULT: 'hsl(var(--accent))',
           soft: 'hsl(var(--accent-soft))',
         },
+        ink: {
+          DEFAULT: 'hsl(var(--ink))',
+          soft: 'hsl(var(--ink-soft))',
+        },
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          2: 'hsl(var(--surface-2))',
+        },
+        line: 'hsl(var(--line))',
       },
       boxShadow: {
-        soft: '0 2px 10px hsla(30, 12%, 18%, 0.05)',
-        whisper: '0 1px 0 hsla(30, 12%, 18%, 0.03), 0 8px 24px hsla(30, 12%, 18%, 0.06)',
-        ink: '0 12px 30px hsla(30, 12%, 18%, 0.08)',
+        soft: '0 2px 10px hsla(var(--shadow-color), 0.08)',
+        whisper: '0 1px 0 hsla(var(--shadow-color), 0.04), 0 8px 24px hsla(var(--shadow-color), 0.1)',
+        ink: '0 12px 30px hsla(var(--shadow-color), 0.16)',
       },
       keyframes: {
         shimmer: { '100%': { transform: 'translateX(100%)' } },

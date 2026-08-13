@@ -1,13 +1,22 @@
 import Link from 'next/link';
 import { getIdentityService, getWatchProgressService } from '@/lib/server/identity';
 import { GuestHistoryList } from '@/components/continue-watching-client';
+import { MediaImage } from '@/components/media-image';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import {
   actionClearAllWatchProgress,
   actionClearWatchProgress,
 } from '../auth/actions';
 
+import type { Metadata } from 'next';
+import { noIndexMetadata } from '@/lib/seo';
+
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: '观看历史',
+  ...noIndexMetadata,
+};
 
 function formatProgress(position: number, duration: number, completed: boolean): string {
   if (completed) return '已看完';
@@ -76,7 +85,7 @@ export default async function HistoryPage({
       </div>
 
       {sp.error && (
-        <div className="rounded-xl border border-[#f3d4d3] bg-[#fdf2f2] px-4 py-3 font-ui text-sm text-[#9F2F2D]">
+        <div className="notice-error !text-sm">
           操作失败，请重试。
         </div>
       )}
@@ -108,22 +117,19 @@ export default async function HistoryPage({
                   href={`/watch/${item.animeId}`}
                   className="flex items-center gap-3 min-w-0 flex-1"
                 >
-                  {item.cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                  <div className="h-16 w-12 shrink-0 overflow-hidden rounded-xl border border-border">
+                    <MediaImage
                       src={item.cover}
                       alt={item.title}
-                      className="h-16 w-12 object-cover rounded-xl border border-[#e8e4dc]"
-                      referrerPolicy="no-referrer"
+                      className="h-full w-full object-cover"
+                      variant="thumb"
                     />
-                  ) : (
-                    <div className="h-16 w-12 rounded-xl bg-[#f0eee9] shrink-0" />
-                  )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-ui text-sm font-medium text-ink truncate">
                       {item.title}
                     </p>
-                    <p className="mt-0.5 font-meta text-[11px] normal-case tracking-normal text-[#8a877f]">
+                    <p className="mt-0.5 font-meta text-[11px] normal-case tracking-normal text-soft">
                       {formatProgress(
                         item.positionSeconds,
                         item.durationSeconds,
@@ -133,9 +139,9 @@ export default async function HistoryPage({
                       {new Date(item.lastWatchedAt).toLocaleString()}
                     </p>
                     {(pct > 0 || item.completed) && (
-                      <div className="mt-2 h-1 w-full max-w-[12rem] overflow-hidden rounded-full bg-[#ece8e0]">
+                      <div className="mt-2 h-1 w-full max-w-[12rem] overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-[#1a1917]"
+                          className="h-full rounded-full bg-ink"
                           style={{ width: `${item.completed ? 100 : pct}%` }}
                         />
                       </div>
@@ -146,7 +152,7 @@ export default async function HistoryPage({
                   <input type="hidden" name="animeId" value={item.animeId} />
                   <button
                     type="submit"
-                    className="rounded-full px-3 py-1.5 font-ui text-[12px] text-soft hover:bg-[#f5f3ee] hover:text-[#9F2F2D] shrink-0 transition active:scale-[0.98]"
+                    className="rounded-full px-3 py-1.5 font-ui text-[12px] text-soft hover:bg-secondary hover:text-destructive shrink-0 transition active:scale-[0.98]"
                   >
                     清除
                   </button>

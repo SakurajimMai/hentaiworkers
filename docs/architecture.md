@@ -39,20 +39,25 @@ Next.js App  --->  Remote MySQL / MariaDB
 |----|------|
 | `animes` / `tags` / `anime_tags` | 里番目录与标签 |
 | `users` | 账号、角色、启停状态与 Session 版本 |
-| `system_settings` | 注册、SMTP、Trust、Turnstile 与播放器设置 |
+| `system_settings` | 注册、SMTP、Trust、Turnstile、播放器、首页幻灯片、漫画发布与站点下载地址 |
 | `email_verification_tokens` / `password_reset_tokens` | 邮箱验证与密码重置 |
-| `user_lists` / `user_list_items` | 收藏、想看、在看、已看完与自定义片单 |
+| `user_lists` / `user_list_items` | 里番收藏（系统收藏列表） |
 | `user_watch_progress` | 登录用户观看进度 |
 | `user_events` | 播放里程碑事件 |
+| `mangas` / `manga_chapters` / `manga_pages` | 已发布漫画、章节与图片 |
+| `manga_favorites` | 登录用户的漫画收藏 |
+| `manga_view_days` / `manga_view_dedup` | 漫画日/周/月/总榜计数 |
 
 `drizzle/migrations/0010–0013` 是已发布过的历史迁移，可能在旧数据库中留下不再使用的 works 表。主站代码不得读写这些表，处理建议见 [变更记录](./CHANGELOG.md)。
 
 ## 5. 接口
 
-- 匿名只读：`/api/animes*`、`/api/tags`
+- 匿名只读：`/api/animes*`、`/api/tags`、`/api/mangas*`
 - 登录用户：`/api/me/watch-progress*`
+- 漫画入库：`POST /api/manga/publish`（共享密钥，不是前台会话）
 - 健康检查：`/api/live`、`/api/ready`、`/api/health`
 - 后台写操作：`app/admin/actions.ts` 的 Server Actions
+- 原生客户端：`mobile/`，只消费公开只读 API
 
 公开契约见 [API 文档](./api/README.md)。
 
@@ -60,10 +65,11 @@ Next.js App  --->  Remote MySQL / MariaDB
 
 - 生产数据库默认要求 TLS；远程连接必须使用证书匹配的 DNS 主机名。
 - 用户 Session 使用 `iron-session`，修改密码会递增 `session_version` 使旧 Cookie 失效。
-- SMTP 密码和 Turnstile Secret 使用 AES-256-GCM 密钥环加密后存库。
+- SMTP 密码、Turnstile Secret 和漫画发布密钥使用 AES-256-GCM 密钥环加密后存库。
+- 页脚下载链接只输出以 `http://` 或 `https://` 开头的地址。
 - 管理后台要求有效的 `admin` 会话；公开写接口要求用户会话。
 - `.env` 不进入 Git 或 Docker 构建上下文。
 
 ## 7. 部署
 
-GitHub Actions 从根目录 `Dockerfile` 构建并发布 App 镜像。Compose 拉取公开镜像、读取 `.env`、暴露健康检查，并默认绑定 `127.0.0.1`。详见 [部署指南](./deployment.md)。
+GitHub Actions 从根目录 `Dockerfile` 构建并发布 App 镜像；`mobile/` 变更会另外触发 Android APK 工作流并创建 Release。Compose 拉取公开镜像、读取 `.env`、暴露健康检查，并默认绑定 `127.0.0.1`。详见 [部署指南](./deployment.md) 与 [移动端](./mobile.md)。

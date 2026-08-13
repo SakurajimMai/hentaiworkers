@@ -1,4 +1,11 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
+import { noIndexMetadata } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: '页面不存在',
+  ...noIndexMetadata,
+};
 
 export default function NotFound() {
   return (

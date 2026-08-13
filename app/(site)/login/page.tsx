@@ -5,7 +5,15 @@ import { getIdentityService } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
 import { actionPublicLogin } from '../auth/actions';
 
+import type { Metadata } from 'next';
+import { noIndexMetadata } from '@/lib/seo';
+
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: '登录',
+  ...noIndexMetadata,
+};
 
 const ERRORS: Record<string, string> = {
   '1': '邮箱或密码不正确，请重试。',
@@ -22,7 +30,8 @@ export default async function LoginPage({
   const sp = await searchParams;
   const user = await getIdentityService().getCurrentUser();
   if (user) {
-    redirect(user.role === 'admin' ? '/admin' : (sp.next?.startsWith('/') ? sp.next : '/favorites'));
+    const fallback = user.role === 'admin' ? '/' : '/favorites';
+    redirect(sp.next?.startsWith('/') && !sp.next.startsWith('//') ? sp.next : fallback);
   }
 
   const auth = await getSystemSettingsService().getPublicAuthConfig();
@@ -38,17 +47,22 @@ export default async function LoginPage({
       </div>
 
       {sp.ok === 'verify' && (
-        <div className="mb-4 rounded-xl border border-[#d8ebda] bg-[#edf7ee] px-4 py-3 font-ui text-sm text-[#346538]">
+        <div className="mb-4 notice-success !text-sm">
           注册成功。请查收验证邮件，完成验证后再登录。
         </div>
       )}
       {sp.ok === 'verified' && (
-        <div className="mb-4 rounded-xl border border-[#d8ebda] bg-[#edf7ee] px-4 py-3 font-ui text-sm text-[#346538]">
+        <div className="mb-4 notice-success !text-sm">
           邮箱已验证，你已登录。
         </div>
       )}
+      {sp.ok === 'password' && (
+        <div className="mb-4 notice-success !text-sm">
+          密码已更新，请使用新密码重新登录。
+        </div>
+      )}
       {sp.error && (
-        <div className="mb-4 rounded-xl border border-[#f3d4d3] bg-[#fdf2f2] px-4 py-3 font-ui text-sm text-[#9F2F2D]">
+        <div className="mb-4 notice-error !text-sm">
           {ERRORS[sp.error] ?? ERRORS['1']}
         </div>
       )}
@@ -99,11 +113,11 @@ export default async function LoginPage({
         </button>
       </form>
 
-      <p className="mt-6 font-ui text-sm text-[#6f6d68] text-center">
+      <p className="mt-6 font-ui text-sm text-soft text-center">
         还没有账号？{' '}
         <Link
           href={`/register${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ''}`}
-          className="text-ink font-medium underline underline-offset-2 decoration-[#d8d4cb] hover:decoration-[#1a1917]"
+          className="text-ink font-medium underline underline-offset-2 decoration-line hover:decoration-ink"
         >
           注册
         </Link>

@@ -2,6 +2,18 @@
 
 面向运维与开发的产品范围变更说明。细粒度历史以 Git 为准。
 
+## 2026-08 — 漫画、移动端与收录修复
+
+- 主站增加漫画目录、详情、滚动阅读、漫画标签、日/周/月/总榜和登录收藏。
+- 漫画数据写入 `mangas` / `manga_chapters` / `manga_pages` / `manga_favorites` / `manga_view_*`，与里番 `tags` 互不相通。
+- 公开只读接口增加 `GET /api/mangas`、`/api/mangas/{id}`、`/api/mangas/{id}/chapters/{number}`，供网页与 `mobile/` 共用。
+- 后台可配置页脚 Android 下载地址（`system_settings.site.androidDownloadUrl`）；留空不显示。
+- `mobile/` 增加漫画目录、详情、阅读，以及本地漫画收藏/历史。APK 由 `.github/workflows/build-android.yml` 构建，产物挂到 GitHub Release。
+- 收藏前台改为爱心开关，去掉「想看 / 在看 / 已看完 / 自定义列表」入口。
+- SEO：修复 sitemap 标签 URL 中未转义的 `&`，去掉会污染子页的全局首页 canonical，私密页 `noindex`，补 `/manga` 与默认 OG 图。
+
+漫画相关迁移：`drizzle/migrations/0014-mangas.sql`、`0015-manga-metadata.sql`、`0016-manga-favorites.sql`、`0017-manga-views.sql`。生产库须人工审核后执行，容器不会自动跑迁移。
+
 ## 2026-08 — 主站收敛为 App-only
 
 - 删除仓库内的数据采集工程、Python 依赖、镜像和启动脚本。

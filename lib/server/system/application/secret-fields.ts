@@ -3,6 +3,7 @@ import type { EncryptedField } from '../domain/settings';
 
 const AAD_SMTP = 'system:smtp:password';
 const AAD_TURNSTILE = 'system:turnstile:secret';
+const AAD_MANGA_PUBLISH = 'system:manga:publish_secret';
 
 export function encryptSecretField(
   cipher: SecretCipher,
@@ -49,4 +50,12 @@ export function encryptTurnstileSecret(cipher: SecretCipher, plaintext: string):
 
 export function decryptTurnstileSecret(cipher: SecretCipher, field: EncryptedField): string {
   return decryptSecretField(cipher, field, AAD_TURNSTILE);
+}
+
+export function encryptMangaPublishSecret(cipher: SecretCipher, plaintext: string): EncryptedField {
+  return encryptSecretField(cipher, plaintext, AAD_MANGA_PUBLISH);
+}
+
+export function decryptMangaPublishSecret(cipher: SecretCipher, field: EncryptedField): string {
+  return decryptSecretField(cipher, field, AAD_MANGA_PUBLISH);
 }

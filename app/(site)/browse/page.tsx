@@ -1,10 +1,50 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
 import { Pagination } from '@/components/pagination';
 import { listAnimes, type SortType } from '@/lib/anime-service';
+import { StructuredData } from '@/components/structured-data';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const sp = await searchParams;
+  const search = typeof sp.search === 'string' ? sp.search.trim() : '';
+  const tag = typeof sp.tagName === 'string' ? sp.tagName.trim() : '';
+  const popular = sp.sort === 'popular';
+  const page = Math.max(1, parseInt(String(sp.page || '1'), 10) || 1);
+  const title = search ? `搜索：${search}` : tag ? `${tag} · 里番` : popular ? '热门里番' : '最近更新里番';
+  const description = search
+    ? `在 AnimeStream 中搜索包含“${search}”的里番视频。`
+    : tag
+      ? `浏览 AnimeStream 的「${tag}」标签作品。`
+      : popular
+        ? '浏览 AnimeStream 里番片库中近期受欢迎的作品。'
+        : '浏览 AnimeStream 里番片库的最近更新内容。';
+  const query = new URLSearchParams();
+  if (sp.tag) query.set('tag', String(sp.tag));
+  if (popular) query.set('sort', 'popular');
+  if (page > 1) query.set('page', String(page));
+  const canonical = query.toString() ? `/browse?${query.toString()}` : '/browse';
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      url: canonical,
+      images: [{ url: '/opengraph-image', alt: 'AnimeStream' }],
+    },
+    robots: search ? { index: false, follow: true } : { index: true, follow: true },
+  };
+}
 
 export default async function BrowsePage({
   searchParams,
@@ -60,19 +100,24 @@ export default async function BrowsePage({
   return (
     <div className="pb-20 sm:pb-24">
       <div className="page-shell pt-8 sm:pt-12">
-        <div className="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-end gap-5 border-b border-[#ece8e0] pb-6">
+        <StructuredData
+          data={{
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: `${heading} · AnimeStream`,
+            description: 'AnimeStream 里番视频目录，支持按标题、标签和热门程度浏览。',
+            url: `${process.env.SITE_URL || ''}${page > 1 ? qs({ page: String(page) }) : '/browse'}`,
+          }}
+        />
+        <div className="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-end gap-5 border-b border-border pb-6">
           <div className="flex-1 min-w-0">
-            <p className="font-meta mb-2">里番</p>
             <h1 className="section-title text-3xl sm:text-4xl text-ink">{heading}</h1>
-            <p className="mt-2 font-ui text-sm text-soft leading-relaxed max-w-prose">
-              按热门或最近更新浏览，也可使用顶栏搜索标题。
-            </p>
           </div>
-          <div className="inline-flex items-center gap-0.5 rounded-full border border-[#e8e4dc] bg-white p-1 shadow-[0_1px_0_hsla(30,12%,18%,0.03)]">
+          <div className="inline-flex items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-ink">
             <Link
               href={qs({ sort: undefined })}
               className={`rounded-full px-3.5 py-1.5 font-ui text-[12px] font-medium transition-colors ${
-                sort === 'latest' ? 'bg-[#1a1917] text-white' : 'text-soft hover:text-ink'
+                sort === 'latest' ? 'bg-ink text-background' : 'text-soft hover:text-ink'
               }`}
             >
               最近更新
@@ -80,7 +125,7 @@ export default async function BrowsePage({
             <Link
               href={qs({ sort: 'popular' })}
               className={`rounded-full px-3.5 py-1.5 font-ui text-[12px] font-medium transition-colors ${
-                sort === 'popular' ? 'bg-[#1a1917] text-white' : 'text-soft hover:text-ink'
+                sort === 'popular' ? 'bg-ink text-background' : 'text-soft hover:text-ink'
               }`}
             >
               热门
@@ -89,7 +134,7 @@ export default async function BrowsePage({
         </div>
 
         {error && (
-          <div className="rounded-xl border border-[#f3d4d3] bg-[#fdf2f2] px-4 py-4 font-ui text-sm text-[#9F2F2D]">
+          <div className="notice-error !text-sm !py-4">
             加载失败：{error}
           </div>
         )}
@@ -107,9 +152,6 @@ export default async function BrowsePage({
 
         {data && data.data.length > 0 && (
           <>
-            <p className="font-meta mb-5 normal-case tracking-normal">
-              第 {data.pagination.page} / {data.pagination.totalPages} 页 · {data.data.length} 部
-            </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-7 sm:gap-x-4">
               {data.data.map((anime) => (
                 <AnimeCard key={anime.id} anime={anime} />

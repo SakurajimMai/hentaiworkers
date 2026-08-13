@@ -10,7 +10,7 @@ export default function SiteLoading() {
         </div>
         <div className="skeleton h-[min(46vh,460px)] min-h-[320px] w-full rounded-3xl" />
         <div className="space-y-4">
-          <div className="flex items-end justify-between border-b border-[#ece8e0] pb-3">
+          <div className="flex items-end justify-between border-b border-border pb-3">
             <div className="space-y-2">
               <div className="skeleton h-3 w-16" />
               <div className="skeleton h-7 w-28" />

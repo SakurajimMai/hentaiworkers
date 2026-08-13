@@ -2,49 +2,49 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: '隐私说明 · AnimeStream',
-  description: 'AnimeStream 如何处理账号、观看进度与日志数据。',
+  title: '隐私说明',
+  description: 'AnimeStream 如何处理账号、观看进度与收藏数据。',
+  alternates: { canonical: '/privacy' },
 };
 
 export default function PrivacyPage() {
   return (
     <div className="page-shell py-12 sm:py-16 pb-20">
       <div className="max-w-2xl">
-        <p className="font-meta mb-3">Legal</p>
         <h1 className="section-title text-3xl sm:text-4xl text-ink">隐私说明</h1>
         <p className="mt-3 font-ui text-sm text-soft leading-relaxed">
-          本文说明本站在提供浏览与播放服务时如何处理与你相关的数据。内容会随功能更新而调整。
+          这里说明本站在提供浏览与播放服务时，会如何处理与你相关的信息。内容会随功能更新而调整。
         </p>
 
-        <div className="mt-10 space-y-8 font-ui text-[15px] leading-relaxed text-[#3a3834]">
+        <div className="mt-10 space-y-8 font-ui text-[15px] leading-relaxed text-foreground/90">
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">我们收集什么</h2>
             <ul className="list-disc pl-5 space-y-1.5 text-soft">
-              <li>账号：注册邮箱、可选昵称、密码哈希（不明文存密码）。</li>
-              <li>观看：登录后的观看进度与片单；未登录时进度仅保存在你的浏览器本地。</li>
-              <li>安全：登录 / 注册 / 重置密码的有限次尝试记录，用于防滥用。</li>
-              <li>运营日志：服务端访问与错误日志，用于排障，不含播放内容本身。</li>
+              <li>账号：注册时使用的邮箱、可选昵称，以及用于登录的密码（我们不会把密码以可读形式保存）。</li>
+              <li>观看：登录后会保存观看进度和收藏；未登录时，进度只留在你正在使用的这台设备上。</li>
+              <li>安全：登录、注册和找回密码时，会记录有限次数的尝试，用来防止恶意刷取。</li>
+              <li>运行记录：为排查故障，站点会留下必要的访问与错误记录，其中不包含你正在观看的具体内容。</li>
             </ul>
           </section>
 
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">我们如何使用</h2>
             <p className="text-soft">
-              数据仅用于登录鉴权、跨设备同步进度与片单、发送密码重置邮件（若管理员启用 SMTP），以及保障服务稳定。不会出售个人账号信息。
+              这些信息只用来帮你登录、在不同设备之间同步进度和收藏、在你需要时发送找回密码的邮件，以及维持站点正常运转。我们不会出售你的账号信息。
             </p>
           </section>
 
           <section className="space-y-2">
-            <h2 className="section-title text-xl text-ink">第三方</h2>
+            <h2 className="section-title text-xl text-ink">安全验证</h2>
             <p className="text-soft">
-              若管理员启用 Cloudflare Turnstile，注册或登录时会与 Turnstile 服务交互以完成人机验证。
+              注册或登录时，站点可能会进行人机验证，用来减少机器批量注册和恶意登录。验证过程可能由合作的安全服务协助完成。
             </p>
           </section>
 
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">你的选择</h2>
             <p className="text-soft">
-              可随时退出登录；可在历史页清除本机或账号进度。如需删除账号，请联系站点管理员处理。
+              你可以随时退出登录，也可以在历史页清除本机或账号里的观看进度。如果希望删除账号，请联系站点管理员。
             </p>
           </section>
         </div>

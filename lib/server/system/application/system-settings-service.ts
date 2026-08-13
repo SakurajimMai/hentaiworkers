@@ -16,8 +16,10 @@ import type {
   SystemSettingsRepository,
 } from '../ports/system-settings-repository';
 import {
+  decryptMangaPublishSecret,
   decryptSmtpPassword,
   decryptTurnstileSecret,
+  encryptMangaPublishSecret,
   encryptSmtpPassword,
   encryptTurnstileSecret,
 } from './secret-fields';
@@ -51,6 +53,13 @@ export type SystemSettingsAdminView = Readonly<{
   }>;
   trust: SystemSettings['trust'];
   player: SystemSettings['player'];
+  manga: Readonly<{
+    enabled: boolean;
+    publishSecretConfigured: boolean;
+    curatedTags: ReadonlyArray<string>;
+  }>;
+  hero: SystemSettings['hero'];
+  site: SystemSettings['site'];
 }>;
 
 export type SystemSettingsUpdateInput = Readonly<{
@@ -77,6 +86,14 @@ export type SystemSettingsUpdateInput = Readonly<{
     preRollAd?: Partial<SystemSettings['player']['preRollAd']>;
     pauseAd?: Partial<SystemSettings['player']['pauseAd']>;
   };
+  manga?: Partial<{
+    enabled: boolean;
+    /** Plaintext publish key; empty/undefined keeps previous. */
+    publishSecret?: string;
+    curatedTags: string[];
+  }>;
+  hero?: Partial<SystemSettings['hero']>;
+  site?: Partial<SystemSettings['site']>;
 }>;
 
 export class SystemSettingsService {
@@ -137,6 +154,13 @@ export class SystemSettingsService {
       },
       trust: s.trust,
       player: s.player,
+      manga: {
+        enabled: s.manga.enabled,
+        publishSecretConfigured: s.manga.publishSecret != null,
+        curatedTags: s.manga.curatedTags,
+      },
+      hero: s.hero,
+      site: s.site,
     };
   }
 
@@ -147,6 +171,11 @@ export class SystemSettingsService {
   async getPublicPlayerConfig() {
     const { toPublicPlayerConfig } = await import('../domain/settings');
     return toPublicPlayerConfig(await this.getSettings());
+  }
+
+  async getPublicSiteConfig() {
+    const { toPublicSiteConfig } = await import('../domain/settings');
+    return toPublicSiteConfig(await this.getSettings());
   }
 
   async update(input: SystemSettingsUpdateInput): Promise<SystemSettingsAdminView> {
@@ -206,6 +235,33 @@ export class SystemSettingsService {
           ...input.player?.pauseAd,
         },
       },
+      manga: {
+        ...current.manga,
+        ...omitUndefined({
+          enabled: input.manga?.enabled,
+          curatedTags: input.manga?.curatedTags,
+        }),
+        publishSecret: mergeEncryptedSecret(
+          current.manga.publishSecret,
+          input.manga?.publishSecret,
+          (plain) => encryptMangaPublishSecret(this.cipher, plain),
+        ),
+      },
+      hero: {
+        ...current.hero,
+        ...omitUndefined({
+          intervalSeconds: input.hero?.intervalSeconds,
+        }),
+        animeIds: input.hero?.animeIds ?? current.hero.animeIds,
+        slides: input.hero?.slides ?? current.hero.slides,
+      },
+      site: {
+        ...current.site,
+        ...omitUndefined({
+          androidDownloadUrl: input.site?.androidDownloadUrl,
+          androidDownloadLabel: input.site?.androidDownloadLabel,
+        }),
+      },
     });
 
     if (next.registration.requireEmailVerification && !next.smtp.enabled) {
@@ -227,6 +283,35 @@ export class SystemSettingsService {
       : null;
     const resolved = assertSmtpConfigured(settings.smtp, password);
     await sendSmtpTest(resolved, to.trim());
+  }
+
+  /** Whether public manga pages are enabled (no secret exposed). */
+  async isMangaEnabled(): Promise<boolean> {
+    const settings = await this.getSettings();
+    return settings.manga.enabled;
+  }
+
+  /**
+   * Validate the shared publish key from tg-manga (or any ingest client).
+   * Key is stored encrypted in system_settings via admin UI — not env.
+   */
+  async assertMangaPublishKey(provided: string | null | undefined): Promise<void> {
+    const settings = await this.getSettings();
+    if (!settings.manga.enabled) {
+      throw new AppError('RESULT_INVALID', '漫画发布已关闭', 403);
+    }
+    if (!settings.manga.publishSecret) {
+      throw new AppError(
+        'CONFIG_INVALID',
+        '未配置漫画发布密钥：请在管理后台 → 系统设置中填写',
+        503,
+      );
+    }
+    const expected = decryptMangaPublishSecret(this.cipher, settings.manga.publishSecret);
+    const got = (provided || '').trim();
+    if (!got || got !== expected) {
+      throw new AppError('AUTH_REQUIRED', '漫画发布密钥无效', 401);
+    }
   }
 
   async assertTurnstileIfRequired(

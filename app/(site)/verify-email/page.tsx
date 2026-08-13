@@ -3,7 +3,15 @@ import { redirect } from 'next/navigation';
 import { AppError } from '@/lib/server/shared/errors';
 import { getSystemSettingsService } from '@/lib/server/system';
 
+import type { Metadata } from 'next';
+import { noIndexMetadata } from '@/lib/seo';
+
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: '验证邮箱',
+  ...noIndexMetadata,
+};
 
 export default async function VerifyEmailPage({
   searchParams,
@@ -35,7 +43,7 @@ export default async function VerifyEmailPage({
     return (
       <div className="mx-auto max-w-sm px-4 py-16 text-center space-y-4">
         <h1 className="font-serif text-2xl">邮箱验证失败</h1>
-        <p className="font-ui text-sm text-[#787774]">{message}</p>
+        <p className="font-ui text-sm text-soft">{message}</p>
         <Link href="/login" className="btn-ink inline-flex">
           去登录
         </Link>

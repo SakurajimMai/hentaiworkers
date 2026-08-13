@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
 
+env:
+  EXPO_PUBLIC_API_BASE_URL: https://www.ixacg.de
+
 jobs:
   build:
     name: Build APK
@@ -48,8 +51,64 @@ jobs:
             sleep 10
           done
 
+      - name: Set Android versionCode from run number
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'app.json';
+          const json = JSON.parse(fs.readFileSync(path, 'utf8'));
+          json.expo.android = json.expo.android || {};
+          json.expo.android.package = json.expo.android.package || 'de.ixacg.animestream';
+          json.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER || 1);
+          json.expo.extra = json.expo.extra || {};
+          json.expo.extra.apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+          fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
+          NODE
+
       - name: Expo prebuild (Android)
         run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            {
+              echo "MYAPP_UPLOAD_STORE_FILE=release.keystore"
+              echo "MYAPP_UPLOAD_STORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}"
+              echo "MYAPP_UPLOAD_KEY_ALIAS=${ANDROID_KEY_ALIAS}"
+              echo "MYAPP_UPLOAD_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}"
+            } >> android/gradle.properties
+            python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          text = p.read_text()
+          if 'MYAPP_UPLOAD_STORE_FILE' not in text:
+              signing = '''
+              signingConfigs {
+                  release {
+                      storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                      storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                      keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                      keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+                  }
+              }
+          '''
+              text = text.replace('android {', 'android {' + signing, 1)
+              text = text.replace(
+                  'release {',
+                  'release {\n            signingConfig signingConfigs.release',
+                  1,
+              )
+              p.write_text(text)
+          PY
+          else
+            echo "No release keystore secret; using Expo debug signing for internal distribution."
+          fi
 
       - name: Enable ABI splits
         run: |

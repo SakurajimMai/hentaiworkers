@@ -82,12 +82,77 @@ export const playerSettingsSchema = z.object({
   pauseAd: playerPauseAdSchema.default({}),
 });
 
+/**
+ * Manga ingest / public catalog.
+ * Publish key is set in admin UI (encrypted in DB) — not via app .env.
+ * External workers (tg-manga) send X-Manga-Publish-Key matching this secret.
+ */
+export const mangaSettingsSchema = z.object({
+  /** When false, /manga is hidden and publish API rejects. */
+  enabled: z.boolean().default(true),
+  /** Encrypted shared secret for POST /api/manga/publish. */
+  publishSecret: encryptedFieldSchema.nullable().default(null),
+  /**
+   * Admin-curated manga tag dictionary (independent of 里番 `tags`).
+   * Shown in admin 漫画标签 and as quick filters on /manga even before use.
+   */
+  curatedTags: z.array(z.string().min(1).max(40)).max(200).default([]),
+});
+
+/** One homepage hero slide: a catalog work or a fully custom banner. */
+export const heroSlideSchema = z.object({
+  /** 'anime' resolves title/cover/link from the catalog; 'custom' uses the fields below. */
+  kind: z.enum(['anime', 'custom']).default('anime'),
+  animeId: z.number().int().positive().nullable().default(null),
+  title: z.string().max(200).default(''),
+  /** Custom cover; also overrides the catalog art for anime slides when set. */
+  imageUrl: z.string().max(1000).default(''),
+  /** Slide target. Custom slides default to '#'; anime slides default to /watch/{id}. */
+  linkUrl: z.string().max(1000).default(''),
+  description: z.string().max(500).default(''),
+});
+
+export const MAX_HERO_SLIDES = 20;
+
+export const siteSettingsSchema = z.object({
+  /** Public Android APK / download page. Empty hides the footer link. */
+  androidDownloadUrl: z.string().max(1000).default(''),
+  androidDownloadLabel: z.string().min(1).max(40).default('下载 App'),
+});
+
+export const heroSettingsSchema = z.object({
+  /** Legacy anime-ID list (pre-slides). Used only when `slides` is empty. */
+  animeIds: z.array(z.number().int().positive()).max(MAX_HERO_SLIDES).default([]),
+  /** Ordered slides; not limited to three. Empty = fall back to animeIds, then latest works. */
+  slides: z.array(heroSlideSchema).max(MAX_HERO_SLIDES).default([]),
+  /** Auto-advance interval in seconds. */
+  intervalSeconds: z.number().int().min(2).max(60).default(7),
+});
+
+export type HeroSlide = z.infer<typeof heroSlideSchema>;
+
+/** Slides to render, honouring the legacy animeIds config. */
+export function effectiveHeroSlides(hero: z.infer<typeof heroSettingsSchema>): HeroSlide[] {
+  if (hero.slides.length) return hero.slides;
+  return hero.animeIds.map((animeId) => ({
+    kind: 'anime' as const,
+    animeId,
+    title: '',
+    imageUrl: '',
+    linkUrl: '',
+    description: '',
+  }));
+}
+
 export const systemSettingsSchema = z.object({
   registration: registrationSettingsSchema.default({}),
   smtp: smtpSettingsSchema.default({}),
   turnstile: turnstileSettingsSchema.default({}),
   trust: trustSettingsSchema.default({}),
   player: playerSettingsSchema.default({}),
+  manga: mangaSettingsSchema.default({}),
+  hero: heroSettingsSchema.default({}),
+  site: siteSettingsSchema.default({}),
 });
 
 export type RegistrationSettings = z.infer<typeof registrationSettingsSchema>;
@@ -95,7 +160,23 @@ export type SmtpSettings = z.infer<typeof smtpSettingsSchema>;
 export type TurnstileSettings = z.infer<typeof turnstileSettingsSchema>;
 export type TrustSettings = z.infer<typeof trustSettingsSchema>;
 export type PlayerSettings = z.infer<typeof playerSettingsSchema>;
+export type MangaSettings = z.infer<typeof mangaSettingsSchema>;
+export type HeroSettings = z.infer<typeof heroSettingsSchema>;
+export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 export type SystemSettings = z.infer<typeof systemSettingsSchema>;
+
+export type PublicSiteConfig = Readonly<{
+  androidDownloadUrl: string;
+  androidDownloadLabel: string;
+}>;
+
+export function toPublicSiteConfig(settings: SystemSettings): PublicSiteConfig {
+  const url = settings.site.androidDownloadUrl.trim();
+  return {
+    androidDownloadUrl: /^https?:\/\//i.test(url) ? url : '',
+    androidDownloadLabel: settings.site.androidDownloadLabel.trim() || '下载 App',
+  };
+}
 
 /** Public player config safe to embed in site pages (no secrets). */
 export type PublicPlayerConfig = Readonly<PlayerSettings>;

@@ -1,9 +1,13 @@
 # Production bundle for the AnimeStream application.
+# Prefer a locally built image that includes manga:
+#   docker build -t sakurajiamai/hentaiworkers-app:manga ..
+#   IMAGE_TAG=manga docker compose up -d
+# Or pull a published tag when available.
 
 services:
   app:
-    image: sakurajiamai/hentaiworkers-app:latest
-    pull_policy: always
+    image: sakurajiamai/hentaiworkers-app:${IMAGE_TAG:-manga}
+    pull_policy: ${PULL_POLICY:-never}
     ports:
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     env_file:

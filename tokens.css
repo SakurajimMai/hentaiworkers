@@ -1,0 +1,30 @@
+/* Hallmark · shared app tokens · editorial application · warm paper / ember anchor */
+:root {
+  --color-paper: hsl(var(--background));
+  --color-paper-2: hsl(var(--surface-2));
+  --color-surface: hsl(var(--surface));
+  --color-ink: hsl(var(--ink));
+  --color-ink-soft: hsl(var(--ink-soft));
+  --color-rule: hsl(var(--line));
+  --color-accent: hsl(var(--accent));
+  --color-focus: hsl(var(--ring));
+  --color-reader-canvas: hsl(var(--reader-canvas));
+  --color-reader-chrome: hsl(var(--reader-chrome));
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "Helvetica Neue", Helvetica, Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-meta: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --dur-short: 180ms;
+  --dur-medium: 320ms;
+  --radius-card: 0.875rem;
+  --radius-control: 0.75rem;
+  --radius-pill: 999px;
+}

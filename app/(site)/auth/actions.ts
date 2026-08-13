@@ -6,10 +6,10 @@ import { redirect } from 'next/navigation';
 import { AppError, isAuthRequiredError } from '@/lib/server/shared/errors';
 import {
   getFavoritesService,
-  getListsService,
   getWatchProgressService,
 } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
+import { toggleMangaFavorite } from '@/lib/server/manga-favorites';
 
 async function clientIp(): Promise<string | null> {
   const h = await headers();
@@ -69,10 +69,9 @@ export async function actionPublicLogin(formData: FormData): Promise<void> {
     if (!user) {
       redirect('/login?error=1');
     }
-    if (user.role === 'admin') {
-      redirect('/admin');
-    }
-    redirect(safeNext(next, '/favorites'));
+    // Admins land on the site like everyone else; the header user menu
+    // exposes 管理中心. /admin stays reachable directly.
+    redirect(safeNext(next, user.role === 'admin' ? '/' : '/favorites'));
   } catch (error) {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof AppError) {
@@ -90,22 +89,76 @@ export async function actionPublicLogout(): Promise<void> {
   redirect('/');
 }
 
-export async function actionToggleFavorite(formData: FormData): Promise<void> {
-  const animeId = parseInt(String(formData.get('animeId') || ''), 10);
-  const returnTo = safeNext(String(formData.get('returnTo') || ''), `/watch/${animeId}`);
-
+export async function actionUpdateProfile(formData: FormData): Promise<void> {
+  const { getIdentityService } = await import('@/lib/server/identity');
+  const displayName = String(formData.get('displayName') || '').trim().slice(0, 64);
   try {
-    await getFavoritesService().toggle(animeId);
+    const user = await getIdentityService().requireUser();
+    await getIdentityService().updateUser(user.id, {
+      displayName: displayName || null,
+    });
+  } catch (error) {
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
+    if (isAuthRequiredError(error)) {
+      redirect('/login?next=/account');
+    }
+    redirect('/account?error=profile');
+  }
+  revalidatePath('/account');
+  redirect('/account?ok=profile');
+}
+
+export async function actionChangeMyPassword(formData: FormData): Promise<void> {
+  const { getIdentityService } = await import('@/lib/server/identity');
+  const current = String(formData.get('current') || '');
+  const next = String(formData.get('next') || '');
+  const confirm = String(formData.get('confirm') || '');
+  if (next.length < 8 || next !== confirm) {
+    redirect('/account?error=password');
+  }
+  try {
+    const user = await getIdentityService().requireUser();
+    // Destroys the session; the user signs in again with the new password.
+    await getIdentityService().changePassword(user.id, current, next);
+  } catch (error) {
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
+    if (isAuthRequiredError(error)) {
+      redirect('/login?next=/account');
+    }
+    if (error instanceof AppError && error.details?.field === 'current') {
+      redirect('/account?error=current');
+    }
+    redirect('/account?error=password');
+  }
+  redirect('/login?ok=password');
+}
+
+export async function actionToggleFavoriteState(animeId: number, returnTo = `/watch/${animeId}`) {
+  try {
+    const result = await getFavoritesService().toggle(animeId);
+    revalidatePath('/favorites');
+    revalidatePath(`/watch/${animeId}`);
+    return { ok: true as const, favorited: result.favorited };
   } catch (error) {
     if (isAuthRequiredError(error)) {
-      redirect(`/login?next=${encodeURIComponent(returnTo)}`);
+      return { ok: false as const, login: `/login?next=${encodeURIComponent(safeNext(returnTo, `/watch/${animeId}`))}` };
     }
-    redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}error=favorite`);
+    return { ok: false as const };
   }
+}
 
-  revalidatePath('/favorites');
-  revalidatePath(`/watch/${animeId}`);
-  redirect(returnTo);
+export async function actionToggleMangaFavoriteState(mangaId: number, returnTo = `/manga/${mangaId}`) {
+  try {
+    const result = await toggleMangaFavorite(mangaId);
+    revalidatePath('/favorites');
+    revalidatePath(`/manga/${mangaId}`);
+    return { ok: true as const, favorited: result.favorited };
+  } catch (error) {
+    if (isAuthRequiredError(error)) {
+      return { ok: false as const, login: `/login?next=${encodeURIComponent(safeNext(returnTo, `/manga/${mangaId}`))}` };
+    }
+    return { ok: false as const };
+  }
 }
 
 export async function actionClearWatchProgress(formData: FormData): Promise<void> {
@@ -170,93 +223,6 @@ export async function actionResetPassword(formData: FormData): Promise<void> {
       redirect(`/reset-password?token=${encodeURIComponent(token)}&error=token`);
     }
     redirect(`/reset-password?token=${encodeURIComponent(token)}&error=1`);
-  }
-}
-
-function listRedirect(listId?: number): string {
-  return listId && Number.isFinite(listId) && listId > 0
-    ? `/favorites?list=${listId}`
-    : '/favorites';
-}
-
-export async function actionCreateList(formData: FormData): Promise<void> {
-  const name = String(formData.get('name') || '');
-  try {
-    const list = await getListsService().createCustom(name);
-    revalidatePath('/favorites');
-    redirect(listRedirect(list.id));
-  } catch (error) {
-    if (error && typeof error === 'object' && 'digest' in error) throw error;
-    if (isAuthRequiredError(error)) {
-      redirect('/login?next=/favorites');
-    }
-    redirect('/favorites?error=list');
-  }
-}
-
-export async function actionDeleteList(formData: FormData): Promise<void> {
-  const listId = parseInt(String(formData.get('listId') || ''), 10);
-  try {
-    await getListsService().deleteCustom(listId);
-    revalidatePath('/favorites');
-    redirect('/favorites');
-  } catch (error) {
-    if (error && typeof error === 'object' && 'digest' in error) throw error;
-    if (isAuthRequiredError(error)) {
-      redirect('/login?next=/favorites');
-    }
-    redirect(`/favorites?list=${listId}&error=list`);
-  }
-}
-
-export async function actionAddToList(formData: FormData): Promise<void> {
-  const listId = parseInt(String(formData.get('listId') || ''), 10);
-  const animeId = parseInt(String(formData.get('animeId') || ''), 10);
-  const returnTo = safeNext(
-    String(formData.get('returnTo') || ''),
-    listRedirect(listId),
-  );
-  try {
-    await getListsService().addItem(listId, animeId);
-    revalidatePath('/favorites');
-    revalidatePath(`/watch/${animeId}`);
-    redirect(returnTo);
-  } catch (error) {
-    if (error && typeof error === 'object' && 'digest' in error) throw error;
-    if (isAuthRequiredError(error)) {
-      redirect(`/login?next=${encodeURIComponent(returnTo)}`);
-    }
-    redirect(returnTo);
-  }
-}
-
-export async function actionRemoveFromList(formData: FormData): Promise<void> {
-  const listId = parseInt(String(formData.get('listId') || ''), 10);
-  const animeId = parseInt(String(formData.get('animeId') || ''), 10);
-  try {
-    await getListsService().removeItem(listId, animeId);
-    revalidatePath('/favorites');
-    redirect(listRedirect(listId));
-  } catch (error) {
-    if (error && typeof error === 'object' && 'digest' in error) throw error;
-    if (isAuthRequiredError(error)) {
-      redirect('/login?next=/favorites');
-    }
-    redirect(`${listRedirect(listId)}?error=1`);
-  }
-}
-
-export async function actionSetListItemNote(formData: FormData): Promise<void> {
-  const listId = parseInt(String(formData.get('listId') || ''), 10);
-  const animeId = parseInt(String(formData.get('animeId') || ''), 10);
-  const note = String(formData.get('note') || '');
-  try {
-    await getListsService().setNote(listId, animeId, note);
-    revalidatePath('/favorites');
-    redirect(listRedirect(listId));
-  } catch (error) {
-    if (error && typeof error === 'object' && 'digest' in error) throw error;
-    redirect(`${listRedirect(listId)}?error=1`);
   }
 }
 

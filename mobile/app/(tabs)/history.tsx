@@ -13,7 +13,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
 import { colors, radius, spacing } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
-import { HistoryItem, historyStore } from '../../services/storage';
+import {
+  HistoryItem,
+  MangaHistoryItem,
+  historyStore,
+  mangaHistoryStore,
+} from '../../services/storage';
+
+type MixedHistory =
+  | (HistoryItem & { kind: 'anime' })
+  | (MangaHistoryItem & { kind: 'manga' });
 
 function formatTime(ts: number) {
   const d = new Date(ts);
@@ -21,21 +30,32 @@ function formatTime(ts: number) {
   return `${d.getMonth() + 1}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function itemTime(item: MixedHistory) {
+  return item.kind === 'anime' ? item.watchedAt : item.readAt;
+}
+
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [items, setItems] = useState<MixedHistory[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
+
+  const reload = async () => {
+    const [animes, mangas] = await Promise.all([historyStore.list(), mangaHistoryStore.list()]);
+    const mixed: MixedHistory[] = [
+      ...animes.map((item) => ({ ...item, kind: 'anime' as const })),
+      ...mangas.map((item) => ({ ...item, kind: 'manga' as const })),
+    ].sort((a, b) => itemTime(b) - itemTime(a));
+    setItems(mixed);
+    setLoaded(true);
+  };
 
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
-      historyStore.list().then((data) => {
-        if (mounted) {
-          setItems(data);
-          setLoaded(true);
-        }
+      reload().then(() => {
+        if (!mounted) return;
       });
       return () => {
         mounted = false;
@@ -43,15 +63,21 @@ export default function HistoryScreen() {
     }, []),
   );
 
-  const remove = async (id: number) => {
-    await historyStore.remove(id);
-    setItems(await historyStore.list());
+  const remove = async (item: MixedHistory) => {
+    if (item.kind === 'anime') await historyStore.remove(item.id);
+    else await mangaHistoryStore.remove(item.id);
+    await reload();
   };
 
   const clearAll = async () => {
-    await historyStore.clear();
+    await Promise.all([historyStore.clear(), mangaHistoryStore.clear()]);
     setItems([]);
     setEditing(false);
+  };
+
+  const openItem = (item: MixedHistory) => {
+    if (item.kind === 'anime') router.push(`/detail/${item.id}`);
+    else router.push(`/manga-reader/${item.id}/${item.chapterNumber}`);
   };
 
   return (
@@ -75,11 +101,11 @@ export default function HistoryScreen() {
       {!loaded ? (
         <AppState loading title="正在加载历史" />
       ) : items.length === 0 ? (
-        <AppState title="还没有观看记录" description="开始播放任意作品就会出现在这里。" />
+        <AppState title="还没有记录" description="播放里番或阅读漫画后会出现在这里。" />
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => `${item.kind}-${item.id}`}
           contentContainerStyle={{
             paddingBottom: insets.bottom + spacing.xxl,
             paddingHorizontal: spacing.lg,
@@ -99,12 +125,12 @@ export default function HistoryScreen() {
             ) : null
           }
           renderItem={({ item }) => {
-            const cover = normalizeMediaUrl(item.cover);
+            const cover = normalizeMediaUrl(item.kind === 'anime' ? item.cover : item.coverUrl);
             return (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`继续观看 ${item.title}`}
-                onPress={() => router.push(`/detail/${item.id}`)}
+                accessibilityLabel={`继续${item.kind === 'anime' ? '观看' : '阅读'} ${item.title}`}
+                onPress={() => openItem(item)}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
                 {cover ? (
@@ -113,17 +139,21 @@ export default function HistoryScreen() {
                   <View style={[styles.cover, styles.coverFallback]} />
                 )}
                 <View style={styles.body}>
+                  <Text style={styles.kind}>{item.kind === 'anime' ? '里番' : '漫画'}</Text>
                   <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
-                  {item.titleJapanese ? (
+                  {item.kind === 'anime' && item.titleJapanese ? (
                     <Text style={styles.itemSub} numberOfLines={1}>{item.titleJapanese}</Text>
                   ) : null}
-                  <Text style={styles.itemTime}>观看至 {formatTime(item.watchedAt)}</Text>
+                  <Text style={styles.itemTime}>
+                    {item.kind === 'manga' ? `读到第 ${item.chapterNumber} 话 · ` : '观看至 '}
+                    {formatTime(itemTime(item))}
+                  </Text>
                 </View>
                 {editing ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`移除 ${item.title}`}
-                    onPress={() => remove(item.id)}
+                    onPress={() => remove(item)}
                     style={styles.removeBtn}
                     hitSlop={10}
                   >
@@ -190,6 +220,12 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: 4,
+  },
+  kind: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   itemTitle: {
     color: colors.text,

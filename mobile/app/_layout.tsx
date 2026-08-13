@@ -34,6 +34,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="detail/[id]" />
           <Stack.Screen name="player/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="manga-detail/[id]" />
+          <Stack.Screen name="manga-reader/[id]/[number]" options={{ animation: 'fade' }} />
         </Stack>
       </View>
     </ThemeProvider>

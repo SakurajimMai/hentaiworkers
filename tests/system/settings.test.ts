@@ -19,6 +19,7 @@ import {
   isEmailAllowedByWhitelist,
   parseSystemSettings,
   toPublicAuthConfig,
+  toPublicSiteConfig,
 } from '../../lib/server/system/domain/settings';
 import { SystemSettingsService } from '../../lib/server/system/application/system-settings-service';
 import type {
@@ -92,6 +93,31 @@ test('player ads accept video and image pre-roll and pause configs', () => {
   assert.equal(settings.player.preRollAd.playDuration, 3);
   assert.equal(settings.player.pauseAd.videoUrl, 'https://cdn.example/pause.mp4');
   assert.equal(settings.player.pauseAd.muted, true);
+});
+
+test('public site config only exposes http(s) android download links', () => {
+  const hidden = toPublicSiteConfig(
+    parseSystemSettings({
+      site: { androidDownloadUrl: 'javascript:alert(1)', androidDownloadLabel: 'App' },
+    }),
+  );
+  assert.equal(hidden.androidDownloadUrl, '');
+  assert.equal(hidden.androidDownloadLabel, 'App');
+
+  const shown = toPublicSiteConfig(
+    parseSystemSettings({
+      site: {
+        androidDownloadUrl: 'https://cdn.example/animestream.apk',
+        androidDownloadLabel: '  下载安卓  ',
+      },
+    }),
+  );
+  assert.equal(shown.androidDownloadUrl, 'https://cdn.example/animestream.apk');
+  assert.equal(shown.androidDownloadLabel, '下载安卓');
+
+  const defaults = toPublicSiteConfig(parseSystemSettings({}));
+  assert.equal(defaults.androidDownloadUrl, '');
+  assert.equal(defaults.androidDownloadLabel, '下载 App');
 });
 
 test('toPublicPlayerConfig preserves preRoll and pause ad video/muted fields', async () => {

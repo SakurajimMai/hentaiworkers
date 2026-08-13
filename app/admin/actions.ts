@@ -6,6 +6,20 @@ import { AppError, isAuthRequiredError } from '@/lib/server/shared/errors';
 import { getIdentityService } from '@/lib/server/identity';
 import { getAdminCatalogService } from '@/lib/server/catalog/admin';
 import { parsePlayerSettingsFromForm } from '@/lib/server/system/domain/player-settings-form';
+import { parseHeroSettingsFromForm } from '@/lib/server/system/domain/hero-settings-form';
+import {
+  deleteAdminManga,
+  deleteAdminMangaChapter,
+  deleteAdminMangaPage,
+  removeAdminMangaTag,
+  renameAdminMangaTag,
+  setAdminMangaChapterPublished,
+  setAdminMangaPublished,
+  updateAdminManga,
+  updateAdminMangaPage,
+  updateAdminMangaPages,
+} from '@/lib/server/manga-admin';
+import { normalizeMangaTagQuery, normalizeMangaTags } from '@/lib/manga-tags';
 
 function mapAuthRedirect(error: unknown, fallback: string): never {
   if (error instanceof AppError) {
@@ -74,6 +88,7 @@ export async function actionSaveAnime(formData: FormData): Promise<void> {
 
     revalidatePath('/admin/animes');
     revalidatePath('/');
+    revalidatePath('/browse');
     redirect('/admin/animes');
   } catch (error) {
     if (error instanceof AppError && error.code === 'RESULT_INVALID') {
@@ -93,6 +108,7 @@ export async function actionDeleteAnime(formData: FormData): Promise<void> {
     await getAdminCatalogService().deleteAnime(id);
     revalidatePath('/admin/animes');
     revalidatePath('/');
+    revalidatePath('/browse');
     redirect('/admin/animes');
   } catch (error) {
     if (error instanceof AppError && error.code === 'RESULT_INVALID') {
@@ -113,6 +129,7 @@ export async function actionToggleAnime(formData: FormData): Promise<void> {
     await getAdminCatalogService().setAnimeActive(id, isActive);
     revalidatePath('/admin/animes');
     revalidatePath('/');
+    revalidatePath('/browse');
     redirect('/admin/animes');
   } catch (error) {
     if (isAuthRequiredError(error)) {
@@ -147,7 +164,185 @@ export async function actionBatchAnimes(formData: FormData): Promise<void> {
 
     revalidatePath('/admin/animes');
     revalidatePath('/');
+    revalidatePath('/browse');
     redirect(`/admin/animes?ok=batch_${operation}&n=${ids.length}`);
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionSaveManga(formData: FormData): Promise<void> {
+  const id = parseInt(String(formData.get('id') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    await updateAdminManga({
+      id,
+      title: String(formData.get('title') || ''),
+      slug: String(formData.get('slug') || ''),
+      author: String(formData.get('author') || '') || null,
+      tags: String(formData.get('tags') || '')
+        .split(/[\n,，、|]+/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      description: String(formData.get('description') || '') || null,
+      coverUrl: String(formData.get('coverUrl') || '') || null,
+      sourceChatTitle: String(formData.get('sourceChatTitle') || '') || null,
+      isPublished: formData.get('isPublished') === '1' ? 1 : 0,
+    });
+    revalidatePath('/admin/mangas');
+    revalidatePath(`/admin/mangas/${id}`);
+    revalidatePath('/manga');
+    redirect(`/admin/mangas/${id}?ok=manga_updated`);
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESULT_INVALID') {
+      redirect(`/admin/mangas/${id}?error=required`);
+    }
+    if (error instanceof AppError && error.code === 'RESULT_CONFLICT') {
+      redirect(`/admin/mangas/${id}?error=slug`);
+    }
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionToggleManga(formData: FormData): Promise<void> {
+  const id = parseInt(String(formData.get('id') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    const isPublished = formData.get('isPublished') === '1' ? 0 : 1;
+    await setAdminMangaPublished(id, isPublished);
+    revalidatePath('/admin/mangas');
+    revalidatePath(`/admin/mangas/${id}`);
+    revalidatePath('/manga');
+    redirect('/admin/mangas?ok=manga_updated');
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionDeleteManga(formData: FormData): Promise<void> {
+  const id = parseInt(String(formData.get('id') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    await deleteAdminManga(id);
+    revalidatePath('/admin/mangas');
+    revalidatePath('/manga');
+    redirect('/admin/mangas?ok=deleted');
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+function mangaAdminReturnTo(formData: FormData, mangaId: number, extra?: string) {
+  const pages = String(formData.get('pages') || '').trim();
+  const chapter = String(formData.get('chapter') || '').trim();
+  const view = String(formData.get('view') || '').trim();
+  const params = new URLSearchParams();
+  if (pages && pages !== '1') params.set('pages', pages);
+  if (chapter) params.set('chapter', chapter);
+  if (view === 'links') params.set('view', 'links');
+  if (extra) {
+    const [key, value] = extra.split('=');
+    if (key && value) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `/admin/mangas/${mangaId}?${query}` : `/admin/mangas/${mangaId}`;
+}
+
+export async function actionDeleteMangaChapter(formData: FormData): Promise<void> {
+  const mangaId = parseInt(String(formData.get('mangaId') || ''), 10);
+  const chapterId = parseInt(String(formData.get('chapterId') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    await deleteAdminMangaChapter(mangaId, chapterId);
+    revalidatePath('/admin/mangas');
+    revalidatePath(`/admin/mangas/${mangaId}`);
+    revalidatePath('/manga');
+    redirect(mangaAdminReturnTo(formData, mangaId, 'ok=chapter_deleted'));
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionDeleteMangaPage(formData: FormData): Promise<void> {
+  const mangaId = parseInt(String(formData.get('mangaId') || ''), 10);
+  const pageId = parseInt(String(formData.get('pageId') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    await deleteAdminMangaPage(mangaId, pageId);
+    revalidatePath('/admin/mangas');
+    revalidatePath(`/admin/mangas/${mangaId}`);
+    revalidatePath('/manga');
+    redirect(mangaAdminReturnTo(formData, mangaId, 'ok=page_deleted'));
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionSaveMangaPage(formData: FormData): Promise<void> {
+  const mangaId = parseInt(String(formData.get('mangaId') || ''), 10);
+  const pageId = parseInt(String(formData.get('pageId') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    await updateAdminMangaPage(mangaId, pageId, String(formData.get('imageUrl') || ''));
+    revalidatePath(`/admin/mangas/${mangaId}`);
+    revalidatePath('/manga');
+    redirect(mangaAdminReturnTo(formData, mangaId, 'ok=page_updated'));
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESULT_INVALID') {
+      redirect(mangaAdminReturnTo(formData, mangaId, 'error=page_url'));
+    }
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionSaveMangaPageUrls(formData: FormData): Promise<void> {
+  const mangaId = parseInt(String(formData.get('mangaId') || ''), 10);
+  const ids = formData
+    .getAll('pageIds')
+    .map((value) => parseInt(String(value), 10))
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  const urls = String(formData.get('urls') || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  try {
+    await getIdentityService().requireAdmin();
+    if (ids.length !== urls.length) {
+      redirect(mangaAdminReturnTo(formData, mangaId, 'error=page_count'));
+    }
+    await updateAdminMangaPages(
+      mangaId,
+      ids.map((id, index) => ({ id, imageUrl: urls[index] })),
+    );
+    revalidatePath(`/admin/mangas/${mangaId}`);
+    revalidatePath('/manga');
+    redirect(mangaAdminReturnTo(formData, mangaId, 'ok=pages_updated'));
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESULT_INVALID') {
+      redirect(mangaAdminReturnTo(formData, mangaId, 'error=page_url'));
+    }
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionToggleMangaChapter(formData: FormData): Promise<void> {
+  const mangaId = parseInt(String(formData.get('mangaId') || ''), 10);
+  const chapterId = parseInt(String(formData.get('chapterId') || ''), 10);
+  try {
+    await getIdentityService().requireAdmin();
+    const isPublished = formData.get('isPublished') === '1' ? 0 : 1;
+    await setAdminMangaChapterPublished(mangaId, chapterId, isPublished);
+    revalidatePath(`/admin/mangas/${mangaId}`);
+    revalidatePath('/manga');
+    redirect(mangaAdminReturnTo(formData, mangaId, 'ok=chapter_updated'));
   } catch (error) {
     if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
     throw error;
@@ -195,6 +390,73 @@ export async function actionDeleteTag(formData: FormData): Promise<void> {
   }
 }
 
+async function updateCuratedMangaTags(
+  mutate: (current: string[]) => string[],
+): Promise<void> {
+  const { getSystemSettingsService } = await import('@/lib/server/system');
+  const service = getSystemSettingsService();
+  const settings = await service.getSettings();
+  const next = normalizeMangaTags(mutate([...settings.manga.curatedTags]));
+  await service.update({ manga: { curatedTags: next } });
+}
+
+function revalidateMangaTagPages(): void {
+  revalidatePath('/admin/manga-tags');
+  revalidatePath('/admin/mangas');
+  revalidatePath('/manga');
+}
+
+export async function actionAddMangaTag(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().requireAdmin();
+    const name = normalizeMangaTagQuery(String(formData.get('name') || ''));
+    if (!name) redirect('/admin/manga-tags?error=name');
+    await updateCuratedMangaTags((current) => [...current, name]);
+    revalidateMangaTagPages();
+    redirect(`/admin/manga-tags?ok=added&tag=${encodeURIComponent(name)}`);
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionRenameMangaTag(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().requireAdmin();
+    const from = normalizeMangaTagQuery(String(formData.get('from') || ''));
+    const to = normalizeMangaTagQuery(String(formData.get('to') || ''));
+    if (!from || !to) redirect('/admin/manga-tags?error=name');
+    if (from === to) redirect('/admin/manga-tags');
+    const affected = await renameAdminMangaTag(from, to);
+    await updateCuratedMangaTags((current) =>
+      current.map((tag) => (tag === from ? to : tag)),
+    );
+    revalidateMangaTagPages();
+    redirect(`/admin/manga-tags?ok=renamed&n=${affected}&tag=${encodeURIComponent(to)}`);
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'RESULT_INVALID') {
+      redirect('/admin/manga-tags?error=name');
+    }
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
+export async function actionDeleteMangaTag(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().requireAdmin();
+    const name = normalizeMangaTagQuery(String(formData.get('name') || ''));
+    if (!name) redirect('/admin/manga-tags?error=name');
+    const affected = await removeAdminMangaTag(name);
+    await updateCuratedMangaTags((current) => current.filter((tag) => tag !== name));
+    revalidateMangaTagPages();
+    redirect(`/admin/manga-tags?ok=deleted&n=${affected}&tag=${encodeURIComponent(name)}`);
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    throw error;
+  }
+}
+
 export async function actionSaveUser(formData: FormData): Promise<void> {
   try {
     await getIdentityService().requireAdmin();
@@ -231,34 +493,6 @@ export async function actionSaveUser(formData: FormData): Promise<void> {
     if (error instanceof AppError && error.code === 'RESULT_CONFLICT') {
       redirect('/admin/users?error=exists');
     }
-    if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
-    }
-    throw error;
-  }
-}
-
-export async function actionImportJson(formData: FormData): Promise<void> {
-  try {
-    await getIdentityService().requireAdmin();
-    const raw = String(formData.get('payload') || '');
-    let items: unknown;
-    try {
-      items = JSON.parse(raw);
-      if (!Array.isArray(items)) throw new Error('root must be array');
-    } catch {
-      redirect('/admin/import?error=json');
-    }
-
-    const result = await getAdminCatalogService().importBatch(
-      items as Array<Record<string, unknown>>,
-    );
-    revalidatePath('/admin/animes');
-    revalidatePath('/');
-    redirect(
-      `/admin/import?ok=1&created=${result.created}&updated=${result.updated}&skipped=${result.skipped}&errors=${result.errors.length}`,
-    );
-  } catch (error) {
     if (isAuthRequiredError(error)) {
       redirect('/admin/login?error=1');
     }
@@ -313,11 +547,22 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
           parseInt(String(formData.get('verificationTokenTtlMinutes') || '60'), 10) || 60,
       },
       player: parsePlayerSettingsFromForm(formData),
+      manga: {
+        enabled: formData.get('mangaEnabled') === '1',
+        publishSecret: String(formData.get('mangaPublishSecret') || '') || undefined,
+      },
+      hero: parseHeroSettingsFromForm(formData),
+      site: {
+        androidDownloadUrl: String(formData.get('androidDownloadUrl') || '').trim(),
+        androidDownloadLabel: String(formData.get('androidDownloadLabel') || '').trim() || '下载 App',
+      },
     });
     revalidatePath('/admin/settings');
+    revalidatePath('/');
     revalidatePath('/login');
     revalidatePath('/register');
     revalidatePath('/watch');
+    revalidatePath('/manga');
     redirect('/admin/settings?ok=1');
   } catch (error) {
     if (error instanceof AppError) {

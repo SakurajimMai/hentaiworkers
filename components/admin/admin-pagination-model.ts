@@ -61,11 +61,15 @@ export function buildAdminPaginationHref(
   basePath: string,
   page: number,
   query?: Record<string, string | undefined>,
+  pageParam = 'page',
 ) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value && key !== 'page') params.set(key, value);
+    if (value && key !== pageParam && key !== 'page') params.set(key, value);
   }
-  params.set('page', String(page));
-  return `${basePath}?${params.toString()}`;
+  if (page > 1 || pageParam !== 'page') {
+    params.set(pageParam, String(page));
+  }
+  const queryString = params.toString();
+  return queryString ? `${basePath}?${queryString}` : basePath;
 }

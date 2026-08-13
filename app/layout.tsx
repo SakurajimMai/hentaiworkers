@@ -3,21 +3,24 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'AnimeStream · 里番',
+    default: 'AnimeStream · 里番与漫画',
     template: '%s · AnimeStream',
   },
-  description: '里番片库：在线观看、进度同步、片单收藏。托管 MP4 播放。',
+  metadataBase: new URL(process.env.SITE_URL || 'http://localhost:3000'),
+  description: 'AnimeStream 提供里番视频浏览、托管 MP4 播放、漫画在线阅读、观看进度同步与片单收藏。',
   applicationName: 'AnimeStream',
+  keywords: ['里番', '在线观影', '漫画阅读', 'AnimeStream'],
   openGraph: {
-    title: 'AnimeStream · 里番',
-    description: '浏览与播放里番，继续上次进度，管理你的片单。',
+    title: 'AnimeStream · 里番与漫画',
+    description: '浏览里番视频与漫画内容，继续上次进度，管理你的片单。',
     type: 'website',
     locale: 'zh_CN',
+    siteName: 'AnimeStream',
   },
   twitter: {
-    card: 'summary',
-    title: 'AnimeStream',
-    description: '里番片库在线观看。',
+    card: 'summary_large_image',
+    title: 'AnimeStream · 里番与漫画',
+    description: '里番视频与漫画内容在线浏览。',
   },
   robots: {
     index: true,
@@ -26,16 +29,22 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#f6f4ef',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f6f4ef' },
+    { media: '(prefers-color-scheme: dark)', color: '#121318' },
+  ],
   width: 'device-width',
   initialScale: 1,
-  colorScheme: 'light',
+  colorScheme: 'light dark',
 };
+
+const THEME_BOOT_SCRIPT = `(function(){try{var k='animestream.theme.v1';var s=localStorage.getItem(k);var m=(s==='light'||s==='dark')?s:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');var r=document.documentElement;r.setAttribute('data-theme',m);r.style.colorScheme=m;var c=m==='dark'?'#121318':'#f6f4ef';var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',c);}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

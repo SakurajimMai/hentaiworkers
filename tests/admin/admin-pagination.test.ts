@@ -60,6 +60,11 @@ test('后台分页链接保留筛选条件并覆盖 page', () => {
     }),
     '/admin/tags?q=%E5%8A%A8%E7%94%BB&scope=used&page=4',
   );
+  assert.equal(
+    buildAdminPaginationHref('/admin/mangas/14', 3, { chapter: '8' }, 'pages'),
+    '/admin/mangas/14?chapter=8&pages=3',
+  );
+  assert.equal(buildAdminPaginationHref('/admin/animes', 1), '/admin/animes');
 });
 
 test('后台分页渲染数字链接、当前页和禁用边界箭头', async () => {
@@ -87,6 +92,9 @@ test('后台分页渲染数字链接、当前页和禁用边界箭头', async ()
     firstPage,
     /href="\/admin\/users\?q=sakura&amp;page=2"/,
   );
+  assert.match(firstPage, />首页<\/span>/);
+  assert.match(firstPage, /href="\/admin\/users\?q=sakura&amp;page=10"[^>]*>末页<\/a>/);
+  assert.match(firstPage, /name="page"/);
   assert.match(firstPage, />…<\/span>/);
 
   const lastPage = renderToStaticMarkup(

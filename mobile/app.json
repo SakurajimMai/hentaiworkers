@@ -17,6 +17,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "de.ixacg.animestream",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#080A0F"
@@ -33,7 +35,7 @@
       "expo-router"
     ],
     "extra": {
-      "apiBaseUrl": ""
+      "apiBaseUrl": "https://www.ixacg.de"
     }
   }
 }

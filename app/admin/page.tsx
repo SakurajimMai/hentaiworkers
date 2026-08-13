@@ -1,35 +1,46 @@
 import Link from 'next/link';
-import { sql } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { animes, tags, users } from '@/lib/schema';
+import { animes, mangas, tags, users } from '@/lib/schema';
+import { listAdminMangas } from '@/lib/server/manga-admin';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboard() {
-  const [[animeCount], [tagCount], [userCount], [activeCount]] = await Promise.all([
+  const [[animeCount], [mangaCount], [tagCount], [userCount], [activeCount]] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(animes),
+    db.select({ count: sql<number>`count(*)` }).from(mangas),
     db.select({ count: sql<number>`count(*)` }).from(tags),
     db.select({ count: sql<number>`count(*)` }).from(users),
     db.select({ count: sql<number>`count(*)` }).from(animes).where(sql`${animes.isActive} = 1`),
   ]);
+  const [latestAnimes, latestMangas] = await Promise.all([
+    db
+      .select({ id: animes.id, title: animes.title, isActive: animes.isActive, updatedAt: animes.updatedAt })
+      .from(animes)
+      .orderBy(desc(animes.updatedAt), desc(animes.id))
+      .limit(5),
+    listAdminMangas({ page: 1, limit: 5 }),
+  ]);
 
   const cards = [
     { label: '里番', value: Number(animeCount.count), href: '/admin/animes' },
-    { label: '上架', value: Number(activeCount.count), href: '/admin/animes' },
+    { label: '漫画', value: Number(mangaCount.count), href: '/admin/mangas' },
+    { label: '上架里番', value: Number(activeCount.count), href: '/admin/animes' },
     { label: '标签', value: Number(tagCount.count), href: '/admin/tags' },
     { label: '用户', value: Number(userCount.count), href: '/admin/users' },
   ];
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="font-meta mb-2">Dashboard</p>
-        <h1 className="section-title text-3xl text-ink">管理概览</h1>
-        <p className="mt-2 font-ui text-sm text-soft max-w-xl leading-relaxed">
-          从下方统计进入列表，管理片库内容与站点用户。
+      <header className="admin-page-intro">
+        <p className="font-meta mb-2">主站维护</p>
+        <h1 className="section-title text-3xl text-ink sm:text-4xl">今天要维护什么</h1>
+        <p className="mt-2 max-w-xl font-ui text-sm leading-relaxed text-soft">
+          从内容状态进入对应工作区。发布、上架、标签和账号操作都保留原有权限校验。
         </p>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      </header>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((c) => (
           <Link
             key={c.label}
@@ -45,9 +56,57 @@ export default async function AdminDashboard() {
         <Link href="/admin/animes/new" className="btn-ink">
           新建里番
         </Link>
-        <Link href="/admin/import" className="btn-ghost">
-          批量导入
+        <Link href="/admin/mangas" className="btn-ghost">
+          管理漫画
         </Link>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="surface-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <h2 className="font-ui text-sm font-semibold text-ink">里番最近变更</h2>
+              <p className="mt-1 font-ui text-[12px] text-soft">直接进入编辑或状态操作</p>
+            </div>
+            <Link href="/admin/animes" className="btn-ghost !px-3 !py-1.5 !text-[12px]">全部</Link>
+          </div>
+          <ul className="divide-y divide-border/70">
+            {latestAnimes.map((anime) => (
+              <li key={anime.id} className="flex items-center gap-3 px-5 py-3.5">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${anime.isActive ? 'bg-[hsl(var(--success))]' : 'bg-muted-foreground/40'}`} />
+                <Link href={`/admin/animes/${anime.id}`} className="min-w-0 flex-1 truncate font-ui text-[13px] text-ink hover:underline">
+                  {anime.title}
+                </Link>
+                <span className="shrink-0 font-meta text-[10px] normal-case tracking-normal text-soft">
+                  {anime.isActive ? '上架' : '下架'}
+                </span>
+              </li>
+            ))}
+            {latestAnimes.length === 0 && <li className="px-5 py-8 font-ui text-sm text-soft">暂无里番记录</li>}
+          </ul>
+        </section>
+        <section className="surface-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <h2 className="font-ui text-sm font-semibold text-ink">漫画发布状态</h2>
+              <p className="mt-1 font-ui text-[12px] text-soft">TG 发布后在这里检查封面与上架状态</p>
+            </div>
+            <Link href="/admin/mangas" className="btn-ghost !px-3 !py-1.5 !text-[12px]">全部</Link>
+          </div>
+          <ul className="divide-y divide-border/70">
+            {latestMangas.data.map((manga) => (
+              <li key={manga.id} className="flex items-center gap-3 px-5 py-3.5">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${manga.isPublished ? 'bg-[hsl(var(--success))]' : 'bg-muted-foreground/40'}`} />
+                <Link href={`/admin/mangas/${manga.id}`} className="min-w-0 flex-1 truncate font-ui text-[13px] text-ink hover:underline">
+                  {manga.title}
+                </Link>
+                <span className="shrink-0 font-meta text-[10px] normal-case tracking-normal text-soft">
+                  P{manga.pageCount ?? 0}
+                </span>
+              </li>
+            ))}
+            {latestMangas.data.length === 0 && <li className="px-5 py-8 font-ui text-sm text-soft">暂无漫画记录</li>}
+          </ul>
+        </section>
       </div>
     </div>
   );

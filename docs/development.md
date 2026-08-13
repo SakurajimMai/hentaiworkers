@@ -33,6 +33,7 @@ npm run dev
 - `drizzle/baseline/0000-production-schema.sql`：核心表基线。
 - `drizzle/migrations/0003–0009`：当前主站能力的增量迁移。
 - `drizzle/migrations/0010–0013`：历史兼容迁移，主站不读写其 works 表。
+- `drizzle/migrations/0014–0017`：漫画表、元数据、收藏与榜单计数。
 - `npm run db:baseline`：从指定数据库导出核心表结构基线。
 - `npm run db:push`：明确禁用，防止未经审核直接修改数据库。
 - `npm run db:studio`：启动 Drizzle Studio。
@@ -63,7 +64,17 @@ ADMIN_BOOTSTRAP_PASSWORD=replace-with-at-least-12-characters
 
 提交前至少运行以上检查，并补充与改动对应的聚焦测试。
 
-## 6. 约束
+## 6. 移动端
+
+```bash
+cd mobile
+npm ci
+npx expo start
+```
+
+改客户端后推到 `main` 即触发 APK 构建，不要在本机 `prebuild` 或提交 `mobile/android`。说明见 [移动端](./mobile.md)。
+
+## 7. 约束
 
 - 新后端逻辑放入现有 `catalog`、`identity` 或 `system` 模块。
 - Route Handler 和 Server Action 只负责协议转换、鉴权与调用应用服务。

@@ -45,3 +45,60 @@ export interface AnimeListParams {
   search?: string;
   sort?: 'latest' | 'popular';
 }
+
+export type MangaRank = 'day' | 'week' | 'month' | 'all';
+
+export interface MangaSummary {
+  id: number;
+  slug: string;
+  title: string;
+  author?: string | null;
+  tags: string[];
+  description?: string | null;
+  coverUrl?: string | null;
+  chapterCount: number;
+  pageCount: number;
+  updatedAt?: string | null;
+}
+
+export interface MangaChapterSummary {
+  id: number;
+  number: number;
+  title?: string | null;
+  pageCount: number;
+}
+
+export interface MangaDetail extends MangaSummary {
+  chapters: MangaChapterSummary[];
+}
+
+export interface MangaPage {
+  index: number;
+  imageUrl: string;
+}
+
+export interface MangaChapterDetail extends MangaChapterSummary {
+  pages: MangaPage[];
+}
+
+export interface MangaListResponse {
+  data: MangaSummary[];
+  pagination: Pagination;
+}
+
+export interface MangaListParams {
+  page?: number;
+  limit?: number;
+  q?: string;
+  tag?: string;
+  rank?: MangaRank;
+}
+
+export interface MangaChapterResponse {
+  manga: {
+    id: number;
+    title: string;
+    coverUrl?: string | null;
+  };
+  chapter: MangaChapterDetail;
+}

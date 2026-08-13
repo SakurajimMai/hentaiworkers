@@ -5,7 +5,7 @@
 - 协议：HTTPS（生产）/ HTTP（本地）
 - 格式：JSON，`Content-Type: application/json`
 - 鉴权：公开只读接口**无需**登录；`/api/me/*` 需前台会话 Cookie
-- 范围：**仅里番目录**（`animes` / `tags`）。无独立「动漫 / works」公开 API
+- 范围：里番目录（`animes` / `tags`）与已发布漫画（`mangas`）。无独立「动漫 / works」公开 API
 - 机读规范：[openapi.yaml](./openapi.yaml)
 
 ## 端点一览
@@ -19,6 +19,9 @@
 | GET | `/api/animes/{id}` | 里番详情（含标签） |
 | GET | `/api/animes/{id}/similar` | 相似推荐 |
 | GET | `/api/tags` | 里番标签字典 |
+| GET | `/api/mangas` | 已发布漫画分页列表 |
+| GET | `/api/mangas/{id}` | 漫画详情（含章节摘要） |
+| GET | `/api/mangas/{id}/chapters/{number}` | 章节图片；同时记一次榜单浏览 |
 | GET/PUT… | `/api/me/watch-progress*` | 登录用户观看进度 |
 
 ## 1. 健康检查
@@ -199,7 +202,56 @@ GET /api/tags
 
 按名称排序。
 
-## 6. 错误约定
+## 6. 漫画列表
+
+```http
+GET /api/mangas?page=1&limit=24&q=关键词&tag=NTR&rank=week
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `page` | integer | `1` | 页码 |
+| `limit` | integer | `24` | 每页条数，最大 100 |
+| `q` | string | — | 匹配标题、作者或漫画标签 |
+| `tag` | string | — | 漫画标签名（不是里番标签 ID） |
+| `rank` | string | — | `day` / `week` / `month` / `all`；缺省按更新时间 |
+
+漫画栏目关闭时返回 `404` `{ "error": "Manga disabled" }`。
+
+### 成功 `200`
+
+```json
+{
+  "data": [
+    {
+      "id": 17,
+      "slug": "example",
+      "title": "示例漫画",
+      "author": "作者",
+      "tags": ["NTR"],
+      "coverUrl": "https://example.com/cover.jpg",
+      "chapterCount": 1,
+      "pageCount": 225
+    }
+  ],
+  "pagination": { "page": 1, "limit": 24, "total": 11, "totalPages": 1 }
+}
+```
+
+## 7. 漫画详情与章节
+
+```http
+GET /api/mangas/17
+GET /api/mangas/17/chapters/1
+```
+
+详情返回作品字段加 `chapters`。章节返回 `{ manga, chapter }`，`chapter.pages` 为 `{ index, imageUrl }`。打开章节会记一次去重浏览，供榜单使用。
+
+```bash
+curl -s "https://www.ixacg.de/api/mangas?limit=2&rank=week"
+```
+
+## 8. 错误约定
 
 | HTTP | 含义 |
 |------|------|
@@ -209,12 +261,12 @@ GET /api/tags
 
 当前公开接口无速率限制中间件；生产建议在反向代理层配置限流。
 
-## 7. 与后台的关系
+## 9. 与后台的关系
 
 - 管理后台写操作通过 **Server Actions**（`app/admin/actions.ts`），**不是**本公开 REST 的一部分。
 - 修改 `is_active`、标题、标签后，公开 API 读到的是同一 MySQL 库的最新数据。
 
-## 8. OpenAPI 使用
+## 10. OpenAPI 使用
 
 ```bash
 # 使用 Redocly / Swagger UI 等加载
