@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { AppError, isAuthRequiredError } from '@/lib/server/shared/errors';
 import { getIdentityService } from '@/lib/server/identity';
 import { getAdminCatalogService } from '@/lib/server/catalog/admin';
+import { parseAdsSettingsFromForm } from '@/lib/server/system/domain/ads-settings-form';
 import { parsePlayerSettingsFromForm } from '@/lib/server/system/domain/player-settings-form';
 import { parseHeroSettingsFromForm } from '@/lib/server/system/domain/hero-settings-form';
 import {
@@ -547,6 +548,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
           parseInt(String(formData.get('verificationTokenTtlMinutes') || '60'), 10) || 60,
       },
       player: parsePlayerSettingsFromForm(formData),
+      ads: parseAdsSettingsFromForm(formData),
       manga: {
         enabled: formData.get('mangaEnabled') === '1',
         publishSecret: String(formData.get('mangaPublishSecret') || '') || undefined,
@@ -562,6 +564,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
     revalidatePath('/login');
     revalidatePath('/register');
     revalidatePath('/watch');
+    revalidatePath('/browse');
     revalidatePath('/manga');
     redirect('/admin/settings?ok=1');
   } catch (error) {

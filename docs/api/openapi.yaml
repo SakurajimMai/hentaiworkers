@@ -20,6 +20,7 @@ servers:
 
 tags:
   - name: System
+  - name: Ads
   - name: Animes
   - name: Tags
   - name: Mangas
@@ -43,6 +44,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthError"
+
+  /api/ads:
+    get:
+      tags: [Ads]
+      summary: Public ad placements
+      description: |
+        Enabled feed slots plus reader / player ads from admin system settings.
+        Used by the website (including mobile browsers) and the Android app.
+      operationId: getPublicAds
+      responses:
+        "200":
+          description: Public ads config (no secrets)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicAdsConfig"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/animes:
     get:
@@ -309,6 +328,97 @@ components:
           example: false
         error:
           type: string
+
+    PublicFeedAdSlot:
+      type: object
+      required: [enabled, name, interval, href, html]
+      properties:
+        enabled:
+          type: boolean
+        name:
+          type: string
+        interval:
+          type: integer
+        href:
+          type: string
+        html:
+          type: string
+
+    PublicReaderAdSlot:
+      type: object
+      required: [enabled, html, interval]
+      properties:
+        enabled:
+          type: boolean
+        html:
+          type: string
+        interval:
+          type: integer
+
+    PublicPlayerPreRollAd:
+      type: object
+      required: [enabled, videoUrl, imageUrl, html, clickUrl, playDuration, totalDuration, muted]
+      properties:
+        enabled:
+          type: boolean
+        videoUrl:
+          type: string
+        imageUrl:
+          type: string
+        html:
+          type: string
+        clickUrl:
+          type: string
+        playDuration:
+          type: integer
+        totalDuration:
+          type: integer
+        muted:
+          type: boolean
+
+    PublicPlayerPauseAd:
+      type: object
+      required: [enabled, videoUrl, imageUrl, html, clickUrl, muted]
+      properties:
+        enabled:
+          type: boolean
+        videoUrl:
+          type: string
+        imageUrl:
+          type: string
+        html:
+          type: string
+        clickUrl:
+          type: string
+        muted:
+          type: boolean
+
+    PublicAdsConfig:
+      type: object
+      required: [feedSlots, reader, player]
+      properties:
+        feedSlots:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicFeedAdSlot"
+        reader:
+          type: object
+          required: [top, middle, bottom]
+          properties:
+            top:
+              $ref: "#/components/schemas/PublicReaderAdSlot"
+            middle:
+              $ref: "#/components/schemas/PublicReaderAdSlot"
+            bottom:
+              $ref: "#/components/schemas/PublicReaderAdSlot"
+        player:
+          type: object
+          required: [preRollAd, pauseAd]
+          properties:
+            preRollAd:
+              $ref: "#/components/schemas/PublicPlayerPreRollAd"
+            pauseAd:
+              $ref: "#/components/schemas/PublicPlayerPauseAd"
 
     Pagination:
       type: object

@@ -20,8 +20,8 @@ npm run seed:admin
 | 里番 | `/admin/animes` | 搜索、上下架、批量操作、删除和编辑 |
 | 漫画 | `/admin/mangas` | 元数据、章节、页面和相关作品 |
 | 里番标签 | `/admin/tags` | 里番标签创建、编辑和删除 |
-| 漫画标签 | `/admin/manga-tags` | 漫画标签新增、重命名、删除与使用统计 |
-| 用户 | `/admin/users` | 创建、改角色、启停和重置密码 |
+| 漫画标签 | `/admin/manga-tags` | 漫画标签新增、重命名、删除与使用统计，分页浏览 |
+| 用户 | `/admin/users` | 创建、改角色、启停和重置密码，分页浏览 |
 | 系统 | `/admin/settings` | 注册、首页幻灯片、移动端下载、SMTP、Trust、Turnstile、播放器与漫画发布 |
 | 账户 | `/admin/account` | 修改当前管理员密码 |
 

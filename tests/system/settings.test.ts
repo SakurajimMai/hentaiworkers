@@ -18,6 +18,7 @@ import type { SessionData } from '../../lib/server/identity/session-config';
 import {
   isEmailAllowedByWhitelist,
   parseSystemSettings,
+  toPublicAdsConfig,
   toPublicAuthConfig,
   toPublicSiteConfig,
 } from '../../lib/server/system/domain/settings';
@@ -118,6 +119,33 @@ test('public site config only exposes http(s) android download links', () => {
   const defaults = toPublicSiteConfig(parseSystemSettings({}));
   assert.equal(defaults.androidDownloadUrl, '');
   assert.equal(defaults.androidDownloadLabel, '下载 App');
+});
+
+test('toPublicAdsConfig keeps enabled feed/reader slots and player ads', () => {
+  const pub = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: {
+        feedSlots: [
+          { enabled: true, name: 'A', interval: 4, href: 'https://a.example', html: '<b>a</b>' },
+          { enabled: false, name: 'B', interval: 9, href: '', html: '<b>b</b>' },
+        ],
+        reader: {
+          top: { enabled: true, html: '<p>top</p>', interval: 5 },
+          bottom: { enabled: false, html: '<p>hidden</p>', interval: 5 },
+        },
+      },
+      player: {
+        preRollAd: { enabled: true, videoUrl: 'https://cdn.example/pre.mp4' },
+      },
+    }),
+  );
+  assert.equal(pub.feedSlots.length, 1);
+  assert.equal(pub.feedSlots[0].html, '<b>a</b>');
+  assert.equal(pub.reader.top.html, '<p>top</p>');
+  assert.equal(pub.reader.bottom.enabled, false);
+  assert.equal(pub.reader.bottom.html, '');
+  assert.equal(pub.reader.middle.enabled, false);
+  assert.equal(pub.player.preRollAd.videoUrl, 'https://cdn.example/pre.mp4');
 });
 
 test('toPublicPlayerConfig preserves preRoll and pause ad video/muted fields', async () => {

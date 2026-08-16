@@ -88,6 +88,53 @@ export type ErrorResponse = {
   error: string;
 };
 
+export type PublicFeedAdSlot = {
+  enabled: boolean;
+  name: string;
+  interval: number;
+  href: string;
+  html: string;
+};
+
+export type PublicReaderAdSlot = {
+  enabled: boolean;
+  html: string;
+  interval: number;
+};
+
+export type PublicPlayerPreRollAd = {
+  enabled: boolean;
+  videoUrl: string;
+  imageUrl: string;
+  html: string;
+  clickUrl: string;
+  playDuration: number;
+  totalDuration: number;
+  muted: boolean;
+};
+
+export type PublicPlayerPauseAd = {
+  enabled: boolean;
+  videoUrl: string;
+  imageUrl: string;
+  html: string;
+  clickUrl: string;
+  muted: boolean;
+};
+
+export type PublicAdsConfig = {
+  feedSlots: PublicFeedAdSlot[];
+  reader: {
+    top: PublicReaderAdSlot;
+    middle: PublicReaderAdSlot;
+    bottom: PublicReaderAdSlot;
+  };
+  player: {
+    preRollAd: PublicPlayerPreRollAd;
+    pauseAd: PublicPlayerPauseAd;
+  };
+};
+
 export interface PublicAnimeService {
   listAnimes(options: ListAnimesOptions): Promise<AnimeListResponse>;
   getAnimeById(id: number): Promise<AnimeDetail | null>;

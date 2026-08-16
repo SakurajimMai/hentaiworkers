@@ -1,6 +1,7 @@
 import { getSystemSettingsService } from '@/lib/server/system';
 import { requireAdmin } from '@/lib/auth';
 import { AdminMangaPublishSecret } from '@/components/admin-manga-publish-secret';
+import { AdsFeedSlotsEditor } from '@/components/admin/ads-feed-slots-editor';
 import { HeroSlidesEditor } from '@/components/admin/hero-slides-editor';
 import { effectiveHeroSlides } from '@/lib/server/system/domain/settings';
 import {
@@ -27,7 +28,7 @@ export default async function AdminSystemSettingsPage({
         <p className="font-meta mb-2">System</p>
         <h1 className="font-serif text-3xl">系统设置</h1>
         <p className="mt-2 font-ui text-sm text-soft max-w-2xl leading-relaxed">
-          配置前台注册策略、首页幻灯片、移动端下载入口、播放器（里番 ArtPlayer 广告/右键）、SMTP、Trust、Cloudflare Turnstile，以及漫画发布密钥。
+          配置前台注册策略、首页幻灯片、移动端下载入口、播放器（里番 ArtPlayer 广告/右键）、信息流/漫画阅读广告、SMTP、Trust、Cloudflare Turnstile，以及漫画发布密钥。
           SMTP / Turnstile / 漫画发布密钥加密存库，表单留空表示不修改。
         </p>
       </div>
@@ -39,6 +40,7 @@ export default async function AdminSystemSettingsPage({
         <a href="#smtp">SMTP</a>
         <a href="#trust">安全验证</a>
         <a href="#player">播放器</a>
+        <a href="#ads">广告</a>
         <a href="#manga">漫画发布</a>
         <a href="#turnstile">Turnstile</a>
       </nav>
@@ -307,6 +309,7 @@ export default async function AdminSystemSettingsPage({
               「可关闭前秒数」内不能跳过；到总时长后自动进入正片。
               仅勾选启用但未填写视频/HTML/图片时，用户不会看到广告。
               可关闭前秒数填 0 时，插件仍约有 1 秒后才显示关闭按钮。
+              网站（含手机浏览器）和 Android App 使用同一套片头 / 暂停广告。
             </p>
             <label className="field-check text-sm">
               <input
@@ -453,6 +456,71 @@ export default async function AdminSystemSettingsPage({
             </div>
           </div>
 
+        </section>
+
+        <section id="ads" className="surface-card scroll-mt-24 p-5 space-y-5">
+          <div>
+            <h2 className="font-ui text-sm font-semibold">广告位</h2>
+            <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
+              信息流可配置多条广告，每条单独开关、单独设置「每隔 x 张卡片」。
+              阅读页只在章节顶部和底部放广告，不会插入到漫画页中间。
+              这里保存后，网站（含手机浏览器）和 Android App 会使用同一套广告。
+              阅读页 HTML 可以直接粘贴联盟脚本（含 document.write、async src）。
+            </p>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <h3 className="font-ui text-[13px] font-semibold">信息流原生卡</h3>
+            <AdsFeedSlotsEditor initialSlots={[...view.ads.feedSlots]} />
+          </div>
+
+          <div className="space-y-4 border-t border-border pt-4">
+            <h3 className="font-ui text-[13px] font-semibold">漫画阅读页</h3>
+
+            <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
+              <label className="field-check text-sm">
+                <input
+                  type="checkbox"
+                  name="adsReaderTopEnabled"
+                  value="1"
+                  defaultChecked={view.ads.reader.top.enabled}
+                />
+                章节阅读顶部广告
+              </label>
+              <label className="block font-meta text-[12px]">
+                HTML
+                <textarea
+                  name="adsReaderTopHtml"
+                  rows={8}
+                  className="admin-input mt-1 font-mono text-[12px]"
+                  defaultValue={view.ads.reader.top.html}
+                  placeholder={'<script>/* 联盟广告代码 */</script>'}
+                />
+              </label>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
+              <label className="field-check text-sm">
+                <input
+                  type="checkbox"
+                  name="adsReaderBottomEnabled"
+                  value="1"
+                  defaultChecked={view.ads.reader.bottom.enabled}
+                />
+                章节阅读底部广告
+              </label>
+              <label className="block font-meta text-[12px]">
+                HTML
+                <textarea
+                  name="adsReaderBottomHtml"
+                  rows={8}
+                  className="admin-input mt-1 font-mono text-[12px]"
+                  defaultValue={view.ads.reader.bottom.html}
+                  placeholder={'<script>/* 联盟广告代码 */</script>'}
+                />
+              </label>
+            </div>
+          </div>
         </section>
 
         {/* Manga publish */}

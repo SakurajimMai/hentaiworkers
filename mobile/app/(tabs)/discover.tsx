@@ -15,7 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AnimeCard } from '../../components/AnimeCard';
 import { AppState } from '../../components/AppState';
+import { FeedAdCard } from '../../components/FeedAdCard';
 import { colors, radius, spacing } from '../../constants/theme';
+import { loadAdsConfig, useCatalogSlots } from '../../services/ads';
 import { animeApi } from '../../services/api';
 import { Anime } from '../../services/types';
 
@@ -52,6 +54,8 @@ export default function DiscoverScreen() {
     () => (width - horizontalPadding * 2 - gridGap * (columns - 1)) / columns,
     [width, columns, gridGap],
   );
+  const itemKey = useCallback((item: Anime) => String(item.id), []);
+  const { slots } = useCatalogSlots(animes, itemKey);
 
   const loadAnimes = useCallback(
     async (nextPage: number) => {
@@ -116,7 +120,7 @@ export default function DiscoverScreen() {
     return [1, 'gap', page, 'gap', totalPages];
   }, [page, totalPages]);
 
-  const renderItem = ({ item, index }: ListRenderItemInfo<Anime>) => {
+  const renderItem = ({ item, index }: ListRenderItemInfo<(typeof slots)[number]>) => {
     const columnIndex = index % columns;
     return (
       <View
@@ -125,7 +129,11 @@ export default function DiscoverScreen() {
           marginRight: columnIndex === columns - 1 ? 0 : gridGap,
         }}
       >
-        <AnimeCard anime={item} onPress={() => router.push(`/detail/${item.id}`)} />
+        {item.type === 'ad' ? (
+          <FeedAdCard ad={item.ad} />
+        ) : (
+          <AnimeCard anime={item.item} onPress={() => router.push(`/detail/${item.item.id}`)} />
+        )}
       </View>
     );
   };
@@ -172,8 +180,8 @@ export default function DiscoverScreen() {
 
       <FlatList
         key={`discover-${columns}`}
-        data={animes}
-        keyExtractor={(item) => String(item.id)}
+        data={slots}
+        keyExtractor={(item) => item.key}
         numColumns={columns}
         renderItem={renderItem}
         contentContainerStyle={{
@@ -264,6 +272,7 @@ export default function DiscoverScreen() {
             colors={[colors.primary]}
             onRefresh={() => {
               setRefreshing(true);
+              loadAdsConfig(true);
               loadAnimes(page);
             }}
           />

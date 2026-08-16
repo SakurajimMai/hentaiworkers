@@ -321,6 +321,115 @@ async function uniqueSlug(base: string): Promise<string> {
   }
 }
 
+async function refreshMangaAggregates(
+  mangaId: number,
+  extras: {
+    author?: string | null;
+    tags?: string[];
+    coverUrl?: string | null;
+    sourceChatTitle?: string | null;
+  } = {},
+): Promise<void> {
+  const [mangaRow] = await db.select().from(mangas).where(eq(mangas.id, mangaId)).limit(1);
+  if (!mangaRow) return;
+  const [chapterCountRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(mangaChapters)
+    .where(eq(mangaChapters.mangaId, mangaId));
+  const [pageCountRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(mangaPages)
+    .innerJoin(mangaChapters, eq(mangaPages.chapterId, mangaChapters.id))
+    .where(eq(mangaChapters.mangaId, mangaId));
+  await db
+    .update(mangas)
+    .set({
+      chapterCount: Number(chapterCountRow?.count ?? 0),
+      pageCount: Number(pageCountRow?.count ?? 0),
+      author: mangaRow.author || extras.author || null,
+      tags: JSON.stringify(
+        normalizeMangaTags([...parseMangaTags(mangaRow.tags), ...(extras.tags || [])]),
+      ),
+      coverUrl: mangaRow.coverUrl || extras.coverUrl || null,
+      sourceChatTitle: extras.sourceChatTitle ?? mangaRow.sourceChatTitle,
+      updatedAt: new Date(),
+    })
+    .where(eq(mangas.id, mangaId));
+}
+
+async function appendMangaChapterPages(
+  chapter: typeof mangaChapters.$inferSelect,
+  input: {
+    author: string | null;
+    tags: string[];
+    imageUrls: string[];
+    coverUrl: string | null;
+    sourceChatTitle: string | null;
+    sourceKey: string;
+  },
+): Promise<PublishMangaResult> {
+  const existingPages = await db
+    .select()
+    .from(mangaPages)
+    .where(eq(mangaPages.chapterId, chapter.id))
+    .orderBy(mangaPages.index);
+  const seen = new Set(existingPages.map((page) => page.imageUrl));
+  const toAdd = input.imageUrls.filter((url) => url && !seen.has(url));
+  const [mangaRow] = await db.select().from(mangas).where(eq(mangas.id, chapter.mangaId)).limit(1);
+
+  if (toAdd.length === 0) {
+    if (mangaRow && (input.author || input.tags.length)) {
+      await refreshMangaAggregates(mangaRow.id, {
+        author: input.author,
+        tags: input.tags,
+        coverUrl: input.coverUrl,
+        sourceChatTitle: input.sourceChatTitle,
+      });
+    }
+    return {
+      status: 'duplicate',
+      sourceKey: input.sourceKey,
+      mangaId: chapter.mangaId,
+      chapterId: chapter.id,
+      slug: mangaRow?.slug,
+    };
+  }
+
+  const nextIndex =
+    existingPages.length === 0
+      ? 0
+      : Math.max(...existingPages.map((page) => Number(page.index) || 0)) + 1;
+  await db.insert(mangaPages).values(
+    toAdd.map((url, offset) => ({
+      chapterId: chapter.id,
+      index: nextIndex + offset,
+      imageUrl: url,
+    })),
+  );
+  const pageCount = existingPages.length + toAdd.length;
+  await db
+    .update(mangaChapters)
+    .set({
+      pageCount,
+      updatedAt: new Date(),
+    })
+    .where(eq(mangaChapters.id, chapter.id));
+  await refreshMangaAggregates(chapter.mangaId, {
+    author: input.author,
+    tags: input.tags,
+    coverUrl: input.coverUrl,
+    sourceChatTitle: input.sourceChatTitle,
+  });
+  return {
+    status: 'ok',
+    mangaId: chapter.mangaId,
+    chapterId: chapter.id,
+    slug: mangaRow?.slug || '',
+    number: chapter.number,
+    pageCount,
+  };
+}
+
 export async function publishMangaChapter(
   input: PublishMangaInput,
 ): Promise<PublishMangaResult> {
@@ -339,27 +448,14 @@ export async function publishMangaChapter(
     .where(eq(mangaChapters.sourceKey, sourceKey))
     .limit(1);
   if (dup) {
-    const [m] = await db.select().from(mangas).where(eq(mangas.id, dup.mangaId)).limit(1);
-    if (m && (author || tags.length)) {
-      await db
-        .update(mangas)
-        .set({
-          author: m.author || author,
-          tags: JSON.stringify(normalizeMangaTags([
-            ...parseMangaTags(m.tags),
-            ...tags,
-          ])),
-          updatedAt: new Date(),
-        })
-        .where(eq(mangas.id, m.id));
-    }
-    return {
-      status: 'duplicate',
+    return appendMangaChapterPages(dup, {
+      author,
+      tags,
+      imageUrls,
+      coverUrl: input.coverUrl ?? null,
+      sourceChatTitle: input.sourceChatTitle ?? null,
       sourceKey,
-      mangaId: dup.mangaId,
-      chapterId: dup.id,
-      slug: m?.slug,
-    };
+    });
   }
 
   // Find or create manga by title + optional source chat

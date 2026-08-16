@@ -2,9 +2,12 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
+import { FeedAdCard } from '@/components/feed-ad-card';
 import { Pagination } from '@/components/pagination';
 import { listAnimes, type SortType } from '@/lib/anime-service';
 import { StructuredData } from '@/components/structured-data';
+import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
+import { getSystemSettingsService } from '@/lib/server/system';
 
 export const revalidate = 60;
 
@@ -63,7 +66,7 @@ export default async function BrowsePage({
   try {
     data = await listAnimes({
       page,
-      limit: 48,
+      limit: 40,
       search,
       tagId: Number.isFinite(tagId) ? tagId : undefined,
       sort,
@@ -97,9 +100,16 @@ export default async function BrowsePage({
     return s ? `/browse?${s}` : '/browse';
   };
 
+  const feedSlots = data && data.data.length > 0
+    ? (await getSystemSettingsService().getPublicAdsConfig()).feedSlots
+    : [];
+  const slots = data
+    ? interleaveFeedAds(data.data, feedSlots, (item) => String(item.id))
+    : null;
+
   return (
     <div className="pb-20 sm:pb-24">
-      <div className="page-shell pt-8 sm:pt-12">
+      <div className="page-shell max-w-6xl pt-8 sm:pt-12">
         <StructuredData
           data={{
             '@context': 'https://schema.org',
@@ -150,12 +160,16 @@ export default async function BrowsePage({
           </div>
         )}
 
-        {data && data.data.length > 0 && (
+        {data && data.data.length > 0 && slots && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-7 sm:gap-x-4">
-              {data.data.map((anime) => (
-                <AnimeCard key={anime.id} anime={anime} />
-              ))}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-5 md:gap-y-8">
+              {slots.map((slot) =>
+                slot.type === 'ad' ? (
+                  <FeedAdCard key={slot.key} html={slot.ad.html} href={slot.ad.href} />
+                ) : (
+                  <AnimeCard key={slot.key} anime={slot.item} />
+                ),
+              )}
             </div>
             <div className="flex justify-center pt-12">
               <Suspense fallback={null}>

@@ -14,8 +14,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppState } from '../../components/AppState';
+import { FeedAdCard } from '../../components/FeedAdCard';
 import { MangaCard } from '../../components/MangaCard';
 import { colors, radius, spacing } from '../../constants/theme';
+import { loadAdsConfig, useCatalogSlots } from '../../services/ads';
 import { mangaApi } from '../../services/api';
 import { MangaRank, MangaSummary } from '../../services/types';
 
@@ -63,6 +65,8 @@ export default function MangaCatalogScreen() {
     () => (width - horizontalPadding * 2 - gridGap * (columns - 1)) / columns,
     [width, columns, gridGap],
   );
+  const itemKey = useCallback((item: MangaSummary) => String(item.id), []);
+  const { slots } = useCatalogSlots(mangas, itemKey);
 
   const loadMangas = useCallback(
     async (nextPage: number) => {
@@ -141,7 +145,7 @@ export default function MangaCatalogScreen() {
     return [1, 'gap', page, 'gap', totalPages];
   }, [page, totalPages]);
 
-  const renderItem = ({ item, index }: ListRenderItemInfo<MangaSummary>) => {
+  const renderItem = ({ item, index }: ListRenderItemInfo<(typeof slots)[number]>) => {
     const columnIndex = index % columns;
     return (
       <View
@@ -150,7 +154,11 @@ export default function MangaCatalogScreen() {
           marginRight: columnIndex === columns - 1 ? 0 : gridGap,
         }}
       >
-        <MangaCard manga={item} onPress={() => router.push(`/manga-detail/${item.id}`)} />
+        {item.type === 'ad' ? (
+          <FeedAdCard ad={item.ad} />
+        ) : (
+          <MangaCard manga={item.item} onPress={() => router.push(`/manga-detail/${item.item.id}`)} />
+        )}
       </View>
     );
   };
@@ -215,8 +223,8 @@ export default function MangaCatalogScreen() {
 
       <FlatList
         key={`manga-${columns}`}
-        data={mangas}
-        keyExtractor={(item) => String(item.id)}
+        data={slots}
+        keyExtractor={(item) => item.key}
         numColumns={columns}
         renderItem={renderItem}
         contentContainerStyle={{
@@ -302,6 +310,7 @@ export default function MangaCatalogScreen() {
             colors={[colors.primary]}
             onRefresh={() => {
               setRefreshing(true);
+              loadAdsConfig(true);
               loadMangas(page);
             }}
           />

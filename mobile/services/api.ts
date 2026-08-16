@@ -8,6 +8,7 @@ import {
   MangaDetail,
   MangaListParams,
   MangaListResponse,
+  PublicAdsConfig,
 } from './types';
 
 function resolveApiBaseUrl(): string {
@@ -181,3 +182,11 @@ class MangaApiService {
 }
 
 export const mangaApi = new MangaApiService();
+
+class AdsApiService {
+  async getAds(): Promise<PublicAdsConfig> {
+    return fetchJson<PublicAdsConfig>('/api/ads');
+  }
+}
+
+export const adsApi = new AdsApiService();

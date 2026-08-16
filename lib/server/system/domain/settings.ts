@@ -99,6 +99,65 @@ export const mangaSettingsSchema = z.object({
   curatedTags: z.array(z.string().min(1).max(40)).max(200).default([]),
 });
 
+export const MAX_FEED_ADS = 12;
+
+/** One native card in /browse and /manga grids. */
+export const feedAdSlotSchema = z.object({
+  enabled: z.boolean().default(true),
+  name: z.string().max(40).default(''),
+  /** Insert after every N content items. */
+  interval: z.number().int().min(1).max(40).default(5),
+  href: z.string().max(1000).default(''),
+  /** Empty = default “广告位招租” card. Supports iframe / HTML / script. */
+  html: z.string().max(20000).default(''),
+});
+
+/** One HTML slot on the manga reader. */
+export const readerAdSlotSchema = z.object({
+  enabled: z.boolean().default(false),
+  html: z.string().max(20000).default(''),
+  /** Only used by the mid-chapter slot. */
+  interval: z.number().int().min(1).max(50).default(5),
+});
+
+export const adsSettingsSchema = z.object({
+  feedSlots: z.array(feedAdSlotSchema).max(MAX_FEED_ADS).default([
+    { enabled: true, name: '信息流广告 1', interval: 5, href: '', html: '' },
+  ]),
+  reader: z
+    .object({
+      top: readerAdSlotSchema.default({}),
+      middle: readerAdSlotSchema.default({}),
+      bottom: readerAdSlotSchema.default({}),
+    })
+    .default({}),
+});
+
+export function migrateAdsSettings(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return {};
+  const ads = raw as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...ads };
+
+  if (!Array.isArray(ads.feedSlots) && ads.feed && typeof ads.feed === 'object') {
+    const feed = ads.feed as Record<string, unknown>;
+    next.feedSlots = [
+      {
+        enabled: feed.enabled !== false,
+        name: '信息流广告 1',
+        interval: feed.interval,
+        href: feed.href,
+        html: feed.html,
+      },
+    ];
+  }
+
+  if (!ads.reader && ads.mangaReader && typeof ads.mangaReader === 'object') {
+    next.reader = { top: {}, middle: ads.mangaReader, bottom: {} };
+  }
+
+  return next;
+}
+
 /** One homepage hero slide: a catalog work or a fully custom banner. */
 export const heroSlideSchema = z.object({
   /** 'anime' resolves title/cover/link from the catalog; 'custom' uses the fields below. */
@@ -151,6 +210,7 @@ export const systemSettingsSchema = z.object({
   trust: trustSettingsSchema.default({}),
   player: playerSettingsSchema.default({}),
   manga: mangaSettingsSchema.default({}),
+  ads: adsSettingsSchema.default({}),
   hero: heroSettingsSchema.default({}),
   site: siteSettingsSchema.default({}),
 });
@@ -161,9 +221,44 @@ export type TurnstileSettings = z.infer<typeof turnstileSettingsSchema>;
 export type TrustSettings = z.infer<typeof trustSettingsSchema>;
 export type PlayerSettings = z.infer<typeof playerSettingsSchema>;
 export type MangaSettings = z.infer<typeof mangaSettingsSchema>;
+export type AdsSettings = z.infer<typeof adsSettingsSchema>;
+export type FeedAdSlot = z.infer<typeof feedAdSlotSchema>;
+export type ReaderAdSlot = z.infer<typeof readerAdSlotSchema>;
 export type HeroSettings = z.infer<typeof heroSettingsSchema>;
 export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 export type SystemSettings = z.infer<typeof systemSettingsSchema>;
+
+export type PublicAdsConfig = Readonly<{
+  feedSlots: ReadonlyArray<FeedAdSlot>;
+  reader: AdsSettings['reader'];
+  player: Readonly<{
+    preRollAd: PlayerSettings['preRollAd'];
+    pauseAd: PlayerSettings['pauseAd'];
+  }>;
+}>;
+
+function publicReaderSlot(slot: ReaderAdSlot): ReaderAdSlot {
+  if (!slot.enabled) {
+    return { enabled: false, html: '', interval: slot.interval };
+  }
+  return slot;
+}
+
+export function toPublicAdsConfig(settings: SystemSettings): PublicAdsConfig {
+  return {
+    feedSlots: settings.ads.feedSlots.filter((slot) => slot.enabled),
+    reader: {
+      top: publicReaderSlot(settings.ads.reader.top),
+      // Mid-chapter interval ads were removed from the reader UX.
+      middle: { enabled: false, html: '', interval: 5 },
+      bottom: publicReaderSlot(settings.ads.reader.bottom),
+    },
+    player: {
+      preRollAd: settings.player.preRollAd,
+      pauseAd: settings.player.pauseAd,
+    },
+  };
+}
 
 export type PublicSiteConfig = Readonly<{
   androidDownloadUrl: string;
@@ -192,7 +287,14 @@ export function defaultSystemSettings(): SystemSettings {
 }
 
 export function parseSystemSettings(value: unknown): SystemSettings {
-  return systemSettingsSchema.parse(value ?? {});
+  const raw =
+    value && typeof value === 'object'
+      ? { ...(value as Record<string, unknown>) }
+      : {};
+  if ('ads' in raw) {
+    raw.ads = migrateAdsSettings(raw.ads);
+  }
+  return systemSettingsSchema.parse(raw);
 }
 
 /** Public, non-secret view for login/register pages. */

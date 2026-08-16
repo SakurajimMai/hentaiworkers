@@ -1,4 +1,5 @@
 import { desc, like, or, sql } from 'drizzle-orm';
+import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
 import { actionSaveUser } from '../actions';
@@ -13,6 +14,7 @@ export default async function AdminUsersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === 'string' ? sp.q.trim() : '';
   const page = Math.max(1, parseInt(String(sp.page || '1'), 10) || 1);
@@ -53,6 +55,11 @@ export default async function AdminUsersPage({
         <button type="submit" className="btn-ghost">
           搜索
         </button>
+        {q ? (
+          <a href="/admin/users" className="btn-ghost !text-[13px]">
+            清除
+          </a>
+        ) : null}
       </form>
 
       <form action={actionSaveUser} className="surface-card p-5 grid sm:grid-cols-2 gap-3">
@@ -85,6 +92,14 @@ export default async function AdminUsersPage({
           创建用户
         </button>
       </form>
+
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        basePath="/admin/users"
+        query={{ q: q || undefined }}
+      />
 
       <div className="surface-card overflow-x-auto">
         <table className="w-full text-left font-ui text-sm">

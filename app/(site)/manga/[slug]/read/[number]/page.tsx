@@ -5,6 +5,7 @@ import { MangaReader } from '@/components/manga-reader';
 import { recordMangaView } from '@/lib/manga-views';
 import { getIdentityService } from '@/lib/server/identity';
 import { isMangaFavorite } from '@/lib/server/manga-favorites';
+import { getSystemSettingsService } from '@/lib/server/system';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,8 +36,9 @@ export default async function MangaReadPage({ params }: { params: Params }) {
   if (slug !== String(manga.id)) permanentRedirect(`/manga/${manga.id}/read/${number}`);
 
   const user = await getIdentityService().getCurrentUser();
-  const [favorited] = await Promise.all([
+  const [favorited, ads] = await Promise.all([
     user ? isMangaFavorite(manga.id) : Promise.resolve(false),
+    getSystemSettingsService().getPublicAdsConfig(),
     recordMangaView(manga.id),
   ]);
 
@@ -48,6 +50,10 @@ export default async function MangaReadPage({ params }: { params: Params }) {
       pages={chapter.pages}
       pageCount={chapter.pageCount}
       favorited={favorited}
+      readerAds={{
+        topHtml: ads.reader.top.enabled ? ads.reader.top.html : '',
+        bottomHtml: ads.reader.bottom.enabled ? ads.reader.bottom.html : '',
+      }}
     />
   );
 }

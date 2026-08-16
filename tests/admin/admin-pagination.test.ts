@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildAdminPaginationHref,
   getAdminPaginationModel,
+  paginateItems,
 } from '../../components/admin/admin-pagination-model';
 
 test('后台分页为短列表输出全部页码', () => {
@@ -48,6 +49,19 @@ test('后台分页在首部、中部和尾部生成紧凑窗口', () => {
 test('后台分页规范化越界页码', () => {
   assert.equal(getAdminPaginationModel(0, 0).page, 1);
   assert.equal(getAdminPaginationModel(99, 8).page, 8);
+});
+
+test('内存列表按页切片并钳制页码', () => {
+  const rows = Array.from({ length: 65 }, (_, index) => index + 1);
+  const first = paginateItems(rows, 1, 30);
+  assert.deepEqual(first.items[0], 1);
+  assert.deepEqual(first.items.at(-1), 30);
+  assert.equal(first.total, 65);
+  assert.equal(first.totalPages, 3);
+
+  const last = paginateItems(rows, 99, 30);
+  assert.equal(last.page, 3);
+  assert.deepEqual(last.items, [61, 62, 63, 64, 65]);
 });
 
 test('后台分页链接保留筛选条件并覆盖 page', () => {

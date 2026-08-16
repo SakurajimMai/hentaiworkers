@@ -195,6 +195,16 @@ export function IconLogout(props: IconProps) {
   );
 }
 
+export function IconMegaphone(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 11v2a2 2 0 0 0 2 2h1l3 4V7L6 9H5a2 2 0 0 0-2 2Z" />
+      <path d="M14 8.5c1.5.9 2.5 2.2 2.5 3.5s-1 2.6-2.5 3.5" />
+      <path d="M17.5 6.5C20 8 21.5 10.2 21.5 12s-1.5 4-4 5.5" />
+    </svg>
+  );
+}
+
 export function IconCalendar(props: IconProps) {
   return (
     <svg {...base(props)}>

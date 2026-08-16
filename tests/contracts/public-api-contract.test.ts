@@ -24,6 +24,10 @@ import {
   createTagsDependency,
   createTagsHandler,
 } from '../../app/api/tags/handler';
+import {
+  createAdsDependency,
+  createAdsHandler,
+} from '../../app/api/ads/handler';
 import type {
   AnimeDetail,
   AnimeListResponse,
@@ -31,8 +35,10 @@ import type {
   HealthError,
   HealthOk,
   ListAnimesOptions,
+  PublicAdsConfig,
   TagSummary,
 } from '../../lib/public-api-types';
+import adsFixtureJson from './fixtures/ads.json';
 import detailFixtureJson from './fixtures/anime-detail.json';
 import listFixtureJson from './fixtures/animes-list.json';
 import healthFixtureJson from './fixtures/health.json';
@@ -54,21 +60,23 @@ const listFixture = listFixtureJson satisfies AnimeListResponse;
 const detailFixture = detailFixtureJson satisfies AnimeDetail;
 const similarFixture = similarFixtureJson satisfies AnimeSimilarItem[];
 const tagsFixture = tagsFixtureJson satisfies TagSummary[];
+const adsFixture = adsFixtureJson satisfies PublicAdsConfig;
 const healthFixture = healthFixtureJson satisfies {
   success: HealthOk;
   failure: HealthError;
 };
 
 async function loadRouteModules() {
-  const [listRoute, detailRoute, similarRoute, tagsRoute, healthRoute] = await Promise.all([
+  const [listRoute, detailRoute, similarRoute, tagsRoute, healthRoute, adsRoute] = await Promise.all([
     import('../../app/api/animes/route'),
     import('../../app/api/animes/[id]/route'),
     import('../../app/api/animes/[id]/similar/route'),
     import('../../app/api/tags/route'),
     import('../../app/api/health/route'),
+    import('../../app/api/ads/route'),
   ]);
 
-  return { listRoute, detailRoute, similarRoute, tagsRoute, healthRoute };
+  return { listRoute, detailRoute, similarRoute, tagsRoute, healthRoute, adsRoute };
 }
 
 async function responseJson(response: Response): Promise<unknown> {
@@ -119,7 +127,7 @@ test('TypeScript 测试脚本使用跨平台递归测试入口', () => {
   assert.equal(packageJson.scripts?.['test:ts'], 'node scripts/run-tests.mjs');
 });
 
-test('五个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
+test('六个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
   const databaseUrl = process.env.DATABASE_URL;
   delete process.env.DATABASE_URL;
   let routes: Awaited<ReturnType<typeof loadRouteModules>>;
@@ -143,6 +151,7 @@ test('五个公开路由不初始化数据库且使用同源可注入 handler �
     createSimilarAnimesHandler,
     createTagsHandler,
     createHealthHandler,
+    createAdsHandler,
   ]) {
     assert.equal(typeof factory, 'function');
   }
@@ -332,6 +341,28 @@ test('标签列表保持 200 黄金响应和 500 错误结构', async () => {
   assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic tags failure' });
 });
 
+test('公开广告配置保持 200 黄金响应和 500 错误结构', async () => {
+  const success = createAdsHandler(async () => adsFixture);
+  const failure = createAdsHandler(async () => {
+    throw new Error('synthetic ads failure');
+  });
+
+  const successResponse = await success();
+  const failureResponse = await withMutedConsoleError(() => failure());
+
+  assert.equal(successResponse.status, 200);
+  assert.deepEqual(await responseJson(successResponse), adsFixture);
+  assert.equal(failureResponse.status, 500);
+  assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic ads failure' });
+});
+
+test('广告配置惰性适配器原样转发公开配置', async () => {
+  const dependency = createAdsDependency(async () => ({
+    getPublicAdsConfig: async () => adsFixture,
+  }));
+  assert.deepEqual(await dependency(), adsFixture);
+});
+
 test('健康检查保持成功和失败黄金契约', async () => {
   const success = createHealthHandler(async () => healthFixture.success.result);
   const failure = createHealthHandler(async () => {
@@ -407,6 +438,20 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
       'tags',
     ],
     AnimeSimilarItem: ['id', 'title', 'cover', 'fanart', 'viewCount'],
+    PublicAdsConfig: ['feedSlots', 'reader', 'player'],
+    PublicFeedAdSlot: ['enabled', 'name', 'interval', 'href', 'html'],
+    PublicReaderAdSlot: ['enabled', 'html', 'interval'],
+    PublicPlayerPreRollAd: [
+      'enabled',
+      'videoUrl',
+      'imageUrl',
+      'html',
+      'clickUrl',
+      'playDuration',
+      'totalDuration',
+      'muted',
+    ],
+    PublicPlayerPauseAd: ['enabled', 'videoUrl', 'imageUrl', 'html', 'clickUrl', 'muted'],
   } as const;
 
   for (const [schemaName, keys] of Object.entries(required)) {
@@ -422,5 +467,10 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
   assertOwnKeys(tagsFixture[0], required.TagSummary);
   assertOwnKeys(healthFixture.success, required.HealthOk);
   assertOwnKeys(healthFixture.failure, required.HealthError);
+  assertOwnKeys(adsFixture, required.PublicAdsConfig);
+  assertOwnKeys(adsFixture.feedSlots[0], required.PublicFeedAdSlot);
+  assertOwnKeys(adsFixture.reader.top, required.PublicReaderAdSlot);
+  assertOwnKeys(adsFixture.player.preRollAd, required.PublicPlayerPreRollAd);
+  assertOwnKeys(adsFixture.player.pauseAd, required.PublicPlayerPauseAd);
   assert.equal(schemas.AnimeSimilarItem.required?.includes('matches'), false);
 });

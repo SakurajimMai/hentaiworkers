@@ -3,6 +3,7 @@ import { AnimeCard } from '@/components/AnimeCard';
 import { GuestContinueWatching } from '@/components/continue-watching-client';
 import { HeroCarousel, type HeroItem } from '@/components/hero-carousel';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
+import { HtmlAd } from '@/components/html-ad';
 import { MangaCard } from '@/components/MangaCard';
 import { MediaImage } from '@/components/media-image';
 import { getAnimeById, listAnimes, recommendFromSeeds } from '@/lib/anime-service';
@@ -41,6 +42,7 @@ export default async function HomePage() {
   let mangas: Awaited<ReturnType<typeof listMangas>>['data'] = [];
   let loggedIn = false;
   let error: string | null = null;
+  let homeAdHtml = '';
 
   try {
     const user = await getIdentityService().getCurrentUser();
@@ -61,6 +63,8 @@ export default async function HomePage() {
     latest = lat.data;
     mangas = mangaData;
     heroIntervalSeconds = system.hero.intervalSeconds;
+    homeAdHtml =
+      system.ads.feedSlots.find((slot) => slot.enabled && slot.html.trim())?.html.trim() || '';
     continueWatching = progress.filter((p) => !p.completed && p.positionSeconds > 5);
     const completedIds = progress.filter((p) => p.completed).map((p) => p.animeId);
     const seedIds = [
@@ -169,6 +173,12 @@ export default async function HomePage() {
         {hero.length > 0 && (
           <HeroCarousel intervalSeconds={heroIntervalSeconds} items={hero} />
         )}
+
+        {homeAdHtml ? (
+          <aside className="reader-ad reader-ad-banner overflow-hidden rounded-2xl border border-border bg-card" aria-label="首页广告">
+            <HtmlAd html={homeAdHtml} />
+          </aside>
+        ) : null}
 
         {loggedIn && continueWatching.length > 0 && (
           <HorizontalCarousel title="继续观看" viewAllHref="/history">

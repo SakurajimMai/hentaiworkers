@@ -102,3 +102,50 @@ export interface MangaChapterResponse {
   };
   chapter: MangaChapterDetail;
 }
+
+export interface FeedAdSlot {
+  enabled: boolean;
+  name: string;
+  interval: number;
+  href: string;
+  html: string;
+}
+
+export interface ReaderAdSlot {
+  enabled: boolean;
+  html: string;
+  interval: number;
+}
+
+export interface PlayerPreRollAd {
+  enabled: boolean;
+  videoUrl: string;
+  imageUrl: string;
+  html: string;
+  clickUrl: string;
+  playDuration: number;
+  totalDuration: number;
+  muted: boolean;
+}
+
+export interface PlayerPauseAd {
+  enabled: boolean;
+  videoUrl: string;
+  imageUrl: string;
+  html: string;
+  clickUrl: string;
+  muted: boolean;
+}
+
+export interface PublicAdsConfig {
+  feedSlots: FeedAdSlot[];
+  reader: {
+    top: ReaderAdSlot;
+    middle: ReaderAdSlot;
+    bottom: ReaderAdSlot;
+  };
+  player: {
+    preRollAd: PlayerPreRollAd;
+    pauseAd: PlayerPauseAd;
+  };
+}

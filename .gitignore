@@ -57,6 +57,7 @@ crawler/**/config.yml
 
 # Agent/session scratch (not product source)
 .worktrees/
+.hallmark/
 findings.md
 progress.md
 task_plan.md

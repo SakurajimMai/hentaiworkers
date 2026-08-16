@@ -57,6 +57,29 @@ export function getAdminPaginationModel(
   };
 }
 
+export function paginateItems<T>(
+  items: readonly T[],
+  page: number,
+  pageSize: number,
+): {
+  page: number;
+  total: number;
+  totalPages: number;
+  items: T[];
+} {
+  const size = Math.max(1, Math.trunc(pageSize) || 1);
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / size) || 1);
+  const current = Math.min(totalPages, Math.max(1, Math.trunc(page) || 1));
+  const start = (current - 1) * size;
+  return {
+    page: current,
+    total,
+    totalPages,
+    items: items.slice(start, start + size),
+  };
+}
+
 export function buildAdminPaginationHref(
   basePath: string,
   page: number,

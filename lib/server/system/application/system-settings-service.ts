@@ -58,6 +58,7 @@ export type SystemSettingsAdminView = Readonly<{
     publishSecretConfigured: boolean;
     curatedTags: ReadonlyArray<string>;
   }>;
+  ads: SystemSettings['ads'];
   hero: SystemSettings['hero'];
   site: SystemSettings['site'];
 }>;
@@ -92,6 +93,14 @@ export type SystemSettingsUpdateInput = Readonly<{
     publishSecret?: string;
     curatedTags: string[];
   }>;
+  ads?: Partial<SystemSettings['ads']> & {
+    feedSlots?: SystemSettings['ads']['feedSlots'];
+    reader?: Partial<SystemSettings['ads']['reader']> & {
+      top?: Partial<SystemSettings['ads']['reader']['top']>;
+      middle?: Partial<SystemSettings['ads']['reader']['middle']>;
+      bottom?: Partial<SystemSettings['ads']['reader']['bottom']>;
+    };
+  };
   hero?: Partial<SystemSettings['hero']>;
   site?: Partial<SystemSettings['site']>;
 }>;
@@ -159,6 +168,7 @@ export class SystemSettingsService {
         publishSecretConfigured: s.manga.publishSecret != null,
         curatedTags: s.manga.curatedTags,
       },
+      ads: s.ads,
       hero: s.hero,
       site: s.site,
     };
@@ -176,6 +186,11 @@ export class SystemSettingsService {
   async getPublicSiteConfig() {
     const { toPublicSiteConfig } = await import('../domain/settings');
     return toPublicSiteConfig(await this.getSettings());
+  }
+
+  async getPublicAdsConfig() {
+    const { toPublicAdsConfig } = await import('../domain/settings');
+    return toPublicAdsConfig(await this.getSettings());
   }
 
   async update(input: SystemSettingsUpdateInput): Promise<SystemSettingsAdminView> {
@@ -246,6 +261,23 @@ export class SystemSettingsService {
           input.manga?.publishSecret,
           (plain) => encryptMangaPublishSecret(this.cipher, plain),
         ),
+      },
+      ads: {
+        feedSlots: input.ads?.feedSlots ?? current.ads.feedSlots,
+        reader: {
+          top: {
+            ...current.ads.reader.top,
+            ...input.ads?.reader?.top,
+          },
+          middle: {
+            ...current.ads.reader.middle,
+            ...input.ads?.reader?.middle,
+          },
+          bottom: {
+            ...current.ads.reader.bottom,
+            ...input.ads?.reader?.bottom,
+          },
+        },
       },
       hero: {
         ...current.hero,

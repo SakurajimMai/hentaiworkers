@@ -14,9 +14,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { AnimeCard } from '../../components/AnimeCard';
 import { AppState } from '../../components/AppState';
+import { FeedAdCard } from '../../components/FeedAdCard';
 import { MangaCard } from '../../components/MangaCard';
 import { SplashScreen } from '../../components/SplashScreen';
 import { colors, spacing } from '../../constants/theme';
+import { loadAdsConfig, useCatalogSlots } from '../../services/ads';
 import { animeApi, mangaApi } from '../../services/api';
 import { Anime, MangaSummary } from '../../services/types';
 
@@ -40,6 +42,8 @@ export default function HomeScreen() {
     () => (width - horizontalPadding * 2 - gridGap * (columns - 1)) / columns,
     [width, columns, gridGap],
   );
+  const itemKey = useCallback((item: Anime) => String(item.id), []);
+  const { slots } = useCatalogSlots(animes, itemKey);
 
   const loadAnimes = useCallback(async () => {
     try {
@@ -63,7 +67,7 @@ export default function HomeScreen() {
     loadAnimes();
   }, [loadAnimes]);
 
-  const renderItem = ({ item, index }: ListRenderItemInfo<Anime>) => {
+  const renderItem = ({ item, index }: ListRenderItemInfo<(typeof slots)[number]>) => {
     const columnIndex = index % columns;
     return (
       <View
@@ -72,7 +76,11 @@ export default function HomeScreen() {
           marginRight: columnIndex === columns - 1 ? 0 : gridGap,
         }}
       >
-        <AnimeCard anime={item} onPress={() => router.push(`/detail/${item.id}`)} />
+        {item.type === 'ad' ? (
+          <FeedAdCard ad={item.ad} />
+        ) : (
+          <AnimeCard anime={item.item} onPress={() => router.push(`/detail/${item.item.id}`)} />
+        )}
       </View>
     );
   };
@@ -97,8 +105,8 @@ export default function HomeScreen() {
 
       <FlatList
         key={`home-${columns}`}
-        data={animes}
-        keyExtractor={(item) => String(item.id)}
+        data={slots}
+        keyExtractor={(item) => item.key}
         numColumns={columns}
         renderItem={renderItem}
         ListHeaderComponent={
@@ -140,6 +148,7 @@ export default function HomeScreen() {
             colors={[colors.primary]}
             onRefresh={() => {
               setRefreshing(true);
+              loadAdsConfig(true);
               loadAnimes();
             }}
           />

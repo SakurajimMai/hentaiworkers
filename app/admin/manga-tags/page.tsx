@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth';
 import { listAdminMangaTagUsage } from '@/lib/server/manga-admin';
 import { getSystemSettingsService } from '@/lib/server/system';
+import { AdminPagination } from '@/components/admin/admin-pagination';
+import { paginateItems } from '@/components/admin/admin-pagination-model';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import {
   actionAddMangaTag,
@@ -11,6 +13,8 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+const PAGE_SIZE = 30;
+
 export default async function AdminMangaTagsPage({
   searchParams,
 }: {
@@ -19,6 +23,7 @@ export default async function AdminMangaTagsPage({
   await requireAdmin();
   const sp = await searchParams;
   const q = typeof sp.q === 'string' ? sp.q.trim() : '';
+  const page = Math.max(1, parseInt(String(sp.page || '1'), 10) || 1);
   const ok = typeof sp.ok === 'string' ? sp.ok : '';
   const error = typeof sp.error === 'string' ? sp.error : '';
   const okTag = typeof sp.tag === 'string' ? sp.tag : '';
@@ -44,6 +49,7 @@ export default async function AdminMangaTagsPage({
       .map((tag) => ({ tag, count: 0, publishedCount: 0, curated: true })),
   ];
   const filtered = q ? rows.filter((row) => row.tag.includes(q)) : rows;
+  const paged = paginateItems(filtered, page, PAGE_SIZE);
 
   const statusMessage = {
     added: `已新增标签「${okTag}」`,
@@ -108,7 +114,7 @@ export default async function AdminMangaTagsPage({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row) => (
+            {paged.items.map((row) => (
               <tr key={row.tag}>
                 <td>
                   <Link
@@ -154,7 +160,7 @@ export default async function AdminMangaTagsPage({
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {paged.items.length === 0 && (
               <tr>
                 <td colSpan={5} className="!p-8 text-center text-soft">
                   {q ? '没有匹配的标签' : '还没有漫画标签，先在上方新增一个常用标签。'}
@@ -164,6 +170,14 @@ export default async function AdminMangaTagsPage({
           </tbody>
         </table>
       </div>
+
+      <AdminPagination
+        page={paged.page}
+        totalPages={paged.totalPages}
+        total={paged.total}
+        basePath="/admin/manga-tags"
+        query={{ q: q || undefined }}
+      />
 
       <p className="font-ui text-[12px] text-soft leading-relaxed max-w-2xl">
         「常用标签」保存在系统设置中，即使还没有作品使用也会保留，供 TG 发布与后台编辑时参考；

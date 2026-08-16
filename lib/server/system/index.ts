@@ -87,9 +87,11 @@ export { SystemSettingsService } from './application/system-settings-service';
 export {
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
+  toPublicAdsConfig,
   toPublicAuthConfig,
   toPublicPlayerConfig,
   type PlayerSettings,
+  type PublicAdsConfig,
   type PublicAuthConfig,
   type PublicPlayerConfig,
   type SystemSettings,

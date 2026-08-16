@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { MangaCard } from '@/components/MangaCard';
 import { MangaPagination } from '@/components/manga-pagination';
@@ -7,7 +8,10 @@ import { normalizeMangaTagQuery } from '@/lib/manga-tags';
 import { isMangaRank } from '@/lib/manga-views';
 import { buildMangaListHref } from '@/components/manga-pagination';
 import { StructuredData } from '@/components/structured-data';
+import { FeedAdCard } from '@/components/feed-ad-card';
 import { resolveSiteUrl } from '@/lib/site-url';
+import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
+import { getSystemSettingsService } from '@/lib/server/system';
 
 export const revalidate = 60;
 
@@ -88,7 +92,7 @@ export default async function MangaListPage({
   try {
     data = await listMangas({
       page,
-      limit: 24,
+      limit: 30,
       q: q || undefined,
       tag: tag || undefined,
       rank,
@@ -107,7 +111,7 @@ export default async function MangaListPage({
       : '/manga';
 
   return (
-    <div className="page-shell py-8 sm:py-12 pb-20">
+    <div className="page-shell max-w-6xl py-8 sm:py-12 pb-20">
       <StructuredData
         data={{
           '@context': 'https://schema.org',
@@ -183,32 +187,60 @@ export default async function MangaListPage({
       )}
 
       {data && data.data.length > 0 && (
-        <>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-5">
-            {data.data.map((m) => (
-              <MangaCard
-                key={m.id}
-                manga={{
-                  id: m.id,
-                  title: m.title,
-                  coverUrl: m.coverUrl,
-                  pageCount: m.pageCount,
-                }}
+        <MangaCatalogGrid
+          items={data.data}
+          pagination={
+            data.totalPages > 1 ? (
+              <MangaPagination
+                page={data.page}
+                totalPages={data.totalPages}
+                q={q || undefined}
+                tag={tag || undefined}
+                rank={rank}
               />
-            ))}
-          </div>
-
-          {data.totalPages > 1 && (
-            <MangaPagination
-              page={data.page}
-              totalPages={data.totalPages}
-              q={q || undefined}
-              tag={tag || undefined}
-              rank={rank}
-            />
-          )}
-        </>
+            ) : null
+          }
+        />
       )}
     </div>
+  );
+}
+
+async function MangaCatalogGrid({
+  items,
+  pagination,
+}: {
+  items: Array<{
+    id: number;
+    title: string;
+    coverUrl?: string | null;
+    pageCount?: number | null;
+  }>;
+  pagination: ReactNode;
+}) {
+  const ads = (await getSystemSettingsService().getPublicAdsConfig()).feedSlots;
+  const slots = interleaveFeedAds(items, ads, (item) => String(item.id));
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-5 md:gap-y-8">
+        {slots.map((slot) =>
+          slot.type === 'ad' ? (
+            <FeedAdCard key={slot.key} html={slot.ad.html} href={slot.ad.href} />
+          ) : (
+            <MangaCard
+              key={slot.key}
+              manga={{
+                id: slot.item.id,
+                title: slot.item.title,
+                coverUrl: slot.item.coverUrl,
+                pageCount: slot.item.pageCount,
+              }}
+            />
+          ),
+        )}
+      </div>
+      {pagination}
+    </>
   );
 }

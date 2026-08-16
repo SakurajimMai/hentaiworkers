@@ -6,6 +6,7 @@ import { IconArrowLeft, IconArrowUp, IconMaximize } from '@/components/icons';
 import { MangaFavoriteButton } from '@/components/manga-favorite-button';
 import { MediaImage } from '@/components/media-image';
 import { ThemeMenu } from '@/components/theme-menu';
+import { HtmlAd } from '@/components/html-ad';
 
 type ReaderPage = {
   index: number;
@@ -19,6 +20,10 @@ type MangaReaderProps = {
   pages: ReaderPage[];
   pageCount: number;
   favorited?: boolean;
+  readerAds?: {
+    topHtml?: string;
+    bottomHtml?: string;
+  };
 };
 
 export function MangaReader({
@@ -28,6 +33,7 @@ export function MangaReader({
   pages,
   pageCount,
   favorited = false,
+  readerAds,
 }: MangaReaderProps) {
   const [activePage, setActivePage] = useState(0);
   const [showTop, setShowTop] = useState(false);
@@ -122,6 +128,8 @@ export function MangaReader({
   };
 
   const progress = totalPages ? Math.round(((activePage + 1) / totalPages) * 100) : 0;
+  const topHtml = readerAds?.topHtml?.trim() || '';
+  const bottomHtml = readerAds?.bottomHtml?.trim() || '';
 
   return (
     <div data-reader-shell className="reader-shell min-h-dvh">
@@ -175,6 +183,11 @@ export function MangaReader({
           </div>
         ) : (
           <div className="reader-stage">
+            {topHtml ? (
+              <aside className="reader-ad reader-ad-banner" aria-label="章节顶部广告">
+                <HtmlAd html={topHtml} />
+              </aside>
+            ) : null}
             {pages.map((page) => (
               <figure
                 key={page.index}
@@ -204,6 +217,11 @@ export function MangaReader({
                 )}
               </figure>
             ))}
+            {bottomHtml ? (
+              <aside className="reader-ad reader-ad-banner" aria-label="章节底部广告">
+                <HtmlAd html={bottomHtml} />
+              </aside>
+            ) : null}
           </div>
         )}
       </main>

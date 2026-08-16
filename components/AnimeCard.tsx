@@ -53,7 +53,7 @@ export function AnimeCard({
       </div>
       <div className="pt-2.5 px-0.5">
         <h3
-          className="font-ui line-clamp-1 text-[13px] font-medium tracking-tight text-ink"
+          className="manga-card-title font-ui text-[13px] font-medium tracking-tight text-ink"
           title={anime.title}
         >
           {anime.title}

@@ -15,7 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../../components/AppState';
+import { HtmlAd } from '../../../components/HtmlAd';
 import { colors, radius, spacing } from '../../../constants/theme';
+import { readerAdHtml, useAdsConfig } from '../../../services/ads';
 import { mangaApi } from '../../../services/api';
 import { normalizeMediaUrl } from '../../../services/media';
 import { mangaFavoritesStore, mangaHistoryStore } from '../../../services/storage';
@@ -73,6 +75,9 @@ export default function MangaReaderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [favorited, setFavorited] = useState(false);
+  const ads = useAdsConfig();
+  const topHtml = readerAdHtml(ads.reader.top);
+  const bottomHtml = readerAdHtml(ads.reader.bottom);
 
   const pages = useMemo(
     () =>
@@ -141,41 +146,42 @@ export default function MangaReaderScreen() {
     setFavorited(next);
   };
 
-  const renderPage = ({ item, index }: ListRenderItemInfo<MangaPage>) => (
+  const renderPage = ({ item }: ListRenderItemInfo<MangaPage>) => (
     <Pressable onPress={() => setChromeVisible((v) => !v)}>
       <MangaPageImage uri={item.imageUrl} width={width} />
-      {index === pages.length - 1 ? (
-        <View style={[styles.endBlock, { paddingBottom: insets.bottom + spacing.xl }]}>
-          <Text style={styles.endText}>
-            {nextChapter ? '本话结束' : '已经读到最后'}
-          </Text>
-          <View style={styles.endActions}>
-            {prevChapter ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openChapter(prevChapter.number)}
-                style={styles.endBtn}
-              >
-                <Text style={styles.endBtnText}>上一话</Text>
-              </Pressable>
-            ) : null}
-            {nextChapter ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openChapter(nextChapter.number)}
-                style={[styles.endBtn, styles.endBtnPrimary]}
-              >
-                <Text style={styles.endBtnPrimaryText}>下一话</Text>
-              </Pressable>
-            ) : (
-              <Pressable accessibilityRole="button" onPress={goBack} style={[styles.endBtn, styles.endBtnPrimary]}>
-                <Text style={styles.endBtnPrimaryText}>返回详情</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-      ) : null}
     </Pressable>
+  );
+
+  const endBlock = (
+    <View style={[styles.endBlock, { paddingBottom: insets.bottom + spacing.xl }]}>
+      <Text style={styles.endText}>
+        {nextChapter ? '本话结束' : '已经读到最后'}
+      </Text>
+      <View style={styles.endActions}>
+        {prevChapter ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => openChapter(prevChapter.number)}
+            style={styles.endBtn}
+          >
+            <Text style={styles.endBtnText}>上一话</Text>
+          </Pressable>
+        ) : null}
+        {nextChapter ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => openChapter(nextChapter.number)}
+            style={[styles.endBtn, styles.endBtnPrimary]}
+          >
+            <Text style={styles.endBtnPrimaryText}>下一话</Text>
+          </Pressable>
+        ) : (
+          <Pressable accessibilityRole="button" onPress={goBack} style={[styles.endBtn, styles.endBtnPrimary]}>
+            <Text style={styles.endBtnPrimaryText}>返回详情</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 
   if (loading) {
@@ -214,6 +220,23 @@ export default function MangaReaderScreen() {
         maxToRenderPerBatch={2}
         windowSize={4}
         removeClippedSubviews
+        ListHeaderComponent={
+          topHtml ? (
+            <View style={styles.readerAd} accessibilityLabel="章节顶部广告">
+              <HtmlAd html={topHtml} dark minHeight={72} maxHeight={240} />
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          <View>
+            {bottomHtml ? (
+              <View style={styles.readerAd} accessibilityLabel="章节底部广告">
+                <HtmlAd html={bottomHtml} dark minHeight={72} maxHeight={240} />
+              </View>
+            ) : null}
+            {pages.length > 0 ? endBlock : null}
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.emptyPages}>
             <ActivityIndicator color={colors.primary} />
@@ -284,6 +307,11 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: colors.black,
     flex: 1,
+  },
+  readerAd: {
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   pageFallback: {
     alignItems: 'center',

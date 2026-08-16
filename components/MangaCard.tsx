@@ -42,7 +42,7 @@ export function MangaCard({
       </div>
       <div className="pt-2.5 px-0.5">
         <h3
-          className="font-ui line-clamp-2 min-h-[2.75rem] text-[13px] font-medium leading-[1.4] tracking-tight text-ink transition-colors group-hover:text-accent"
+          className="manga-card-title font-ui text-[13px] font-medium tracking-tight text-ink transition-colors group-hover:text-accent"
           title={manga.title}
         >
           {manga.title}
