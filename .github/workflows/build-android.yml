@@ -134,6 +134,31 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Smoke test release APK startup
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: Pixel_2
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -camera-back none
+          script: |
+            adb install -r mobile/android/app/build/outputs/apk/release/app-universal-release.apk
+            adb logcat -c
+            adb shell am force-stop de.ixacg.animestream
+            adb shell am start -W -n de.ixacg.animestream/.MainActivity
+            sleep 8
+            if [ -z "$(adb shell pidof de.ixacg.animestream | tr -d '\r')" ]; then
+              echo "AnimeStream process is not running after launch"
+              adb logcat -d -v brief
+              exit 1
+            fi
+            if adb logcat -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|ReactNativeJS"; then
+              echo "AnimeStream startup produced a fatal runtime error"
+              exit 1
+            fi
+
       - name: Rename APKs
         run: |
           mkdir -p artifacts
