@@ -33,8 +33,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-screen-orientation",
-      "react-native-webview"
+      "expo-screen-orientation"
     ],
     "extra": {
       "apiBaseUrl": "https://www.ixacg.de"

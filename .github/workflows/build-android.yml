@@ -45,8 +45,8 @@ jobs:
       - name: Install dependencies
         run: |
           for i in 1 2 3; do
-            npm install --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 && break
-            echo "npm install attempt $i failed, retrying..."
+            npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 && break
+            echo "npm ci attempt $i failed, retrying..."
             rm -rf node_modules
             sleep 10
           done
