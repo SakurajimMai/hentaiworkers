@@ -13,6 +13,7 @@ permissions:
 
 env:
   EXPO_PUBLIC_API_BASE_URL: https://www.ixacg.de
+  NODE_ENV: production
 
 jobs:
   build:
