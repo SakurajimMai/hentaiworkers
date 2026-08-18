@@ -11,33 +11,28 @@ import {
   PublicAdsConfig,
 } from './types';
 
+const DEFAULT_API_ORIGIN = 'https://www.ixacg.de';
+
 function resolveApiBaseUrl(): string {
   if (Platform.OS === 'web') return '';
 
-  const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
+  const extra = (
+    Constants.expoConfig?.extra ??
+    (Constants as { manifest?: { extra?: { apiBaseUrl?: string } } }).manifest?.extra
+  ) as { apiBaseUrl?: string } | undefined;
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
   const fromExtra = extra?.apiBaseUrl?.trim();
-  const candidate = (fromEnv || fromExtra || '').replace(/\/+$/, '');
+  const candidate = (fromEnv || fromExtra || DEFAULT_API_ORIGIN).replace(/\/+$/, '');
 
-  if (!candidate) {
-    throw new Error(
-      'Mobile API base URL is required. Set EXPO_PUBLIC_API_BASE_URL or expo.extra.apiBaseUrl.',
-    );
-  }
-
-  let parsed: URL;
   try {
-    parsed = new URL(candidate);
+    const parsed = new URL(candidate);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return DEFAULT_API_ORIGIN;
+    }
+    return parsed.origin;
   } catch {
-    throw new Error('Mobile API base URL must be an absolute HTTP(S) origin');
+    return DEFAULT_API_ORIGIN;
   }
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new Error('Mobile API base URL only supports HTTP(S)');
-  }
-  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
-    throw new Error('Mobile API base URL must not include path, query, or hash');
-  }
-  return parsed.origin;
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();

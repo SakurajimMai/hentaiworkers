@@ -2,6 +2,8 @@
 
 `mobile/` 是独立的 Expo 54 / React Native 客户端，只读主站公开 API，不进 Docker 镜像。
 
+独立 APK 必须带上 `react-native-gesture-handler` 和 `react-native-reanimated`（expo-router 的 peer 依赖）。Expo Go 里自带这两包，缺了它们时开发正常、安装 APK 会一打开就闪退。
+
 里番走 `/api/animes*`，漫画走 `/api/mangas*`。收藏和历史存在设备本地（AsyncStorage），与网页账号不同步。
 
 ## 1. 本地开发
