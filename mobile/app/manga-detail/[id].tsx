@@ -89,7 +89,7 @@ export default function MangaDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, styles.centered]}>
         <AppState loading title="正在加载漫画" />
       </View>
     );
@@ -97,7 +97,7 @@ export default function MangaDetailScreen() {
 
   if (error || !manga) {
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, styles.centered]}>
         <AppState
           title="详情加载失败"
           description={error || '没有找到这部漫画。'}
@@ -267,6 +267,10 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: colors.background,
     flex: 1,
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   topBar: {
     alignItems: 'center',

@@ -11,7 +11,6 @@ interface MangaCardProps {
 }
 
 export function MangaCard({ manga, width, onPress }: MangaCardProps) {
-  const subtitle = manga.author || (manga.pageCount ? `P${manga.pageCount}` : ' ');
   const cover = normalizeMediaUrl(manga.coverUrl);
 
   return (
@@ -38,9 +37,6 @@ export function MangaCard({ manga, width, onPress }: MangaCardProps) {
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
           {manga.title}
-        </Text>
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {subtitle}
         </Text>
       </View>
     </Pressable>
@@ -81,8 +77,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   body: {
-    gap: 2,
-    minHeight: 64,
     paddingBottom: 2,
     paddingHorizontal: 2,
     paddingTop: spacing.sm,
@@ -92,12 +86,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
-    minHeight: 40,
-  },
-  subtitle: {
-    color: colors.textSubtle,
-    fontSize: 11,
-    lineHeight: 14,
-    minHeight: 14,
+    minHeight: 36,
   },
 });

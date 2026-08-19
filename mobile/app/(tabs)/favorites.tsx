@@ -179,9 +179,6 @@ export default function FavoritesScreen() {
                         ) : null}
                       </Pressable>
                       <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-                      {item.author ? (
-                        <Text style={styles.cardSub} numberOfLines={1}>{item.author}</Text>
-                      ) : null}
                     </View>
                   );
                 })}

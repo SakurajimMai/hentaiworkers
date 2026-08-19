@@ -214,11 +214,6 @@ export default function MangaCatalogScreen() {
             <Ionicons name="close" size={14} color={colors.primary} />
           </Pressable>
         ) : null}
-        {total > 0 ? (
-          <Text style={styles.metaText}>
-            共 {total} 部 · 第 {page} / {totalPages} 页
-          </Text>
-        ) : null}
       </View>
 
       <FlatList

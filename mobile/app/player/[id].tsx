@@ -66,7 +66,7 @@ export default function PlayerScreen() {
     <View style={styles.screen}>
       <StatusBar hidden />
       {loading ? (
-        <AppState loading title="正在加载播放器" />
+        <View style={styles.screen} />
       ) : error || !anime || !videoUrl ? (
         <AppState
           title="无法播放"

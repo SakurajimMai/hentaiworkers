@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -341,12 +340,6 @@ export default function VideoPlayer({ videoUrl, title, poster, fill }: VideoPlay
         userAgent="Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
       />
       ) : null}
-      {loading && !errorMsg ? (
-        <View style={[styles.overlay, { pointerEvents: 'none' }]}>
-          <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={styles.overlayText}>加载播放器中...</Text>
-        </View>
-      ) : null}
       {errorMsg ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorTitle}>播放失败</Text>
@@ -382,17 +375,6 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: colors.black,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  overlayText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
   },
   errorBox: {
     ...StyleSheet.absoluteFillObject,
