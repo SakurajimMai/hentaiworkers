@@ -4,6 +4,7 @@
 import { and, desc, eq, like, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
+  cleanMangaDisplayTitle,
   normalizeMangaTagQuery,
   normalizeMangaTags,
   parseMangaTags,
@@ -324,6 +325,9 @@ async function uniqueSlug(base: string): Promise<string> {
 async function refreshMangaAggregates(
   mangaId: number,
   extras: {
+    title?: string | null;
+    chapterTitle?: string | null;
+    chapterId?: number | null;
     author?: string | null;
     tags?: string[];
     coverUrl?: string | null;
@@ -341,9 +345,11 @@ async function refreshMangaAggregates(
     .from(mangaPages)
     .innerJoin(mangaChapters, eq(mangaPages.chapterId, mangaChapters.id))
     .where(eq(mangaChapters.mangaId, mangaId));
+  const nextTitle = extras.title?.trim();
   await db
     .update(mangas)
     .set({
+      title: nextTitle || mangaRow.title,
       chapterCount: Number(chapterCountRow?.count ?? 0),
       pageCount: Number(pageCountRow?.count ?? 0),
       author: mangaRow.author || extras.author || null,
@@ -355,11 +361,20 @@ async function refreshMangaAggregates(
       updatedAt: new Date(),
     })
     .where(eq(mangas.id, mangaId));
+  const nextChapterTitle = extras.chapterTitle?.trim();
+  if (nextChapterTitle && extras.chapterId) {
+    await db
+      .update(mangaChapters)
+      .set({ title: nextChapterTitle, updatedAt: new Date() })
+      .where(eq(mangaChapters.id, extras.chapterId));
+  }
 }
 
 async function appendMangaChapterPages(
   chapter: typeof mangaChapters.$inferSelect,
   input: {
+    title?: string | null;
+    chapterTitle?: string | null;
     author: string | null;
     tags: string[];
     imageUrls: string[];
@@ -378,8 +393,11 @@ async function appendMangaChapterPages(
   const [mangaRow] = await db.select().from(mangas).where(eq(mangas.id, chapter.mangaId)).limit(1);
 
   if (toAdd.length === 0) {
-    if (mangaRow && (input.author || input.tags.length)) {
+    if (mangaRow && (input.author || input.tags.length || input.title || input.chapterTitle)) {
       await refreshMangaAggregates(mangaRow.id, {
+        title: input.title,
+        chapterTitle: input.chapterTitle,
+        chapterId: chapter.id,
         author: input.author,
         tags: input.tags,
         coverUrl: input.coverUrl,
@@ -415,6 +433,9 @@ async function appendMangaChapterPages(
     })
     .where(eq(mangaChapters.id, chapter.id));
   await refreshMangaAggregates(chapter.mangaId, {
+    title: input.title,
+    chapterTitle: input.chapterTitle,
+    chapterId: chapter.id,
     author: input.author,
     tags: input.tags,
     coverUrl: input.coverUrl,
@@ -433,7 +454,7 @@ async function appendMangaChapterPages(
 export async function publishMangaChapter(
   input: PublishMangaInput,
 ): Promise<PublishMangaResult> {
-  const title = input.title.trim();
+  const title = cleanMangaDisplayTitle(input.title) || input.title.trim();
   const author = input.author?.trim() || null;
   const tags = normalizeMangaTags(input.tags);
   const imageUrls = input.imageUrls.map((u) => u.trim()).filter(Boolean);
@@ -449,6 +470,8 @@ export async function publishMangaChapter(
     .limit(1);
   if (dup) {
     return appendMangaChapterPages(dup, {
+      title,
+      chapterTitle: cleanMangaDisplayTitle(input.chapterTitle) || input.chapterTitle?.trim() || title,
       author,
       tags,
       imageUrls,
@@ -507,7 +530,7 @@ export async function publishMangaChapter(
   const chapterInsert = await db.insert(mangaChapters).values({
     mangaId: mangaRow.id,
     number,
-    title: input.chapterTitle?.trim() || `第 ${number} 话`,
+    title: cleanMangaDisplayTitle(input.chapterTitle) || input.chapterTitle?.trim() || `第 ${number} 话`,
     sourceKey,
     pageCount: imageUrls.length,
     isPublished: 1,
