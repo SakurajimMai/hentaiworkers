@@ -139,7 +139,7 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          profile: Pixel_2
+          profile: pixel_2
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -camera-back none
