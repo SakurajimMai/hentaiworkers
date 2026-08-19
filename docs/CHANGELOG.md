@@ -5,7 +5,7 @@
 ## 2026-08 — Android 构建解阻
 
 - CI 不再用无 KVM 的 x86 模拟器跑 ARM64 冒烟（会误杀构建、也测不出真机）。改为校验 APK 完整性与启动必需的原生库。
-- 补 `babel.config.js` 的 Reanimated 插件，恢复 `usesCleartextTraffic`。
+- 恢复 `usesCleartextTraffic`。不另写 babel.config，避免 CI 找不到 `babel-preset-expo`。
 
 ## 2026-08 — Android APK 闪退
 
