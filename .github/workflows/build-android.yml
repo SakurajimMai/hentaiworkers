@@ -147,6 +147,7 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          pre-emulator-launch-script: adb start-server
           script: |
             adb install -r mobile/android/app/build/outputs/apk/release/app-universal-release.apk
             adb logcat -c
@@ -205,6 +206,7 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          pre-emulator-launch-script: adb start-server
           script: |
             adb install -r mobile/artifacts/AnimeStream-${{ github.run_number }}-arm64-v8a.apk
             adb logcat -c
