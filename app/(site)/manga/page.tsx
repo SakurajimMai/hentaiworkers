@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { MangaCard } from '@/components/MangaCard';
-import { MangaPagination } from '@/components/manga-pagination';
+import { Pagination } from '@/components/pagination';
 import { isMangaEnabled, listMangas } from '@/lib/manga-client';
 import { normalizeMangaTagQuery } from '@/lib/manga-tags';
 import { isMangaRank } from '@/lib/manga-views';
@@ -191,13 +191,11 @@ export default async function MangaListPage({
           items={data.data}
           pagination={
             data.totalPages > 1 ? (
-              <MangaPagination
-                page={data.page}
-                totalPages={data.totalPages}
-                q={q || undefined}
-                tag={tag || undefined}
-                rank={rank}
-              />
+              <div className="flex justify-center pt-12">
+                <Suspense fallback={null}>
+                  <Pagination page={data.page} totalPages={data.totalPages} />
+                </Suspense>
+              </div>
             ) : null
           }
         />
