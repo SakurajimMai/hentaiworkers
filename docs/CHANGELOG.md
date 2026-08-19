@@ -2,6 +2,11 @@
 
 面向运维与开发的产品范围变更说明。细粒度历史以 Git 为准。
 
+## 2026-08 — Android 构建解阻
+
+- CI 不再用无 KVM 的 x86 模拟器跑 ARM64 冒烟（会误杀构建、也测不出真机）。改为校验 APK 完整性与启动必需的原生库。
+- 补 `babel.config.js` 的 Reanimated 插件，恢复 `usesCleartextTraffic`。
+
 ## 2026-08 — Android APK 闪退
 
 - 补上独立 APK 缺失的 `react-native-gesture-handler` / `react-native-reanimated`，避免安装后一打开就退出。

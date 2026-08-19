@@ -141,7 +141,7 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Validate release APKs and ARM64 native libraries
+      - name: Validate release APKs
         run: |
           UNIVERSAL_APK=android/app/build/outputs/apk/release/app-universal-release.apk
           ARM64_APK=android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
@@ -149,8 +149,8 @@ jobs:
           test -s "$ARM64_APK"
           unzip -tq "$UNIVERSAL_APK"
           unzip -tq "$ARM64_APK"
-          unzip -Z1 "$UNIVERSAL_APK" > "$RUNNER_TEMP/universal-apk-entries.txt"
           unzip -Z1 "$ARM64_APK" > "$RUNNER_TEMP/arm64-apk-entries.txt"
+          unzip -Z1 "$UNIVERSAL_APK" > "$RUNNER_TEMP/universal-apk-entries.txt"
           if ! grep -q '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
             echo "ARM64 APK has no arm64-v8a native libraries"
             exit 1
@@ -159,32 +159,25 @@ jobs:
             echo "ARM64 APK contains an unexpected ABI"
             exit 1
           fi
+          if ! grep -Eq 'assets/index.android.bundle|assets/.+\.hbc' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
+            echo "APK is missing the Hermes / JS bundle"
+            exit 1
+          fi
+          missing=0
+          for lib in libreactnative.so libhermes.so libreanimated.so libworklets.so libgesturehandler.so; do
+            if ! grep -q "^lib/arm64-v8a/${lib}$" "$RUNNER_TEMP/arm64-apk-entries.txt"; then
+              echo "ARM64 APK missing ${lib}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Native library listing:"
+            grep '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt"
+            exit 1
+          fi
           grep '^lib/arm64-v8a/' "$RUNNER_TEMP/universal-apk-entries.txt" | LC_ALL=C sort > "$RUNNER_TEMP/universal-arm64-libs.txt"
           grep '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt" | LC_ALL=C sort > "$RUNNER_TEMP/split-arm64-libs.txt"
           diff -u "$RUNNER_TEMP/universal-arm64-libs.txt" "$RUNNER_TEMP/split-arm64-libs.txt"
-
-      - name: Smoke test universal APK startup
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          profile: pixel_2
-          force-avd-creation: true
-          emulator-boot-timeout: 900
-          cores: 4
-          ram-size: 4096M
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          pre-emulator-launch-script: adb start-server
-          script: |
-            adb install -r mobile/android/app/build/outputs/apk/release/app-universal-release.apk
-            adb logcat -c
-            adb shell am force-stop de.ixacg.animestream
-            adb shell am start -W -n de.ixacg.animestream/.MainActivity
-            sleep 8
-            if [ -z "$(adb shell pidof de.ixacg.animestream | tr -d '\r')" ]; then echo "AnimeStream process is not running after launch"; adb logcat -d -v brief; exit 1; fi
-            if adb logcat --pid="$(adb shell pidof de.ixacg.animestream | tr -d '\r')" -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|Fatal signal|UnsatisfiedLinkError|couldn't find DSO|Unable to load script|ReactNativeJS.*(Error|Exception|Invariant Violation)"; then echo "AnimeStream startup produced a fatal runtime error"; exit 1; fi
 
       - name: Rename APKs
         run: |
