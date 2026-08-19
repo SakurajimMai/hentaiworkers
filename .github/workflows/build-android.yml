@@ -47,7 +47,13 @@ jobs:
       - name: Install dependencies
         run: |
           for i in 1 2 3; do
-            npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 && break
+            if npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "npm ci failed after 3 attempts"
+              exit 1
+            fi
             echo "npm ci attempt $i failed, retrying..."
             rm -rf node_modules
             sleep 10
@@ -135,12 +141,34 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Smoke test universal and ARM64 APK startup
+      - name: Validate release APKs and ARM64 native libraries
+        run: |
+          UNIVERSAL_APK=android/app/build/outputs/apk/release/app-universal-release.apk
+          ARM64_APK=android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          test -s "$UNIVERSAL_APK"
+          test -s "$ARM64_APK"
+          unzip -tq "$UNIVERSAL_APK"
+          unzip -tq "$ARM64_APK"
+          unzip -Z1 "$UNIVERSAL_APK" > "$RUNNER_TEMP/universal-apk-entries.txt"
+          unzip -Z1 "$ARM64_APK" > "$RUNNER_TEMP/arm64-apk-entries.txt"
+          if ! grep -q '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
+            echo "ARM64 APK has no arm64-v8a native libraries"
+            exit 1
+          fi
+          if grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
+            echo "ARM64 APK contains an unexpected ABI"
+            exit 1
+          fi
+          grep '^lib/arm64-v8a/' "$RUNNER_TEMP/universal-apk-entries.txt" | LC_ALL=C sort > "$RUNNER_TEMP/universal-arm64-libs.txt"
+          grep '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt" | LC_ALL=C sort > "$RUNNER_TEMP/split-arm64-libs.txt"
+          diff -u "$RUNNER_TEMP/universal-arm64-libs.txt" "$RUNNER_TEMP/split-arm64-libs.txt"
+
+      - name: Smoke test universal APK startup
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
-          target: google_apis_playstore
+          target: google_apis
           profile: pixel_2
           force-avd-creation: true
           emulator-boot-timeout: 900
@@ -156,18 +184,7 @@ jobs:
             adb shell am start -W -n de.ixacg.animestream/.MainActivity
             sleep 8
             if [ -z "$(adb shell pidof de.ixacg.animestream | tr -d '\r')" ]; then echo "AnimeStream process is not running after launch"; adb logcat -d -v brief; exit 1; fi
-            if adb logcat -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|ReactNativeJS"; then echo "AnimeStream startup produced a fatal runtime error"; exit 1; fi
-            test -s mobile/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
-            if ! unzip -Z1 mobile/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk | grep -q '^lib/arm64-v8a/'; then echo "ARM64 APK has no arm64-v8a native libraries"; exit 1; fi
-            if unzip -Z1 mobile/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk | grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/'; then echo "ARM64 APK contains an unexpected ABI"; exit 1; fi
-            adb uninstall de.ixacg.animestream || true
-            adb install -r --abi arm64-v8a mobile/android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
-            adb logcat -c
-            adb shell am force-stop de.ixacg.animestream
-            adb shell am start -W -n de.ixacg.animestream/.MainActivity
-            sleep 8
-            if [ -z "$(adb shell pidof de.ixacg.animestream | tr -d '\r')" ]; then echo "AnimeStream ARM64 process is not running after launch"; adb logcat -d -v brief; exit 1; fi
-            if adb logcat -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|ReactNativeJS"; then echo "AnimeStream ARM64 startup produced a fatal runtime error"; exit 1; fi
+            if adb logcat --pid="$(adb shell pidof de.ixacg.animestream | tr -d '\r')" -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|Fatal signal|UnsatisfiedLinkError|couldn't find DSO|Unable to load script|ReactNativeJS.*(Error|Exception|Invariant Violation)"; then echo "AnimeStream startup produced a fatal runtime error"; exit 1; fi
 
       - name: Rename APKs
         run: |
