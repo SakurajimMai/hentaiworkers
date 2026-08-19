@@ -184,7 +184,7 @@ jobs:
   smoke-arm64:
     name: Smoke test ARM64 APK
     needs: build
-    runs-on: ubuntu-24.04-arm
+    runs-on: macos-14
 
     steps:
       - name: Download APK artifact
