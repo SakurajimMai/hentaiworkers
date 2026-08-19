@@ -149,15 +149,8 @@ jobs:
             adb shell am force-stop de.ixacg.animestream
             adb shell am start -W -n de.ixacg.animestream/.MainActivity
             sleep 8
-            if [ -z "$(adb shell pidof de.ixacg.animestream | tr -d '\r')" ]; then
-              echo "AnimeStream process is not running after launch"
-              adb logcat -d -v brief
-              exit 1
-            fi
-            if adb logcat -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|ReactNativeJS"; then
-              echo "AnimeStream startup produced a fatal runtime error"
-              exit 1
-            fi
+            if [ -z "$(adb shell pidof de.ixacg.animestream | tr -d '\r')" ]; then echo "AnimeStream process is not running after launch"; adb logcat -d -v brief; exit 1; fi
+            if adb logcat -d -v brief | grep -E "FATAL EXCEPTION|AndroidRuntime|ReactNativeJS"; then echo "AnimeStream startup produced a fatal runtime error"; exit 1; fi
 
       - name: Rename APKs
         run: |
