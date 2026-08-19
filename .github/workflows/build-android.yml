@@ -142,8 +142,11 @@ jobs:
           arch: x86_64
           profile: pixel_2
           force-avd-creation: true
+          emulator-boot-timeout: 900
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
             adb install -r mobile/android/app/build/outputs/apk/release/app-universal-release.apk
             adb logcat -c
@@ -198,8 +201,10 @@ jobs:
           profile: pixel_2
           force-avd-creation: true
           emulator-boot-timeout: 900
+          cores: 4
+          ram-size: 4096M
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
             adb install -r mobile/artifacts/AnimeStream-${{ github.run_number }}-arm64-v8a.apk
             adb logcat -c
