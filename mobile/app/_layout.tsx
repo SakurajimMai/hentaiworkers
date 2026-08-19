@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { colors } from '../constants/theme';
+import { colors, screenFill } from '../constants/theme';
 
 const navTheme = {
   ...DarkTheme,
@@ -77,14 +77,20 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <RootErrorBoundary>
         <ThemeProvider value={navTheme}>
-          <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View collapsable={false} style={screenFill}>
             <StatusBar style="light" backgroundColor={colors.background} />
             <Stack
               screenOptions={{
-                animation: 'slide_from_right',
-                contentStyle: { backgroundColor: colors.background },
+                animation: 'fade',
+                animationDuration: 180,
+                contentStyle: screenFill,
+                freezeOnBlur: false,
                 headerShown: false,
                 navigationBarColor: colors.background,
+                navigationBarTranslucent: false,
+                statusBarBackgroundColor: colors.background,
+                statusBarStyle: 'light',
+                statusBarTranslucent: false,
               }}
             >
               <Stack.Screen name="(tabs)" />

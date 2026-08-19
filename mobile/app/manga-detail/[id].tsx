@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
 import { MangaCard } from '../../components/MangaCard';
+import { RemoteImage } from '../../components/RemoteImage';
 import { colors, radius, shadow, spacing } from '../../constants/theme';
 import { mangaApi } from '../../services/api';
 import { normalizeMediaUrl } from '../../services/media';
@@ -89,7 +90,7 @@ export default function MangaDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.screen, styles.centered]}>
+      <View collapsable={false} style={[styles.screen, styles.centered]}>
         <AppState loading title="正在加载漫画" />
       </View>
     );
@@ -97,7 +98,7 @@ export default function MangaDetailScreen() {
 
   if (error || !manga) {
     return (
-      <View style={[styles.screen, styles.centered]}>
+      <View collapsable={false} style={[styles.screen, styles.centered]}>
         <AppState
           title="详情加载失败"
           description={error || '没有找到这部漫画。'}
@@ -112,7 +113,7 @@ export default function MangaDetailScreen() {
   const firstChapter = manga.chapters[0]?.number;
 
   return (
-    <View style={styles.screen}>
+    <View collapsable={false} style={styles.screen}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable
           accessibilityRole="button"
@@ -146,7 +147,7 @@ export default function MangaDetailScreen() {
           <View style={styles.infoRow}>
             <View style={styles.posterShadow}>
               {cover ? (
-                <Image source={{ uri: cover }} style={styles.poster} resizeMode="cover" />
+                <RemoteImage source={{ uri: cover }} style={styles.poster} resizeMode="cover" />
               ) : (
                 <View style={[styles.poster, styles.posterFallback]} />
               )}

@@ -7,11 +7,23 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0A0F",
+    "primaryColor": "#0A0A0F",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#080A0F"
+      "backgroundColor": "#0A0A0F"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#0A0A0F",
+      "barStyle": "light-content",
+      "translucent": false
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#0A0A0F",
+      "barStyle": "light-content",
+      "enforceContrast": false
     },
     "ios": {
       "supportsTablet": true
@@ -21,8 +33,9 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#080A0F"
+        "backgroundColor": "#0A0A0F"
       },
+      "backgroundColor": "#0A0A0F",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "usesCleartextTraffic": true,
@@ -37,7 +50,8 @@
     "plugins": [
       "expo-router",
       "expo-screen-orientation",
-      "expo-font"
+      "expo-font",
+      "./plugins/withDarkWindow"
     ],
     "extra": {
       "apiBaseUrl": "https://www.ixacg.de"

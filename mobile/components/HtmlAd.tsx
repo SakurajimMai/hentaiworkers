@@ -3,6 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import * as Linking from 'expo-linking';
 import { API_BASE_URL } from '../services/api';
+import { colors } from '../constants/theme';
 
 function wrapHtml(html: string, dark: boolean) {
   const bg = dark ? '#0A0A0F' : 'transparent';
@@ -46,7 +47,7 @@ export function HtmlAd({
   html,
   minHeight = 72,
   maxHeight = 280,
-  dark = false,
+  dark = true,
   fill = false,
 }: {
   html: string;
@@ -92,10 +93,12 @@ export function HtmlAd({
   }
 
   return (
-    <View style={fill ? styles.fill : { height: fill ? undefined : Math.min(maxHeight, Math.max(minHeight, height)) }}>
+    <View style={fill ? styles.fill : { backgroundColor: colors.background, height: Math.min(maxHeight, Math.max(minHeight, height)) }}>
       <WebView
         source={{ html: sourceHtml, baseUrl: API_BASE_URL || 'https://www.ixacg.de' }}
-        style={fill ? styles.fillWeb : { height: Math.min(maxHeight, Math.max(minHeight, height)), backgroundColor: 'transparent' }}
+        containerStyle={styles.webBg}
+        style={fill ? styles.fillWeb : { height: Math.min(maxHeight, Math.max(minHeight, height)), backgroundColor: colors.background }}
+        androidLayerType="hardware"
         originWhitelist={['*']}
         javaScriptEnabled
         domStorageEnabled
@@ -122,11 +125,16 @@ export function HtmlAd({
 
 const styles = StyleSheet.create({
   fill: {
+    backgroundColor: colors.background,
     flex: 1,
     overflow: 'hidden',
   },
   fillWeb: {
-    backgroundColor: 'transparent',
+    backgroundColor: colors.background,
+    flex: 1,
+  },
+  webBg: {
+    backgroundColor: colors.background,
     flex: 1,
   },
 });

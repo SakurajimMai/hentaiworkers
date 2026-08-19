@@ -16,7 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AnimeCard } from '../../components/AnimeCard';
 import { AppState } from '../../components/AppState';
 import { FeedAdCard } from '../../components/FeedAdCard';
-import { colors, radius, spacing } from '../../constants/theme';
+import { colors, radius, spacing, virtualizedListProps } from '../../constants/theme';
 import { loadAdsConfig, useCatalogSlots } from '../../services/ads';
 import { animeApi } from '../../services/api';
 import { Anime } from '../../services/types';
@@ -139,7 +139,7 @@ export default function DiscoverScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <Text style={styles.title}>发现</Text>
         <View style={styles.searchBox}>
@@ -179,6 +179,8 @@ export default function DiscoverScreen() {
         keyExtractor={(item) => item.key}
         numColumns={columns}
         renderItem={renderItem}
+        {...virtualizedListProps}
+        overScrollMode="never"
         contentContainerStyle={{
           paddingHorizontal: horizontalPadding,
           paddingBottom: insets.bottom + spacing.xxl,

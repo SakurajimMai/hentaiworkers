@@ -323,6 +323,7 @@ export default function VideoPlayer({ videoUrl, title, poster, fill }: VideoPlay
         ref={webviewRef}
         source={{ html, baseUrl: API_BASE_URL || 'https://www.ixacg.de' }}
         style={styles.webview}
+        containerStyle={styles.webview}
         allowsFullscreenVideo
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}

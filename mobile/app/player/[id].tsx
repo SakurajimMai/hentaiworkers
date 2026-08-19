@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import VideoPlayer from '../../components/VideoPlayer';
 import { AppState } from '../../components/AppState';
@@ -15,6 +15,7 @@ import { colors, radius, spacing } from '../../constants/theme';
 export default function PlayerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const navigation = useNavigation();
   const animeId = Number(Array.isArray(id) ? id[0] : id);
 
   const [anime, setAnime] = useState<Anime | null>(null);
@@ -49,11 +50,26 @@ export default function PlayerScreen() {
     })();
     return () => {
       mounted = false;
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT).catch(() => {});
     };
   }, [animeId]);
 
-  const goBack = () => {
+  useEffect(() => {
+    const restorePortrait = () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT).catch(() => {});
+    };
+    const unsub = navigation.addListener('beforeRemove', restorePortrait);
+    return () => {
+      unsub();
+      restorePortrait();
+    };
+  }, [navigation]);
+
+  const goBack = async () => {
+    try {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
+    } catch {
+      /* ignore */
+    }
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };
@@ -63,7 +79,7 @@ export default function PlayerScreen() {
   const videoUrl = normalizeMediaUrl(anime?.videoUrl);
 
   return (
-    <View style={styles.screen}>
+    <View collapsable={false} style={styles.screen}>
       <StatusBar hidden />
       {loading ? (
         <View style={styles.screen} />

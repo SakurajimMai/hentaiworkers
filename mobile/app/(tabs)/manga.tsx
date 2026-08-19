@@ -16,7 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppState } from '../../components/AppState';
 import { FeedAdCard } from '../../components/FeedAdCard';
 import { MangaCard } from '../../components/MangaCard';
-import { colors, radius, spacing } from '../../constants/theme';
+import { colors, radius, spacing, virtualizedListProps } from '../../constants/theme';
 import { loadAdsConfig, useCatalogSlots } from '../../services/ads';
 import { mangaApi } from '../../services/api';
 import { MangaRank, MangaSummary } from '../../services/types';
@@ -164,7 +164,7 @@ export default function MangaCatalogScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <Text style={styles.title}>漫画</Text>
         <View style={styles.searchBox}>
@@ -222,6 +222,8 @@ export default function MangaCatalogScreen() {
         keyExtractor={(item) => item.key}
         numColumns={columns}
         renderItem={renderItem}
+        {...virtualizedListProps}
+        overScrollMode="never"
         contentContainerStyle={{
           paddingHorizontal: horizontalPadding,
           paddingBottom: insets.bottom + spacing.xxl,

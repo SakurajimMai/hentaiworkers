@@ -22,7 +22,7 @@ export function FeedAdCard({
   const frame = (
     <View style={styles.cover}>
       {html ? (
-        <HtmlAd html={html} fill minHeight={120} maxHeight={420} />
+        <HtmlAd html={html} dark fill minHeight={120} maxHeight={420} />
       ) : (
         <View style={styles.placeholder}>
           <View style={styles.badge}>

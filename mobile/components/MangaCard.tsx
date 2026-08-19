@@ -1,8 +1,9 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MangaSummary } from '../services/types';
 import { colors, radius, spacing } from '../constants/theme';
 import { normalizeMediaUrl } from '../services/media';
+import { RemoteImage } from './RemoteImage';
 
 interface MangaCardProps {
   manga: Pick<MangaSummary, 'id' | 'title' | 'coverUrl' | 'author' | 'pageCount'>;
@@ -27,7 +28,7 @@ export function MangaCard({ manga, width, onPress }: MangaCardProps) {
     >
       <View style={styles.coverWrap}>
         {cover ? (
-          <Image source={{ uri: cover }} style={styles.cover} resizeMode="cover" />
+          <RemoteImage source={{ uri: cover }} style={styles.cover} resizeMode="cover" />
         ) : (
           <View style={styles.coverFallback}>
             <Text style={styles.coverFallbackText}>无封面</Text>

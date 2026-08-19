@@ -10,7 +10,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppState } from '../../components/AppState';
-import { colors, radius, spacing } from '../../constants/theme';
+import { colors, radius, spacing, virtualizedListProps } from '../../constants/theme';
 import { animeApi } from '../../services/api';
 
 interface PopularTag {
@@ -54,7 +54,7 @@ export default function TagsScreen() {
 
   if (loading && tags.length === 0) {
     return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
+      <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
         <Text style={styles.title}>标签</Text>
         <AppState loading title="正在加载标签" />
       </SafeAreaView>
@@ -63,7 +63,7 @@ export default function TagsScreen() {
 
   if (error && tags.length === 0) {
     return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
+      <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
         <Text style={styles.title}>标签</Text>
         <AppState title="加载失败" description={error} actionLabel="重试" onAction={loadTags} />
       </SafeAreaView>
@@ -71,7 +71,7 @@ export default function TagsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>标签</Text>
       </View>
@@ -79,6 +79,8 @@ export default function TagsScreen() {
         data={tags}
         keyExtractor={(item) => String(item.id)}
         numColumns={2}
+        {...virtualizedListProps}
+        overScrollMode="never"
         contentContainerStyle={{
           paddingBottom: insets.bottom + spacing.xxl,
           paddingHorizontal: spacing.lg,

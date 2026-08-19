@@ -17,7 +17,7 @@ import { AppState } from '../../components/AppState';
 import { FeedAdCard } from '../../components/FeedAdCard';
 import { MangaCard } from '../../components/MangaCard';
 import { SplashScreen } from '../../components/SplashScreen';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, virtualizedListProps } from '../../constants/theme';
 import { loadAdsConfig, useCatalogSlots } from '../../services/ads';
 import { animeApi, mangaApi } from '../../services/api';
 import { Anime, MangaSummary } from '../../services/types';
@@ -91,14 +91,14 @@ export default function HomeScreen() {
 
   if (error && animes.length === 0) {
     return (
-      <SafeAreaView style={styles.screen} edges={['top']}>
+      <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
         <AppState title="加载失败" description={error} actionLabel="重试" onAction={loadAnimes} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <Text style={styles.title}>热门</Text>
       </View>
@@ -109,6 +109,8 @@ export default function HomeScreen() {
         keyExtractor={(item) => item.key}
         numColumns={columns}
         renderItem={renderItem}
+        {...virtualizedListProps}
+        overScrollMode="never"
         ListHeaderComponent={
           mangas.length > 0 ? (
             <View style={styles.mangaBlock}>

@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
+import { RemoteImage } from '../../components/RemoteImage';
 import { colors, radius, spacing } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
 import {
@@ -74,7 +74,7 @@ export default function FavoritesScreen() {
   }, [cardWidth, columns, gridGap]);
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.headerSide} />
         <Text style={styles.title}>我的收藏</Text>
@@ -123,7 +123,7 @@ export default function FavoritesScreen() {
                         style={({ pressed }) => [styles.cardCover, pressed && styles.cardPressed]}
                       >
                         {cover ? (
-                          <Image source={{ uri: cover }} style={styles.image} />
+                          <RemoteImage source={{ uri: cover }} style={styles.image} />
                         ) : (
                           <View style={[styles.image, styles.imageFallback]} />
                         )}
@@ -162,7 +162,7 @@ export default function FavoritesScreen() {
                         style={({ pressed }) => [styles.cardCover, pressed && styles.cardPressed]}
                       >
                         {cover ? (
-                          <Image source={{ uri: cover }} style={styles.image} />
+                          <RemoteImage source={{ uri: cover }} style={styles.image} />
                         ) : (
                           <View style={[styles.image, styles.imageFallback]} />
                         )}

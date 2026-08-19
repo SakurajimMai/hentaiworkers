@@ -16,7 +16,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../../components/AppState';
 import { HtmlAd } from '../../../components/HtmlAd';
-import { colors, radius, spacing } from '../../../constants/theme';
+import { RemoteImage } from '../../../components/RemoteImage';
+import { colors, radius, spacing, virtualizedListProps } from '../../../constants/theme';
 import { readerAdHtml, useAdsConfig } from '../../../services/ads';
 import { mangaApi } from '../../../services/api';
 import { normalizeMediaUrl } from '../../../services/media';
@@ -52,7 +53,7 @@ function MangaPageImage({ uri, width }: { uri: string; width: number }) {
   }
 
   return (
-    <Image
+    <RemoteImage
       source={{ uri }}
       resizeMode="contain"
       style={{ width, height: width / ratio, backgroundColor: colors.black }}
@@ -186,7 +187,7 @@ export default function MangaReaderScreen() {
 
   if (loading) {
     return (
-      <View style={styles.screen}>
+      <View collapsable={false} style={styles.screen}>
         <StatusBar style="light" hidden />
         <AppState loading title="正在打开章节" />
       </View>
@@ -195,7 +196,7 @@ export default function MangaReaderScreen() {
 
   if (error || !chapter || !manga) {
     return (
-      <View style={styles.screen}>
+      <View collapsable={false} style={styles.screen}>
         <StatusBar style="light" />
         <AppState
           title="阅读页加载失败"
@@ -208,7 +209,7 @@ export default function MangaReaderScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View collapsable={false} style={styles.screen}>
       <StatusBar style="light" hidden={!chromeVisible} />
       <FlatList
         data={pages}
@@ -216,10 +217,11 @@ export default function MangaReaderScreen() {
         renderItem={renderPage}
         extraData={chromeVisible}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={2}
-        maxToRenderPerBatch={2}
-        windowSize={4}
-        removeClippedSubviews
+        {...virtualizedListProps}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        overScrollMode="never"
+        windowSize={8}
         ListHeaderComponent={
           topHtml ? (
             <View style={styles.readerAd} accessibilityLabel="章节顶部广告">

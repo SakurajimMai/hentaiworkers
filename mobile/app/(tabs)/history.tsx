@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +10,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
-import { colors, radius, spacing } from '../../constants/theme';
+import { RemoteImage } from '../../components/RemoteImage';
+import { colors, radius, spacing, virtualizedListProps } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
 import {
   HistoryItem,
@@ -81,7 +81,7 @@ export default function HistoryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
+    <SafeAreaView collapsable={false} style={styles.screen} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: spacing.lg }]}>
         <View style={styles.headerSide} />
         <Text style={styles.title}>历史记录</Text>
@@ -106,6 +106,8 @@ export default function HistoryScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => `${item.kind}-${item.id}`}
+          {...virtualizedListProps}
+          overScrollMode="never"
           contentContainerStyle={{
             paddingBottom: insets.bottom + spacing.xxl,
             paddingHorizontal: spacing.lg,
@@ -134,7 +136,7 @@ export default function HistoryScreen() {
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
                 {cover ? (
-                  <Image source={{ uri: cover }} style={styles.cover} />
+                  <RemoteImage source={{ uri: cover }} style={styles.cover} />
                 ) : (
                   <View style={[styles.cover, styles.coverFallback]} />
                 )}

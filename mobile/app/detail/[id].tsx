@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  Image,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -16,7 +15,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppState } from '../../components/AppState';
-import { colors, radius, shadow, spacing } from '../../constants/theme';
+import { RemoteImage } from '../../components/RemoteImage';
+import { colors, radius, shadow, spacing, virtualizedListProps } from '../../constants/theme';
 import { normalizeMediaUrl, splitMediaList } from '../../services/media';
 import { animeApi } from '../../services/api';
 import { favoritesStore } from '../../services/storage';
@@ -123,7 +123,7 @@ export default function DetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView collapsable={false} style={styles.screen}>
         <AppState loading title="正在加载详情" description="封面和推荐内容即将准备完成。" />
       </SafeAreaView>
     );
@@ -131,7 +131,7 @@ export default function DetailScreen() {
 
   if (error || !anime) {
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView collapsable={false} style={styles.screen}>
         <AppState
           title="详情加载失败"
           description={error || '没有找到这部作品。'}
@@ -149,7 +149,7 @@ export default function DetailScreen() {
   const meta = [formatYear(anime), '日本', tagSummary].filter(Boolean).join(' · ');
 
   return (
-    <View style={styles.screen}>
+    <View collapsable={false} style={styles.screen}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable
           accessibilityRole="button"
@@ -182,7 +182,7 @@ export default function DetailScreen() {
           <View style={styles.infoRow}>
             <View style={styles.posterShadow}>
               {cover ? (
-                <Image source={{ uri: cover }} style={styles.poster} resizeMode="cover" />
+                <RemoteImage source={{ uri: cover }} style={styles.poster} resizeMode="cover" />
               ) : (
                 <View style={[styles.poster, styles.posterFallback]} />
               )}
@@ -279,7 +279,7 @@ export default function DetailScreen() {
                     pressed && styles.stillPressed,
                   ]}
                 >
-                  <Image source={{ uri: image }} resizeMode="cover" style={styles.stillImage} />
+                  <RemoteImage source={{ uri: image }} resizeMode="cover" style={styles.stillImage} />
                 </Pressable>
               ))}
             </View>
@@ -300,7 +300,7 @@ export default function DetailScreen() {
                   style={({ pressed }) => [styles.recommendRow, pressed && styles.recommendPressed]}
                 >
                   {preview ? (
-                    <Image source={{ uri: preview }} style={styles.recommendCover} resizeMode="cover" />
+                    <RemoteImage source={{ uri: preview }} style={styles.recommendCover} resizeMode="cover" />
                   ) : (
                     <View style={[styles.recommendCover, styles.recommendFallback]} />
                   )}
@@ -330,6 +330,8 @@ export default function DetailScreen() {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            {...virtualizedListProps}
+            overScrollMode="never"
             keyExtractor={(item, index) => `${item}-${index}`}
             initialScrollIndex={lightboxIndex ?? 0}
             getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
@@ -339,7 +341,7 @@ export default function DetailScreen() {
             }}
             renderItem={({ item }) => (
               <Pressable style={[styles.lightboxPage, { width }]} onPress={() => setLightboxIndex(null)}>
-                <Image source={{ uri: item }} resizeMode="contain" style={styles.lightboxImage} />
+                <RemoteImage source={{ uri: item }} resizeMode="contain" style={styles.lightboxImage} />
               </Pressable>
             )}
           />

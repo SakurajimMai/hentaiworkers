@@ -31,7 +31,7 @@ export function SplashScreen() {
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
 
   return (
-    <View style={styles.container}>
+    <View collapsable={false} style={styles.container}>
       <Animated.View style={[styles.logo, { transform: [{ scale }], opacity }]}>
         <Ionicons name="play" size={36} color={colors.white} />
       </Animated.View>

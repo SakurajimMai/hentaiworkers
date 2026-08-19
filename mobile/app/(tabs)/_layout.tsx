@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text } from 'react-native';
-import { colors } from '../../constants/theme';
+import { colors, screenFill } from '../../constants/theme';
 
 type IconGlyph = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -26,8 +26,13 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 export default function TabsLayout() {
   return (
     <Tabs
+      detachInactiveScreens={false}
       screenOptions={{
+        freezeOnBlur: false,
         headerShown: false,
+        lazy: false,
+        sceneStyle: screenFill,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: styles.tabBar,
         tabBarShowLabel: true,
         tabBarActiveTintColor: colors.primary,

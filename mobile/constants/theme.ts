@@ -52,3 +52,16 @@ export const shadow = Platform.select({
     elevation: 10,
   },
 }) as object;
+
+export const screenFill = {
+  backgroundColor: colors.background,
+  flex: 1,
+} as const;
+
+export const virtualizedListProps = {
+  initialNumToRender: 9,
+  maxToRenderPerBatch: 9,
+  removeClippedSubviews: false,
+  updateCellsBatchingPeriod: 16,
+  windowSize: 10,
+} as const;
