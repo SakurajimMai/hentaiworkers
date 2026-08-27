@@ -4,7 +4,7 @@
 
 独立 APK 必须带上 `react-native-gesture-handler` 和 `react-native-reanimated`（expo-router 的 peer 依赖）。Expo Go 里自带这两包，缺了它们时开发正常、安装 APK 会一打开就闪退。
 
-里番走 `/api/animes*`，漫画走 `/api/mangas*`。收藏和历史存在设备本地（AsyncStorage），与网页账号不同步。
+里番走 `/api/animes*`，漫画走 `/api/mangas*`。未登录时收藏和历史存在本机；登录后走 `/api/me/favorites`、`/api/me/watch-progress` 和 `/api/me/manga-progress`，与网页账号互通。
 
 ## 1. 本地开发
 
@@ -28,13 +28,13 @@ EXPO_PUBLIC_API_BASE_URL=https://www.ixacg.de
 | 首页 | 热门里番，以及漫画横滑入口 |
 | 发现 | 里番搜索与标签筛选 |
 | 漫画 | 搜索、日/周/月/总榜、标签筛选 |
-| 历史 | 里番观看与漫画阅读记录 |
-| 收藏 | 本机收藏的里番与漫画 |
+| 历史 | 里番观看与漫画阅读记录（登录后与网页同步） |
+| 收藏 | 里番与漫画收藏（登录后与网页同步） |
 | 我的 | 网站账号登录 / 退出 |
 
 发现页和漫画页是瀑布流无限加载（上滑加载更多），不再翻页。
 
-详情在 `/manga-detail/{id}`，阅读在 `/manga-reader/{id}/{chapter}`。阅读页参考 TachiyomiJ2K：条漫/翻页、左右点击翻页、中间开关工具栏、目录、背景与遮罩亮度、上一话/下一话。
+详情在 `/manga-detail/{id}`，阅读在 `/manga-reader/{id}/{chapter}`。阅读页为条漫连续滚动，底部可拖进度条，双指只能放大、松手还原到原尺寸。
 
 登录走 `POST /api/auth/login`（JSON），会话 cookie 存在本机并随请求带上。
 

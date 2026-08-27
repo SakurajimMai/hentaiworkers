@@ -17,6 +17,7 @@ import type {
 import type { SessionData } from '../../lib/server/identity/session-config';
 import {
   isEmailAllowedByWhitelist,
+  isOutboundMailReady,
   parseSystemSettings,
   toPublicAdsConfig,
   toPublicAuthConfig,
@@ -94,6 +95,25 @@ test('player ads accept video and image pre-roll and pause configs', () => {
   assert.equal(settings.player.preRollAd.playDuration, 3);
   assert.equal(settings.player.pauseAd.videoUrl, 'https://cdn.example/pause.mp4');
   assert.equal(settings.player.pauseAd.muted, true);
+});
+
+test('outbound mail ready requires enablement, host, sender and password', () => {
+  assert.equal(
+    isOutboundMailReady({ enabled: false, host: 'smtp.example.com', fromEmail: 'a@b.com', passwordConfigured: true }),
+    false,
+  );
+  assert.equal(
+    isOutboundMailReady({ enabled: true, host: '', fromEmail: 'a@b.com', passwordConfigured: true }),
+    false,
+  );
+  assert.equal(
+    isOutboundMailReady({ enabled: true, host: 'smtp.example.com', fromEmail: 'a@b.com', passwordConfigured: false }),
+    false,
+  );
+  assert.equal(
+    isOutboundMailReady({ enabled: true, host: 'smtp.example.com', fromEmail: 'a@b.com', passwordConfigured: true }),
+    true,
+  );
 });
 
 test('public site config only exposes http(s) android download links', () => {

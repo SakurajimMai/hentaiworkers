@@ -45,7 +45,7 @@ export default function LoginScreen() {
         style={styles.body}
       >
         <Text style={styles.title}>登录 AnimeStream</Text>
-        <Text style={styles.hint}>使用网站账号登录，收藏可在网页与 App 间同步浏览。</Text>
+        <Text style={styles.hint}>使用网站账号登录后，收藏和历史会与网页同步。</Text>
         <TextInput
           autoCapitalize="none"
           autoCorrect={false}

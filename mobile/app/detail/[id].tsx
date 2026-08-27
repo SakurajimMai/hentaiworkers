@@ -19,7 +19,7 @@ import { RemoteImage } from '../../components/RemoteImage';
 import { colors, radius, shadow, spacing, virtualizedListProps } from '../../constants/theme';
 import { normalizeMediaUrl, splitMediaList } from '../../services/media';
 import { animeApi } from '../../services/api';
-import { favoritesStore } from '../../services/storage';
+import { isAnimeFavorite, toggleAnimeFavorite } from '../../services/library';
 import { Anime, Tag } from '../../services/types';
 
 function formatYear(anime: Anime) {
@@ -96,7 +96,7 @@ export default function DetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (Number.isFinite(animeId)) {
-        favoritesStore.has(animeId).then(setFavorited);
+        isAnimeFavorite(animeId).then(setFavorited);
       }
     }, [animeId]),
   );
@@ -113,7 +113,7 @@ export default function DetailScreen() {
 
   const toggleFavorite = async () => {
     if (!anime) return;
-    const next = await favoritesStore.toggle(anime);
+    const next = await toggleAnimeFavorite(anime);
     setFavorited(next);
   };
 

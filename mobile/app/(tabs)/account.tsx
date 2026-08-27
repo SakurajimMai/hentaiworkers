@@ -30,7 +30,7 @@ export default function AccountScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.muted}>登录后可在网页与 App 使用同一账号。</Text>
+            <Text style={styles.muted}>登录后收藏和观看/阅读历史会与网页同步。</Text>
             <Pressable onPress={() => router.push('/login')} style={styles.btnPrimary}>
               <Text style={styles.btnPrimaryText}>登录</Text>
             </Pressable>

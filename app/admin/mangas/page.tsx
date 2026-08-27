@@ -34,7 +34,7 @@ export default async function AdminMangasPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-meta mb-2">mangas / pages</p>
+          <p className="font-meta mb-2">漫画</p>
           <h1 className="section-title text-3xl text-ink">漫画管理</h1>
           <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-soft">
             管理 TG 发布的漫画和页面。上架状态会直接影响前台目录与阅读页。

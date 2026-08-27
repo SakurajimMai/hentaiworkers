@@ -10,6 +10,7 @@ import {
 } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
 import { toggleMangaFavorite } from '@/lib/server/manga-favorites';
+import { deleteAllMangaProgress } from '@/lib/server/manga-progress';
 
 async function clientIp(): Promise<string | null> {
   const h = await headers();
@@ -179,6 +180,7 @@ export async function actionClearWatchProgress(formData: FormData): Promise<void
 export async function actionClearAllWatchProgress(): Promise<void> {
   try {
     await getWatchProgressService().deleteAllMine();
+    await deleteAllMangaProgress();
   } catch (error) {
     if (isAuthRequiredError(error)) {
       redirect('/login?next=/history');
@@ -197,13 +199,14 @@ export async function actionRequestPasswordReset(formData: FormData): Promise<vo
     redirect('/forgot-password?ok=1');
   } catch (error) {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
-    if (error instanceof AppError && error.code === 'CONFIG_INVALID') {
-      redirect('/forgot-password?error=smtp');
-    }
     if (error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED') {
       redirect('/forgot-password?error=rate');
     }
-    redirect('/forgot-password?error=1');
+    if (error instanceof AppError && error.code === 'RESULT_INVALID') {
+      redirect('/forgot-password?error=1');
+    }
+    // Mail / config failures stay silent so the public page never mentions SMTP.
+    redirect('/forgot-password?ok=1');
   }
 }
 

@@ -4,42 +4,28 @@ import {
   Image,
   ListRenderItemInfo,
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
+  useWindowDimensions,
+  type ViewToken,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from '../../../components/AppState';
 import { HtmlAd } from '../../../components/HtmlAd';
+import { PageScrubber } from '../../../components/PageScrubber';
 import { RemoteImage } from '../../../components/RemoteImage';
+import { ZoomableReader } from '../../../components/ZoomableReader';
 import { colors, radius, spacing, virtualizedListProps } from '../../../constants/theme';
 import { readerAdHtml, useAdsConfig } from '../../../services/ads';
 import { mangaApi } from '../../../services/api';
+import { isMangaFavorite, recordMangaHistory, toggleMangaFavorite } from '../../../services/library';
 import { normalizeMediaUrl } from '../../../services/media';
-import { mangaFavoritesStore, mangaHistoryStore } from '../../../services/storage';
 import { MangaChapterDetail, MangaDetail, MangaPage } from '../../../services/types';
-
-const SETTINGS_KEY = '@manga/reader-settings';
-
-type ReaderMode = 'webtoon' | 'paged';
-type ReaderBg = 'black' | 'gray' | 'white';
-type ReaderSettings = { mode: ReaderMode; rtl: boolean; bg: ReaderBg; brightness: number };
-
-const DEFAULT_SETTINGS: ReaderSettings = { mode: 'webtoon', rtl: false, bg: 'black', brightness: 0 };
-
-const BG_COLOR: Record<ReaderBg, string> = {
-  black: '#000000',
-  gray: '#1C1C1C',
-  white: '#F4F4F5',
-};
 
 function MangaPageImage({ uri, width }: { uri: string; width: number }) {
   const [ratio, setRatio] = useState(2 / 3);
@@ -84,7 +70,6 @@ export default function MangaReaderScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<MangaPage>>(null);
-  const scrollOffset = useRef(0);
 
   const mangaId = Number(Array.isArray(id) ? id[0] : id);
   const chapterNumber = Number(Array.isArray(numberRaw) ? numberRaw[0] : numberRaw);
@@ -96,27 +81,11 @@ export default function MangaReaderScreen() {
   const [chromeVisible, setChromeVisible] = useState(true);
   const [favorited, setFavorited] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
-  const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
+  const [zoomed, setZoomed] = useState(false);
   const ads = useAdsConfig();
   const topHtml = readerAdHtml(ads.reader.top);
   const bottomHtml = readerAdHtml(ads.reader.bottom);
-
-  useEffect(() => {
-    AsyncStorage.getItem(SETTINGS_KEY)
-      .then((raw) => {
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as Partial<ReaderSettings>;
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-      })
-      .catch(() => undefined);
-  }, []);
-
-  const saveSettings = (next: ReaderSettings) => {
-    setSettings(next);
-    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => undefined);
-  };
 
   const pages = useMemo(
     () =>
@@ -149,7 +118,7 @@ export default function MangaReaderScreen() {
       setManga(detail);
       setChapter(payload.chapter);
       setPageIndex(0);
-      await mangaHistoryStore.push(detail, chapterNumber);
+      await recordMangaHistory(detail, chapterNumber, 0);
       for (const page of payload.chapter.pages.slice(0, 4)) {
         const uri = normalizeMediaUrl(page.imageUrl);
         if (uri) Image.prefetch(uri).catch(() => undefined);
@@ -167,9 +136,17 @@ export default function MangaReaderScreen() {
 
   useEffect(() => {
     if (Number.isFinite(mangaId)) {
-      mangaFavoritesStore.has(mangaId).then(setFavorited);
+      isMangaFavorite(mangaId).then(setFavorited);
     }
   }, [mangaId]);
+
+  useEffect(() => {
+    if (!manga || !pages.length) return;
+    const timer = setTimeout(() => {
+      recordMangaHistory(manga, chapterNumber, pageIndex).catch(() => undefined);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [chapterNumber, manga, pageIndex, pages.length]);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -183,7 +160,7 @@ export default function MangaReaderScreen() {
 
   const toggleFavorite = async () => {
     if (!manga) return;
-    const next = await mangaFavoritesStore.toggle(manga);
+    const next = await toggleMangaFavorite(manga);
     setFavorited(next);
   };
 
@@ -198,50 +175,30 @@ export default function MangaReaderScreen() {
       return;
     }
     setPageIndex(next);
-    if (settings.mode === 'paged') {
-      listRef.current?.scrollToIndex({ index: next, animated: true });
-    } else {
-      listRef.current?.scrollToIndex({ index: next, animated: true, viewPosition: 0 });
-    }
+    listRef.current?.scrollToIndex({ index: next, animated: true, viewPosition: 0 });
   };
 
-  const handleTap = (x: number) => {
-    if (x < width / 3) {
-      goPage(settings.rtl ? pageIndex + 1 : pageIndex - 1);
-    } else if (x > (width * 2) / 3) {
-      goPage(settings.rtl ? pageIndex - 1 : pageIndex + 1);
-    } else {
-      setChromeVisible((v) => !v);
-    }
+  const handleTap = (x: number, viewWidth: number) => {
+    const w = viewWidth || width;
+    if (x < w / 3) goPage(pageIndex - 1);
+    else if (x > (w * 2) / 3) goPage(pageIndex + 1);
+    else setChromeVisible((value) => !value);
   };
 
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offset = event.nativeEvent.contentOffset;
-    if (settings.mode === 'paged') {
-      const idx = Math.round((settings.rtl ? -offset.x : offset.x) / Math.max(width, 1));
-      if (idx >= 0 && idx < pages.length) setPageIndex(idx);
-    } else {
-      scrollOffset.current = offset.y;
-      const approx = Math.min(
-        pages.length - 1,
-        Math.max(0, Math.floor(offset.y / Math.max(height * 0.8, 1))),
-      );
-      setPageIndex(approx);
-    }
-  };
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const first = viewableItems[0];
+    if (typeof first?.index === 'number') setPageIndex(first.index);
+  }).current;
 
   const renderPage = ({ item }: ListRenderItemInfo<MangaPage>) => (
-    <Pressable onPress={(e) => handleTap(e.nativeEvent.locationX)} style={{ width }}>
+    <View style={{ width }}>
       <MangaPageImage uri={item.imageUrl} width={width} />
-    </Pressable>
+    </View>
   );
-
-  const bg = BG_COLOR[settings.bg];
-  const fg = settings.bg === 'white' ? '#111' : colors.white;
 
   if (loading) {
     return (
-      <View collapsable={false} style={[styles.screen, { backgroundColor: bg }]}>
+      <View collapsable={false} style={styles.screen}>
         <StatusBar style="light" hidden />
         <AppState loading title="正在打开章节" />
       </View>
@@ -250,7 +207,7 @@ export default function MangaReaderScreen() {
 
   if (error || !chapter || !manga) {
     return (
-      <View collapsable={false} style={[styles.screen, { backgroundColor: bg }]}>
+      <View collapsable={false} style={styles.screen}>
         <StatusBar style="light" />
         <AppState
           title="阅读页加载失败"
@@ -263,60 +220,48 @@ export default function MangaReaderScreen() {
   }
 
   return (
-    <View collapsable={false} style={[styles.screen, { backgroundColor: bg }]}>
-      <StatusBar style={settings.bg === 'white' ? 'dark' : 'light'} hidden={!chromeVisible} />
-      <FlatList
-        ref={listRef}
-        data={pages}
-        key={settings.mode + String(settings.rtl)}
-        horizontal={settings.mode === 'paged'}
-        pagingEnabled={settings.mode === 'paged'}
-        inverted={settings.mode === 'paged' && settings.rtl}
-        keyExtractor={(item) => String(item.index)}
-        renderItem={renderPage}
-        extraData={chromeVisible}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        {...virtualizedListProps}
-        initialNumToRender={3}
-        maxToRenderPerBatch={3}
-        overScrollMode="never"
-        windowSize={8}
-        onScrollToIndexFailed={({ index }) => {
-          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false }), 80);
-        }}
-        ListHeaderComponent={
-          settings.mode === 'webtoon' && topHtml ? (
-            <View style={styles.readerAd} accessibilityLabel="章节顶部广告">
-              <HtmlAd html={topHtml} dark minHeight={72} maxHeight={240} />
-            </View>
-          ) : null
-        }
-        ListFooterComponent={
-          settings.mode === 'webtoon' ? (
-            <View style={{ paddingBottom: insets.bottom + spacing.xl }}>
+    <View collapsable={false} style={styles.screen}>
+      <StatusBar style="light" hidden={!chromeVisible} />
+      <ZoomableReader onTap={handleTap} onZoomChange={setZoomed}>
+        <FlatList
+          ref={listRef}
+          data={pages}
+          keyExtractor={(item) => String(item.index)}
+          renderItem={renderPage}
+          extraData={chromeVisible}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!zoomed}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
+          {...virtualizedListProps}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          overScrollMode="never"
+          windowSize={8}
+          onScrollToIndexFailed={({ index }) => {
+            setTimeout(() => listRef.current?.scrollToIndex({ index, animated: false }), 80);
+          }}
+          ListHeaderComponent={
+            topHtml ? (
+              <View style={styles.readerAd} accessibilityLabel="章节顶部广告">
+                <HtmlAd html={topHtml} dark minHeight={72} maxHeight={240} />
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            <View style={{ paddingBottom: insets.bottom + 88 }}>
               {bottomHtml ? (
                 <View style={styles.readerAd}>
                   <HtmlAd html={bottomHtml} dark minHeight={72} maxHeight={240} />
                 </View>
               ) : null}
-              <Text style={[styles.endText, { color: fg }]}>
+              <Text style={styles.endText}>
                 {nextChapter ? '本话结束，点右侧进入下一话' : '已经读到最后'}
               </Text>
             </View>
-          ) : null
-        }
-      />
-
-      {settings.brightness > 0 ? (
-        <View pointerEvents="none" style={[styles.dim, { opacity: settings.brightness }]} />
-      ) : null}
-
-      <Text style={[styles.pageHud, { bottom: insets.bottom + 8, color: fg }]}>
-        {Math.min(pageIndex + 1, pages.length)} / {pages.length}
-      </Text>
+          }
+        />
+      </ZoomableReader>
 
       {chromeVisible ? (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -329,7 +274,7 @@ export default function MangaReaderScreen() {
                 {manga.title}
               </Text>
               <Text style={styles.chromeSub} numberOfLines={1}>
-                {chapter.title || `第 ${chapter.number} 话`} · {pageIndex + 1}/{pages.length}
+                {chapter.title || `第 ${chapter.number} 话`}
               </Text>
             </Pressable>
             <Pressable onPress={toggleFavorite} style={styles.chromeBtn}>
@@ -339,91 +284,34 @@ export default function MangaReaderScreen() {
                 color={favorited ? colors.primary : colors.white}
               />
             </Pressable>
-            <Pressable onPress={() => setSettingsOpen(true)} style={styles.chromeBtn} accessibilityLabel="阅读设置">
-              <Ionicons name="options-outline" size={18} color={colors.white} />
-            </Pressable>
-          </View>
-          <View style={[styles.bottomChrome, { paddingBottom: insets.bottom + spacing.sm }]}>
-            <Pressable
-              disabled={!prevChapter}
-              onPress={() => prevChapter && openChapter(prevChapter.number)}
-              style={[styles.navBtn, !prevChapter && styles.navBtnDisabled]}
-            >
-              <Text style={styles.navBtnText}>上一话</Text>
-            </Pressable>
-            <Pressable onPress={() => setChaptersOpen(true)} style={styles.navBtn}>
-              <Text style={styles.navBtnText}>目录</Text>
-            </Pressable>
-            <Pressable
-              disabled={!nextChapter}
-              onPress={() => nextChapter && openChapter(nextChapter.number)}
-              style={[styles.navBtn, !nextChapter && styles.navBtnDisabled]}
-            >
-              <Text style={styles.navBtnText}>下一话</Text>
+            <Pressable onPress={() => setChaptersOpen(true)} style={styles.chromeBtn} accessibilityLabel="目录">
+              <Ionicons name="list-outline" size={18} color={colors.white} />
             </Pressable>
           </View>
         </View>
       ) : null}
 
-      <Modal visible={settingsOpen} transparent animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
-        <Pressable style={styles.modalBg} onPress={() => setSettingsOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>阅读设置</Text>
-            <Text style={styles.sheetLabel}>阅读方式</Text>
-            <View style={styles.row}>
-              {(['webtoon', 'paged'] as ReaderMode[]).map((mode) => (
-                <Pressable
-                  key={mode}
-                  onPress={() => saveSettings({ ...settings, mode })}
-                  style={[styles.chip, settings.mode === mode && styles.chipOn]}
-                >
-                  <Text style={[styles.chipText, settings.mode === mode && styles.chipTextOn]}>
-                    {mode === 'webtoon' ? '条漫连续' : '翻页'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.sheetLabel}>翻页方向</Text>
-            <View style={styles.row}>
-              <Pressable onPress={() => saveSettings({ ...settings, rtl: false })} style={[styles.chip, !settings.rtl && styles.chipOn]}>
-                <Text style={[styles.chipText, !settings.rtl && styles.chipTextOn]}>从左向右</Text>
-              </Pressable>
-              <Pressable onPress={() => saveSettings({ ...settings, rtl: true })} style={[styles.chip, settings.rtl && styles.chipOn]}>
-                <Text style={[styles.chipText, settings.rtl && styles.chipTextOn]}>从右向左</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.sheetLabel}>背景</Text>
-            <View style={styles.row}>
-              {(['black', 'gray', 'white'] as ReaderBg[]).map((bgKey) => (
-                <Pressable
-                  key={bgKey}
-                  onPress={() => saveSettings({ ...settings, bg: bgKey })}
-                  style={[styles.chip, settings.bg === bgKey && styles.chipOn]}
-                >
-                  <Text style={[styles.chipText, settings.bg === bgKey && styles.chipTextOn]}>
-                    {bgKey === 'black' ? '纯黑' : bgKey === 'gray' ? '深灰' : '浅色'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.sheetLabel}>遮罩亮度</Text>
-            <View style={styles.row}>
-              {[0, 0.15, 0.3, 0.45].map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => saveSettings({ ...settings, brightness: value })}
-                  style={[styles.chip, settings.brightness === value && styles.chipOn]}
-                >
-                  <Text style={[styles.chipText, settings.brightness === value && styles.chipTextOn]}>
-                    {value === 0 ? '关' : `${Math.round(value * 100)}%`}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.sheetHint}>点屏幕左侧上一页、右侧下一页、中间显示/隐藏工具栏。</Text>
+      <View style={[styles.scrubberBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+        <View style={styles.scrubberRow}>
+          <Pressable
+            disabled={!prevChapter}
+            onPress={() => prevChapter && openChapter(prevChapter.number)}
+            style={[styles.edgeBtn, !prevChapter && styles.edgeBtnDisabled]}
+          >
+            <Text style={styles.edgeBtnText}>上一话</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+          <View style={styles.scrubberGrow}>
+            <PageScrubber index={pageIndex} total={pages.length} onSeek={goPage} />
+          </View>
+          <Pressable
+            disabled={!nextChapter}
+            onPress={() => nextChapter && openChapter(nextChapter.number)}
+            style={[styles.edgeBtn, !nextChapter && styles.edgeBtnDisabled]}
+          >
+            <Text style={styles.edgeBtnText}>下一话</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <Modal visible={chaptersOpen} transparent animationType="fade" onRequestClose={() => setChaptersOpen(false)}>
         <Pressable style={styles.modalBg} onPress={() => setChaptersOpen(false)}>
@@ -437,7 +325,10 @@ export default function MangaReaderScreen() {
                   onPress={() => openChapter(item.number)}
                   style={[styles.chapterRow, item.number === chapterNumber && styles.chapterRowOn]}
                 >
-                  <Text style={[styles.chapterText, item.number === chapterNumber && styles.chapterTextOn]} numberOfLines={1}>
+                  <Text
+                    style={[styles.chapterText, item.number === chapterNumber && styles.chapterTextOn]}
+                    numberOfLines={1}
+                  >
                     {item.title || `第 ${item.number} 话`}
                   </Text>
                 </Pressable>
@@ -455,9 +346,7 @@ const styles = StyleSheet.create({
   readerAd: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
   pageFallback: { alignItems: 'center', backgroundColor: colors.surfaceMuted, justifyContent: 'center' },
   pageFallbackText: { color: colors.textSubtle, fontSize: 13 },
-  dim: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },
-  pageHud: { fontSize: 11, opacity: 0.7, position: 'absolute', right: 12 },
-  endText: { fontSize: 13, paddingVertical: spacing.lg, textAlign: 'center' },
+  endText: { color: colors.white, fontSize: 13, paddingVertical: spacing.lg, textAlign: 'center' },
   topChrome: {
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -470,27 +359,27 @@ const styles = StyleSheet.create({
   chromeTitleWrap: { flex: 1 },
   chromeTitle: { color: colors.white, fontSize: 14, fontWeight: '800' },
   chromeSub: { color: 'rgba(255,255,255,0.68)', fontSize: 11, marginTop: 2 },
-  bottomChrome: {
-    backgroundColor: 'rgba(0,0,0,0.72)',
+  scrubberBar: {
+    backgroundColor: 'rgba(0,0,0,0.78)',
     bottom: 0,
-    flexDirection: 'row',
-    gap: spacing.md,
     left: 0,
-    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     position: 'absolute',
     right: 0,
   },
-  navBtn: {
+  scrubberRow: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 10,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
   },
-  navBtnDisabled: { opacity: 0.35 },
-  navBtnText: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  scrubberGrow: { flex: 1 },
+  edgeBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+  },
+  edgeBtnDisabled: { opacity: 0.3 },
+  edgeBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   modalBg: { backgroundColor: 'rgba(0,0,0,0.55)', flex: 1, justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface,
@@ -500,18 +389,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   sheetTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
-  sheetLabel: { color: colors.textMuted, fontSize: 12, marginTop: spacing.sm },
-  sheetHint: { color: colors.textSubtle, fontSize: 12, lineHeight: 18, marginTop: spacing.sm },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  chipOn: { backgroundColor: colors.primary },
-  chipText: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
-  chipTextOn: { color: colors.white },
   chapterRow: { paddingVertical: 10 },
   chapterRowOn: { opacity: 1 },
   chapterText: { color: colors.text, fontSize: 14 },

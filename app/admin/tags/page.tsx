@@ -51,8 +51,8 @@ export default async function AdminTagsPage({
   return (
     <div className="space-y-8">
       <div>
-        <p className="font-meta mb-2">Anime tags</p>
-        <h1 className="font-serif text-3xl">里番标签</h1>
+        <p className="font-meta mb-2">里番标签</p>
+        <h1 className="section-title text-3xl text-ink">里番标签</h1>
         <p className="mt-2 font-ui text-sm text-soft max-w-2xl">
           管理里番标签字典 `tags`，并查看关联作品数量。漫画标签存在漫画作品上，不会出现在这里。
         </p>

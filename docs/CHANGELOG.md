@@ -23,7 +23,7 @@
 - 收藏前台改为爱心开关，去掉「想看 / 在看 / 已看完 / 自定义列表」入口。
 - SEO：修复 sitemap 标签 URL 中未转义的 `&`，去掉会污染子页的全局首页 canonical，私密页 `noindex`，补 `/manga` 与默认 OG 图。
 
-漫画相关迁移：`drizzle/migrations/0014-mangas.sql`、`0015-manga-metadata.sql`、`0016-manga-favorites.sql`、`0017-manga-views.sql`。生产库须人工审核后执行，容器不会自动跑迁移。
+漫画相关迁移：`drizzle/migrations/0014-mangas.sql`、`0015-manga-metadata.sql`、`0016-manga-favorites.sql`、`0017-manga-views.sql`、`0018-manga-reading-progress.sql`。生产库须人工审核后执行，容器不会自动跑迁移；漫画阅读进度服务会在首次写入时 `CREATE TABLE IF NOT EXISTS`。
 
 ## 2026-08 — 主站收敛为 App-only
 

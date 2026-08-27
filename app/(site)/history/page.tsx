@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getIdentityService, getWatchProgressService } from '@/lib/server/identity';
+import { listMangaProgress } from '@/lib/server/manga-progress';
 import { GuestHistoryList } from '@/components/continue-watching-client';
 import { MediaImage } from '@/components/media-image';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
@@ -57,7 +58,10 @@ export default async function HistoryPage({
     );
   }
 
-  const items = await getWatchProgressService().listMine(100);
+  const [items, mangaItems] = await Promise.all([
+    getWatchProgressService().listMine(100),
+    listMangaProgress(100).catch(() => []),
+  ]);
 
   return (
     <div className="page-shell py-8 sm:py-12 pb-20 space-y-8">
@@ -67,10 +71,10 @@ export default async function HistoryPage({
           <h1 className="section-title text-3xl text-ink">观看历史</h1>
           <p className="mt-2 font-ui text-sm text-soft">
             {user.displayName || user.username} · 共{' '}
-            <span className="tabular">{items.length}</span> 条 · 跨设备同步
+            <span className="tabular">{items.length + mangaItems.length}</span> 条 · 跨设备同步
           </p>
         </div>
-        {items.length > 0 && (
+        {(items.length > 0 || mangaItems.length > 0) && (
           <form action={actionClearAllWatchProgress}>
             <ConfirmSubmitButton
               title="清除确认"
@@ -90,17 +94,45 @@ export default async function HistoryPage({
         </div>
       )}
 
-      {items.length === 0 ? (
+      {items.length === 0 && mangaItems.length === 0 ? (
         <div className="empty-state space-y-4">
           <p className="font-meta">Cloud history</p>
-          <p className="section-title text-2xl text-ink">还没有云端观看记录</p>
-          <p className="font-ui text-sm text-soft">播放几秒以上后会自动写入进度。</p>
+          <p className="section-title text-2xl text-ink">还没有云端记录</p>
+          <p className="font-ui text-sm text-soft">播放里番或阅读漫画后会写入账号。</p>
           <Link href="/browse" className="btn-ink inline-flex">
             去里番馆
           </Link>
         </div>
       ) : (
         <ul className="space-y-3">
+          {mangaItems.map((item) => (
+            <li
+              key={`manga-${item.mangaId}`}
+              className="surface-card p-3.5 sm:p-4 flex items-center gap-4 justify-between"
+            >
+              <Link
+                href={`/manga/${item.slug}/read/${item.chapterNumber}`}
+                className="flex items-center gap-3 min-w-0 flex-1"
+              >
+                <div className="h-16 w-12 shrink-0 overflow-hidden rounded-xl border border-border">
+                  <MediaImage
+                    src={item.coverUrl}
+                    alt={item.title}
+                    className="h-full w-full object-cover"
+                    variant="thumb"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-ui text-sm font-medium text-ink truncate">{item.title}</p>
+                  <p className="mt-0.5 font-meta text-[11px] normal-case tracking-normal text-soft">
+                    漫画 · 读到第 {item.chapterNumber} 话
+                    {' · '}
+                    {new Date(item.lastReadAt).toLocaleString()}
+                  </p>
+                </div>
+              </Link>
+            </li>
+          ))}
           {items.map((item) => {
             const pct =
               item.durationSeconds > 0

@@ -53,12 +53,19 @@ export async function actionLogout(): Promise<void> {
 }
 
 export async function actionChangePassword(formData: FormData): Promise<void> {
+  const current = String(formData.get('current') || '');
+  const next = String(formData.get('next') || '');
+  const confirm = String(formData.get('confirm') || '');
+  if (next.length < 8) {
+    redirect('/admin/account?error=short');
+  }
+  if (next !== confirm) {
+    redirect('/admin/account?error=mismatch');
+  }
   try {
     const admin = await getIdentityService().requireAdmin();
-    const current = String(formData.get('current') || '');
-    const next = String(formData.get('next') || '');
     await getIdentityService().changePassword(admin.id, current, next);
-    redirect('/admin/account?ok=1');
+    redirect('/admin/login?ok=password');
   } catch (error) {
     mapAuthRedirect(error, '/admin/account?error=1');
   }

@@ -54,7 +54,7 @@ export default async function AdminAnimesPage({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="font-meta mb-2">里番 · animes / tags</p>
+          <p className="font-meta mb-2">里番</p>
           <h1 className="section-title text-3xl text-ink">里番管理</h1>
           <p className="mt-2 font-ui text-sm text-soft leading-relaxed">
             里番片库与标签（tags）。支持批量上架/下架/删除。

@@ -25,8 +25,8 @@ export default async function AdminSystemSettingsPage({
   return (
     <div className="space-y-6">
       <div>
-        <p className="font-meta mb-2">System</p>
-        <h1 className="font-serif text-3xl">系统设置</h1>
+        <p className="font-meta mb-2">系统</p>
+        <h1 className="section-title text-3xl text-ink sm:text-4xl">系统设置</h1>
         <p className="mt-2 font-ui text-sm text-soft max-w-2xl leading-relaxed">
           配置前台注册策略、首页幻灯片、页脚（App 下载 / Telegram 频道）、播放器（里番 ArtPlayer 广告/右键）、信息流/漫画阅读广告、SMTP、Trust、Cloudflare Turnstile，以及漫画发布密钥。
           SMTP / Turnstile / 漫画发布密钥加密存库，表单留空表示不修改。

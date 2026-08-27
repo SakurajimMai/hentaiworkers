@@ -8,7 +8,7 @@ import VideoPlayer from '../../components/VideoPlayer';
 import { AppState } from '../../components/AppState';
 import { animeApi } from '../../services/api';
 import { normalizeMediaUrl, splitMediaList } from '../../services/media';
-import { historyStore } from '../../services/storage';
+import { recordAnimeHistory } from '../../services/library';
 import { Anime } from '../../services/types';
 import { colors, radius, spacing } from '../../constants/theme';
 
@@ -41,7 +41,7 @@ export default function PlayerScreen() {
         const detail = await animeApi.getAnimeDetail(animeId);
         if (!mounted) return;
         setAnime(detail);
-        historyStore.push(detail);
+        await recordAnimeHistory(detail);
       } catch (e) {
         if (mounted) setError(e instanceof Error ? e.message : '加载失败');
       } finally {

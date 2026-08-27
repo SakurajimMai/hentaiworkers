@@ -25,12 +25,22 @@ export async function hydrateSession(): Promise<AuthUser | null> {
 export async function signIn(emailOrUsername: string, password: string): Promise<AuthUser> {
   const user = await authApi.login(emailOrUsername, password);
   emit(user);
+  try {
+    const { syncLibraryAfterLogin } = await import('./library');
+    await syncLibraryAfterLogin();
+  } catch {
+    /* sync is best-effort */
+  }
   return user;
 }
 
 export async function signOut(): Promise<void> {
   await authApi.logout();
   emit(null);
+}
+
+export function getCachedUser(): AuthUser | null {
+  return currentUser;
 }
 
 export function useSession() {

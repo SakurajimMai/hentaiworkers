@@ -67,8 +67,17 @@ function cookieFromSetCookie(header: string | null): string {
   return header.split(';')[0].trim();
 }
 
-async function persistSessionCookie(header: string | null): Promise<void> {
-  const value = cookieFromSetCookie(header);
+function readSetCookie(headers: Headers): string | null {
+  const withGetSetCookie = headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof withGetSetCookie.getSetCookie === 'function') {
+    const match = withGetSetCookie.getSetCookie().find((value) => /animestream_session=/i.test(value));
+    if (match) return match;
+  }
+  return headers.get('set-cookie');
+}
+
+async function persistSessionCookie(headers: Headers): Promise<void> {
+  const value = cookieFromSetCookie(readSetCookie(headers));
   if (!value) return;
   sessionCookie = value;
   try {
@@ -142,7 +151,7 @@ async function fetchJson<T>(endpoint: string, init?: RequestInit): Promise<T> {
     ...init,
     headers,
   });
-  await persistSessionCookie(response.headers.get('set-cookie'));
+  await persistSessionCookie(response.headers);
 
   const responseText = await response.text();
   let payload: any = null;
@@ -156,7 +165,11 @@ async function fetchJson<T>(endpoint: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const message = payload?.error || `请求失败：${response.status}`;
+    const rawError = payload?.error;
+    const message =
+      typeof rawError === 'string'
+        ? rawError
+        : rawError?.message || `请求失败：${response.status}`;
     throw new ApiError(message, response.status);
   }
 
@@ -265,3 +278,132 @@ class AuthApiService {
 }
 
 export const authApi = new AuthApiService();
+
+export interface CloudFavoriteAnime {
+  id: number;
+  title: string;
+  cover?: string | null;
+  favoritedAt?: string;
+}
+
+export interface CloudFavoriteManga {
+  id: number;
+  title: string;
+  coverUrl?: string | null;
+  favoritedAt?: string;
+}
+
+export interface CloudWatchItem {
+  animeId: number;
+  title: string;
+  cover: string | null;
+  lastWatchedAt: string;
+  positionSeconds?: number;
+  durationSeconds?: number;
+  completed?: boolean;
+}
+
+export interface CloudMangaProgressItem {
+  mangaId: number;
+  title: string;
+  coverUrl: string | null;
+  chapterNumber: number;
+  pageIndex: number;
+  lastReadAt: string;
+}
+
+class MeApiService {
+  async getFavorites(): Promise<{ animes: CloudFavoriteAnime[]; mangas: CloudFavoriteManga[] }> {
+    return fetchJson('/api/me/favorites');
+  }
+
+  async setFavorite(
+    kind: 'anime' | 'manga',
+    id: number,
+    favorited?: boolean,
+  ): Promise<{ favorited: boolean }> {
+    return fetchJson('/api/me/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, id, favorited }),
+    });
+  }
+
+  async getWatchProgress(): Promise<{ data: CloudWatchItem[] }> {
+    return fetchJson('/api/me/watch-progress?limit=50');
+  }
+
+  async putWatchProgress(
+    animeId: number,
+    body: { positionSeconds: number; durationSeconds?: number; completed?: boolean },
+  ): Promise<void> {
+    await fetchJson(`/api/me/watch-progress/${animeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async mergeWatchProgress(
+    rows: Array<{
+      animeId: number;
+      positionSeconds: number;
+      durationSeconds: number;
+      lastWatchedAt?: string;
+    }>,
+  ): Promise<void> {
+    await fetchJson('/api/me/watch-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+  }
+
+  async deleteWatchProgress(animeId: number): Promise<void> {
+    await fetchJson(`/api/me/watch-progress/${animeId}`, { method: 'DELETE' });
+  }
+
+  async deleteAllWatchProgress(): Promise<void> {
+    await fetchJson('/api/me/watch-progress', { method: 'DELETE' });
+  }
+
+  async getMangaProgress(): Promise<{ data: CloudMangaProgressItem[] }> {
+    return fetchJson('/api/me/manga-progress?limit=50');
+  }
+
+  async putMangaProgress(
+    mangaId: number,
+    body: { chapterNumber: number; pageIndex?: number },
+  ): Promise<void> {
+    await fetchJson(`/api/me/manga-progress/${mangaId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async mergeMangaProgress(
+    rows: Array<{
+      mangaId: number;
+      chapterNumber: number;
+      pageIndex?: number;
+      lastReadAt?: string;
+    }>,
+  ): Promise<void> {
+    await fetchJson('/api/me/manga-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows }),
+    });
+  }
+
+  async deleteMangaProgress(mangaId: number): Promise<void> {
+    await fetchJson(`/api/me/manga-progress/${mangaId}`, { method: 'DELETE' });
+  }
+
+  async deleteAllMangaProgress(): Promise<void> {
+    await fetchJson('/api/me/manga-progress', { method: 'DELETE' });
+  }
+}
+
+export const meApi = new MeApiService();

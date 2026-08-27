@@ -1,11 +1,20 @@
 import 'react-native-gesture-handler';
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, useEffect, type ErrorInfo, type ReactNode } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { Pressable, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors, screenFill } from '../constants/theme';
+import { hydrateSession } from '../services/session';
+
+function SessionBootstrap() {
+  useEffect(() => {
+    hydrateSession().catch(() => undefined);
+  }, []);
+  return null;
+}
 
 const navTheme = {
   ...DarkTheme,
@@ -74,7 +83,9 @@ class RootErrorBoundary extends Component<
 
 export default function RootLayout() {
   return (
+    <GestureHandlerRootView style={screenFill}>
     <SafeAreaProvider>
+      <SessionBootstrap />
       <RootErrorBoundary>
         <ThemeProvider value={navTheme}>
           <View collapsable={false} style={screenFill}>
@@ -104,5 +115,6 @@ export default function RootLayout() {
         </ThemeProvider>
       </RootErrorBoundary>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

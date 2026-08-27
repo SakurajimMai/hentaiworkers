@@ -100,6 +100,17 @@ export function MangaReader({
   }, [loadAround, readerKey, pages.length]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetch(`/api/me/manga-progress/${mangaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapterNumber, pageIndex: activePage }),
+      }).catch(() => undefined);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [activePage, chapterNumber, mangaId]);
+
+  useEffect(() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const onScroll = () => {
       const y = window.scrollY;

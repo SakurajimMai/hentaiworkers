@@ -35,6 +35,20 @@ export const smtpSettingsSchema = z.object({
   fromName: z.string().max(128).default('AnimeStream'),
 });
 
+/** Admin-only: whether outbound mail can actually be sent. Never expose to the public site. */
+export function isOutboundMailReady(smtp: {
+  enabled: boolean;
+  host: string;
+  fromEmail: string;
+  passwordConfigured?: boolean;
+  password?: EncryptedField | string | null;
+}): boolean {
+  if (!smtp.enabled) return false;
+  if (!smtp.host.trim() || !smtp.fromEmail.trim()) return false;
+  if (typeof smtp.passwordConfigured === 'boolean') return smtp.passwordConfigured;
+  return smtp.password != null && smtp.password !== '';
+}
+
 export const turnstileSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   siteKey: z.string().max(128).default(''),

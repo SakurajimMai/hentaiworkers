@@ -24,18 +24,13 @@ export default async function ForgotPasswordPage({
         <p className="font-meta mb-2">Account</p>
         <h1 className="section-title text-3xl text-ink">忘记密码</h1>
         <p className="mt-2 font-ui text-sm text-soft leading-relaxed">
-          输入注册邮箱。若账号存在且站点已配置 SMTP，将收到重置链接（60 分钟有效）。
+          输入注册邮箱。如果该邮箱已注册，我们会发送重置邮件。
         </p>
       </div>
 
       {sp.ok === '1' && (
         <div className="notice-success !text-sm">
-          若该邮箱已注册，重置邮件已发送（请检查垃圾箱）。
-        </div>
-      )}
-      {sp.error === 'smtp' && (
-        <div className="notice-error !text-sm">
-          邮件服务未就绪，请联系管理员配置 SMTP。
+          如果该邮箱已注册，请查收邮件，并检查垃圾箱。
         </div>
       )}
       {sp.error === 'rate' && (

@@ -9,7 +9,7 @@ import { RemoteImage } from '../../components/RemoteImage';
 import { colors, radius, shadow, spacing } from '../../constants/theme';
 import { mangaApi } from '../../services/api';
 import { normalizeMediaUrl } from '../../services/media';
-import { mangaFavoritesStore } from '../../services/storage';
+import { isMangaFavorite, toggleMangaFavorite } from '../../services/library';
 import { MangaDetail, MangaSummary } from '../../services/types';
 
 export default function MangaDetailScreen() {
@@ -65,7 +65,7 @@ export default function MangaDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (Number.isFinite(mangaId)) {
-        mangaFavoritesStore.has(mangaId).then(setFavorited);
+        isMangaFavorite(mangaId).then(setFavorited);
       }
     }, [mangaId]),
   );
@@ -77,7 +77,7 @@ export default function MangaDetailScreen() {
 
   const toggleFavorite = async () => {
     if (!manga) return;
-    const next = await mangaFavoritesStore.toggle(manga);
+    const next = await toggleMangaFavorite(manga);
     setFavorited(next);
   };
 

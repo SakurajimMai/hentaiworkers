@@ -3,17 +3,21 @@ import { desc, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { animes, mangas, tags, users } from '@/lib/schema';
 import { listAdminMangas } from '@/lib/server/manga-admin';
+import { getSystemSettingsService } from '@/lib/server/system';
+import { isOutboundMailReady } from '@/lib/server/system/domain/settings';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboard() {
-  const [[animeCount], [mangaCount], [tagCount], [userCount], [activeCount]] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(animes),
-    db.select({ count: sql<number>`count(*)` }).from(mangas),
-    db.select({ count: sql<number>`count(*)` }).from(tags),
-    db.select({ count: sql<number>`count(*)` }).from(users),
-    db.select({ count: sql<number>`count(*)` }).from(animes).where(sql`${animes.isActive} = 1`),
-  ]);
+  const [[animeCount], [mangaCount], [tagCount], [userCount], [activeCount], settings] =
+    await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(animes),
+      db.select({ count: sql<number>`count(*)` }).from(mangas),
+      db.select({ count: sql<number>`count(*)` }).from(tags),
+      db.select({ count: sql<number>`count(*)` }).from(users),
+      db.select({ count: sql<number>`count(*)` }).from(animes).where(sql`${animes.isActive} = 1`),
+      getSystemSettingsService().getAdminView(),
+    ]);
   const [latestAnimes, latestMangas] = await Promise.all([
     db
       .select({ id: animes.id, title: animes.title, isActive: animes.isActive, updatedAt: animes.updatedAt })
@@ -22,6 +26,7 @@ export default async function AdminDashboard() {
       .limit(5),
     listAdminMangas({ page: 1, limit: 5 }),
   ]);
+  const mailReady = isOutboundMailReady(settings.smtp);
 
   const cards = [
     { label: '里番', value: Number(animeCount.count), href: '/admin/animes' },
@@ -40,6 +45,16 @@ export default async function AdminDashboard() {
           从内容状态进入对应工作区。发布、上架、标签和账号操作都保留原有权限校验。
         </p>
       </header>
+      {!mailReady && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-secondary/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-ui text-[13px] leading-relaxed text-soft">
+            邮件发送未启用。前台找回密码只会显示统一提示，用户看不到具体原因。
+          </p>
+          <Link href="/admin/settings#smtp" className="btn-ghost !px-3 !py-1.5 !text-[12px] shrink-0">
+            去配置
+          </Link>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((c) => (
           <Link
@@ -58,6 +73,9 @@ export default async function AdminDashboard() {
         </Link>
         <Link href="/admin/mangas" className="btn-ghost">
           管理漫画
+        </Link>
+        <Link href="/admin/account" className="btn-ghost">
+          账户与密码
         </Link>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

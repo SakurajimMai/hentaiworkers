@@ -250,6 +250,28 @@ export const mangaPages = mysqlTable(
   ],
 );
 
+export const mangaReadingProgress = mysqlTable(
+  'manga_reading_progress',
+  {
+    id: serial('id').primaryKey(),
+    userId: int('user_id').notNull(),
+    mangaId: int('manga_id').notNull(),
+    chapterNumber: int('chapter_number').notNull().default(1),
+    pageIndex: int('page_index').notNull().default(0),
+    lastReadAt: datetime('last_read_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: datetime('updated_at')
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+  },
+  (t) => [
+    uniqueIndex('manga_reading_progress_user_manga_uidx').on(t.userId, t.mangaId),
+    index('manga_reading_progress_user_last_idx').on(t.userId, t.lastReadAt),
+    index('manga_reading_progress_manga_id_idx').on(t.mangaId),
+  ],
+);
+
 export type Anime = typeof animes.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type User = typeof users.$inferSelect;

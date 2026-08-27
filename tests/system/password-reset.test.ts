@@ -269,3 +269,10 @@ test('admin and inactive users do not receive reset tokens', async () => {
   await b.service.requestPasswordReset('dead@example.com');
   assert.equal(b.resets.rows.size, 0);
 });
+
+test('requestPasswordReset stays accepted when outbound mail is disabled', async () => {
+  const { service, resets } = buildService({ smtpEnabled: false });
+  const result = await service.requestPasswordReset('user@example.com');
+  assert.equal(result.accepted, true);
+  assert.equal(resets.rows.size, 0);
+});

@@ -60,7 +60,7 @@ export default async function AdminMangaTagsPage({
   return (
     <div className="space-y-8">
       <div className="admin-page-intro">
-        <p className="font-meta mb-2">Manga tags</p>
+        <p className="font-meta mb-2">漫画标签</p>
         <h1 className="section-title text-3xl text-ink">漫画标签</h1>
         <p className="mt-2 font-ui text-sm text-soft max-w-2xl leading-relaxed">
           漫画标签保存在每部漫画的记录上，与里番标签互不相通。这里可以新增常用标签、

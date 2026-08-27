@@ -13,12 +13,9 @@ import { AppState } from '../../components/AppState';
 import { RemoteImage } from '../../components/RemoteImage';
 import { colors, radius, spacing, virtualizedListProps } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
-import {
-  HistoryItem,
-  MangaHistoryItem,
-  historyStore,
-  mangaHistoryStore,
-} from '../../services/storage';
+import { clearHistory, listHistory, removeHistoryItem } from '../../services/library';
+import { HistoryItem, MangaHistoryItem } from '../../services/storage';
+import { useSession } from '../../services/session';
 
 type MixedHistory =
   | (HistoryItem & { kind: 'anime' })
@@ -40,9 +37,10 @@ export default function HistoryScreen() {
   const [items, setItems] = useState<MixedHistory[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const { user, ready } = useSession();
 
   const reload = async () => {
-    const [animes, mangas] = await Promise.all([historyStore.list(), mangaHistoryStore.list()]);
+    const { animes, mangas } = await listHistory();
     const mixed: MixedHistory[] = [
       ...animes.map((item) => ({ ...item, kind: 'anime' as const })),
       ...mangas.map((item) => ({ ...item, kind: 'manga' as const })),
@@ -54,23 +52,23 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
+      if (!ready) return;
       reload().then(() => {
         if (!mounted) return;
       });
       return () => {
         mounted = false;
       };
-    }, []),
+    }, [ready, user?.id]),
   );
 
   const remove = async (item: MixedHistory) => {
-    if (item.kind === 'anime') await historyStore.remove(item.id);
-    else await mangaHistoryStore.remove(item.id);
+    await removeHistoryItem(item.kind, item.id);
     await reload();
   };
 
   const clearAll = async () => {
-    await Promise.all([historyStore.clear(), mangaHistoryStore.clear()]);
+    await clearHistory();
     setItems([]);
     setEditing(false);
   };
@@ -101,7 +99,14 @@ export default function HistoryScreen() {
       {!loaded ? (
         <AppState loading title="正在加载历史" />
       ) : items.length === 0 ? (
-        <AppState title="还没有记录" description="播放里番或阅读漫画后会出现在这里。" />
+        <AppState
+          title="还没有记录"
+          description={
+            user
+              ? '网页和 App 共用同一份历史。播放或阅读后会出现在这里。'
+              : '登录后可与网页历史互通。未登录时记录只保存在这台设备。'
+          }
+        />
       ) : (
         <FlatList
           data={items}

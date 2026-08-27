@@ -46,6 +46,7 @@ Next.js App  --->  Remote MySQL / MariaDB
 | `user_events` | 播放里程碑事件 |
 | `mangas` / `manga_chapters` / `manga_pages` | 已发布漫画、章节与图片 |
 | `manga_favorites` | 登录用户的漫画收藏 |
+| `manga_reading_progress` | 登录用户漫画阅读进度（网页与 APK 共用） |
 | `manga_view_days` / `manga_view_dedup` | 漫画日/周/月/总榜计数 |
 
 `drizzle/migrations/0010–0013` 是已发布过的历史迁移，可能在旧数据库中留下不再使用的 works 表。主站代码不得读写这些表，处理建议见 [变更记录](./CHANGELOG.md)。
@@ -53,7 +54,7 @@ Next.js App  --->  Remote MySQL / MariaDB
 ## 5. 接口
 
 - 匿名只读：`/api/animes*`、`/api/tags`、`/api/mangas*`
-- 登录用户：`/api/me/watch-progress*`
+- 登录用户：`/api/me/watch-progress*`、`/api/me/favorites`、`/api/me/manga-progress*`
 - 漫画入库：`POST /api/manga/publish`（共享密钥，不是前台会话）
 - 健康检查：`/api/live`、`/api/ready`、`/api/health`
 - 后台写操作：`app/admin/actions.ts` 的 Server Actions

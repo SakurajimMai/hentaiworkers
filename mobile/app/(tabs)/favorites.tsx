@@ -14,12 +14,9 @@ import { AppState } from '../../components/AppState';
 import { RemoteImage } from '../../components/RemoteImage';
 import { colors, radius, spacing } from '../../constants/theme';
 import { normalizeMediaUrl } from '../../services/media';
-import {
-  FavoriteItem,
-  MangaFavoriteItem,
-  favoritesStore,
-  mangaFavoritesStore,
-} from '../../services/storage';
+import { listFavorites, removeAnimeFavorite, removeMangaFavorite } from '../../services/library';
+import { FavoriteItem, MangaFavoriteItem } from '../../services/storage';
+import { useSession } from '../../services/session';
 
 export default function FavoritesScreen() {
   const router = useRouter();
@@ -29,6 +26,7 @@ export default function FavoritesScreen() {
   const [mangas, setMangas] = useState<MangaFavoriteItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const { user, ready } = useSession();
 
   const horizontalPadding = spacing.lg;
   const gridGap = spacing.md;
@@ -36,10 +34,7 @@ export default function FavoritesScreen() {
   const cardWidth = (width - horizontalPadding * 2 - gridGap * (columns - 1)) / columns;
 
   const reload = async () => {
-    const [animeItems, mangaItems] = await Promise.all([
-      favoritesStore.list(),
-      mangaFavoritesStore.list(),
-    ]);
+    const { animes: animeItems, mangas: mangaItems } = await listFavorites();
     setAnimes(animeItems);
     setMangas(mangaItems);
     setLoaded(true);
@@ -48,22 +43,23 @@ export default function FavoritesScreen() {
   useFocusEffect(
     useCallback(() => {
       let mounted = true;
+      if (!ready) return;
       reload().then(() => {
         if (!mounted) return;
       });
       return () => {
         mounted = false;
       };
-    }, []),
+    }, [ready, user?.id]),
   );
 
   const removeAnime = async (id: number) => {
-    await favoritesStore.remove(id);
+    await removeAnimeFavorite(id);
     await reload();
   };
 
   const removeManga = async (id: number) => {
-    await mangaFavoritesStore.remove(id);
+    await removeMangaFavorite(id);
     await reload();
   };
 
@@ -96,7 +92,11 @@ export default function FavoritesScreen() {
       ) : empty ? (
         <AppState
           title="还没有收藏"
-          description="在详情页点爱心，里番和漫画都会出现在这里。"
+          description={
+            user
+              ? '网页和 App 共用同一份收藏。在详情页点爱心即可同步。'
+              : '登录后可与网页收藏互通。未登录时收藏只保存在这台设备。'
+          }
         />
       ) : (
         <ScrollView
