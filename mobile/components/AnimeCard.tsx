@@ -73,8 +73,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cover: {
-    height: '100%',
-    width: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   coverFallback: {
     alignItems: 'center',

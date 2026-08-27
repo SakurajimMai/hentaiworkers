@@ -13,11 +13,9 @@ const MAX_SCALE = 4;
 
 export function ZoomableReader({
   children,
-  onTap,
   onZoomChange,
 }: {
   children: React.ReactNode;
-  onTap?: (x: number, width: number) => void;
   onZoomChange?: (zoomed: boolean) => void;
 }) {
   const [box, setBox] = useState({ width: 1, height: 1 });
@@ -57,6 +55,7 @@ export function ZoomableReader({
       }
     });
 
+  // 未放大时不要抢竖滑；放大后才平移画面。
   const pan = Gesture.Pan()
     .manualActivation(true)
     .minPointers(1)
@@ -79,13 +78,8 @@ export function ZoomableReader({
       savedTy.value = ty.value;
     });
 
-  const tap = Gesture.Tap()
-    .maxDuration(280)
-    .onEnd((event) => {
-      if (onTap) runOnJS(onTap)(event.x, box.width);
-    });
-
-  const composed = Gesture.Simultaneous(pinch, pan, tap);
+  const nativeScroll = Gesture.Native();
+  const composed = Gesture.Simultaneous(nativeScroll, pinch, pan);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
@@ -98,8 +92,10 @@ export function ZoomableReader({
 
   return (
     <GestureDetector gesture={composed}>
-      <View style={styles.clip} onLayout={onLayout}>
-        <Animated.View style={[styles.fill, style]}>{children}</Animated.View>
+      <View style={styles.clip} onLayout={onLayout} collapsable={false}>
+        <Animated.View style={[styles.fill, style]} collapsable={false}>
+          {children}
+        </Animated.View>
       </View>
     </GestureDetector>
   );

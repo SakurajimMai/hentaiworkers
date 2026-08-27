@@ -9,6 +9,9 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type GestureResponderEvent,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
   type ViewToken,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -29,36 +32,15 @@ import { MangaChapterDetail, MangaDetail, MangaPage } from '../../../services/ty
 
 function MangaPageImage({ uri, width }: { uri: string; width: number }) {
   const [ratio, setRatio] = useState(2 / 3);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    Image.getSize(
-      uri,
-      (w, h) => {
-        if (!cancelled && w > 0 && h > 0) setRatio(w / h);
-      },
-      () => {
-        if (!cancelled) setFailed(true);
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [uri]);
-
-  if (failed) {
-    return (
-      <View style={[styles.pageFallback, { width, height: width * 1.4 }]}>
-        <Text style={styles.pageFallbackText}>图片加载失败</Text>
-      </View>
-    );
-  }
 
   return (
     <RemoteImage
       source={{ uri }}
       resizeMode="contain"
+      onLoad={(event) => {
+        const src = event.nativeEvent.source;
+        if (src?.width > 0 && src?.height > 0) setRatio(src.width / src.height);
+      }}
       style={{ width, height: width / ratio, backgroundColor: 'transparent' }}
     />
   );
@@ -78,7 +60,9 @@ export default function MangaReaderScreen() {
   const [chapter, setChapter] = useState<MangaChapterDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chromeVisible, setChromeVisible] = useState(true);
+  const [chromeVisible, setChromeVisible] = useState(false);
+  const touchStart = useRef({ x: 0, y: 0, t: 0 });
+  const didScroll = useRef(false);
   const [favorited, setFavorited] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [chaptersOpen, setChaptersOpen] = useState(false);
@@ -178,11 +162,32 @@ export default function MangaReaderScreen() {
     listRef.current?.scrollToIndex({ index: next, animated: true, viewPosition: 0 });
   };
 
-  const handleTap = (x: number, viewWidth: number) => {
-    const w = viewWidth || width;
-    if (x < w / 3) goPage(pageIndex - 1);
-    else if (x > (w * 2) / 3) goPage(pageIndex + 1);
-    else setChromeVisible((value) => !value);
+  const onTouchStart = (event: GestureResponderEvent) => {
+    didScroll.current = false;
+    touchStart.current = {
+      x: event.nativeEvent.pageX,
+      y: event.nativeEvent.pageY,
+      t: Date.now(),
+    };
+  };
+
+  const onTouchEnd = (event: GestureResponderEvent) => {
+    if (zoomed) return;
+    const dt = Date.now() - touchStart.current.t;
+    const dx = Math.abs(event.nativeEvent.pageX - touchStart.current.x);
+    const dy = Math.abs(event.nativeEvent.pageY - touchStart.current.y);
+    if (!didScroll.current && dt < 280 && dx < 12 && dy < 12) {
+      setChromeVisible((value) => !value);
+    }
+  };
+
+  const onScrollBeginDrag = () => {
+    didScroll.current = true;
+    if (chromeVisible) setChromeVisible(false);
+  };
+
+  const onMomentumScrollEnd = (_event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    didScroll.current = false;
   };
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -222,15 +227,18 @@ export default function MangaReaderScreen() {
   return (
     <View collapsable={false} style={styles.screen}>
       <StatusBar style="light" hidden={!chromeVisible} />
-      <ZoomableReader onTap={handleTap} onZoomChange={setZoomed}>
+      <ZoomableReader onZoomChange={setZoomed}>
         <FlatList
           ref={listRef}
           data={pages}
           keyExtractor={(item) => String(item.index)}
           renderItem={renderPage}
-          extraData={chromeVisible}
           showsVerticalScrollIndicator={false}
           scrollEnabled={!zoomed}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          onScrollBeginDrag={onScrollBeginDrag}
+          onMomentumScrollEnd={onMomentumScrollEnd}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
           {...virtualizedListProps}
@@ -249,14 +257,14 @@ export default function MangaReaderScreen() {
             ) : null
           }
           ListFooterComponent={
-            <View style={{ paddingBottom: insets.bottom + 88 }}>
+            <View style={{ paddingBottom: insets.bottom + 96 }}>
               {bottomHtml ? (
                 <View style={styles.readerAd}>
                   <HtmlAd html={bottomHtml} dark minHeight={72} maxHeight={240} />
                 </View>
               ) : null}
               <Text style={styles.endText}>
-                {nextChapter ? '本话结束，点右侧进入下一话' : '已经读到最后'}
+                {nextChapter ? '本话结束，打开菜单进入下一话' : '已经读到最后'}
               </Text>
             </View>
           }
@@ -288,30 +296,29 @@ export default function MangaReaderScreen() {
               <Ionicons name="list-outline" size={18} color={colors.white} />
             </Pressable>
           </View>
+          <View style={[styles.scrubberBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+            <View style={styles.scrubberRow}>
+              <Pressable
+                disabled={!prevChapter}
+                onPress={() => prevChapter && openChapter(prevChapter.number)}
+                style={[styles.edgeBtn, !prevChapter && styles.edgeBtnDisabled]}
+              >
+                <Text style={styles.edgeBtnText}>上一话</Text>
+              </Pressable>
+              <View style={styles.scrubberGrow}>
+                <PageScrubber index={pageIndex} total={pages.length} onSeek={goPage} />
+              </View>
+              <Pressable
+                disabled={!nextChapter}
+                onPress={() => nextChapter && openChapter(nextChapter.number)}
+                style={[styles.edgeBtn, !nextChapter && styles.edgeBtnDisabled]}
+              >
+                <Text style={styles.edgeBtnText}>下一话</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       ) : null}
-
-      <View style={[styles.scrubberBar, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <View style={styles.scrubberRow}>
-          <Pressable
-            disabled={!prevChapter}
-            onPress={() => prevChapter && openChapter(prevChapter.number)}
-            style={[styles.edgeBtn, !prevChapter && styles.edgeBtnDisabled]}
-          >
-            <Text style={styles.edgeBtnText}>上一话</Text>
-          </Pressable>
-          <View style={styles.scrubberGrow}>
-            <PageScrubber index={pageIndex} total={pages.length} onSeek={goPage} />
-          </View>
-          <Pressable
-            disabled={!nextChapter}
-            onPress={() => nextChapter && openChapter(nextChapter.number)}
-            style={[styles.edgeBtn, !nextChapter && styles.edgeBtnDisabled]}
-          >
-            <Text style={styles.edgeBtnText}>下一话</Text>
-          </Pressable>
-        </View>
-      </View>
 
       <Modal visible={chaptersOpen} transparent animationType="fade" onRequestClose={() => setChaptersOpen(false)}>
         <Pressable style={styles.modalBg} onPress={() => setChaptersOpen(false)}>
