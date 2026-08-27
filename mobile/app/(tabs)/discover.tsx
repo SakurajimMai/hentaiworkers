@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   ListRenderItemInfo,
   Pressable,
@@ -46,6 +47,7 @@ export default function DiscoverScreen() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const horizontalPadding = spacing.lg;
   const gridGap = spacing.md;
@@ -58,9 +60,10 @@ export default function DiscoverScreen() {
   const { slots } = useCatalogSlots(animes, itemKey);
 
   const loadAnimes = useCallback(
-    async (nextPage: number) => {
+    async (nextPage: number, append = false) => {
       try {
-        setLoading(true);
+        if (append) setLoadingMore(true);
+        else setLoading(true);
         setError(null);
         const response = await animeApi.getAnimeList({
           page: nextPage,
@@ -68,7 +71,11 @@ export default function DiscoverScreen() {
           search: appliedSearch,
           tagId: tagId ? Number(tagId) : undefined,
         });
-        setAnimes(response.data);
+        setAnimes((prev) => {
+          if (!append || nextPage <= 1) return response.data;
+          const seen = new Set(prev.map((item) => item.id));
+          return [...prev, ...response.data.filter((item) => !seen.has(item.id))];
+        });
         setPage(response.pagination.page);
         setTotal(response.pagination.total);
         setTotalPages(Math.max(response.pagination.totalPages, 1));
@@ -76,6 +83,7 @@ export default function DiscoverScreen() {
         setError(e instanceof Error ? e.message : '加载失败');
       } finally {
         setLoading(false);
+        setLoadingMore(false);
         setRefreshing(false);
       }
     },
@@ -89,8 +97,8 @@ export default function DiscoverScreen() {
   }, [initialSearch]);
 
   useEffect(() => {
-    loadAnimes(page);
-  }, [loadAnimes, page]);
+    void loadAnimes(1, false);
+  }, [loadAnimes]);
 
   const submitSearch = () => {
     setPage(1);
@@ -101,24 +109,10 @@ export default function DiscoverScreen() {
     router.replace('/discover');
   };
 
-  const changePage = (next: number) => {
-    if (!loading && next >= 1 && next <= totalPages && next !== page) {
-      setPage(next);
-    }
+  const loadMore = () => {
+    if (loading || loadingMore || page >= totalPages) return;
+    void loadAnimes(page + 1, true);
   };
-
-  const pageItems = useMemo<(number | 'gap')[]>(() => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    if (page <= 3) {
-      return [1, 2, 3, 'gap', totalPages];
-    }
-    if (page >= totalPages - 2) {
-      return [1, 'gap', totalPages - 2, totalPages - 1, totalPages];
-    }
-    return [1, 'gap', page, 'gap', totalPages];
-  }, [page, totalPages]);
 
   const renderItem = ({ item, index }: ListRenderItemInfo<(typeof slots)[number]>) => {
     const columnIndex = index % columns;
@@ -194,72 +188,17 @@ export default function DiscoverScreen() {
             <AppState title="没有内容" description="尝试搜索其它关键词" />
           )
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
         ListFooterComponent={
-          animes.length > 0 && totalPages > 1 ? (
-            <View style={styles.pagination}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="上一页"
-                disabled={page <= 1}
-                onPress={() => changePage(page - 1)}
-                style={({ pressed }) => [
-                  styles.pageNav,
-                  page <= 1 && styles.pageNavDisabled,
-                  pressed && page > 1 && styles.pagePressed,
-                ]}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={16}
-                  color={page <= 1 ? colors.textSubtle : colors.text}
-                />
-              </Pressable>
-              {pageItems.map((item, idx) =>
-                item === 'gap' ? (
-                  <Text key={`gap-${idx}`} style={styles.pageGap}>
-                    ···
-                  </Text>
-                ) : (
-                  <Pressable
-                    key={item}
-                    accessibilityRole="button"
-                    accessibilityLabel={`第 ${item} 页`}
-                    onPress={() => changePage(item)}
-                    style={({ pressed }) => [
-                      styles.pageNum,
-                      item === page && styles.pageNumActive,
-                      pressed && item !== page && styles.pagePressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.pageNumText,
-                        item === page && styles.pageNumTextActive,
-                      ]}
-                    >
-                      {item}
-                    </Text>
-                  </Pressable>
-                ),
-              )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="下一页"
-                disabled={page >= totalPages}
-                onPress={() => changePage(page + 1)}
-                style={({ pressed }) => [
-                  styles.pageNav,
-                  page >= totalPages && styles.pageNavDisabled,
-                  pressed && page < totalPages && styles.pagePressed,
-                ]}
-              >
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={page >= totalPages ? colors.textSubtle : colors.text}
-                />
-              </Pressable>
+          loadingMore ? (
+            <View style={styles.feedFooter}>
+              <ActivityIndicator color={colors.primary} />
             </View>
+          ) : animes.length > 0 ? (
+            <Text style={styles.feedHint}>
+              {page >= totalPages ? `共 ${total} 部` : '上滑加载更多'}
+            </Text>
           ) : null
         }
         refreshControl={
@@ -270,7 +209,7 @@ export default function DiscoverScreen() {
             onRefresh={() => {
               setRefreshing(true);
               loadAdsConfig(true);
-              loadAnimes(page);
+              loadAnimes(1);
             }}
           />
         }
@@ -389,5 +328,15 @@ const styles = StyleSheet.create({
   },
   pagePressed: {
     opacity: 0.78,
+  },
+  feedFooter: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  feedHint: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    paddingVertical: spacing.lg,
+    textAlign: 'center',
   },
 });

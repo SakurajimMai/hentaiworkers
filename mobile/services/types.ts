@@ -46,6 +46,13 @@ export interface AnimeListParams {
   sort?: 'latest' | 'popular';
 }
 
+export interface AuthUser {
+  id: number;
+  username: string;
+  displayName?: string | null;
+  role: 'user' | 'admin' | string;
+}
+
 export type MangaRank = 'day' | 'week' | 'month' | 'all';
 
 export interface MangaSummary {

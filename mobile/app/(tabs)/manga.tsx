@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   ListRenderItemInfo,
   Pressable,
@@ -57,6 +58,7 @@ export default function MangaCatalogScreen() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const horizontalPadding = spacing.lg;
   const gridGap = spacing.md;
@@ -69,9 +71,10 @@ export default function MangaCatalogScreen() {
   const { slots } = useCatalogSlots(mangas, itemKey);
 
   const loadMangas = useCallback(
-    async (nextPage: number) => {
+    async (nextPage: number, append = false) => {
       try {
-        setLoading(true);
+        if (append) setLoadingMore(true);
+        else setLoading(true);
         setError(null);
         const response = await mangaApi.getMangaList({
           page: nextPage,
@@ -80,7 +83,11 @@ export default function MangaCatalogScreen() {
           tag: tag || undefined,
           rank,
         });
-        setMangas(response.data);
+        setMangas((prev) => {
+          if (!append || nextPage <= 1) return response.data;
+          const seen = new Set(prev.map((item) => item.id));
+          return [...prev, ...response.data.filter((item) => !seen.has(item.id))];
+        });
         setPage(response.pagination.page);
         setTotal(response.pagination.total);
         setTotalPages(Math.max(response.pagination.totalPages, 1));
@@ -88,6 +95,7 @@ export default function MangaCatalogScreen() {
         setError(e instanceof Error ? e.message : '加载失败');
       } finally {
         setLoading(false);
+        setLoadingMore(false);
         setRefreshing(false);
       }
     },
@@ -101,8 +109,8 @@ export default function MangaCatalogScreen() {
   }, [initialSearch, tag, rank]);
 
   useEffect(() => {
-    loadMangas(page);
-  }, [loadMangas, page]);
+    void loadMangas(1, false);
+  }, [loadMangas]);
 
   const pushFilters = (next: { q?: string; tag?: string; rank?: string }) => {
     const paramsNext: Record<string, string> = {};
@@ -126,24 +134,10 @@ export default function MangaCatalogScreen() {
     pushFilters({ rank: next });
   };
 
-  const changePage = (next: number) => {
-    if (!loading && next >= 1 && next <= totalPages && next !== page) {
-      setPage(next);
-    }
+  const loadMore = () => {
+    if (loading || loadingMore || page >= totalPages) return;
+    void loadMangas(page + 1, true);
   };
-
-  const pageItems = useMemo<(number | 'gap')[]>(() => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    if (page <= 3) {
-      return [1, 2, 3, 'gap', totalPages];
-    }
-    if (page >= totalPages - 2) {
-      return [1, 'gap', totalPages - 2, totalPages - 1, totalPages];
-    }
-    return [1, 'gap', page, 'gap', totalPages];
-  }, [page, totalPages]);
 
   const renderItem = ({ item, index }: ListRenderItemInfo<(typeof slots)[number]>) => {
     const columnIndex = index % columns;
@@ -237,67 +231,17 @@ export default function MangaCatalogScreen() {
             <AppState title="没有内容" description="换个关键词，或看看最近更新。" />
           )
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
         ListFooterComponent={
-          mangas.length > 0 && totalPages > 1 ? (
-            <View style={styles.pagination}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="上一页"
-                disabled={page <= 1}
-                onPress={() => changePage(page - 1)}
-                style={({ pressed }) => [
-                  styles.pageNav,
-                  page <= 1 && styles.pageNavDisabled,
-                  pressed && page > 1 && styles.pagePressed,
-                ]}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={16}
-                  color={page <= 1 ? colors.textSubtle : colors.text}
-                />
-              </Pressable>
-              {pageItems.map((item, idx) =>
-                item === 'gap' ? (
-                  <Text key={`gap-${idx}`} style={styles.pageGap}>
-                    ···
-                  </Text>
-                ) : (
-                  <Pressable
-                    key={item}
-                    accessibilityRole="button"
-                    accessibilityLabel={`第 ${item} 页`}
-                    onPress={() => changePage(item)}
-                    style={({ pressed }) => [
-                      styles.pageNum,
-                      item === page && styles.pageNumActive,
-                      pressed && item !== page && styles.pagePressed,
-                    ]}
-                  >
-                    <Text style={[styles.pageNumText, item === page && styles.pageNumTextActive]}>
-                      {item}
-                    </Text>
-                  </Pressable>
-                ),
-              )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="下一页"
-                disabled={page >= totalPages}
-                onPress={() => changePage(page + 1)}
-                style={({ pressed }) => [
-                  styles.pageNav,
-                  page >= totalPages && styles.pageNavDisabled,
-                  pressed && page < totalPages && styles.pagePressed,
-                ]}
-              >
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={page >= totalPages ? colors.textSubtle : colors.text}
-                />
-              </Pressable>
+          loadingMore ? (
+            <View style={styles.feedFooter}>
+              <ActivityIndicator color={colors.primary} />
             </View>
+          ) : mangas.length > 0 ? (
+            <Text style={styles.feedHint}>
+              {page >= totalPages ? `共 ${total} 部` : '上滑加载更多'}
+            </Text>
           ) : null
         }
         refreshControl={
@@ -308,7 +252,7 @@ export default function MangaCatalogScreen() {
             onRefresh={() => {
               setRefreshing(true);
               loadAdsConfig(true);
-              loadMangas(page);
+              loadMangas(1);
             }}
           />
         }
@@ -455,5 +399,15 @@ const styles = StyleSheet.create({
   },
   pagePressed: {
     opacity: 0.78,
+  },
+  feedFooter: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+  feedHint: {
+    color: colors.textSubtle,
+    fontSize: 12,
+    paddingVertical: spacing.lg,
+    textAlign: 'center',
   },
 });

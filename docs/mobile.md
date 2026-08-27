@@ -30,8 +30,13 @@ EXPO_PUBLIC_API_BASE_URL=https://www.ixacg.de
 | 漫画 | 搜索、日/周/月/总榜、标签筛选 |
 | 历史 | 里番观看与漫画阅读记录 |
 | 收藏 | 本机收藏的里番与漫画 |
+| 我的 | 网站账号登录 / 退出 |
 
-详情在 `/manga-detail/{id}`，阅读在 `/manga-reader/{id}/{chapter}`，纵向连续滚图。
+发现页和漫画页是瀑布流无限加载（上滑加载更多），不再翻页。
+
+详情在 `/manga-detail/{id}`，阅读在 `/manga-reader/{id}/{chapter}`。阅读页参考 TachiyomiJ2K：条漫/翻页、左右点击翻页、中间开关工具栏、目录、背景与遮罩亮度、上一话/下一话。
+
+登录走 `POST /api/auth/login`（JSON），会话 cookie 存在本机并随请求带上。
 
 不要在开发机执行 `expo prebuild` 或 `assembleRelease`。打包只走 GitHub Actions。
 

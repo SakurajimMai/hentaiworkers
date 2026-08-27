@@ -1,9 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import {
   Anime,
   AnimeListParams,
   AnimeListResponse,
+  AuthUser,
   MangaChapterResponse,
   MangaDetail,
   MangaListParams,
@@ -36,6 +38,45 @@ function resolveApiBaseUrl(): string {
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
+
+const SESSION_COOKIE_KEY = '@auth/cookie';
+let sessionCookie = '';
+
+export async function loadSessionCookie(): Promise<string> {
+  try {
+    sessionCookie = (await AsyncStorage.getItem(SESSION_COOKIE_KEY)) || '';
+  } catch {
+    sessionCookie = '';
+  }
+  return sessionCookie;
+}
+
+export async function clearSessionCookie(): Promise<void> {
+  sessionCookie = '';
+  try {
+    await AsyncStorage.removeItem(SESSION_COOKIE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function cookieFromSetCookie(header: string | null): string {
+  if (!header) return '';
+  const match = header.match(/animestream_session=[^;]+/i);
+  if (match) return match[0];
+  return header.split(';')[0].trim();
+}
+
+async function persistSessionCookie(header: string | null): Promise<void> {
+  const value = cookieFromSetCookie(header);
+  if (!value) return;
+  sessionCookie = value;
+  try {
+    await AsyncStorage.setItem(SESSION_COOKIE_KEY, value);
+  } catch {
+    /* ignore */
+  }
+}
 
 export class ApiError extends Error {
   status: number;
@@ -86,12 +127,22 @@ function buildMangaListQuery(params: MangaListParams = {}) {
   return query.toString();
 }
 
-async function fetchJson<T>(endpoint: string): Promise<T> {
+async function fetchJson<T>(endpoint: string, init?: RequestInit): Promise<T> {
+  if (!sessionCookie) {
+    await loadSessionCookie();
+  }
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (sessionCookie) {
+    headers.Cookie = sessionCookie;
+  }
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      Accept: 'application/json',
-    },
+    ...init,
+    headers,
   });
+  await persistSessionCookie(response.headers.get('set-cookie'));
 
   const responseText = await response.text();
   let payload: any = null;
@@ -185,3 +236,32 @@ class AdsApiService {
 }
 
 export const adsApi = new AdsApiService();
+
+class AuthApiService {
+  async login(emailOrUsername: string, password: string): Promise<AuthUser> {
+    const payload = await fetchJson<{ user: AuthUser } | { error?: string }>('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailOrUsername, password }),
+    });
+    if (!('user' in payload) || !payload.user) {
+      throw new ApiError(('error' in payload && payload.error) || '登录失败', 401);
+    }
+    return payload.user;
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await fetchJson('/api/auth/logout', { method: 'POST' });
+    } finally {
+      await clearSessionCookie();
+    }
+  }
+
+  async me(): Promise<AuthUser | null> {
+    const payload = await fetchJson<{ user: AuthUser | null }>('/api/me');
+    return payload.user || null;
+  }
+}
+
+export const authApi = new AuthApiService();

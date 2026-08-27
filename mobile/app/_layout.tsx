@@ -98,6 +98,7 @@ export default function RootLayout() {
               <Stack.Screen name="player/[id]" options={{ animation: 'fade' }} />
               <Stack.Screen name="manga-detail/[id]" />
               <Stack.Screen name="manga-reader/[id]/[number]" options={{ animation: 'fade' }} />
+              <Stack.Screen name="login" options={{ animation: 'fade', presentation: 'modal' }} />
             </Stack>
           </View>
         </ThemeProvider>

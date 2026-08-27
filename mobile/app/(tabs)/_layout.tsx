@@ -85,6 +85,15 @@ export default function TabsLayout() {
           tabBarLabel: ({ focused }) => <TabLabel label="收藏" focused={focused} />,
         }}
       />
+      <Tabs.Screen
+        name="account"
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />
+          ),
+          tabBarLabel: ({ focused }) => <TabLabel label="我的" focused={focused} />,
+        }}
+      />
     </Tabs>
   );
 }
