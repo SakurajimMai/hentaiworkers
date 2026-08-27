@@ -6,6 +6,21 @@
 export const MAX_MANGA_TAG_LENGTH = 40;
 export const MAX_MANGA_TAGS = 30;
 
+const TRAILING_META =
+  /(?:\s*(?:原作|角色|艺术家|藝術家|其他|混合|汉化|漢化|译者|譯者)\s*[:：][^\n]*)+$/u;
+
+/** Strip channel template tails like「原作： Order」or empty「原作: 角色:」. */
+export function cleanMangaDisplayTitle(value: string | null | undefined): string {
+  let title = String(value ?? '').replace(/\s+/g, ' ').replace(/^[-_| ]+|[-_| ]+$/g, '');
+  if (!title) return '';
+  let prev = '';
+  while (prev !== title) {
+    prev = title;
+    title = title.replace(TRAILING_META, '').replace(/^[-_| ]+|[-_| ]+$/g, '');
+  }
+  return title;
+}
+
 function cleanTag(value: string): string {
   return value.normalize('NFKC').trim();
 }

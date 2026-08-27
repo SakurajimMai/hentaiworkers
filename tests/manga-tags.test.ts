@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  cleanMangaDisplayTitle,
   mangaRecordHasTag,
   mangaTagHref,
   normalizeMangaTagQuery,
@@ -35,4 +36,12 @@ test('漫画标签链接只指向漫画目录', () => {
 
 test('查询标签会做 NFKC 规范化', () => {
   assert.equal(normalizeMangaTagQuery('  Ａ '), 'A');
+});
+
+test('漫画标题去掉原作/角色模板尾巴', () => {
+  assert.equal(
+    cleanMangaDisplayTitle('早乙女乱马 铃鹿御前 BBC 原作： Order'),
+    '早乙女乱马 铃鹿御前 BBC',
+  );
+  assert.equal(cleanMangaDisplayTitle('kei SPH/BBC 原作: 角色:'), 'kei SPH/BBC');
 });

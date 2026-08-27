@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic';
 const emptySite = {
   androidDownloadUrl: '',
   androidDownloadLabel: '下载 App',
+  telegramUrl: '',
+  telegramLabel: 'Telegram',
 } as const;
 
 async function readPublicSiteConfig() {
@@ -43,7 +45,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 AnimeStream
               </p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-10 gap-y-6 font-ui text-[13px]">
+            <div
+              className={`grid grid-cols-2 gap-x-10 gap-y-6 font-ui text-[13px] ${
+                site.telegramUrl ? 'sm:grid-cols-4' : 'sm:grid-cols-3'
+              }`}
+            >
               <div>
                 <p className="font-meta mb-2.5">浏览</p>
                 <ul className="space-y-1.5 text-soft">
@@ -111,6 +117,23 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                   </li>
                 </ul>
               </div>
+              {site.telegramUrl ? (
+                <div>
+                  <p className="font-meta mb-2.5">社区</p>
+                  <ul className="space-y-1.5 text-soft">
+                    <li>
+                      <a
+                        href={site.telegramUrl}
+                        className="hover:text-ink transition-colors"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        {site.telegramLabel}
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border pt-5">

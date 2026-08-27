@@ -147,8 +147,9 @@ export default async function HomePage() {
           },
         }}
       />
-      <div className="page-shell pt-8 sm:pt-12 space-y-14 sm:space-y-16">
+      <div className="page-shell pt-3 sm:pt-4">
         <h1 className="sr-only">AnimeStream 里番与漫画</h1>
+        <div className="space-y-14 sm:space-y-16">
         {error && (
           <div className="notice-error !text-sm">
             无法加载内容：{error}
@@ -267,6 +268,7 @@ export default async function HomePage() {
             ))}
           </HorizontalCarousel>
         )}
+        </div>
       </div>
     </div>
   );

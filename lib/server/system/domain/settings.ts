@@ -177,6 +177,9 @@ export const siteSettingsSchema = z.object({
   /** Public Android APK / download page. Empty hides the footer link. */
   androidDownloadUrl: z.string().max(1000).default(''),
   androidDownloadLabel: z.string().min(1).max(40).default('下载 App'),
+  /** Public Telegram channel / group. Empty hides the footer link. */
+  telegramUrl: z.string().max(1000).default(''),
+  telegramLabel: z.string().min(1).max(40).default('Telegram'),
 });
 
 export const heroSettingsSchema = z.object({
@@ -263,13 +266,33 @@ export function toPublicAdsConfig(settings: SystemSettings): PublicAdsConfig {
 export type PublicSiteConfig = Readonly<{
   androidDownloadUrl: string;
   androidDownloadLabel: string;
+  telegramUrl: string;
+  telegramLabel: string;
 }>;
+
+const TELEGRAM_HTTPS =
+  /^https?:\/\/(?:t\.me|telegram\.me|telegram\.dog)\//i;
+const TELEGRAM_HOST = /^(?:t\.me|telegram\.me|telegram\.dog)\//i;
+const TELEGRAM_USERNAME = /^@?[a-zA-Z][a-zA-Z0-9_]{3,31}$/;
+
+export function normalizePublicTelegramUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+  if (TELEGRAM_HTTPS.test(value)) return value;
+  if (TELEGRAM_HOST.test(value)) return `https://${value}`;
+  if (TELEGRAM_USERNAME.test(value)) {
+    return `https://t.me/${value.replace(/^@/, '')}`;
+  }
+  return '';
+}
 
 export function toPublicSiteConfig(settings: SystemSettings): PublicSiteConfig {
   const url = settings.site.androidDownloadUrl.trim();
   return {
     androidDownloadUrl: /^https?:\/\//i.test(url) ? url : '',
     androidDownloadLabel: settings.site.androidDownloadLabel.trim() || '下载 App',
+    telegramUrl: normalizePublicTelegramUrl(settings.site.telegramUrl),
+    telegramLabel: settings.site.telegramLabel.trim() || 'Telegram',
   };
 }
 

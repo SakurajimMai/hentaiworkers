@@ -1,13 +1,7 @@
 export default function SiteLoading() {
   return (
     <div className="pb-20 sm:pb-24">
-      <div className="page-shell pt-8 sm:pt-12 space-y-12">
-        <div className="max-w-xl space-y-3">
-          <div className="skeleton h-3 w-24" />
-          <div className="skeleton h-10 w-72 max-w-full" />
-          <div className="skeleton h-4 w-full max-w-md" />
-          <div className="skeleton h-4 w-2/3 max-w-sm" />
-        </div>
+      <div className="page-shell pt-3 sm:pt-4 space-y-12">
         <div className="skeleton h-[min(46vh,460px)] min-h-[320px] w-full rounded-3xl" />
         <div className="space-y-4">
           <div className="flex items-end justify-between border-b border-border pb-3">

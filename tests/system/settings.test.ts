@@ -119,6 +119,33 @@ test('public site config only exposes http(s) android download links', () => {
   const defaults = toPublicSiteConfig(parseSystemSettings({}));
   assert.equal(defaults.androidDownloadUrl, '');
   assert.equal(defaults.androidDownloadLabel, '下载 App');
+  assert.equal(defaults.telegramUrl, '');
+  assert.equal(defaults.telegramLabel, 'Telegram');
+});
+
+test('public site config accepts telegram channel aliases', () => {
+  const hidden = toPublicSiteConfig(
+    parseSystemSettings({
+      site: { telegramUrl: 'javascript:alert(1)', telegramLabel: '频道' },
+    }),
+  );
+  assert.equal(hidden.telegramUrl, '');
+  assert.equal(hidden.telegramLabel, '频道');
+
+  const shown = toPublicSiteConfig(
+    parseSystemSettings({
+      site: { telegramUrl: '@ACGN_Manga', telegramLabel: '  漫画频道  ' },
+    }),
+  );
+  assert.equal(shown.telegramUrl, 'https://t.me/ACGN_Manga');
+  assert.equal(shown.telegramLabel, '漫画频道');
+
+  const invite = toPublicSiteConfig(
+    parseSystemSettings({
+      site: { telegramUrl: 't.me/+AbCdEf' },
+    }),
+  );
+  assert.equal(invite.telegramUrl, 'https://t.me/+AbCdEf');
 });
 
 test('toPublicAdsConfig keeps enabled feed/reader slots and player ads', () => {

@@ -292,6 +292,8 @@ export class SystemSettingsService {
         ...omitUndefined({
           androidDownloadUrl: input.site?.androidDownloadUrl,
           androidDownloadLabel: input.site?.androidDownloadLabel,
+          telegramUrl: input.site?.telegramUrl,
+          telegramLabel: input.site?.telegramLabel,
         }),
       },
     });
@@ -426,9 +428,12 @@ export class SystemSettingsService {
     password: string;
     turnstileToken?: string | null;
     remoteIp?: string | null;
+    skipTurnstile?: boolean;
   }): Promise<UserRecord | null> {
     this.assertNotRateLimited('login', input.remoteIp, input.emailOrUsername);
-    await this.assertTurnstileIfRequired('login', input.turnstileToken, input.remoteIp);
+    if (!input.skipTurnstile) {
+      await this.assertTurnstileIfRequired('login', input.turnstileToken, input.remoteIp);
+    }
     return this.identity.loginPublic(input.emailOrUsername, input.password);
   }
 

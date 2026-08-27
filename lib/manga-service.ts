@@ -392,18 +392,9 @@ async function appendMangaChapterPages(
   const toAdd = input.imageUrls.filter((url) => url && !seen.has(url));
   const [mangaRow] = await db.select().from(mangas).where(eq(mangas.id, chapter.mangaId)).limit(1);
 
-  if (toAdd.length === 0) {
-    if (mangaRow && (input.author || input.tags.length || input.title || input.chapterTitle)) {
-      await refreshMangaAggregates(mangaRow.id, {
-        title: input.title,
-        chapterTitle: input.chapterTitle,
-        chapterId: chapter.id,
-        author: input.author,
-        tags: input.tags,
-        coverUrl: input.coverUrl,
-        sourceChatTitle: input.sourceChatTitle,
-      });
-    }
+  // 同源再采：图片可能被重新传到图床变成新 URL。页数没有增加时一律视为重复，
+  // 既不追加页面，也不刷新 updatedAt。
+  if (toAdd.length === 0 || existingPages.length >= input.imageUrls.length) {
     return {
       status: 'duplicate',
       sourceKey: input.sourceKey,

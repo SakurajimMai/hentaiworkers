@@ -557,6 +557,8 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
       site: {
         androidDownloadUrl: String(formData.get('androidDownloadUrl') || '').trim(),
         androidDownloadLabel: String(formData.get('androidDownloadLabel') || '').trim() || '下载 App',
+        telegramUrl: String(formData.get('telegramUrl') || '').trim(),
+        telegramLabel: String(formData.get('telegramLabel') || '').trim() || 'Telegram',
       },
     });
     revalidatePath('/admin/settings');

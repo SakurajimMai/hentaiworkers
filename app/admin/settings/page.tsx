@@ -28,7 +28,7 @@ export default async function AdminSystemSettingsPage({
         <p className="font-meta mb-2">System</p>
         <h1 className="font-serif text-3xl">系统设置</h1>
         <p className="mt-2 font-ui text-sm text-soft max-w-2xl leading-relaxed">
-          配置前台注册策略、首页幻灯片、移动端下载入口、播放器（里番 ArtPlayer 广告/右键）、信息流/漫画阅读广告、SMTP、Trust、Cloudflare Turnstile，以及漫画发布密钥。
+          配置前台注册策略、首页幻灯片、页脚（App 下载 / Telegram 频道）、播放器（里番 ArtPlayer 广告/右键）、信息流/漫画阅读广告、SMTP、Trust、Cloudflare Turnstile，以及漫画发布密钥。
           SMTP / Turnstile / 漫画发布密钥加密存库，表单留空表示不修改。
         </p>
       </div>
@@ -36,7 +36,7 @@ export default async function AdminSystemSettingsPage({
       <nav className="admin-section-nav sticky top-[4.5rem] z-20 -mx-1 bg-background/95 px-1 py-2 backdrop-blur" aria-label="系统设置分区">
         <a href="#registration">注册</a>
         <a href="#hero">幻灯片</a>
-        <a href="#app">移动端</a>
+        <a href="#app">页脚</a>
         <a href="#smtp">SMTP</a>
         <a href="#trust">安全验证</a>
         <a href="#player">播放器</a>
@@ -131,9 +131,9 @@ export default async function AdminSystemSettingsPage({
         </section>
 
         <section id="app" className="surface-card scroll-mt-24 p-5 space-y-4">
-          <h2 className="font-ui text-sm font-semibold">移动端下载</h2>
+          <h2 className="font-ui text-sm font-semibold">页脚链接</h2>
           <p className="font-ui text-[12px] text-soft leading-relaxed">
-            填入安卓安装包或下载页地址后，前台页脚「浏览」栏会显示下载入口。留空则不显示。
+            填入后会显示在前台页脚。下载地址出现在「浏览」栏，Telegram 频道出现在「社区」栏。留空则不显示。
           </p>
           <label className="block font-meta text-[12px]">
             下载地址
@@ -145,12 +145,31 @@ export default async function AdminSystemSettingsPage({
             />
           </label>
           <label className="block font-meta text-[12px] max-w-xs">
-            链接文字
+            下载链接文字
             <input
               name="androidDownloadLabel"
               className="admin-input mt-1"
               defaultValue={view.site.androidDownloadLabel}
               placeholder="下载 App"
+              maxLength={40}
+            />
+          </label>
+          <label className="block font-meta text-[12px]">
+            Telegram 频道
+            <input
+              name="telegramUrl"
+              className="admin-input mt-1 font-mono text-[12px]"
+              defaultValue={view.site.telegramUrl}
+              placeholder="@channel 或 https://t.me/channel"
+            />
+          </label>
+          <label className="block font-meta text-[12px] max-w-xs">
+            Telegram 链接文字
+            <input
+              name="telegramLabel"
+              className="admin-input mt-1"
+              defaultValue={view.site.telegramLabel}
+              placeholder="Telegram"
               maxLength={40}
             />
           </label>
