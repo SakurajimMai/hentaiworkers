@@ -311,6 +311,5 @@ class LibraryRepository(
 
     private fun isLoggedIn() = session.state.value.user != null
 
-    private fun cloudTime(value: String?): Long =
-        runCatching { value?.let(Instant::parse)?.toEpochMilli() }.getOrNull() ?: System.currentTimeMillis()
+    private fun cloudTime(value: String?): Long = runCatching { value?.let(Instant::parse)?.toEpochMilli() }.getOrNull() ?: System.currentTimeMillis()
 }

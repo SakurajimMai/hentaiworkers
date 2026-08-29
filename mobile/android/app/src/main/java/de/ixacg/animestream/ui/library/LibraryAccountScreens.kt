@@ -134,8 +134,11 @@ fun LibraryScreen(
                         }
                     },
                     onRemove = {
-                        if (tab == 0) viewModel.removeFavorite(item.kind, item.id)
-                        else viewModel.removeHistory(item.kind, item.id)
+                        if (tab == 0) {
+                            viewModel.removeFavorite(item.kind, item.id)
+                        } else {
+                            viewModel.removeHistory(item.kind, item.id)
+                        }
                     },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
@@ -346,11 +349,13 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth().height(52.dp),
             enabled = !session.busy,
         ) {
-            if (session.busy) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            else Text("登录")
+            if (session.busy) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            } else {
+                Text("登录")
+            }
         }
     }
 }
 
-fun formatChapter(number: Double): String =
-    if (number % 1.0 == 0.0) number.toLong().toString() else number.toString().trimEnd('0').trimEnd('.')
+fun formatChapter(number: Double): String = if (number % 1.0 == 0.0) number.toLong().toString() else number.toString().trimEnd('0').trimEnd('.')

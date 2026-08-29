@@ -289,12 +289,13 @@ private fun NativeVideoPlayer(
             Surface(color = Color(0xAA000000), shape = MaterialTheme.shapes.small) {
                 IconButton(
                     onClick = {
-                        speed = when (speed) {
-                            1f -> 1.25f
-                            1.25f -> 1.5f
-                            1.5f -> 2f
-                            else -> 1f
-                        }
+                        speed =
+                            when (speed) {
+                                1f -> 1.25f
+                                1.25f -> 1.5f
+                                1.5f -> 2f
+                                else -> 1f
+                            }
                         player.setPlaybackSpeed(speed)
                     },
                     modifier = Modifier.size(48.dp),
@@ -305,11 +306,12 @@ private fun NativeVideoPlayer(
             Surface(color = Color(0xAA000000), shape = MaterialTheme.shapes.small) {
                 IconButton(
                     onClick = {
-                        resizeMode = when (resizeMode) {
-                            AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                            AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                            else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        }
+                        resizeMode =
+                            when (resizeMode) {
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            }
                     },
                     modifier = Modifier.size(48.dp),
                 ) {

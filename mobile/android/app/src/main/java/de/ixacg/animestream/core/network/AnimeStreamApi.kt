@@ -52,13 +52,19 @@ interface AnimeStreamApi {
     ): AnimeListResponse
 
     @GET("api/animes/{id}")
-    suspend fun anime(@Path("id") id: Long): Anime
+    suspend fun anime(
+        @Path("id") id: Long,
+    ): Anime
 
     @GET("api/animes/{id}/similar")
-    suspend fun similarAnimes(@Path("id") id: Long): List<Anime>
+    suspend fun similarAnimes(
+        @Path("id") id: Long,
+    ): List<Anime>
 
     @GET("api/tags")
-    suspend fun tags(@Query("limit") limit: Int): List<Tag>
+    suspend fun tags(
+        @Query("limit") limit: Int,
+    ): List<Tag>
 
     @GET("api/mangas")
     suspend fun mangas(
@@ -70,7 +76,9 @@ interface AnimeStreamApi {
     ): MangaListResponse
 
     @GET("api/mangas/{id}")
-    suspend fun manga(@Path("id") id: Long): MangaDetail
+    suspend fun manga(
+        @Path("id") id: Long,
+    ): MangaDetail
 
     @GET("api/mangas/{id}/chapters/{number}")
     suspend fun mangaChapter(
@@ -82,7 +90,9 @@ interface AnimeStreamApi {
     suspend fun ads(): PublicAdsConfig
 
     @POST("api/auth/login")
-    suspend fun login(@Body body: LoginBody): UserEnvelope
+    suspend fun login(
+        @Body body: LoginBody,
+    ): UserEnvelope
 
     @POST("api/auth/logout")
     suspend fun logout(): Response<Unit>
@@ -94,10 +104,14 @@ interface AnimeStreamApi {
     suspend fun favorites(): FavoritesEnvelope
 
     @POST("api/me/favorites")
-    suspend fun setFavorite(@Body body: FavoriteBody): FavoriteResult
+    suspend fun setFavorite(
+        @Body body: FavoriteBody,
+    ): FavoriteResult
 
     @GET("api/me/watch-progress")
-    suspend fun watchProgress(@Query("limit") limit: Int = 50): WatchProgressEnvelope
+    suspend fun watchProgress(
+        @Query("limit") limit: Int = 50,
+    ): WatchProgressEnvelope
 
     @PUT("api/me/watch-progress/{animeId}")
     suspend fun putWatchProgress(
@@ -106,16 +120,22 @@ interface AnimeStreamApi {
     ): Response<Unit>
 
     @POST("api/me/watch-progress")
-    suspend fun mergeWatchProgress(@Body body: WatchMergeBody): Response<Unit>
+    suspend fun mergeWatchProgress(
+        @Body body: WatchMergeBody,
+    ): Response<Unit>
 
     @DELETE("api/me/watch-progress/{animeId}")
-    suspend fun deleteWatchProgress(@Path("animeId") animeId: Long): Response<Unit>
+    suspend fun deleteWatchProgress(
+        @Path("animeId") animeId: Long,
+    ): Response<Unit>
 
     @DELETE("api/me/watch-progress")
     suspend fun clearWatchProgress(): Response<Unit>
 
     @GET("api/me/manga-progress")
-    suspend fun mangaProgress(@Query("limit") limit: Int = 50): MangaProgressEnvelope
+    suspend fun mangaProgress(
+        @Query("limit") limit: Int = 50,
+    ): MangaProgressEnvelope
 
     @PUT("api/me/manga-progress/{mangaId}")
     suspend fun putMangaProgress(
@@ -124,10 +144,14 @@ interface AnimeStreamApi {
     ): Response<Unit>
 
     @POST("api/me/manga-progress")
-    suspend fun mergeMangaProgress(@Body body: MangaMergeBody): Response<Unit>
+    suspend fun mergeMangaProgress(
+        @Body body: MangaMergeBody,
+    ): Response<Unit>
 
     @DELETE("api/me/manga-progress/{mangaId}")
-    suspend fun deleteMangaProgress(@Path("mangaId") mangaId: Long): Response<Unit>
+    suspend fun deleteMangaProgress(
+        @Path("mangaId") mangaId: Long,
+    ): Response<Unit>
 
     @DELETE("api/me/manga-progress")
     suspend fun clearMangaProgress(): Response<Unit>
@@ -176,11 +200,12 @@ internal fun parseApiError(error: HttpException): String {
 }
 
 object ApiClient {
-    val json = Json {
-        ignoreUnknownKeys = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
+    val json =
+        Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+            explicitNulls = false
+        }
 
     fun create(
         cookieStore: SessionCookieStore,

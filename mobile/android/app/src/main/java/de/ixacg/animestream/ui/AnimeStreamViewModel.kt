@@ -552,8 +552,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         fun factory(container: AppContainer): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    AnimeStreamViewModel(container) as T
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = AnimeStreamViewModel(container) as T
             }
     }
 }

@@ -146,13 +146,10 @@ abstract class LibraryDatabase : RoomDatabase() {
     }
 }
 
-fun AnimeFavoriteEntity.asModel() =
-    AnimeFavorite(id, title, cover, titleJapanese, releaseYear, favoritedAt)
+fun AnimeFavoriteEntity.asModel() = AnimeFavorite(id, title, cover, titleJapanese, releaseYear, favoritedAt)
 
-fun MangaFavoriteEntity.asModel() =
-    MangaFavorite(id, title, coverUrl, author, favoritedAt)
+fun MangaFavoriteEntity.asModel() = MangaFavorite(id, title, coverUrl, author, favoritedAt)
 
 fun AnimeHistoryEntity.asModel() = AnimeHistory(id, title, cover, titleJapanese, watchedAt)
 
-fun MangaHistoryEntity.asModel() =
-    MangaHistory(id, title, coverUrl, chapterNumber, pageIndex, readAt)
+fun MangaHistoryEntity.asModel() = MangaHistory(id, title, coverUrl, chapterNumber, pageIndex, readAt)

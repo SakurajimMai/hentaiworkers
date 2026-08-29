@@ -44,8 +44,7 @@ object PlayerAdPolicy {
         elapsedSeconds: Int,
         closeDelaySeconds: Int,
         totalDurationSeconds: Int,
-    ): Boolean =
-        elapsedSeconds >= closeDelaySeconds.coerceIn(0, totalDurationSeconds.coerceAtLeast(1))
+    ): Boolean = elapsedSeconds >= closeDelaySeconds.coerceIn(0, totalDurationSeconds.coerceAtLeast(1))
 
     fun shouldShowPauseAd(
         playbackStarted: Boolean,

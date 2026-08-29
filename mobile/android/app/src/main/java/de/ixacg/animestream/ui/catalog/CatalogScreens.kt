@@ -258,9 +258,10 @@ fun MangaCatalogScreen(
     val gridState = rememberLazyGridState()
     LaunchedEffect(Unit) { viewModel.ensureMangasLoaded() }
     LaunchedEffect(state.query) { if (query != state.query) query = state.query }
-    val visibleTags = remember(state.items, state.selectedTag) {
-        (listOfNotNull(state.selectedTag) + state.items.flatMap(MangaSummary::tags)).distinct().take(20)
-    }
+    val visibleTags =
+        remember(state.items, state.selectedTag) {
+            (listOfNotNull(state.selectedTag) + state.items.flatMap(MangaSummary::tags)).distinct().take(20)
+        }
     val entries =
         remember(state.items, ads.config.feedSlots) {
             AdsRepository.interleave(state.items, ads.config.feedSlots) { manga, _ -> "manga-${manga.id}" }

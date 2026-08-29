@@ -48,8 +48,7 @@ object MediaUrlNormalizer {
         return rewriteCdnUrl(absolute)
     }
 
-    fun split(raw: String?): List<String> =
-        raw.orEmpty().split(',').mapNotNull(::normalize).distinct()
+    fun split(raw: String?): List<String> = raw.orEmpty().split(',').mapNotNull(::normalize).distinct()
 
     fun imageHeaders(): Map<String, String> =
         mapOf(

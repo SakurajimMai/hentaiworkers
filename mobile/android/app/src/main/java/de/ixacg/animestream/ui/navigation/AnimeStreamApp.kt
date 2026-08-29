@@ -151,7 +151,9 @@ private fun AppNavHost(
     modifier: Modifier,
 ) {
     fun animeDetail(id: Long) = navController.navigate("anime/$id")
+
     fun mangaDetail(id: Long) = navController.navigate("manga-detail/$id")
+
     fun reader(
         mangaId: Long,
         chapter: Double,
@@ -279,5 +281,4 @@ private fun NavHostController.navigateMain(route: String) {
     }
 }
 
-private fun Double.toRouteNumber(): String =
-    if (this % 1.0 == 0.0) toLong().toString() else toString()
+private fun Double.toRouteNumber(): String = if (this % 1.0 == 0.0) toLong().toString() else toString()

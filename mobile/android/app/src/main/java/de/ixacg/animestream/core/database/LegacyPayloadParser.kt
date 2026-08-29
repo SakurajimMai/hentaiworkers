@@ -115,18 +115,13 @@ object LegacyPayloadParser {
         )
     }
 
-    private fun JsonObject.string(name: String): String? =
-        get(name)?.nullablePrimitive()?.contentOrNull
+    private fun JsonObject.string(name: String): String? = get(name)?.nullablePrimitive()?.contentOrNull
 
-    private fun JsonObject.long(name: String): Long? =
-        get(name)?.nullablePrimitive()?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() }
+    private fun JsonObject.long(name: String): Long? = get(name)?.nullablePrimitive()?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() }
 
-    private fun JsonObject.int(name: String): Int? =
-        get(name)?.nullablePrimitive()?.let { it.intOrNull ?: it.contentOrNull?.toIntOrNull() }
+    private fun JsonObject.int(name: String): Int? = get(name)?.nullablePrimitive()?.let { it.intOrNull ?: it.contentOrNull?.toIntOrNull() }
 
-    private fun JsonObject.double(name: String): Double? =
-        get(name)?.nullablePrimitive()?.contentOrNull?.toDoubleOrNull()
+    private fun JsonObject.double(name: String): Double? = get(name)?.nullablePrimitive()?.contentOrNull?.toDoubleOrNull()
 
-    private fun JsonElement.nullablePrimitive() =
-        runCatching { jsonPrimitive }.getOrNull()?.takeUnless { it.contentOrNull == null }
+    private fun JsonElement.nullablePrimitive() = runCatching { jsonPrimitive }.getOrNull()?.takeUnless { it.contentOrNull == null }
 }

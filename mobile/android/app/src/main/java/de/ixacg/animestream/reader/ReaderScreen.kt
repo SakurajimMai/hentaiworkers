@@ -461,8 +461,11 @@ private fun ReaderSystemBarsEffect(chromeVisible: Boolean) {
     DisposableEffect(activity, chromeVisible) {
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        if (chromeVisible) controller.show(WindowInsetsCompat.Type.systemBars())
-        else controller.hide(WindowInsetsCompat.Type.systemBars())
+        if (chromeVisible) {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
         onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 }
