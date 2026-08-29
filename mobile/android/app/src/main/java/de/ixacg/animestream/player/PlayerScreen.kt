@@ -178,7 +178,7 @@ private fun NativeVideoPlayer(
     val lifecycleOwner = LocalLifecycleOwner.current
     var speed by remember(url) { mutableFloatStateOf(1f) }
     var resizeMode by remember(url) { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
-    var playerView by remember { mutableStateOf<PlayerView?>(null) }
+    var attachedPlayerView by remember { mutableStateOf<PlayerView?>(null) }
     var lifecycleStarted by remember(url, instanceToken) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
     }
@@ -260,7 +260,7 @@ private fun NativeVideoPlayer(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             player.removeListener(listener)
-            playerView?.player = null
+            attachedPlayerView?.player = null
             player.release()
         }
     }
@@ -269,13 +269,13 @@ private fun NativeVideoPlayer(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                PlayerView(ctx).apply {
-                    playerView = this
-                    player = playbackPlayer
-                    useController = true
-                    controllerShowTimeoutMs = 3_500
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                    this.resizeMode = resizeMode
+                PlayerView(ctx).also { view ->
+                    attachedPlayerView = view
+                    view.player = playbackPlayer
+                    view.useController = true
+                    view.controllerShowTimeoutMs = 3_500
+                    view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                    view.resizeMode = resizeMode
                 }
             },
             update = {
