@@ -88,6 +88,15 @@ test('mobile is a native Kotlin application without a JavaScript runtime', () =>
     ),
     'utf8',
   );
+  const roomSchema = JSON.parse(
+    readFileSync(
+      join(
+        root,
+        'mobile/android/app/schemas/de.ixacg.animestream.core.database.LibraryDatabase/1.json',
+      ),
+      'utf8',
+    ),
+  ) as { database: { version: number } };
   const notices = readFileSync(join(root, 'mobile/android/app/src/main/assets/THIRD_PARTY_NOTICES.md'), 'utf8');
   const apache = readFileSync(join(root, 'mobile/android/app/src/main/assets/licenses/Apache-2.0.txt'), 'utf8');
 
@@ -104,6 +113,7 @@ test('mobile is a native Kotlin application without a JavaScript runtime', () =>
   assert.match(navigation, /animestream:\/\/player\/\{animeId\}/);
   assert.match(navigation, /animestream:\/\/manga-detail\/\{mangaId\}/);
   assert.match(navigation, /animestream:\/\/manga-reader\/\{mangaId\}\/\{chapter\}/);
+  assert.equal(roomSchema.database.version, 1);
   assert.match(notices, /assets\/licenses\/Apache-2\.0\.txt/);
   assert.match(apache, /Apache License\s+Version 2\.0, January 2004/);
   assert.equal(existsSync(join(root, 'mobile/package.json')), false);

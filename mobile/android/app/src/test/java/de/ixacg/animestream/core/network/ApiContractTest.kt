@@ -2,9 +2,8 @@ package de.ixacg.animestream.core.network
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import de.ixacg.animestream.core.model.LoginBody
+import de.ixacg.animestream.data.repository.SessionRepository
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -69,8 +68,7 @@ class ApiContractTest {
             cookies.clear()
             val api = ApiClient.create(cookies, server.url("/").toString())
 
-            api.login(LoginBody("mei", "password"))
-            advanceUntilIdle()
+            SessionRepository(api, cookies).login("mei", "password")
             val restoredCookies = SessionCookieStore(context, server.url("/"), backgroundScope)
             restoredCookies.hydrate()
             ApiClient.create(restoredCookies, server.url("/").toString()).me()

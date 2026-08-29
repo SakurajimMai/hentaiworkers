@@ -6,9 +6,13 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -24,9 +28,13 @@ class SessionCookieStore(
     private val apiHost = apiOrigin.host
     private val apiIsHttps = apiOrigin.isHttps
     private val cachedHeader = AtomicReference("")
+    private val persistenceMutex = Mutex()
+    private val pendingPersistence = AtomicReference<Job?>(null)
 
     suspend fun hydrate() {
-        cachedHeader.set(dataStore.data.first()[SESSION_COOKIE].orEmpty())
+        persistenceMutex.withLock {
+            cachedHeader.set(dataStore.data.first()[SESSION_COOKIE].orEmpty())
+        }
     }
 
     override fun saveFromResponse(
@@ -37,9 +45,29 @@ class SessionCookieStore(
         val cookie = cookies.lastOrNull { it.name.equals(SESSION_NAME, ignoreCase = true) } ?: return
         val header = if (cookie.maxAgeSeconds == 0L) "" else "${cookie.name}=${cookie.value}"
         cachedHeader.set(header)
-        applicationScope.launch {
-            dataStore.edit { preferences ->
-                if (header.isBlank()) preferences.remove(SESSION_COOKIE) else preferences[SESSION_COOKIE] = header
+        pendingPersistence.set(
+            applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                persistenceMutex.withLock {
+                    persistHeader(header)
+                }
+            },
+        )
+    }
+
+    internal suspend fun awaitPersistence() {
+        while (true) {
+            val job = pendingPersistence.get() ?: return
+            job.join()
+            if (pendingPersistence.compareAndSet(job, null)) return
+        }
+    }
+
+    private suspend fun persistHeader(header: String) {
+        dataStore.edit { preferences ->
+            if (header.isBlank()) {
+                preferences.remove(SESSION_COOKIE)
+            } else {
+                preferences[SESSION_COOKIE] = header
             }
         }
     }
@@ -63,14 +91,14 @@ class SessionCookieStore(
 
     suspend fun clear() {
         cachedHeader.set("")
-        dataStore.edit { it.remove(SESSION_COOKIE) }
+        persistenceMutex.withLock { persistHeader("") }
     }
 
     suspend fun importLegacyCookie(raw: String): Boolean {
         val match = SESSION_PATTERN.find(raw.trim()) ?: return false
         val header = match.value
         cachedHeader.set(header)
-        dataStore.edit { it[SESSION_COOKIE] = header }
+        persistenceMutex.withLock { persistHeader(header) }
         return true
     }
 

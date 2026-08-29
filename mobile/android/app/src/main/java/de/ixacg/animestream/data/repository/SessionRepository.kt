@@ -38,6 +38,7 @@ class SessionRepository(
         mutableState.value = mutableState.value.copy(busy = true, error = null)
         return try {
             val payload = apiCall { api.login(LoginBody(identity.trim(), password)) }
+            cookieStore.awaitPersistence()
             val user = payload.user ?: throw ApiError(payload.error ?: "登录失败", 401)
             mutableState.value = SessionState(ready = true, user = user)
             user
