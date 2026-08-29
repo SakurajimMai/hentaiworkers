@@ -88,7 +88,7 @@ jobs:
         run: ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon --stacktrace
 
       - name: Generate Ktlint formatting patch
-        if: steps.quality.outcome == 'failure'
+        if: failure() && steps.quality.outcome == 'failure'
         run: |
           ./gradlew ktlintFormat --no-daemon
           mkdir -p app/build/reports
