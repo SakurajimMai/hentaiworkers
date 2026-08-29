@@ -19,8 +19,8 @@ class MediaUrlNormalizerTest {
             "https://www.ixacg.de/cdn-img/file/1787838438761_1111765.jpg?width=900",
             MediaUrlNormalizer.rewriteCdnUrl(
                 "https://image.ixacg.de/file/1787838438761_1111765.jpg?width=900",
-                "https://www.ixacg.de"
-            )
+                "https://www.ixacg.de",
+            ),
         )
     }
 
@@ -30,8 +30,8 @@ class MediaUrlNormalizerTest {
             "https://static.hxsl.org/cover.jpg",
             MediaUrlNormalizer.rewriteCdnUrl(
                 "https://static.hxsl.org/cover.jpg",
-                "https://www.ixacg.de"
-            )
+                "https://www.ixacg.de",
+            ),
         )
     }
 
@@ -40,8 +40,8 @@ class MediaUrlNormalizerTest {
         assertEquals(
             listOf("https://static.hxsl.org/one.jpg", "https://static.hxsl.org/two.jpg"),
             MediaUrlNormalizer.split(
-                "https://static.hxsl.org/one.jpg, invalid value, https://static.hxsl.org/two.jpg"
-            )
+                "https://static.hxsl.org/one.jpg, invalid value, https://static.hxsl.org/two.jpg",
+            ),
         )
         assertNull(MediaUrlNormalizer.normalize("javascript:alert(1)"))
     }

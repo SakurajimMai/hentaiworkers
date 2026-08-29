@@ -9,7 +9,8 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+fun String.asBuildConfigString(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 val apiBaseUrl =
     providers.gradleProperty("ANIMESTREAM_API_BASE_URL")
@@ -76,7 +77,7 @@ android {
                 }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -95,7 +96,7 @@ android {
     packaging {
         resources.excludes += setOf(
             "/META-INF/{AL2.0,LGPL2.1}",
-            "/META-INF/DEPENDENCIES"
+            "/META-INF/DEPENDENCIES",
         )
     }
 

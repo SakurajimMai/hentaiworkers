@@ -35,7 +35,7 @@ class LegacyStorageMigratorTest {
     }
 
     @Test
-    fun `migration is idempotent preserves newer native rows and keeps old database`() {
+    fun `migration is idempotent preserves newer native rows and keeps old database`() =
         runTest {
             val source = context.openOrCreateDatabase("RKStorage", Context.MODE_PRIVATE, null)
             source.execSQL("CREATE TABLE catalystLocalStorage (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
@@ -43,22 +43,22 @@ class LegacyStorageMigratorTest {
                 "INSERT INTO catalystLocalStorage(key,value) VALUES (?,?)",
                 arrayOf(
                     LegacyPayloadParser.AUTH_COOKIE,
-                    "animestream_session=legacy-token"
-                )
+                    "animestream_session=legacy-token",
+                ),
             )
             source.execSQL(
                 "INSERT INTO catalystLocalStorage(key,value) VALUES (?,?)",
                 arrayOf(
                     LegacyPayloadParser.ANIME_FAVORITES,
-                    """[{"id":4,"title":"Legacy","favoritedAt":1000}]"""
-                )
+                    """[{"id":4,"title":"Legacy","favoritedAt":1000}]""",
+                ),
             )
             source.execSQL(
                 "INSERT INTO catalystLocalStorage(key,value) VALUES (?,?)",
                 arrayOf(
                     LegacyPayloadParser.MANGA_HISTORY,
-                    """[{"id":8,"title":"Manga","chapterNumber":3,"pageIndex":6,"readAt":2000},{"id":"bad"}]"""
-                )
+                    """[{"id":8,"title":"Manga","chapterNumber":3,"pageIndex":6,"readAt":2000},{"id":"bad"}]""",
+                ),
             )
             source.close()
 
@@ -70,15 +70,15 @@ class LegacyStorageMigratorTest {
                         cover = null,
                         titleJapanese = null,
                         releaseYear = null,
-                        favoritedAt = 5_000
-                    )
+                        favoritedAt = 5_000,
+                    ),
                 )
             }
             val cookieStore =
                 SessionCookieStore(
                     context,
                     "https://www.ixacg.de/".toHttpUrl(),
-                    backgroundScope
+                    backgroundScope,
                 )
             cookieStore.clear()
             cookieStore.setMigrationVersionForTest(0)
@@ -96,10 +96,9 @@ class LegacyStorageMigratorTest {
             assertEquals(1, cookieStore.migrationVersion())
             assertTrue(context.getDatabasePath("RKStorage").exists())
         }
-    }
 
     @Test
-    fun `migration does not overwrite a persisted native cookie after restart`() {
+    fun `migration does not overwrite a persisted native cookie after restart`() =
         runTest {
             val source = context.openOrCreateDatabase("RKStorage", Context.MODE_PRIVATE, null)
             source.execSQL("CREATE TABLE catalystLocalStorage (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
@@ -107,8 +106,8 @@ class LegacyStorageMigratorTest {
                 "INSERT INTO catalystLocalStorage(key,value) VALUES (?,?)",
                 arrayOf(
                     LegacyPayloadParser.AUTH_COOKIE,
-                    "animestream_session=legacy-token"
-                )
+                    "animestream_session=legacy-token",
+                ),
             )
             source.close()
 
@@ -124,5 +123,4 @@ class LegacyStorageMigratorTest {
             assertEquals("animestream_session=native-token", restartedCookieStore.currentHeader())
             assertEquals(1, restartedCookieStore.migrationVersion())
         }
-    }
 }

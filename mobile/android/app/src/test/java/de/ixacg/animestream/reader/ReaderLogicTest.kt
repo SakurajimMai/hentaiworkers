@@ -13,9 +13,9 @@ class ReaderLogicTest {
                 listOf(
                     VisibleReaderPage(index = 2, visiblePixels = 39, totalPixels = 100),
                     VisibleReaderPage(index = 3, visiblePixels = 40, totalPixels = 100),
-                    VisibleReaderPage(index = 4, visiblePixels = 90, totalPixels = 100)
-                )
-            )
+                    VisibleReaderPage(index = 4, visiblePixels = 90, totalPixels = 100),
+                ),
+            ),
         )
         assertNull(ReaderLogic.activePage(listOf(VisibleReaderPage(1, 0, 100))))
     }
@@ -27,9 +27,9 @@ class ReaderLogicTest {
             ReaderLogic.activePage(
                 listOf(
                     VisibleReaderPage(index = 1, visiblePixels = 600, totalPixels = 20_000),
-                    VisibleReaderPage(index = 2, visiblePixels = 900, totalPixels = 80_000)
-                )
-            )
+                    VisibleReaderPage(index = 2, visiblePixels = 900, totalPixels = 80_000),
+                ),
+            ),
         )
     }
 

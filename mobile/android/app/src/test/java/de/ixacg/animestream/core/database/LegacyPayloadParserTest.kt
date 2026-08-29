@@ -14,9 +14,9 @@ class LegacyPayloadParserTest {
                         """[{"id":7,"title":"A","watchedAt":90},{"id":"bad","title":"B"},{"id":8}]""",
                     LegacyPayloadParser.MANGA_HISTORY to
                         """[{"id":9,"title":"M","chapterNumber":2,"pageIndex":4,"readAt":100}]""",
-                    LegacyPayloadParser.ANIME_FAVORITES to "not-json"
+                    LegacyPayloadParser.ANIME_FAVORITES to "not-json",
                 ),
-                now = { 500L }
+                now = { 500L },
             )
 
         assertEquals(listOf(7L), payload.animeHistory.map { it.id })
