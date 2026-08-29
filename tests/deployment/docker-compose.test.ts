@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
@@ -47,11 +47,38 @@ for (const relativePath of ['docker-compose.yml', 'deploy/docker-compose.yml']) 
 test('Android APK workflow builds mobile and publishes a GitHub Release', () => {
   const workflow = readFileSync(join(root, '.github/workflows/build-android.yml'), 'utf8');
   assert.match(workflow, /name: Build Android APK/);
-  assert.match(workflow, /working-directory: mobile/);
-  assert.match(workflow, /npx expo prebuild --platform android/);
-  assert.match(workflow, /\.\/gradlew assembleRelease/);
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /working-directory: mobile\/android/);
+  assert.match(workflow, /ktlintCheck lintRelease testDebugUnitTest assembleRelease/);
+  assert.match(workflow, /versionCode='\$\{GITHUB_RUN_NUMBER\}'/);
+  assert.match(workflow, /de\.ixacg\.animestream\.MainActivity/);
+  assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /tag_name: build-\$\{\{ github\.run_number \}\}/);
-  assert.match(workflow, /EXPO_PUBLIC_API_BASE_URL: https:\/\/www\.ixacg\.de/);
+  assert.match(workflow, /ANIMESTREAM_API_BASE_URL: https:\/\/www\.ixacg\.de/);
+  assert.match(workflow, /Android signing secrets are only partially configured/);
+  assert.match(workflow, /needs\.build\.outputs\.signing_mode == 'release'/);
+  assert.doesNotMatch(workflow, /setup-node|npm ci|expo prebuild|EXPO_PUBLIC/);
+});
+
+test('mobile is a native Kotlin application without a JavaScript runtime', () => {
+  const appGradle = readFileSync(join(root, 'mobile/android/app/build.gradle.kts'), 'utf8');
+  const versions = readFileSync(join(root, 'mobile/android/gradle/libs.versions.toml'), 'utf8');
+  const manifest = readFileSync(join(root, 'mobile/android/app/src/main/AndroidManifest.xml'), 'utf8');
+  const notices = readFileSync(join(root, 'mobile/android/app/src/main/assets/THIRD_PARTY_NOTICES.md'), 'utf8');
+  const apache = readFileSync(join(root, 'mobile/android/app/src/main/assets/licenses/Apache-2.0.txt'), 'utf8');
+
+  assert.match(appGradle, /applicationId = "de\.ixacg\.animestream"/);
+  assert.match(appGradle, /implementation\(libs\.media3\.exoplayer\.hls\)/);
+  assert.match(appGradle, /implementation\(libs\.telephoto\.zoomable\.image\.coil\)/);
+  assert.match(versions, /telephoto = "0\.16\.0"/);
+  assert.match(manifest, /android:name="\.MainActivity"/);
+  assert.match(manifest, /android:scheme="animestream"/);
+  assert.match(notices, /assets\/licenses\/Apache-2\.0\.txt/);
+  assert.match(apache, /Apache License\s+Version 2\.0, January 2004/);
+  assert.equal(existsSync(join(root, 'mobile/package.json')), false);
+  assert.equal(existsSync(join(root, 'mobile/App.tsx')), false);
+  assert.doesNotMatch(appGradle, /react-native|expo|hermes|metro/i);
 });
 
 test('Docker Hub workflow publishes only the application image', () => {

@@ -1,16 +1,12 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
+# Native Android build state
 .kotlin/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/captures/
+android/.idea/
+android/app/release.keystore
+android/app/debug.keystore
 *.orig.*
 *.jks
 *.p8
@@ -18,24 +14,19 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
-# Metro
+# Legacy/local tooling caches are never migration inputs
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
 .metro-health-check*
-
-# debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# Local/editor state
+.DS_Store
+*.pem
+android/gradle.properties.local

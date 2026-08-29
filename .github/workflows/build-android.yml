@@ -2,38 +2,42 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-android.yml'
+  pull_request:
     paths:
       - 'mobile/**'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 env:
-  EXPO_PUBLIC_API_BASE_URL: https://www.ixacg.de
-  NODE_ENV: production
+  ANIMESTREAM_API_BASE_URL: https://www.ixacg.de
 
 jobs:
   build:
-    name: Build APK
+    name: Check and build native APK
     runs-on: ubuntu-latest
+    outputs:
+      signing_mode: ${{ steps.signing.outputs.mode }}
     defaults:
       run:
-        working-directory: mobile
+        working-directory: mobile/android
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -44,170 +48,107 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install dependencies
-        run: |
-          for i in 1 2 3; do
-            if npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000; then
-              break
-            fi
-            if [ "$i" -eq 3 ]; then
-              echo "npm ci failed after 3 attempts"
-              exit 1
-            fi
-            echo "npm ci attempt $i failed, retrying..."
-            rm -rf node_modules
-            sleep 10
-          done
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Set Android versionCode from run number
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const path = 'app.json';
-          const json = JSON.parse(fs.readFileSync(path, 'utf8'));
-          json.expo.android = json.expo.android || {};
-          json.expo.android.package = json.expo.android.package || 'de.ixacg.animestream';
-          json.expo.android.versionCode = Number(process.env.GITHUB_RUN_NUMBER || 1);
-          json.expo.extra = json.expo.extra || {};
-          json.expo.extra.apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-          fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
-          NODE
-
-      - name: Expo prebuild (Android)
-        run: npx expo prebuild --platform android --no-install --clean
-
-      - name: Configure release signing
+      - name: Configure signing
+        id: signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
-            {
-              echo "MYAPP_UPLOAD_STORE_FILE=release.keystore"
-              echo "MYAPP_UPLOAD_STORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}"
-              echo "MYAPP_UPLOAD_KEY_ALIAS=${ANDROID_KEY_ALIAS}"
-              echo "MYAPP_UPLOAD_KEY_PASSWORD=${ANDROID_KEY_PASSWORD}"
-            } >> android/gradle.properties
-            python3 - <<'PY'
-          from pathlib import Path
-          p = Path('android/app/build.gradle')
-          text = p.read_text()
-          if 'MYAPP_UPLOAD_STORE_FILE' not in text:
-              signing = '''
-              signingConfigs {
-                  release {
-                      storeFile file(MYAPP_UPLOAD_STORE_FILE)
-                      storePassword MYAPP_UPLOAD_STORE_PASSWORD
-                      keyAlias MYAPP_UPLOAD_KEY_ALIAS
-                      keyPassword MYAPP_UPLOAD_KEY_PASSWORD
-                  }
-              }
-          '''
-              text = text.replace('android {', 'android {' + signing, 1)
-              text = text.replace(
-                  'release {',
-                  'release {\n            signingConfig signingConfigs.release',
-                  1,
-              )
-              p.write_text(text)
-          PY
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && \
+             [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && \
+             [ -n "$ANDROID_KEY_ALIAS" ] && \
+             [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            key_store_path="$RUNNER_TEMP/animestream-release.keystore"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$key_store_path"
+            echo "ANDROID_KEYSTORE_PATH=$key_store_path" >> "$GITHUB_ENV"
+            echo "SIGNING_MODE=release" >> "$GITHUB_ENV"
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+          elif [ -z "$ANDROID_KEYSTORE_BASE64" ] && \
+               [ -z "$ANDROID_KEYSTORE_PASSWORD" ] && \
+               [ -z "$ANDROID_KEY_ALIAS" ] && \
+               [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "SIGNING_MODE=internal-debug" >> "$GITHUB_ENV"
+            echo "mode=internal-debug" >> "$GITHUB_OUTPUT"
+            echo "No release keystore configured; this artifact is for internal testing only."
           else
-            echo "No release keystore secret; using Expo debug signing for internal distribution."
+            echo "Android signing secrets are only partially configured. Configure all four values or leave all four empty."
+            exit 1
           fi
 
-      - name: Enable ABI splits
+      - name: Grant wrapper permission
+        run: chmod +x gradlew
+
+      - name: Format, lint, test and assemble
+        run: ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon --stacktrace
+
+      - name: Validate APK identity and contents
         run: |
-          cat >> android/app/build.gradle <<'EOF'
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          unzip -tq "$apk"
 
-          android {
-              splits {
-                  abi {
-                      reset()
-                      enable true
-                      universalApk true
-                      include "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-                  }
-              }
-          }
-          EOF
+          aapt_bin=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          apksigner_bin=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          test -x "$aapt_bin"
+          test -x "$apksigner_bin"
 
-      - name: Grant gradlew execute permission
-        run: chmod +x android/gradlew
+          badging=$($aapt_bin dump badging "$apk")
+          printf '%s\n' "$badging" | grep -F "package: name='de.ixacg.animestream' versionCode='${GITHUB_RUN_NUMBER}'"
+          printf '%s\n' "$badging" | grep -F "launchable-activity: name='de.ixacg.animestream.MainActivity'"
+          "$apksigner_bin" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signature.txt"
 
-      - name: Build release APK
-        working-directory: mobile/android
-        run: ./gradlew assembleRelease --no-daemon
+          unzip -Z1 "$apk" > "$RUNNER_TEMP/apk-entries.txt"
+          if grep -Eqi 'index\.android\.bundle|\.hbc$|lib(reactnative|hermes|reanimated|worklets|gesturehandler)\.so' "$RUNNER_TEMP/apk-entries.txt"; then
+            echo "APK still contains a JavaScript runtime or React Native bundle"
+            exit 1
+          fi
 
-      - name: Validate release APKs
+      - name: Prepare universal artifact
         run: |
-          UNIVERSAL_APK=android/app/build/outputs/apk/release/app-universal-release.apk
-          ARM64_APK=android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
-          test -s "$UNIVERSAL_APK"
-          test -s "$ARM64_APK"
-          unzip -tq "$UNIVERSAL_APK"
-          unzip -tq "$ARM64_APK"
-          unzip -Z1 "$ARM64_APK" > "$RUNNER_TEMP/arm64-apk-entries.txt"
-          unzip -Z1 "$UNIVERSAL_APK" > "$RUNNER_TEMP/universal-apk-entries.txt"
-          if ! grep -q '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
-            echo "ARM64 APK has no arm64-v8a native libraries"
-            exit 1
-          fi
-          if grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
-            echo "ARM64 APK contains an unexpected ABI"
-            exit 1
-          fi
-          if ! grep -Eq 'assets/index.android.bundle|assets/.+\.hbc' "$RUNNER_TEMP/arm64-apk-entries.txt"; then
-            echo "APK is missing the Hermes / JS bundle"
-            exit 1
-          fi
-          missing=0
-          for lib in libreactnative.so libhermes.so libreanimated.so libworklets.so libgesturehandler.so; do
-            if ! grep -q "^lib/arm64-v8a/${lib}$" "$RUNNER_TEMP/arm64-apk-entries.txt"; then
-              echo "ARM64 APK missing ${lib}"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "Native library listing:"
-            grep '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt"
-            exit 1
-          fi
-          grep '^lib/arm64-v8a/' "$RUNNER_TEMP/universal-apk-entries.txt" | LC_ALL=C sort > "$RUNNER_TEMP/universal-arm64-libs.txt"
-          grep '^lib/arm64-v8a/' "$RUNNER_TEMP/arm64-apk-entries.txt" | LC_ALL=C sort > "$RUNNER_TEMP/split-arm64-libs.txt"
-          diff -u "$RUNNER_TEMP/universal-arm64-libs.txt" "$RUNNER_TEMP/split-arm64-libs.txt"
-
-      - name: Rename APKs
-        run: |
-          mkdir -p artifacts
-          BUILD=${{ github.run_number }}
-          declare -A MAP=(
-            [app-armeabi-v7a-release.apk]="AnimeStream-${BUILD}-armeabi-v7a.apk"
-            [app-arm64-v8a-release.apk]="AnimeStream-${BUILD}-arm64-v8a.apk"
-            [app-x86-release.apk]="AnimeStream-${BUILD}-x86.apk"
-            [app-x86_64-release.apk]="AnimeStream-${BUILD}-x86_64.apk"
-            [app-universal-release.apk]="AnimeStream-${BUILD}-universal.apk"
-          )
-          for src in "${!MAP[@]}"; do
-            if [ -f "android/app/build/outputs/apk/release/$src" ]; then
-              cp "android/app/build/outputs/apk/release/$src" "artifacts/${MAP[$src]}"
-            fi
-          done
-          ls -lh artifacts/
+          mkdir -p ../artifacts
+          cp app/build/outputs/apk/release/app-release.apk "../artifacts/AnimeStream-${GITHUB_RUN_NUMBER}-universal.apk"
+          {
+            echo "versionCode=${GITHUB_RUN_NUMBER}"
+            echo "package=de.ixacg.animestream"
+            echo "signing=${SIGNING_MODE}"
+            echo "api=${ANIMESTREAM_API_BASE_URL}"
+          } > ../artifacts/build-info.txt
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: AnimeStream-apk-${{ github.run_number }}
-          path: mobile/artifacts/AnimeStream-*.apk
+          path: |
+            mobile/artifacts/AnimeStream-*.apk
+            mobile/artifacts/build-info.txt
           retention-days: 30
+
+      - name: Upload Android reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeStream-android-reports-${{ github.run_number }}
+          path: |
+            mobile/android/app/build/reports/
+            mobile/android/app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
   release:
     name: Create GitHub Release
     needs: build
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      needs.build.outputs.signing_mode == 'release'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -221,31 +162,25 @@ jobs:
           name: AnimeStream-apk-${{ github.run_number }}
           path: mobile/artifacts
 
-      - name: Generate release notes from commits
+      - name: Generate release notes
         run: |
-          PREV_TAG=$(git tag --sort=-creatordate | grep '^build-' | grep -v "^build-${{ github.run_number }}$" | head -1 || true)
+          previous_tag=$(git tag --sort=-creatordate | grep '^build-' | grep -v "^build-${{ github.run_number }}$" | head -1 || true)
+          signing=$(sed -n 's/^signing=//p' mobile/artifacts/build-info.txt)
           {
             echo "## Changes"
             echo
-            if [ -n "$PREV_TAG" ]; then
-              echo "Since \`$PREV_TAG\`:"
-              echo
-              git log --no-merges --pretty=format:"- %s (%h)" "$PREV_TAG..HEAD"
+            if [ -n "$previous_tag" ]; then
+              git log --no-merges --pretty=format:'- %s (%h)' "$previous_tag..HEAD"
             else
-              git log --no-merges --pretty=format:"- %s (%h)" -20
+              git log --no-merges --pretty=format:'- %s (%h)' -20
             fi
             echo
             echo
-            echo "## APK Variants"
+            echo "## Android"
             echo
-            echo "Pick the APK matching your device CPU. \`universal\` works on all devices but is larger."
-            echo
-            echo "- \`arm64-v8a\` — most modern Android phones (recommended)"
-            echo "- \`armeabi-v7a\` — older 32-bit phones"
-            echo "- \`x86_64\` / \`x86\` — emulators and rare Intel devices"
-            echo "- \`universal\` — fallback that runs anywhere"
+            echo "- Native Kotlin / Jetpack Compose universal APK"
+            echo "- Signing mode: \`$signing\`"
           } > release-notes.md
-          cat release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

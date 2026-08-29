@@ -1,0 +1,36 @@
+package de.ixacg.animestream.reader
+
+data class VisibleReaderPage(
+    val index: Int,
+    val visiblePixels: Int,
+    val totalPixels: Int,
+)
+
+object ReaderLogic {
+    fun activePage(
+        pages: List<VisibleReaderPage>,
+        minimumVisibleFraction: Float = 0.4f,
+    ): Int? {
+        val visiblePages = pages.filter { it.totalPixels > 0 && it.visiblePixels > 0 }
+        return visiblePages.firstOrNull { page ->
+            page.visiblePixels.toFloat() / page.totalPixels >= minimumVisibleFraction
+        }?.index ?: visiblePages.maxByOrNull(VisibleReaderPage::visiblePixels)?.index
+    }
+
+    fun boundedPage(
+        requested: Int,
+        pageCount: Int,
+    ): Int = requested.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+
+    fun pageAspectRatio(
+        width: Int,
+        height: Int,
+        fallback: Float = 0.72f,
+    ): Float {
+        if (width <= 0 || height <= 0) return fallback
+        return (width.toFloat() / height).coerceIn(MIN_PAGE_ASPECT_RATIO, MAX_PAGE_ASPECT_RATIO)
+    }
+
+    private const val MIN_PAGE_ASPECT_RATIO = 0.001f
+    private const val MAX_PAGE_ASPECT_RATIO = 4f
+}
