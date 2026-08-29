@@ -9,8 +9,7 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-fun String.asBuildConfigString(): String =
-    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 val apiBaseUrl =
     providers.gradleProperty("ANIMESTREAM_API_BASE_URL")
@@ -94,10 +93,11 @@ android {
     }
 
     packaging {
-        resources.excludes += setOf(
-            "/META-INF/{AL2.0,LGPL2.1}",
-            "/META-INF/DEPENDENCIES",
-        )
+        resources.excludes +=
+            setOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/DEPENDENCIES",
+            )
     }
 
     testOptions {
