@@ -84,7 +84,15 @@ jobs:
         run: chmod +x gradlew
 
       - name: Format, lint, test and assemble
+        id: quality
         run: ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon --stacktrace
+
+      - name: Generate Ktlint formatting patch
+        if: steps.quality.outcome == 'failure'
+        run: |
+          ./gradlew ktlintFormat --no-daemon
+          mkdir -p app/build/reports
+          git -C "$GITHUB_WORKSPACE" diff --binary -- mobile/android > app/build/reports/ktlint-format.patch
 
       - name: Validate APK identity and contents
         run: |
