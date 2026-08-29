@@ -11,12 +11,19 @@ class LegacyPayloadParserTest {
             LegacyPayloadParser.parse(
                 mapOf(
                     LegacyPayloadParser.ANIME_HISTORY to
-                        """[{"id":7,"title":"A","watchedAt":90},{"id":"bad","title":"B"},{"id":8}]""",
+                        """
+                        [
+                          {"id":7,"title":"A","watchedAt":90},
+                          {"id":"bad","title":"B"},
+                          {"id":8},
+                          {"id":10,"title":"missing timestamp"},
+                          {"id":11,"title":"zero timestamp","watchedAt":0}
+                        ]
+                        """.trimIndent(),
                     LegacyPayloadParser.MANGA_HISTORY to
                         """[{"id":9,"title":"M","chapterNumber":2,"pageIndex":4,"readAt":100}]""",
                     LegacyPayloadParser.ANIME_FAVORITES to "not-json",
                 ),
-                now = { 500L },
             )
 
         assertEquals(listOf(7L), payload.animeHistory.map { it.id })

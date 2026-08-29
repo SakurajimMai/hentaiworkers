@@ -80,7 +80,9 @@ fun LibraryScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var editing by rememberSaveable { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
-    LaunchedEffect(session.user?.id) { viewModel.refreshLibrary() }
+    LaunchedEffect(session.ready, session.user?.id) {
+        if (session.ready) viewModel.refreshLibrary()
+    }
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(

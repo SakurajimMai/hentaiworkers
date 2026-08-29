@@ -31,6 +31,18 @@ object ReaderLogic {
         return (width.toFloat() / height).coerceIn(MIN_PAGE_ASPECT_RATIO, MAX_PAGE_ASPECT_RATIO)
     }
 
+    fun requiresBoundedViewport(
+        imageWidth: Int,
+        imageHeight: Int,
+        viewportWidth: Int,
+        viewportHeight: Int,
+    ): Boolean {
+        if (imageWidth <= 0 || imageHeight <= 0 || viewportWidth <= 0 || viewportHeight <= 0) return false
+        val scaledImageHeight = imageHeight.toDouble() * viewportWidth / imageWidth
+        return scaledImageHeight > viewportHeight.toDouble() * MAX_UNBOUNDED_VIEWPORT_HEIGHTS
+    }
+
     private const val MIN_PAGE_ASPECT_RATIO = 0.001f
     private const val MAX_PAGE_ASPECT_RATIO = 4f
+    private const val MAX_UNBOUNDED_VIEWPORT_HEIGHTS = 8
 }

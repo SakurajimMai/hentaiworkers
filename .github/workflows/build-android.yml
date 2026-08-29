@@ -85,6 +85,10 @@ jobs:
 
       - name: Format, lint, test and assemble
         id: quality
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           mkdir -p app/build/reports
           set -o pipefail
@@ -147,6 +151,7 @@ jobs:
           path: |
             mobile/android/app/build/reports/
             mobile/android/app/build/test-results/
+            mobile/android/app/schemas/
           if-no-files-found: ignore
           retention-days: 14
 

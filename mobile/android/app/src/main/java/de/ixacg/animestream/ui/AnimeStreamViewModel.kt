@@ -142,18 +142,22 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         loadTags()
     }
 
-    fun refreshHome() {
+    fun refreshHome(forceAds: Boolean = false) {
+        if (forceAds) refreshAds(force = true)
         viewModelScope.launch {
             mutableHome.update { it.copy(loading = true, error = null) }
             runCatching {
                 coroutineScope {
                     val animes = async { catalog.animes(page = 1, limit = HOME_ANIME_LIMIT, sort = "popular") }
-                    val mangas = async { catalog.mangas(page = 1, limit = HOME_MANGA_LIMIT) }
-                    HomeContent(animes.await().data, mangas.await().data)
+                    val mangas =
+                        async {
+                            runCatching { catalog.mangas(page = 1, limit = HOME_MANGA_LIMIT).data }
+                                .getOrDefault(emptyList())
+                        }
+                    HomeContent(animes.await().data, mangas.await())
                 }
             }.onSuccess { mutableHome.value = Loadable(value = it) }
                 .onFailure { mutableHome.value = Loadable(error = it.userMessage()) }
-            refreshAds(force = true)
         }
     }
 
@@ -193,7 +197,8 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         refreshDiscover()
     }
 
-    fun refreshDiscover() {
+    fun refreshDiscover(forceAds: Boolean = false) {
+        if (forceAds) refreshAds(force = true)
         discoverJob?.cancel()
         discoverJob =
             viewModelScope.launch {
@@ -272,7 +277,8 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         refreshMangas()
     }
 
-    fun refreshMangas() {
+    fun refreshMangas(forceAds: Boolean = false) {
+        if (forceAds) refreshAds(force = true)
         mangaJob?.cancel()
         mangaJob =
             viewModelScope.launch {

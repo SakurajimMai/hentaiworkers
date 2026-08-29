@@ -28,16 +28,13 @@ object LegacyPayloadParser {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun parse(
-        values: Map<String, String>,
-        now: () -> Long = System::currentTimeMillis,
-    ): LegacyPayload =
+    fun parse(values: Map<String, String>): LegacyPayload =
         LegacyPayload(
             cookie = values[AUTH_COOKIE],
-            animeHistory = parseArray(values[ANIME_HISTORY]) { animeHistory(it, now()) },
-            animeFavorites = parseArray(values[ANIME_FAVORITES]) { animeFavorite(it, now()) },
-            mangaHistory = parseArray(values[MANGA_HISTORY]) { mangaHistory(it, now()) },
-            mangaFavorites = parseArray(values[MANGA_FAVORITES]) { mangaFavorite(it, now()) },
+            animeHistory = parseArray(values[ANIME_HISTORY], ::animeHistory),
+            animeFavorites = parseArray(values[ANIME_FAVORITES], ::animeFavorite),
+            mangaHistory = parseArray(values[MANGA_HISTORY], ::mangaHistory),
+            mangaFavorites = parseArray(values[MANGA_FAVORITES], ::mangaFavorite),
         )
 
     private fun <T> parseArray(
@@ -52,66 +49,58 @@ object LegacyPayloadParser {
         }.getOrDefault(emptyList())
     }
 
-    private fun animeHistory(
-        item: JsonObject,
-        now: Long,
-    ): AnimeHistoryEntity? {
+    private fun animeHistory(item: JsonObject): AnimeHistoryEntity? {
         val id = item.long("id") ?: return null
         val title = item.string("title")?.takeIf(String::isNotBlank) ?: return null
+        val watchedAt = item.long("watchedAt")?.takeIf { it > 0 } ?: return null
         return AnimeHistoryEntity(
             id = id,
             title = title,
             cover = item.string("cover"),
             titleJapanese = item.string("titleJapanese"),
-            watchedAt = item.long("watchedAt")?.takeIf { it > 0 } ?: now,
+            watchedAt = watchedAt,
         )
     }
 
-    private fun animeFavorite(
-        item: JsonObject,
-        now: Long,
-    ): AnimeFavoriteEntity? {
+    private fun animeFavorite(item: JsonObject): AnimeFavoriteEntity? {
         val id = item.long("id") ?: return null
         val title = item.string("title")?.takeIf(String::isNotBlank) ?: return null
+        val favoritedAt = item.long("favoritedAt")?.takeIf { it > 0 } ?: return null
         return AnimeFavoriteEntity(
             id = id,
             title = title,
             cover = item.string("cover"),
             titleJapanese = item.string("titleJapanese"),
             releaseYear = item.int("releaseYear"),
-            favoritedAt = item.long("favoritedAt")?.takeIf { it > 0 } ?: now,
+            favoritedAt = favoritedAt,
         )
     }
 
-    private fun mangaHistory(
-        item: JsonObject,
-        now: Long,
-    ): MangaHistoryEntity? {
+    private fun mangaHistory(item: JsonObject): MangaHistoryEntity? {
         val id = item.long("id") ?: return null
         val title = item.string("title")?.takeIf(String::isNotBlank) ?: return null
         val chapter = item.double("chapterNumber") ?: return null
+        val readAt = item.long("readAt")?.takeIf { it > 0 } ?: return null
         return MangaHistoryEntity(
             id = id,
             title = title,
             coverUrl = item.string("coverUrl"),
             chapterNumber = chapter,
             pageIndex = item.int("pageIndex")?.coerceAtLeast(0) ?: 0,
-            readAt = item.long("readAt")?.takeIf { it > 0 } ?: now,
+            readAt = readAt,
         )
     }
 
-    private fun mangaFavorite(
-        item: JsonObject,
-        now: Long,
-    ): MangaFavoriteEntity? {
+    private fun mangaFavorite(item: JsonObject): MangaFavoriteEntity? {
         val id = item.long("id") ?: return null
         val title = item.string("title")?.takeIf(String::isNotBlank) ?: return null
+        val favoritedAt = item.long("favoritedAt")?.takeIf { it > 0 } ?: return null
         return MangaFavoriteEntity(
             id = id,
             title = title,
             coverUrl = item.string("coverUrl"),
             author = item.string("author"),
-            favoritedAt = item.long("favoritedAt")?.takeIf { it > 0 } ?: now,
+            favoritedAt = favoritedAt,
         )
     }
 

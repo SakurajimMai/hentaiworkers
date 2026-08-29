@@ -58,7 +58,7 @@ fun HomeScreen(
     val ads by viewModel.adsState.collectAsStateWithLifecycle()
     PullToRefreshBox(
         isRefreshing = state.loading && state.value != null,
-        onRefresh = viewModel::refreshHome,
+        onRefresh = { viewModel.refreshHome(forceAds = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
         val content = state.value
@@ -68,7 +68,7 @@ fun HomeScreen(
                 error = state.error.takeIf { content == null },
                 empty = content != null && content.animes.isEmpty() && content.mangas.isEmpty(),
                 emptyText = "暂时没有可浏览的内容",
-                onRetry = viewModel::refreshHome,
+                onRetry = { viewModel.refreshHome() },
             )
         ) {
             return@PullToRefreshBox
@@ -159,7 +159,7 @@ fun DiscoverScreen(
 
     PullToRefreshBox(
         isRefreshing = state.loading && state.items.isNotEmpty(),
-        onRefresh = viewModel::refreshDiscover,
+        onRefresh = { viewModel.refreshDiscover(forceAds = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
         if (
@@ -168,7 +168,7 @@ fun DiscoverScreen(
                 error = state.error.takeIf { state.items.isEmpty() },
                 empty = !state.loading && state.error == null && state.items.isEmpty() && state.page > 0,
                 emptyText = "没有找到符合条件的里番",
-                onRetry = viewModel::refreshDiscover,
+                onRetry = { viewModel.refreshDiscover() },
             )
         ) {
             return@PullToRefreshBox
@@ -276,7 +276,7 @@ fun MangaCatalogScreen(
 
     PullToRefreshBox(
         isRefreshing = state.loading && state.items.isNotEmpty(),
-        onRefresh = viewModel::refreshMangas,
+        onRefresh = { viewModel.refreshMangas(forceAds = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
         if (
@@ -285,7 +285,7 @@ fun MangaCatalogScreen(
                 error = state.error.takeIf { state.items.isEmpty() },
                 empty = !state.loading && state.error == null && state.items.isEmpty() && state.page > 0,
                 emptyText = "没有找到符合条件的漫画",
-                onRetry = viewModel::refreshMangas,
+                onRetry = { viewModel.refreshMangas() },
             )
         ) {
             return@PullToRefreshBox

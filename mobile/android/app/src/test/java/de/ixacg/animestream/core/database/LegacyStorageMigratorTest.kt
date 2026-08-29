@@ -50,7 +50,7 @@ class LegacyStorageMigratorTest {
                 "INSERT INTO catalystLocalStorage(key,value) VALUES (?,?)",
                 arrayOf(
                     LegacyPayloadParser.ANIME_FAVORITES,
-                    """[{"id":4,"title":"Legacy","favoritedAt":1000}]""",
+                    """[{"id":4,"title":"Legacy","favoritedAt":1000},{"id":5,"title":"Damaged"},{"id":6,"title":"Imported","favoritedAt":2000}]""",
                 ),
             )
             source.execSQL(
@@ -73,6 +73,16 @@ class LegacyStorageMigratorTest {
                         favoritedAt = 5_000,
                     ),
                 )
+                database.libraryDao().putAnimeFavorite(
+                    AnimeFavoriteEntity(
+                        id = 5,
+                        title = "Native protected",
+                        cover = null,
+                        titleJapanese = null,
+                        releaseYear = null,
+                        favoritedAt = 5_000,
+                    ),
+                )
             }
             val cookieStore =
                 SessionCookieStore(
@@ -88,8 +98,12 @@ class LegacyStorageMigratorTest {
             migrator.migrateIfNeeded()
 
             val favorite = withContext(Dispatchers.IO) { database.libraryDao().animeFavorite(4) }
+            val protected = withContext(Dispatchers.IO) { database.libraryDao().animeFavorite(5) }
+            val imported = withContext(Dispatchers.IO) { database.libraryDao().animeFavorite(6) }
             val history = withContext(Dispatchers.IO) { database.libraryDao().mangaHistory() }
             assertEquals("Native newer", favorite?.title)
+            assertEquals("Native protected", protected?.title)
+            assertEquals("Imported", imported?.title)
             assertEquals(1, history.size)
             assertEquals(6, history.single().pageIndex)
             assertEquals("animestream_session=legacy-token", cookieStore.currentHeader())

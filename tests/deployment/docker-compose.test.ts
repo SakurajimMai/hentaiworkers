@@ -46,6 +46,17 @@ for (const relativePath of ['docker-compose.yml', 'deploy/docker-compose.yml']) 
 
 test('Android APK workflow builds mobile and publishes a GitHub Release', () => {
   const workflow = readFileSync(join(root, '.github/workflows/build-android.yml'), 'utf8');
+  const parsedWorkflow = parse(workflow) as {
+    jobs: {
+      build: {
+        steps: Array<{ name?: string; env?: Record<string, string> }>;
+      };
+    };
+  };
+  const qualityStep = parsedWorkflow.jobs.build.steps.find(
+    (step) => step.name === 'Format, lint, test and assemble',
+  );
+
   assert.match(workflow, /name: Build Android APK/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
@@ -58,6 +69,11 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /ANIMESTREAM_API_BASE_URL: https:\/\/www\.ixacg\.de/);
   assert.match(workflow, /Android signing secrets are only partially configured/);
   assert.match(workflow, /needs\.build\.outputs\.signing_mode == 'release'/);
+  assert.deepEqual(qualityStep?.env, {
+    ANDROID_KEYSTORE_PASSWORD: '${{ secrets.ANDROID_KEYSTORE_PASSWORD }}',
+    ANDROID_KEY_ALIAS: '${{ secrets.ANDROID_KEY_ALIAS }}',
+    ANDROID_KEY_PASSWORD: '${{ secrets.ANDROID_KEY_PASSWORD }}',
+  });
   assert.doesNotMatch(workflow, /setup-node|npm ci|expo prebuild|EXPO_PUBLIC/);
 });
 
@@ -65,15 +81,29 @@ test('mobile is a native Kotlin application without a JavaScript runtime', () =>
   const appGradle = readFileSync(join(root, 'mobile/android/app/build.gradle.kts'), 'utf8');
   const versions = readFileSync(join(root, 'mobile/android/gradle/libs.versions.toml'), 'utf8');
   const manifest = readFileSync(join(root, 'mobile/android/app/src/main/AndroidManifest.xml'), 'utf8');
+  const navigation = readFileSync(
+    join(
+      root,
+      'mobile/android/app/src/main/java/de/ixacg/animestream/ui/navigation/AnimeStreamApp.kt',
+    ),
+    'utf8',
+  );
   const notices = readFileSync(join(root, 'mobile/android/app/src/main/assets/THIRD_PARTY_NOTICES.md'), 'utf8');
   const apache = readFileSync(join(root, 'mobile/android/app/src/main/assets/licenses/Apache-2.0.txt'), 'utf8');
 
   assert.match(appGradle, /applicationId = "de\.ixacg\.animestream"/);
   assert.match(appGradle, /implementation\(libs\.media3\.exoplayer\.hls\)/);
   assert.match(appGradle, /implementation\(libs\.telephoto\.zoomable\.image\.coil\)/);
+  assert.match(appGradle, /alias\(libs\.plugins\.room\)/);
+  assert.match(appGradle, /room\s*\{\s*schemaDirectory\("\$projectDir\/schemas"\)/);
+  assert.doesNotMatch(appGradle, /arg\("room\.schemaLocation"/);
   assert.match(versions, /telephoto = "0\.16\.0"/);
   assert.match(manifest, /android:name="\.MainActivity"/);
   assert.match(manifest, /android:scheme="animestream"/);
+  assert.match(navigation, /animestream:\/\/detail\/\{animeId\}/);
+  assert.match(navigation, /animestream:\/\/player\/\{animeId\}/);
+  assert.match(navigation, /animestream:\/\/manga-detail\/\{mangaId\}/);
+  assert.match(navigation, /animestream:\/\/manga-reader\/\{mangaId\}\/\{chapter\}/);
   assert.match(notices, /assets\/licenses\/Apache-2\.0\.txt/);
   assert.match(apache, /Apache License\s+Version 2\.0, January 2004/);
   assert.equal(existsSync(join(root, 'mobile/package.json')), false);

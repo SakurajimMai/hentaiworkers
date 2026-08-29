@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -61,7 +62,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -366,6 +370,7 @@ private fun ZoomableReaderPage(
 ) {
     val context = LocalContext.current
     var ratio by remember(page.imageUrl) { mutableFloatStateOf(0.72f) }
+    var imageSize by remember(page.imageUrl) { mutableStateOf(IntSize.Zero) }
     var retry by remember(page.imageUrl) { mutableIntStateOf(0) }
     var loadState by remember(page.imageUrl) { mutableStateOf(PageLoadState.Loading) }
     val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 4f))
@@ -382,6 +387,7 @@ private fun ZoomableReaderPage(
                     onSuccess = { _, result ->
                         val width = result.drawable.intrinsicWidth
                         val height = result.drawable.intrinsicHeight
+                        imageSize = IntSize(width.coerceAtLeast(0), height.coerceAtLeast(0))
                         ratio = ReaderLogic.pageAspectRatio(width, height)
                         loadState = PageLoadState.Ready
                     },
@@ -393,43 +399,60 @@ private fun ZoomableReaderPage(
             .distinctUntilChanged()
             .collect { fraction -> onZoomChanged((fraction ?: 0f) > 0.01f) }
     }
-    Box(
-        modifier = Modifier.fillMaxWidth().aspectRatio(ratio),
-        contentAlignment = Alignment.Center,
-    ) {
-        ZoomableAsyncImage(
-            model = request,
-            contentDescription = "漫画第 ${page.index + 1} 页",
-            state = imageState,
-            imageLoader = context.imageLoader,
-            modifier = Modifier.fillMaxSize(),
-            alignment = Alignment.TopCenter,
-            contentScale = ContentScale.FillWidth,
-            onClick = {
-                if ((zoomableState.zoomFraction ?: 0f) <= 0.01f) onTap()
-            },
-        )
-        when (loadState) {
-            PageLoadState.Loading -> {
-                Box(Modifier.fillMaxSize().background(Color(0xFF111111)), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+    val viewportHeight = LocalConfiguration.current.screenHeightDp.coerceAtLeast(1).dp
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val boundedViewport =
+            ReaderLogic.requiresBoundedViewport(
+                imageWidth = imageSize.width,
+                imageHeight = imageSize.height,
+                viewportWidth = with(density) { maxWidth.roundToPx() },
+                viewportHeight = with(density) { viewportHeight.roundToPx() },
+            )
+        val pageModifier =
+            if (boundedViewport) {
+                Modifier.fillMaxWidth().height(viewportHeight)
+            } else {
+                Modifier.fillMaxWidth().aspectRatio(ratio)
             }
-            PageLoadState.Error -> {
-                Column(
-                    modifier = Modifier.fillMaxSize().background(Color(0xFF111111)),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White)
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { retry++ }) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
-                        Text("重试本页")
+        Box(
+            modifier = pageModifier,
+            contentAlignment = Alignment.Center,
+        ) {
+            ZoomableAsyncImage(
+                model = request,
+                contentDescription = "漫画第 ${page.index + 1} 页",
+                state = imageState,
+                imageLoader = context.imageLoader,
+                modifier = Modifier.fillMaxSize(),
+                alignment = Alignment.TopCenter,
+                contentScale = ContentScale.FillWidth,
+                onClick = {
+                    if ((zoomableState.zoomFraction ?: 0f) <= 0.01f) onTap()
+                },
+            )
+            when (loadState) {
+                PageLoadState.Loading -> {
+                    Box(Modifier.fillMaxSize().background(Color(0xFF111111)), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
                 }
+                PageLoadState.Error -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize().background(Color(0xFF111111)),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { retry++ }) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Text("重试本页")
+                        }
+                    }
+                }
+                PageLoadState.Ready -> Unit
             }
-            PageLoadState.Ready -> Unit
         }
     }
 }

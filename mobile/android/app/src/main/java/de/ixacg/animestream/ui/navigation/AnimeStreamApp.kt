@@ -196,7 +196,11 @@ private fun AppNavHost(
         composable(
             route = "anime/{animeId}",
             arguments = listOf(navArgument("animeId") { type = NavType.LongType }),
-            deepLinks = listOf(navDeepLink { uriPattern = "animestream://anime/{animeId}" }),
+            deepLinks =
+                listOf(
+                    navDeepLink { uriPattern = "animestream://anime/{animeId}" },
+                    navDeepLink { uriPattern = "animestream://detail/{animeId}" },
+                ),
         ) { entry ->
             val id = entry.arguments?.getLong("animeId") ?: return@composable
             AnimeDetailScreen(
@@ -214,7 +218,11 @@ private fun AppNavHost(
         composable(
             route = "manga-detail/{mangaId}",
             arguments = listOf(navArgument("mangaId") { type = NavType.LongType }),
-            deepLinks = listOf(navDeepLink { uriPattern = "animestream://manga/{mangaId}" }),
+            deepLinks =
+                listOf(
+                    navDeepLink { uriPattern = "animestream://manga/{mangaId}" },
+                    navDeepLink { uriPattern = "animestream://manga-detail/{mangaId}" },
+                ),
         ) { entry ->
             val id = entry.arguments?.getLong("mangaId") ?: return@composable
             MangaDetailScreen(
@@ -252,6 +260,8 @@ private fun AppNavHost(
                 listOf(
                     navDeepLink { uriPattern = "animestream://reader/{mangaId}/{chapter}" },
                     navDeepLink { uriPattern = "animestream://reader/{mangaId}/{chapter}?page={page}" },
+                    navDeepLink { uriPattern = "animestream://manga-reader/{mangaId}/{chapter}" },
+                    navDeepLink { uriPattern = "animestream://manga-reader/{mangaId}/{chapter}?page={page}" },
                 ),
         ) { entry ->
             val id = entry.arguments?.getLong("mangaId") ?: return@composable

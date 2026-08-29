@@ -1,7 +1,9 @@
 package de.ixacg.animestream.reader
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderLogicTest {
@@ -45,5 +47,34 @@ class ReaderLogicTest {
         assertEquals(0.004f, ReaderLogic.pageAspectRatio(width = 1_000, height = 250_000), 0.00001f)
         assertEquals(0.001f, ReaderLogic.pageAspectRatio(width = 1_000, height = 2_000_000), 0.00001f)
         assertEquals(0.72f, ReaderLogic.pageAspectRatio(width = 0, height = 0), 0f)
+    }
+
+    @Test
+    fun `uses finite viewport only for extreme long pages`() {
+        assertFalse(
+            ReaderLogic.requiresBoundedViewport(
+                imageWidth = 1_000,
+                imageHeight = 10_000,
+                viewportWidth = 1_080,
+                viewportHeight = 2_400,
+            ),
+        )
+        assertTrue(
+            ReaderLogic.requiresBoundedViewport(
+                imageWidth = 1_000,
+                imageHeight = 250_000,
+                viewportWidth = 1_080,
+                viewportHeight = 2_400,
+            ),
+        )
+        assertTrue(
+            ReaderLogic.requiresBoundedViewport(
+                imageWidth = 1_000,
+                imageHeight = 2_000_000,
+                viewportWidth = 1_080,
+                viewportHeight = 2_400,
+            ),
+        )
+        assertFalse(ReaderLogic.requiresBoundedViewport(0, 0, 1_080, 2_400))
     }
 }
