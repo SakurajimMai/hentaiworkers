@@ -13,15 +13,15 @@ class PlayerAdPolicyTest {
 
         assertEquals(
             PlayerAdPolicy.PreRollDecision.Waiting,
-            PlayerAdPolicy.preRollDecision(adsReady = false, ad),
+            PlayerAdPolicy.preRollDecision(adsReady = false, ad)
         )
         assertEquals(
             PlayerAdPolicy.PreRollDecision.Show,
-            PlayerAdPolicy.preRollDecision(adsReady = true, ad),
+            PlayerAdPolicy.preRollDecision(adsReady = true, ad)
         )
         assertEquals(
             PlayerAdPolicy.PreRollDecision.Skip,
-            PlayerAdPolicy.preRollDecision(adsReady = true, PlayerPreRollAd()),
+            PlayerAdPolicy.preRollDecision(adsReady = true, PlayerPreRollAd())
         )
     }
 
@@ -38,11 +38,11 @@ class PlayerAdPolicyTest {
         assertTrue(PlayerAdPolicy.hasContent("", "", "<p>ad</p>"))
         assertEquals(
             PlayerAdPolicy.PreRollTiming(closeDelaySeconds = 120, totalDurationSeconds = 120),
-            PlayerAdPolicy.normalizePreRollTiming(closeDelaySeconds = 999, totalDurationSeconds = 2),
+            PlayerAdPolicy.normalizePreRollTiming(closeDelaySeconds = 999, totalDurationSeconds = 2)
         )
         assertEquals(
             PlayerAdPolicy.PreRollTiming(closeDelaySeconds = 0, totalDurationSeconds = 5),
-            PlayerAdPolicy.normalizePreRollTiming(closeDelaySeconds = 0, totalDurationSeconds = 0),
+            PlayerAdPolicy.normalizePreRollTiming(closeDelaySeconds = 0, totalDurationSeconds = 0)
         )
     }
 

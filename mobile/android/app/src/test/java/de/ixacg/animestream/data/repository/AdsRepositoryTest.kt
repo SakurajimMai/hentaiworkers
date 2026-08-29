@@ -12,7 +12,7 @@ class AdsRepositoryTest {
             listOf(
                 FeedAdSlot(enabled = true, name = "fast", interval = 0),
                 FeedAdSlot(enabled = true, name = "slow", interval = 50),
-                FeedAdSlot(enabled = false, name = "off", interval = 1),
+                FeedAdSlot(enabled = false, name = "off", interval = 1)
             )
         val result = AdsRepository.interleave((1..40).toList(), ads) { item, _ -> "item-$item" }
         val adRows = result.filterIsInstance<FeedEntry.Ad>()

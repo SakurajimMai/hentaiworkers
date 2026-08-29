@@ -32,14 +32,14 @@ class ApiContractTest {
     }
 
     @Test
-    fun `catalog query preserves page filter search and sort`() =
+    fun `catalog query preserves page filter search and sort`() {
         runTest {
             server.enqueue(
                 MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody(
-                        """{"data":[{"id":7,"title":"Example"}],"pagination":{"page":2,"limit":30,"total":1,"totalPages":2}}""",
-                    ),
+                        """{"data":[{"id":7,"title":"Example"}],"pagination":{"page":2,"limit":30,"total":1,"totalPages":2}}"""
+                    )
             )
             val api = createApi()
             val result = api.animes(page = 2, limit = 30, tagId = 9, search = "night", sort = "popular")
@@ -49,20 +49,21 @@ class ApiContractTest {
             assertEquals("/api/animes?page=2&limit=30&tag=9&search=night&sort=popular", request.path)
             assertEquals("application/json", request.getHeader("Accept"))
         }
+    }
 
     @Test
-    fun `session cookie persists from login and is sent to me`() =
+    fun `session cookie persists from login and is sent to me`() {
         runTest {
             server.enqueue(
                 MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setHeader("Set-Cookie", "animestream_session=test-token; Path=/; HttpOnly")
-                    .setBody("""{"user":{"id":1,"username":"mei","role":"user"}}"""),
+                    .setBody("""{"user":{"id":1,"username":"mei","role":"user"}}""")
             )
             server.enqueue(
                 MockResponse()
                     .setHeader("Content-Type", "application/json")
-                    .setBody("""{"user":{"id":1,"username":"mei","role":"user"}}"""),
+                    .setBody("""{"user":{"id":1,"username":"mei","role":"user"}}""")
             )
             val context = ApplicationProvider.getApplicationContext<Context>()
             val cookies = SessionCookieStore(context, server.url("/"), backgroundScope)
@@ -81,6 +82,7 @@ class ApiContractTest {
             assertTrue(loginRequest.body.readUtf8().contains("\"emailOrUsername\":\"mei\""))
             assertEquals("animestream_session=test-token", meRequest.getHeader("Cookie"))
         }
+    }
 
     private fun kotlinx.coroutines.test.TestScope.createApi(): AnimeStreamApi {
         val context = ApplicationProvider.getApplicationContext<Context>()
