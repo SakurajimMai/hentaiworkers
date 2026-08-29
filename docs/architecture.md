@@ -9,12 +9,12 @@ AnimeStream 主站是一个 Next.js 模块化单体。Node.js 进程和生产 Co
 ## 2. 运行拓扑
 
 ```text
-Browser / Mobile
-       |
-       v
-HTTPS reverse proxy
-       |
-       v
+Browser / Native Kotlin Android client
+                  |
+                  v
+          HTTPS reverse proxy
+                  |
+                  v
 Next.js App  --->  Remote MySQL / MariaDB
 ```
 
@@ -58,9 +58,11 @@ Next.js App  --->  Remote MySQL / MariaDB
 - 漫画入库：`POST /api/manga/publish`（共享密钥，不是前台会话）
 - 健康检查：`/api/live`、`/api/ready`、`/api/health`
 - 后台写操作：`app/admin/actions.ts` 的 Server Actions
-- 原生客户端：`mobile/`，只消费公开只读 API
+- 原生客户端：`mobile/android/`，消费公开目录接口与现有登录用户接口，不导入主站私有模块
 
 公开契约见 [API 文档](./api/README.md)。
+
+Android 客户端是独立的单 Activity Compose 应用。Retrofit/OkHttp 调用主站 API，Media3 播放 MP4/HLS，Room 保存匿名用户的收藏和历史，DataStore 保存目标站点会话与迁移版本。首次覆盖安装会只读导入旧 `RKStorage` 数据；原数据库保留用于失败恢复。客户端不进入根 TypeScript/ESLint 范围、Docker 构建上下文或生产 Compose 拓扑。
 
 ## 6. 安全
 
@@ -73,4 +75,4 @@ Next.js App  --->  Remote MySQL / MariaDB
 
 ## 7. 部署
 
-GitHub Actions 从根目录 `Dockerfile` 构建并发布 App 镜像；`mobile/` 变更会另外触发 Android APK 工作流并创建 Release。Compose 拉取公开镜像、读取 `.env`、暴露健康检查，并默认绑定 `127.0.0.1`。详见 [部署指南](./deployment.md) 与 [移动端](./mobile.md)。
+GitHub Actions 从根目录 `Dockerfile` 构建并发布 App 镜像；`mobile/` 变更会另外触发 Android 检查与 APK 构建。只有 `main` 上使用正式签名的非 Pull Request 运行创建 Release；未配置签名 Secrets 时仅保留内部测试 Artifact。Compose 拉取公开镜像、读取 `.env`、暴露健康检查，并默认绑定 `127.0.0.1`。详见 [部署指南](./deployment.md) 与 [移动端](./mobile.md)。

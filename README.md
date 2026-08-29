@@ -1,6 +1,6 @@
 # AnimeStream
 
-AnimeStream 是基于 Next.js 15、React 19、Drizzle ORM 与 MySQL/MariaDB 的里番与漫画站点，包含公开浏览、MP4 播放、漫画阅读、账号体系、管理后台，以及 `mobile/` 中的 Expo Android 客户端。
+AnimeStream 是基于 Next.js 15、React 19、Drizzle ORM 与 MySQL/MariaDB 的里番与漫画站点，包含公开浏览、MP4 播放、漫画阅读、账号体系、管理后台，以及 `mobile/android/` 中的原生 Kotlin Android 客户端。
 
 本仓库包含主站与 `crawler/` 独立工程空间。数据抓取和媒体下载不属于主站运行时，也不与主站共享依赖、配置、容器或内部 API。
 
@@ -13,7 +13,7 @@ AnimeStream 是基于 Next.js 15、React 19、Drizzle ORM 与 MySQL/MariaDB 的�
 - 里番、漫画、标签、用户和系统设置后台
 - 后台可配置页脚 Android 下载地址
 - 公开只读 API（里番 + 漫画）与健康检查
-- `mobile/` Expo 客户端；APK 由 GitHub Actions 构建并发布到 Release
+- `mobile/android/` Kotlin + Jetpack Compose 客户端；APK 只由 GitHub Actions 构建并发布到 Release
 
 ## 本地启动
 
@@ -54,14 +54,9 @@ npm run build
 
 ## 移动端
 
-```bash
-cd mobile
-cp .env.example .env
-npm ci
-npx expo start
-```
+移动端源码位于 `mobile/android/`。开发机只编辑 Kotlin、Compose 和资源文件，不要求安装 JDK、Gradle 或 Android SDK，也不要在本机运行 Android 编译。推送分支或提交 Pull Request 后，**Build Android APK** 会在 GitHub Actions 完成格式检查、Lint、单元测试和 Release APK 构建；只有 `main` 上通过验证、使用正式签名的非 Pull Request 运行会创建 `build-<run>` 预发布 Release。未配置签名 Secrets 时只上传明确标记为内部测试的 Actions Artifact。
 
-原生包不要在本机打。推送到 `main` 且改动了 `mobile/`，或在 Actions 里手动运行 **Build Android APK**，会产出 APK 并挂到 `build-<run>` Release。把 Release 资源地址填进后台「系统设置 → 移动端下载」，页脚「浏览」栏就会出现下载入口。详见 [移动端文档](./docs/mobile.md)。
+把 Release 中的 universal APK 地址填进后台「系统设置 → 移动端下载」，页脚「浏览」栏就会出现下载入口。详见 [移动端文档](./docs/mobile.md)。
 
 ## Docker
 
@@ -83,7 +78,7 @@ components/          前台和后台组件
 lib/                 主站业务、漫画目录、SEO 与公开 API 适配
 lib/server/          catalog、identity、system 业务模块与基础设施
 drizzle/             数据库基线和历史迁移（含 0014–0017 漫画表）
-mobile/              Expo / React Native 客户端
+mobile/android/      Kotlin / Jetpack Compose Android 客户端
 scripts/             主站维护与质量检查脚本
 tests/               TypeScript 测试
 crawler/             独立数据采集工程；不进入主站构建和部署

@@ -74,4 +74,6 @@ CI 发布：
 
 ## 7. Android APK
 
-APK 不进 App 镜像。推送 `mobile/**` 到 `main`，或手动运行 **Build Android APK**，会在 GitHub Release `build-<run>` 挂上安装包。把资源 URL 填进后台「移动端下载」，前台页脚才会显示。步骤见 [移动端文档](./mobile.md)。
+APK 不进 App 镜像。`mobile/**` 或 Android 工作流变更在任意分支、Pull Request 和手动运行时都会远程完成格式检查、Lint、单元测试、Release 构建及包名/版本/签名校验；只有 `main` 的非 Pull Request 运行且使用正式签名时，才会在 GitHub Release `build-<run>` 挂上 `AnimeStream-<run>-universal.apk`。
+
+生产分发前必须配置四个 Android 签名 Secrets，使新 Kotlin APK 与已安装版本使用相同签名；未配置时产物使用 debug 签名并明确标记为仅限内部测试 Artifact，不创建 GitHub Release，部分配置则直接失败。把 Release 资源 URL 填进后台「移动端下载」，前台页脚才会显示。步骤见 [移动端文档](./mobile.md)。
