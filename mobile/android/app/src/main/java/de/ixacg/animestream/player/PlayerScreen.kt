@@ -264,13 +264,14 @@ private fun NativeVideoPlayer(
             player.release()
         }
     }
+    val playbackPlayer = player
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     playerView = this
-                    player = player
+                    player = playbackPlayer
                     useController = true
                     controllerShowTimeoutMs = 3_500
                     setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
@@ -278,7 +279,7 @@ private fun NativeVideoPlayer(
                 }
             },
             update = {
-                it.player = player
+                it.player = playbackPlayer
                 it.resizeMode = resizeMode
             },
         )

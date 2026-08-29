@@ -98,6 +98,7 @@ fun ReaderScreen(
     val ads = adsState.config
     val content = state.value?.takeIf { it.manga.id == mangaId && it.chapter.number == chapterNumber }
     val pages = content?.chapter?.pages.orEmpty()
+    val nextChapter = content?.nextChapter
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -197,10 +198,10 @@ fun ReaderScreen(
                         ) {
                             Text("本话完", color = Color.White, style = MaterialTheme.typography.titleLarge)
                             Text(
-                                if (content.nextChapter == null) "已经是最后一话" else "继续下一话",
+                                if (nextChapter == null) "已经是最后一话" else "继续下一话",
                                 color = Color(0xFFAAA69F),
                             )
-                            content.nextChapter?.let { next ->
+                            nextChapter?.let { next ->
                                 Button(onClick = { onChapter(next.number) }, modifier = Modifier.heightIn(min = 48.dp)) {
                                     Text("第 ${formatChapter(next.number)} 话")
                                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
