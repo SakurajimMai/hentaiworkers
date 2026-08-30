@@ -49,6 +49,7 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   const parsedWorkflow = parse(workflow) as {
     jobs: {
       build: {
+        environment: { name: string };
         steps: Array<{ name?: string; env?: Record<string, string> }>;
       };
       release: {
@@ -78,6 +79,14 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /name: Build Android APK/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /use_production_signing:/);
+  assert.match(workflow, /type: boolean/);
+  assert.match(
+    parsedWorkflow.jobs.build.environment.name,
+    /github\.ref == 'refs\/heads\/main'/,
+  );
+  assert.match(parsedWorkflow.jobs.build.environment.name, /Production/);
+  assert.match(parsedWorkflow.jobs.build.environment.name, /CI/);
   assert.match(workflow, /working-directory: mobile\/android/);
   assert.match(workflow, /ktlintCheck lintRelease testDebugUnitTest assembleRelease/);
   assert.match(workflow, /versionCode='\$\{GITHUB_RUN_NUMBER\}'/);
@@ -104,6 +113,10 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /tag_name: build-\$\{\{ github\.run_number \}\}/);
   assert.match(workflow, /ANIMESTREAM_API_BASE_URL: https:\/\/www\.ixacg\.de/);
   assert.match(workflow, /Android signing secrets are only partially configured/);
+  assert.match(workflow, /keytool -list/);
+  assert.match(workflow, /ANDROID_RELEASE_CERT_SHA256/);
+  assert.match(workflow, /Release APK certificate does not match/);
+  assert.match(workflow, /Builds 39 and earlier used an Expo debug certificate/);
   assert.match(workflow, /needs\.build\.outputs\.signing_mode == 'release'/);
   assert.deepEqual(qualityStep?.env, {
     ANDROID_KEYSTORE_PASSWORD: '${{ secrets.ANDROID_KEYSTORE_PASSWORD }}',

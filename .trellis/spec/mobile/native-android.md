@@ -13,8 +13,13 @@ scope, Docker image, production Compose services, and server-private imports.
 - Application id: `de.ixacg.animestream`.
 - Deep-link scheme: `animestream`.
 - Minimum supported SDK: 24 unless a separately approved product change raises it.
-- Production upgrades require the existing release signing key. An ephemeral debug key is
-  only valid for an explicitly marked internal Actions artifact.
+- Production signing secrets must live in the branch-restricted `Production` environment, never
+  as repository-wide secrets. Ordinary branch builds use a secret-free `CI` environment.
+- Production APKs must match the pinned `ANDROID_RELEASE_CERT_SHA256` repository variable. An
+  ephemeral debug key is only valid for an explicitly marked internal Actions artifact.
+- Builds 39 and earlier used the public Expo template debug certificate. It must not be reused as
+  the production key; users must uninstall those builds before installing the first securely
+  signed native release.
 - A `main` build may create a GitHub Release only when all four release-signing secrets are
   present. Partial signing configuration must fail.
 - The first native launch must idempotently import the five known `RKStorage` values without

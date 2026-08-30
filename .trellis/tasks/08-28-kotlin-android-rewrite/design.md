@@ -171,8 +171,10 @@ Gradle Kotlin DSL 将版本、API origin、签名和 APK 命名纳入可重复�
 
 - Java 17 toolchain，提交 Gradle wrapper 和 version catalog。
 - `versionCode = GITHUB_RUN_NUMBER`，本地解析不到时使用 `1`。
-- release signing 直接读取现有四个 CI environment values，不把 secret 写入仓库或长期文件。
+- release signing 只读取受分支规则保护的 `Production` environment 中四个 Secrets，不把 secret 写入仓库；普通分支使用无密钥的 `CI` environment。
+- 仓库变量 `ANDROID_RELEASE_CERT_SHA256` 固定生产证书指纹，release APK 必须逐包匹配。
 - 无 release keystore 时使用 debug signing，并在 artifact/release notes 标注 internal。
+- Build 39 及更早版本使用公开 Expo debug 证书，不能作为生产密钥继续使用；首次安装新生产签名版前需卸载旧版并提示未同步本地数据风险。
 - 当前原生依赖为四种 ABI 提供 `.so`，因此构建真实的 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` split 和 universal APK；CI 必须验证每个 split 只含目标 ABI，并禁止将同一 APK 伪装为多个架构。
 
 工作流：

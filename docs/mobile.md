@@ -45,7 +45,7 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 
 - 任意分支推送并改动 `mobile/**` 或工作流文件
 - 改动上述路径的 Pull Request
-- 在 GitHub Actions 手动运行 **Build Android APK**
+- 在 GitHub Actions 手动运行 **Build Android APK**；只有受 `Production` 分支规则允许的候选分支才能显式选择 `use_production_signing`
 
 远程构建执行：
 
@@ -70,7 +70,7 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 
 ## 4. 签名与覆盖安装
 
-正式分发必须在仓库 Secrets 中完整配置：
+正式分发必须在受分支规则保护的 `Production` environment 中完整配置：
 
 | Secret | 说明 |
 |--------|------|
@@ -79,7 +79,11 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 | `ANDROID_KEY_ALIAS` | 密钥别名 |
 | `ANDROID_KEY_PASSWORD` | 密钥密码 |
 
+仓库变量 `ANDROID_RELEASE_CERT_SHA256` 必须固定为生产证书的 SHA-256；CI 会拒绝任何使用其他证书的 release APK。普通分支使用不含密钥的 `CI` environment，`Production` 通常只允许 `main`；需要验证候选分支时，只临时允许该精确分支并手动选择 `use_production_signing`，验证后立即移除规则。
+
 四项完整时生成 release-signed APK；四项全空时生成明确标记为 `internal-debug` 的内部测试 Artifact，不能覆盖正式签名版本、不能用于公开分发，也不会创建 GitHub Release。只配置部分 Secret 会让工作流失败，防止误标签名。keystore 仅解码到 GitHub Runner 临时目录，不进入 Artifact 或仓库。
+
+Build 39 及更早版本使用 Expo 模板中的公开 debug 证书，不是可延续的生产签名。首次安装新生产签名版本前必须卸载旧版；卸载会删除未同步的本地数据，应先登录同步或自行备份。后续版本必须一直使用同一份新生产 keystore，才能直接覆盖升级。
 
 Kotlin APK 要覆盖旧安装，包名和签名必须同时保持一致。首次启动会检查旧 `RKStorage` 的 `catalystLocalStorage` 表，并只读迁移以下键：
 

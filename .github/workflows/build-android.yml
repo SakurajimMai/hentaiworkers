@@ -10,6 +10,12 @@ on:
       - 'mobile/**'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
+    inputs:
+      use_production_signing:
+        description: Use the protected Production signing key for a release candidate
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: android-${{ github.workflow }}-${{ github.ref }}
@@ -21,11 +27,14 @@ permissions:
 
 env:
   ANIMESTREAM_API_BASE_URL: https://www.ixacg.de
+  ANDROID_RELEASE_CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
 
 jobs:
   build:
     name: Check and build native APK
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.use_production_signing)) && 'Production' || 'CI' }}
     outputs:
       signing_mode: ${{ steps.signing.outputs.mode }}
     defaults:
@@ -65,6 +74,10 @@ jobs:
              [ -n "$ANDROID_KEY_PASSWORD" ]; then
             key_store_path="$RUNNER_TEMP/animestream-release.keystore"
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$key_store_path"
+            keytool -list \
+              -keystore "$key_store_path" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              -alias "$ANDROID_KEY_ALIAS" >/dev/null
             echo "ANDROID_KEYSTORE_PATH=$key_store_path" >> "$GITHUB_ENV"
             echo "SIGNING_MODE=release" >> "$GITHUB_ENV"
             echo "mode=release" >> "$GITHUB_OUTPUT"
@@ -200,6 +213,20 @@ jobs:
             fi
           done < "$output_map"
 
+          if [ "$SIGNING_MODE" = "release" ]; then
+            expected_certificate_digest=$(
+              printf '%s' "$ANDROID_RELEASE_CERT_SHA256" |
+                tr -d ':' |
+                tr '[:upper:]' '[:lower:]'
+            )
+            printf '%s\n' "$expected_certificate_digest" | grep -Eq '^[0-9a-f]{64}$'
+            if [ "$certificate_digest_ref" != "$expected_certificate_digest" ]; then
+              echo "Release APK certificate does not match ANDROID_RELEASE_CERT_SHA256"
+              exit 1
+            fi
+          fi
+          echo "APK_CERT_SHA256=$certificate_digest_ref" >> "$GITHUB_ENV"
+
           unique_hash_count=$(printf '%s\n' "${apk_hashes[@]}" | LC_ALL=C sort -u | wc -l)
           test "$unique_hash_count" -eq 5
 
@@ -226,6 +253,7 @@ jobs:
             echo "versionCode=${GITHUB_RUN_NUMBER}"
             echo "package=de.ixacg.animestream"
             echo "signing=${SIGNING_MODE}"
+            echo "certificateSha256=${APK_CERT_SHA256}"
             echo "api=${ANIMESTREAM_API_BASE_URL}"
             echo "variants=arm64-v8a,armeabi-v7a,x86_64,x86,universal"
           } > ../artifacts/build-info.txt
@@ -304,6 +332,8 @@ jobs:
             echo
             echo
             echo "## Android"
+            echo
+            echo "> Builds 39 and earlier used an Expo debug certificate. Android cannot update them to this production-signed build; uninstall the old app first. Uninstalling removes unsynced local data."
             echo
             echo "Pick the APK matching your device CPU. The universal APK contains all supported ABIs but is larger."
             echo
