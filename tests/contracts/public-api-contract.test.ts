@@ -28,6 +28,11 @@ import {
   createAdsDependency,
   createAdsHandler,
 } from '../../app/api/ads/handler';
+import {
+  createListMangasDependency,
+  createListMangasHandler,
+  type ListMangasOptions,
+} from '../../app/api/mangas/handler';
 import type {
   AnimeDetail,
   AnimeListResponse,
@@ -38,10 +43,13 @@ import type {
   PublicAdsConfig,
   TagSummary,
 } from '../../lib/public-api-types';
+import type { MangaListResult } from '../../lib/manga-service';
+import { PUBLIC_READ_CACHE_CONTROL } from '../../lib/server/shared/stale-read-cache';
 import adsFixtureJson from './fixtures/ads.json';
 import detailFixtureJson from './fixtures/anime-detail.json';
 import listFixtureJson from './fixtures/animes-list.json';
 import healthFixtureJson from './fixtures/health.json';
+import mangaListFixtureJson from './fixtures/mangas-list.json';
 import similarFixtureJson from './fixtures/similar.json';
 import tagsFixtureJson from './fixtures/tags.json';
 
@@ -61,22 +69,42 @@ const detailFixture = detailFixtureJson satisfies AnimeDetail;
 const similarFixture = similarFixtureJson satisfies AnimeSimilarItem[];
 const tagsFixture = tagsFixtureJson satisfies TagSummary[];
 const adsFixture = adsFixtureJson satisfies PublicAdsConfig;
+const mangaListFixture = mangaListFixtureJson;
+const mangaServiceFixture = {
+  data: mangaListFixture.data.map((item) => ({
+    ...item,
+    updatedAt: new Date(item.updatedAt),
+  })),
+  page: mangaListFixture.pagination.page,
+  limit: mangaListFixture.pagination.limit,
+  total: mangaListFixture.pagination.total,
+  totalPages: mangaListFixture.pagination.totalPages,
+} satisfies MangaListResult;
 const healthFixture = healthFixtureJson satisfies {
   success: HealthOk;
   failure: HealthError;
 };
 
 async function loadRouteModules() {
-  const [listRoute, detailRoute, similarRoute, tagsRoute, healthRoute, adsRoute] = await Promise.all([
+  const [listRoute, detailRoute, similarRoute, tagsRoute, healthRoute, adsRoute, mangaListRoute] = await Promise.all([
     import('../../app/api/animes/route'),
     import('../../app/api/animes/[id]/route'),
     import('../../app/api/animes/[id]/similar/route'),
     import('../../app/api/tags/route'),
     import('../../app/api/health/route'),
     import('../../app/api/ads/route'),
+    import('../../app/api/mangas/route'),
   ]);
 
-  return { listRoute, detailRoute, similarRoute, tagsRoute, healthRoute, adsRoute };
+  return {
+    listRoute,
+    detailRoute,
+    similarRoute,
+    tagsRoute,
+    healthRoute,
+    adsRoute,
+    mangaListRoute,
+  };
 }
 
 async function responseJson(response: Response): Promise<unknown> {
@@ -127,7 +155,7 @@ test('TypeScript 测试脚本使用跨平台递归测试入口', () => {
   assert.equal(packageJson.scripts?.['test:ts'], 'node scripts/run-tests.mjs');
 });
 
-test('六个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
+test('七个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
   const databaseUrl = process.env.DATABASE_URL;
   delete process.env.DATABASE_URL;
   let routes: Awaited<ReturnType<typeof loadRouteModules>>;
@@ -152,6 +180,7 @@ test('六个公开路由不初始化数据库且使用同源可注入 handler �
     createTagsHandler,
     createHealthHandler,
     createAdsHandler,
+    createListMangasHandler,
   ]) {
     assert.equal(typeof factory, 'function');
   }
@@ -187,12 +216,43 @@ test('生产惰性适配器选择正确导出并原样转发参数', async () =>
   const tagsDependency = createTagsDependency(async () => ({
     listTags: async () => tagsFixture,
   }));
+  const mangaOptions: ListMangasOptions = {
+    page: 2,
+    limit: 10,
+    q: 'synthetic manga',
+    tag: 'Synthetic Tag',
+    rank: 'week',
+  };
+  let receivedMangaOptions: ListMangasOptions | undefined;
+  const mangaDependency = createListMangasDependency(async () => ({
+    isMangaEnabled: async () => true,
+    listMangas: async (options) => {
+      receivedMangaOptions = options;
+      return mangaServiceFixture;
+    },
+  }));
 
   assert.deepEqual(await listDependency(listOptions), listFixture);
   assert.deepEqual(receivedListOptions, listOptions);
   assert.deepEqual(await detailDependency(detailFixture.id), detailFixture);
   assert.deepEqual(await similarDependency(detailFixture.id), similarFixture);
   assert.deepEqual(await tagsDependency(), tagsFixture);
+  assert.deepEqual(await mangaDependency(mangaOptions), mangaServiceFixture);
+  assert.deepEqual(receivedMangaOptions, mangaOptions);
+});
+
+test('漫画生产依赖在功能关闭时不读取列表', async () => {
+  let listCalls = 0;
+  const dependency = createListMangasDependency(async () => ({
+    isMangaEnabled: async () => false,
+    listMangas: async () => {
+      listCalls += 1;
+      return mangaServiceFixture;
+    },
+  }));
+
+  assert.equal(await dependency({ page: 1, limit: 24 }), null);
+  assert.equal(listCalls, 0);
 });
 
 test('健康检查惰性适配器只执行 SELECT 1', async () => {
@@ -221,6 +281,7 @@ test('动漫列表保持 200 黄金响应和默认查询参数', async () => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(await responseJson(response), listFixture);
+  assert.equal(response.headers.get('cache-control'), PUBLIC_READ_CACHE_CONTROL);
   assert.deepEqual(received, {
     page: 1,
     limit: 48,
@@ -337,6 +398,7 @@ test('标签列表保持 200 黄金响应和 500 错误结构', async () => {
 
   assert.equal(successResponse.status, 200);
   assert.deepEqual(await responseJson(successResponse), tagsFixture);
+  assert.equal(successResponse.headers.get('cache-control'), PUBLIC_READ_CACHE_CONTROL);
   assert.equal(failureResponse.status, 500);
   assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic tags failure' });
 });
@@ -352,6 +414,7 @@ test('公开广告配置保持 200 黄金响应和 500 错误结构', async () =
 
   assert.equal(successResponse.status, 200);
   assert.deepEqual(await responseJson(successResponse), adsFixture);
+  assert.equal(successResponse.headers.get('cache-control'), PUBLIC_READ_CACHE_CONTROL);
   assert.equal(failureResponse.status, 500);
   assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic ads failure' });
 });
@@ -361,6 +424,50 @@ test('广告配置惰性适配器原样转发公开配置', async () => {
     getPublicAdsConfig: async () => adsFixture,
   }));
   assert.deepEqual(await dependency(), adsFixture);
+});
+
+test('漫画列表保持 200 黄金响应、查询参数和缓存策略', async () => {
+  let received: ListMangasOptions | undefined;
+  const handler = createListMangasHandler(async (options) => {
+    received = options;
+    return mangaServiceFixture;
+  });
+
+  const response = await handler(new NextRequest(
+    'http://fixture.invalid/api/mangas?page=2&limit=10&q=synthetic%20manga&tag=Synthetic%20Tag&rank=week',
+  ));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseJson(response), mangaListFixture);
+  assert.equal(response.headers.get('cache-control'), PUBLIC_READ_CACHE_CONTROL);
+  assert.deepEqual(received, {
+    page: 2,
+    limit: 10,
+    q: 'synthetic manga',
+    tag: 'Synthetic Tag',
+    rank: 'week',
+  });
+});
+
+test('漫画列表保持功能关闭 404 和依赖异常 500 契约', async () => {
+  const disabled = createListMangasHandler(async () => null);
+  const failure = createListMangasHandler(async () => {
+    throw new Error('synthetic manga failure');
+  });
+
+  const disabledResponse = await disabled(
+    new NextRequest('http://fixture.invalid/api/mangas'),
+  );
+  const failureResponse = await withMutedConsoleError(() =>
+    failure(new NextRequest('http://fixture.invalid/api/mangas')),
+  );
+
+  assert.equal(disabledResponse.status, 404);
+  assert.deepEqual(await responseJson(disabledResponse), { error: 'Manga disabled' });
+  assert.equal(disabledResponse.headers.get('cache-control'), null);
+  assert.equal(failureResponse.status, 500);
+  assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic manga failure' });
+  assert.equal(failureResponse.headers.get('cache-control'), null);
 });
 
 test('健康检查保持成功和失败黄金契约', async () => {

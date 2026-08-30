@@ -157,7 +157,10 @@ fun DiscoverScreen(
     val ads by viewModel.adsState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf(state.query) }
     val gridState = rememberLazyGridState()
-    LaunchedEffect(Unit) { viewModel.ensureDiscoverLoaded() }
+    LaunchedEffect(Unit) {
+        viewModel.ensureDiscoverLoaded()
+        viewModel.ensureAdsLoaded()
+    }
     LaunchedEffect(state.query) { if (query != state.query) query = state.query }
     val entries =
         remember(state.items, ads.config.feedSlots) {
@@ -270,7 +273,10 @@ fun MangaCatalogScreen(
     val ads by viewModel.adsState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf(state.query) }
     val gridState = rememberLazyGridState()
-    LaunchedEffect(Unit) { viewModel.ensureMangasLoaded() }
+    LaunchedEffect(Unit) {
+        viewModel.ensureMangasLoaded()
+        viewModel.ensureAdsLoaded()
+    }
     LaunchedEffect(state.query) { if (query != state.query) query = state.query }
     val visibleTags =
         remember(state.items, state.selectedTag) {

@@ -104,6 +104,7 @@ fun PlayerScreen(
 
     ImmersiveLandscapeEffect()
     BackHandler(onBack = onBack)
+    LaunchedEffect(viewModel) { viewModel.ensureAdsLoaded() }
     LaunchedEffect(animeId, retryToken) { viewModel.loadPlayer(animeId) }
     LaunchedEffect(animeId, adsState) {
         if (!preRollDecided) {

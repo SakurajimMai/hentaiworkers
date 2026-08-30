@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { PublicAdsConfig } from '@/lib/public-api-types';
+import { PUBLIC_READ_CACHE_CONTROL } from '@/lib/server/shared/stale-read-cache';
 
 export type PublicAdsLoader = () => Promise<PublicAdsConfig>;
 export type AdsSettingsService = {
@@ -22,7 +23,7 @@ export function createAdsHandler(loadAds: PublicAdsLoader) {
       const ads = await loadAds();
       return NextResponse.json(ads, {
         headers: {
-          'Cache-Control': 'public, max-age=30, stale-while-revalidate=120',
+          'Cache-Control': PUBLIC_READ_CACHE_CONTROL,
         },
       });
     } catch (e) {

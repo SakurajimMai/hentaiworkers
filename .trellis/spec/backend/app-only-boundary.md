@@ -24,7 +24,9 @@ Supported server route groups:
 
 ```text
 GET /api/animes*
+GET /api/mangas*
 GET /api/tags
+GET /api/ads
 GET /api/{live,ready,health}
 GET|PUT|DELETE /api/me/watch-progress*
 ```
@@ -52,6 +54,13 @@ Pure control-plane tables and `anime_sources` do not belong to active App schema
 tooling. Historical migrations `0010`-`0013` remain immutable, but App code must not read or
 write their works tables. Removal work never drops tables or rewrites stored catalog rows
 automatically.
+
+Public anime, manga, tag, and ad reads may use a module-local stale-while-revalidate cache only at
+the production dependency boundary. Settled catalog values use a strictly bounded LRU (64 query
+keys for anime/manga, one for tags/ads); a separate transient in-flight registry provides same-key
+single-flight and must not refill state after `clear()`. Preserve the existing JSON/status contract,
+propagate cold-load failures, bound stale lifetime, and never apply this cache to identity, library,
+progress, administration, or other private reads.
 
 ## 4. Validation & Error Matrix
 

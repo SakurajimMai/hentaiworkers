@@ -35,7 +35,9 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 
 本地不要求安装 JDK、Gradle、Android SDK 或模拟器，不要运行 `gradlew`、Android Studio build、设备测试或任何 Android 编译。可以运行根项目的非 Android lint、typecheck、测试、边界检查与构建；Android 反馈以 GitHub Actions 为准。
 
-生产 API origin 由工作流环境变量/Gradle property `ANIMESTREAM_API_BASE_URL` 注入，默认是 `https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询与 fragment；空值、非法值或非 HTTP(S) 值会回退到默认站点，避免错误 CI 配置导致启动崩溃。API 请求使用 15 秒连接、45 秒读取、30 秒写入和 60 秒整次调用上限，以容忍移动网络抖动；超时会显示可重试的中文提示，首页刷新失败不会清除已经加载的内容。
+生产 API origin 由工作流环境变量/Gradle property `ANIMESTREAM_API_BASE_URL` 注入，默认是 `https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询与 fragment；空值、非法值或非 HTTP(S) 值会回退到默认站点，避免错误 CI 配置导致启动崩溃。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用上限；超时会显示可重试的中文提示，HTTP 5xx 不会暴露服务端内部错误。
+
+首页同时请求里番和漫画，但不再互相阻塞：任一栏目先返回有效内容就立即结束全屏等待，另一个栏目继续补齐；单栏失败不会清除或遮挡已返回内容，而是在内容上方提供内联重试。启动阶段不再同时请求广告和标签，广告在首批内容后或播放器、阅读器及广告目录直达时按需加载，标签进入发现页时加载；本地没有登录 Cookie 时也不会请求 `/api/me`。
 
 ## 3. GitHub Actions 构建
 

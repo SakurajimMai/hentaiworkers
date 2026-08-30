@@ -129,6 +129,15 @@ Android 命令仅写入 GitHub Actions，不在本地执行：
 ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon
 ```
 
+## Reliability Hotfix - Build 62 Follow-up
+
+- [x] 为公开动漫、漫画、标签和广告生产依赖增加有界 stale-while-revalidate 缓存、同键单飞和失败退避测试。
+- [x] 首页两个目录改为渐进提交，任一有效内容先返回时停止全屏 spinner，并覆盖完成顺序与部分失败测试。
+- [x] 延后广告与标签启动请求；无登录 Cookie 时跳过 `/api/me`，广告消费页直达时按需补载。
+- [x] 将目录 API 调用预算收紧到 connect 8s、read/write 20s、call 25s，并更新错误契约测试与文档。
+- [ ] 运行根应用全套检查，通过 GitHub Actions Android 检查/签名构建后再发布五个 ABI APK。
+- [ ] 部署无 schema 变更的服务端镜像，验证 `/api/live`、四个公开目录和生产日志，再执行真机 smoke。
+
 ## Rollback Points
 
 - Phase 1 失败：恢复原 `.github/workflows/build-android.yml`，Expo 源码尚未删除。

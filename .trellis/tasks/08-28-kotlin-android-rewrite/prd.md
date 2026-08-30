@@ -61,6 +61,14 @@
 - Android 可点击目标至少 `48dp`，相邻目标保留间距，适配系统安全区、字体缩放、TalkBack 和减少动态效果。
 - 加载、空、错误、离线/网络失败和禁用状态必须可识别并提供可执行的恢复动作。
 
+### Startup Reliability
+
+- 首页里番与漫画必须渐进加载；任一栏目先取得有效内容时立即结束全屏等待，不得被另一栏目的超时阻塞。
+- 单个栏目失败不得清除或阻塞已返回内容；只有首屏没有任何可用内容时才显示全屏错误。
+- 广告、标签和无登录 Cookie 的会话校验不得与首屏目录形成不必要的启动请求突发。
+- 公开目录服务必须在远程数据库短暂断连时返回最近一次成功结果，并限制缓存键数量、并发刷新和陈旧数据时长。
+- 移动端网络等待预算必须短于服务端最坏故障窗口，避免长时间转圈后才出现可重试提示。
+
 ### CI-Only Build And Release
 
 - 开发机只需编辑代码，不要求安装 JDK、Gradle 或 Android SDK，也不在本地执行 Android 编译。
@@ -90,6 +98,7 @@
 - [ ] GitHub Actions 在非发布分支完成检查与五种 APK 构建，在已验证的 `main` 提交上显式发布包含全部五个 APK 的可下载 `build-*` Release。
 - [ ] APK 保持 `de.ixacg.animestream`，生产 API、签名 Secret、图标和下载发布链路不变。
 - [ ] 根应用的 lint、typecheck、测试、边界检查和构建不因移动端重写回归。
+- [ ] 真机首屏在任一目录先返回时立即可浏览；数据库连接短暂重置时公开目录使用有界陈旧缓存降级。
 - [ ] `README.md`、`docs/mobile.md`、`docs/development.md`、`docs/deployment.md`、`docs/architecture.md` 和变更日志不再把客户端描述为 Expo。
 
 ## Notes

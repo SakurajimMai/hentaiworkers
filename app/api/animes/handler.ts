@@ -5,6 +5,7 @@ import type {
   PublicAnimeService,
   SortType,
 } from '@/lib/public-api-types';
+import { PUBLIC_READ_CACHE_CONTROL } from '@/lib/server/shared/stale-read-cache';
 
 export type { ListAnimesOptions } from '@/lib/public-api-types';
 
@@ -41,7 +42,9 @@ export function createListAnimesHandler(listAnimes: ListAnimesDependency) {
         search,
         sort,
       });
-      return NextResponse.json(result);
+      return NextResponse.json(result, {
+        headers: { 'Cache-Control': PUBLIC_READ_CACHE_CONTROL },
+      });
     } catch (e) {
       console.error(e);
       return NextResponse.json(

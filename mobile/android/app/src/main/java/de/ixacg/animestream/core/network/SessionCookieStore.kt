@@ -114,6 +114,8 @@ class SessionCookieStore(
 
     internal fun currentHeader(): String = cachedHeader.get()
 
+    internal fun hasSessionCookie(): Boolean = cachedHeader.get().isNotBlank()
+
     private companion object {
         const val SESSION_NAME = "animestream_session"
         val SESSION_PATTERN = Regex("animestream_session=[^;\\s]+", RegexOption.IGNORE_CASE)

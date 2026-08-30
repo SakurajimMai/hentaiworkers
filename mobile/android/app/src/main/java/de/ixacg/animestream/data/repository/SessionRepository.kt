@@ -27,7 +27,12 @@ class SessionRepository(
 
     suspend fun hydrate() {
         cookieStore.hydrate()
-        val user = runCatching { apiCall { api.me().user } }.getOrNull()
+        val user =
+            if (cookieStore.hasSessionCookie()) {
+                runCatching { apiCall { api.me().user } }.getOrNull()
+            } else {
+                null
+            }
         mutableState.value = SessionState(ready = true, user = user)
     }
 

@@ -169,6 +169,9 @@ suspend fun <T> apiCall(request: suspend () -> T): T =
     try {
         request()
     } catch (error: HttpException) {
+        if (error.code() in 500..599) {
+            throw ApiError("服务器暂时不可用，请稍后重试", error.code())
+        }
         throw ApiError(parseApiError(error), error.code())
     } catch (error: IOException) {
         if (error is ApiError) throw error
@@ -212,10 +215,10 @@ internal fun parseApiError(error: HttpException): String {
 }
 
 object ApiClient {
-    private const val CONNECT_TIMEOUT_SECONDS = 15L
-    private const val READ_TIMEOUT_SECONDS = 45L
-    private const val WRITE_TIMEOUT_SECONDS = 30L
-    private const val CALL_TIMEOUT_SECONDS = 60L
+    private const val CONNECT_TIMEOUT_SECONDS = 8L
+    private const val READ_TIMEOUT_SECONDS = 20L
+    private const val WRITE_TIMEOUT_SECONDS = 20L
+    private const val CALL_TIMEOUT_SECONDS = 25L
 
     val json =
         Json {

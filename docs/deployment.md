@@ -18,6 +18,8 @@ chmod 600 deploy/.env
 
 必须填写 `DATABASE_URL`、`SITE_URL`、`SESSION_SECRET`、`APP_ENCRYPTION_KEYRING` 和 `APP_ENCRYPTION_CURRENT_KEY_ID`。远程数据库保持 `DATABASE_TLS_MODE=required`；如使用私有 CA，再设置仓库内相对路径 `DATABASE_TLS_CA_FILE` 并确保文件在部署目录可读。
 
+远程数据库连接默认在 5 秒内建立；瞬时网络错误最多重试两次，因此连接故障预算约 15.75 秒，短于 Android 目录请求的读取与整次调用上限。公开动漫、漫画、标签和广告读取使用进程内有界缓存：成功值 30 秒内直接返回，数据库短暂不可用时最多使用 15 分钟内的最近成功值并后台刷新。容器重启后缓存为空，升级完成应请求四个公开目录端点完成预热。
+
 ## 3. 启动
 
 ```bash

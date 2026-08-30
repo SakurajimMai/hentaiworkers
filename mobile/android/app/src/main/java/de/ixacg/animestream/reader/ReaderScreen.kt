@@ -115,10 +115,11 @@ fun ReaderScreen(
 
     BackHandler(onBack = onBack)
     ReaderSystemBarsEffect(chromeVisible)
+    LaunchedEffect(viewModel) { viewModel.ensureAdsLoaded() }
     LaunchedEffect(mangaId, chapterNumber, initialPage) {
         viewModel.loadReader(mangaId, chapterNumber, initialPage)
     }
-    LaunchedEffect(content?.chapter?.id) {
+    LaunchedEffect(content?.chapter?.id, topAdEnabled) {
         if (content != null && pages.isNotEmpty()) {
             listState.scrollToItem(pageStartIndex + content.currentPage.coerceIn(pages.indices))
         }

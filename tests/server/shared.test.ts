@@ -16,6 +16,7 @@ import {
 } from '../../lib/server/shared/logger';
 import {
   parseConfig,
+  parseDatabaseConfig,
   type AppConfig,
   type EnvironmentSource,
 } from '../../lib/server/shared/config';
@@ -263,6 +264,13 @@ test('配置解析只返回白名单数据库字段并解析 TLS、连接池和 
     Object.keys(config.encryption.keys).sort(),
     ['previous', 'primary'],
   );
+});
+
+test('数据库连接默认超时短于公开 API 的移动端读取预算', () => {
+  const environment = validEnvironment({ DATABASE_CONNECT_TIMEOUT_MS: undefined });
+
+  assert.equal(parseConfig(environment).database.pool.connectTimeoutMs, 5_000);
+  assert.equal(parseDatabaseConfig(environment).pool.connectTimeoutMs, 5_000);
 });
 
 test('redactor 脱敏嵌在普通错误文本中的 URL 查询密钥', () => {

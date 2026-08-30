@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": 920001,
+      "slug": "synthetic-contract-manga",
+      "title": "Synthetic Contract Manga",
+      "author": null,
+      "tags": ["Synthetic Tag"],
+      "description": null,
+      "coverUrl": null,
+      "chapterCount": 1,
+      "pageCount": 12,
+      "sourceChatTitle": null,
+      "updatedAt": "2026-08-30T00:00:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 2,
+    "limit": 10,
+    "total": 11,
+    "totalPages": 2
+  }
+}

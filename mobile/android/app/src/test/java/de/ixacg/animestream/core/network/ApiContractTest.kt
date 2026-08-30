@@ -9,15 +9,19 @@ import java.net.SocketTimeoutException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import retrofit2.HttpException
+import retrofit2.Response
 
 @RunWith(RobolectricTestRunner::class)
 class ApiContractTest {
@@ -91,11 +95,26 @@ class ApiContractTest {
             val cookies = SessionCookieStore(context, server.url("/"), backgroundScope)
             val client = ApiClient.createHttpClient(cookies)
 
-            assertEquals(TimeUnit.SECONDS.toMillis(15), client.connectTimeoutMillis.toLong())
-            assertEquals(TimeUnit.SECONDS.toMillis(45), client.readTimeoutMillis.toLong())
-            assertEquals(TimeUnit.SECONDS.toMillis(30), client.writeTimeoutMillis.toLong())
-            assertEquals(TimeUnit.SECONDS.toMillis(60), client.callTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(8), client.connectTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(20), client.readTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(20), client.writeTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(25), client.callTimeoutMillis.toLong())
             assertTrue(client.retryOnConnectionFailure)
+        }
+
+    @Test
+    fun `session hydrate skips me request when cookie is empty`() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val cookies = SessionCookieStore(context, server.url("/"), backgroundScope)
+            cookies.clear()
+            val repository = SessionRepository(ApiClient.create(cookies, server.url("/").toString()), cookies)
+
+            repository.hydrate()
+
+            assertTrue(repository.state.value.ready)
+            assertNull(repository.state.value.user)
+            assertEquals(0, server.requestCount)
         }
 
     @Test
@@ -108,6 +127,33 @@ class ApiContractTest {
 
             assertEquals(0, error.status)
             assertEquals("服务器响应超时，请检查网络后重试", error.message)
+        }
+
+    @Test
+    fun `server errors hide internals while client errors preserve api message`() =
+        runTest {
+            val serverError =
+                runCatching {
+                    apiCall<Unit> {
+                        throw HttpException(Response.error<Unit>(503, "Failed query: private detail".toResponseBody()))
+                    }
+                }.exceptionOrNull() as ApiError
+            val clientError =
+                runCatching {
+                    apiCall<Unit> {
+                        throw HttpException(
+                            Response.error<Unit>(
+                                400,
+                                """{"error":{"message":"请求参数无效"}}""".toResponseBody(),
+                            ),
+                        )
+                    }
+                }.exceptionOrNull() as ApiError
+
+            assertEquals(503, serverError.status)
+            assertEquals("服务器暂时不可用，请稍后重试", serverError.message)
+            assertEquals(400, clientError.status)
+            assertEquals("请求参数无效", clientError.message)
         }
 
     @Test

@@ -15,7 +15,6 @@ import de.ixacg.animestream.core.model.PublicAdsConfig
 import de.ixacg.animestream.core.model.Tag
 import de.ixacg.animestream.data.repository.SessionState
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -38,60 +37,27 @@ data class HomeContent(
     val mangas: List<MangaSummary> = emptyList(),
 )
 
-internal fun resolveHomeLoad(
-    previous: HomeContent?,
-    animeResult: Result<List<Anime>>,
-    mangaResult: Result<List<MangaSummary>>,
-): Loadable<HomeContent> {
-    val freshAnimes = animeResult.getOrNull()
-    val freshMangas = mangaResult.getOrNull()
-    val hasSuccessfulRequest = freshAnimes != null || freshMangas != null
-    val mergedContent =
-        if (hasSuccessfulRequest) {
-            HomeContent(
-                animes = freshAnimes ?: previous?.animes.orEmpty(),
-                mangas = freshMangas ?: previous?.mangas.orEmpty(),
-            )
-        } else {
-            previous
-        }
-    val visibleContent = mergedContent?.takeIf { it.animes.isNotEmpty() || it.mangas.isNotEmpty() }
-    val error =
-        when {
-            animeResult.isFailure && mangaResult.isFailure -> animeResult.exceptionOrNull()?.userMessage()
-            animeResult.isFailure && mergedContent?.animes.isNullOrEmpty() ->
-                animeResult.exceptionOrNull()?.userMessage()
-            visibleContent == null && mangaResult.isFailure -> mangaResult.exceptionOrNull()?.userMessage()
-            else -> null
-        }
-    val resolvedValue =
-        when {
-            !hasSuccessfulRequest -> previous
-            visibleContent != null || (animeResult.isSuccess && mangaResult.isSuccess) -> mergedContent
-            else -> null
-        }
-
-    return Loadable(
-        value = resolvedValue,
-        error = error,
-    )
-}
-
-private suspend fun <T> Deferred<T>.awaitResult(): Result<T> =
+private suspend fun <T> captureResult(request: suspend () -> T): Result<T> =
     try {
-        Result.success(await())
+        Result.success(request())
     } catch (error: CancellationException) {
         throw error
     } catch (error: Throwable) {
         Result.failure(error)
     }
 
-private fun Throwable.userMessage(): String = message?.takeIf(String::isNotBlank) ?: "请求失败，请重试"
+internal fun Throwable.userMessage(): String = message?.takeIf(String::isNotBlank) ?: "请求失败，请重试"
 
 data class AdsState(
     val config: PublicAdsConfig = PublicAdsConfig.Empty,
     val ready: Boolean = false,
 )
+
+internal fun shouldStartAdsLoad(
+    ready: Boolean,
+    active: Boolean,
+    force: Boolean,
+): Boolean = !active && (force || !ready)
 
 data class AnimeCatalogState(
     val items: List<Anime> = emptyList(),
@@ -180,6 +146,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private var discoverJob: Job? = null
     private var mangaJob: Job? = null
     private var homeJob: Job? = null
+    private var adsJob: Job? = null
     private var detailJob: Job? = null
     private var mangaDetailJob: Job? = null
     private var playerJob: Job? = null
@@ -192,33 +159,55 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
             container.sessionRepository.hydrate()
         }
         refreshHome()
-        refreshAds()
-        loadTags()
     }
 
     fun refreshHome(forceAds: Boolean = false) {
-        if (forceAds) refreshAds(force = true)
         homeJob?.cancel()
         homeJob =
             viewModelScope.launch {
                 val previous = mutableHome.value.value
                 mutableHome.update { it.copy(loading = true, error = null) }
-                val next =
-                    supervisorScope {
-                        val animes = async { catalog.animes(page = 1, limit = HOME_ANIME_LIMIT, sort = "popular").data }
-                        val mangas = async { catalog.mangas(page = 1, limit = HOME_MANGA_LIMIT).data }
-                        resolveHomeLoad(
-                            previous = previous,
-                            animeResult = animes.awaitResult(),
-                            mangaResult = mangas.awaitResult(),
+                val coordinator = HomeLoadCoordinator(previous)
+                supervisorScope {
+                    launch {
+                        publishHomeUpdate(
+                            coordinator.animeCompleted(
+                                captureResult {
+                                    catalog.animes(page = 1, limit = HOME_ANIME_LIMIT, sort = "popular").data
+                                },
+                            ),
+                            forceAds,
                         )
                     }
-                mutableHome.value = next
+                    launch {
+                        publishHomeUpdate(
+                            coordinator.mangaCompleted(
+                                captureResult {
+                                    catalog.mangas(page = 1, limit = HOME_MANGA_LIMIT).data
+                                },
+                            ),
+                            forceAds,
+                        )
+                    }
+                }
             }
     }
 
-    fun refreshAds(force: Boolean = false) {
-        viewModelScope.launch {
+    fun ensureAdsLoaded() {
+        refreshAds()
+    }
+
+    private fun refreshAds(force: Boolean = false) {
+        if (
+            !shouldStartAdsLoad(
+                ready = mutableAdsState.value.ready,
+                active = adsJob?.isActive == true,
+                force = force,
+            )
+        ) {
+            return
+        }
+        adsJob = viewModelScope.launch {
             mutableAdsState.value = AdsState(config = adsRepository.load(force), ready = true)
         }
     }
@@ -234,7 +223,16 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun ensureDiscoverLoaded() {
+        loadTags()
         if (mutableDiscover.value.page == 0 && !mutableDiscover.value.loading) refreshDiscover()
+    }
+
+    private fun publishHomeUpdate(
+        update: HomeLoadUpdate,
+        forceAds: Boolean,
+    ) {
+        mutableHome.value = update.state
+        if (update.shouldLoadAds) refreshAds(force = forceAds)
     }
 
     fun searchAnimes(query: String) {

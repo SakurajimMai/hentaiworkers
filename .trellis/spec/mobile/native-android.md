@@ -33,6 +33,12 @@ scope, Docker image, production Compose services, and server-private imports.
 - Configure explicit, bounded API connect/read/write/call timeouts that tolerate mobile-network
   latency; do not fall back to OkHttp's 10-second defaults or expose raw transport exception text
   to users. A failed refresh must preserve already-rendered home content.
+- Home catalog sections publish in completion order. The first non-empty section must replace the
+  full-screen spinner while the other request continues; a later partial failure keeps content and
+  exposes inline retry, while only a no-content failure may use the full-screen error state.
+- Do not restore an unconditional startup burst for tags, ads, or `/api/me`. Tags load on discovery,
+  `/api/me` requires a persisted session cookie, and ads load after useful home content or on demand
+  from any directly entered player, reader, or catalog screen that consumes ads.
 - Invalid API origins and media URLs fail closed or use the documented production fallback.
 - Logged-out library data uses Room; the target-site session and migration version use
   DataStore; login performs best-effort local-to-cloud merging.

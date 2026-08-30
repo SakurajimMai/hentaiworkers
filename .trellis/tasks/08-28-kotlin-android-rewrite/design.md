@@ -99,6 +99,10 @@ de.ixacg.animestream
 
 `MediaUrlNormalizer` 保持现有规则：绝对 URL 校验、逗号媒体列表、`image.ixacg.de` 改写到 `${origin}/cdn-img/...`。图片请求继续发送 `Accept` 和站点 `Referer`。
 
+首屏网络调度使用渐进式合并：里番和漫画并发请求，但任一请求成功并返回非空内容后立即提交对应 section，另一个请求继续补齐；首个失败在另一请求尚未完成时不升级为全屏错误，部分失败在已有内容上方提供内联重试。广告在首批首页目录内容之后或播放器、阅读器等实际消费页直达时按需加载，标签仅在进入发现页时加载，空登录 Cookie 跳过 `/api/me`。目录 JSON 请求使用 8 秒连接、20 秒读写和 25 秒整次调用上限，媒体与图片客户端不受此预算影响。
+
+生产端公开目录在 route 的生产依赖边界使用模块级、进程内 stale-while-revalidate 缓存。动漫/漫画的 settled LRU 以规范化查询为键且严格最多保留 64 项，标签/广告各保留一项；独立 in-flight 表只负责同键单飞并在完成后清理。成功值 30 秒内直接使用，之后在 15 分钟内立即返回陈旧值并单飞后台刷新。失败刷新设置短暂退避，冷缓存仍保持原有 500 契约。该缓存不覆盖身份、收藏、进度或管理接口，也不改变 JSON 响应结构。
+
 ## 7. Local Data And Upgrade Migration
 
 新客户端使用 Room 保存四类结构化列表，DataStore 保存会话 Cookie、迁移版本和少量设置。
@@ -216,3 +220,5 @@ checkout -> JDK/Android SDK/Gradle cache
 | HTML 广告与原生 UI 不匹配 | 受限 WebView 封装，保持现有配置优先于视觉纯度 |
 | 覆盖安装丢本地数据 | 只读旧库、幂等迁移 fixture、同包名/同签名检查 |
 | CI 首次构建才发现依赖问题 | 先完成 Gradle/CI vertical slice，再扩展页面 |
+| 远程数据库 TLS 连接短暂重置 | 公开目录有界陈旧缓存、同键请求合并、客户端渐进首屏与短等待预算 |
+| 生产 API 仅有单 IPv4 路由 | 保持可重试错误；只有部署并验证第二个 JSON API 源后才启用客户端 origin 回退 |

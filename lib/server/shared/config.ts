@@ -87,7 +87,7 @@ const environmentSchema = z.object({
   ),
   DATABASE_CONNECT_TIMEOUT_MS: integerEnvironment(
     'DATABASE_CONNECT_TIMEOUT_MS',
-    20_000,
+    5_000,
     1,
     300_000,
   ),
@@ -343,7 +343,7 @@ const databaseEnvironmentSchema = z.object({
   ),
   DATABASE_CONNECT_TIMEOUT_MS: integerEnvironment(
     'DATABASE_CONNECT_TIMEOUT_MS',
-    20_000,
+    5_000,
     1,
     300_000,
   ),
