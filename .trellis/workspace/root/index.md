@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 2
-- **Last Active**: 2026-08-04
+- **Total Sessions**: 3
+- **Last Active**: 2026-08-30
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~65 | Active |
+| `journal-1.md` | ~86 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 3 | 2026-08-30 | Fix Android weak-network timeout | `34540b9` | `feat/kotlin-android-client` |
 | 2 | 2026-08-04 | Add isolated Hanime crawler workspace | `fa1f09b`, `cd219e8`, `d92a868` | `main` |
 | 1 | 2026-08-03 | Remove crawler runtime and control plane | `226befb` | `main` |
 <!-- @@@/auto:session-history -->

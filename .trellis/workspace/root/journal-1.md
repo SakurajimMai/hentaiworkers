@@ -63,3 +63,24 @@ Added an independent crawler/hanime Python workspace while keeping the deployed 
 ### Next Steps
 
 - Install crawler dependencies in an isolated environment before running its focused Python unit tests.
+
+
+## Session 3: Fix Android weak-network timeout
+
+**Date**: 2026-08-30
+**Task**: Fix Android weak-network timeout
+**Branch**: `feat/kotlin-android-client`
+
+### Summary
+
+Raised bounded Android API timeouts, localized transport errors, made home loads independently resilient with inline retry UI, added regression tests, passed root checks and three GitHub Actions Android gates, and published production-signed build-62.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `34540b9` | (see git log) |
+
+### Status
+
+[OK] **Completed**
