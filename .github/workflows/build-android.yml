@@ -11,8 +11,8 @@ on:
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
     inputs:
-      use_production_signing:
-        description: Use the protected Production signing key for a release candidate
+      publish_release:
+        description: Publish the verified production-signed APKs to GitHub Releases
         required: false
         default: false
         type: boolean
@@ -34,7 +34,7 @@ jobs:
     name: Check and build native APK
     runs-on: ubuntu-latest
     environment:
-      name: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.use_production_signing)) && 'Production' || 'CI' }}
+      name: ${{ github.ref == 'refs/heads/main' && 'Production' || 'CI' }}
     outputs:
       signing_mode: ${{ steps.signing.outputs.mode }}
     defaults:
@@ -285,7 +285,8 @@ jobs:
     needs: build
     if: >-
       github.ref == 'refs/heads/main' &&
-      github.event_name != 'pull_request' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.publish_release &&
       needs.build.outputs.signing_mode == 'release'
     runs-on: ubuntu-latest
     permissions:

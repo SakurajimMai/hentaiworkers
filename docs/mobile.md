@@ -45,7 +45,7 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 
 - 任意分支推送并改动 `mobile/**` 或工作流文件
 - 改动上述路径的 Pull Request
-- 在 GitHub Actions 手动运行 **Build Android APK**；只有受 `Production` 分支规则允许的候选分支才能显式选择 `use_production_signing`
+- 在 GitHub Actions 手动运行 **Build Android APK**；只有 `main` 可以显式选择 `publish_release` 创建公开 Release
 
 远程构建执行：
 
@@ -66,7 +66,7 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 | `build-info.txt` | 包名、版本、API origin 与签名模式 |
 | Android reports | Lint、测试结果和诊断报告，保留 14 天 |
 
-分支、Pull Request 和非 `main` 手动运行只上传 Actions Artifact，不创建 Release。只有 `main` 的非 Pull Request 运行且使用正式签名时，才会在 [GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases) 创建 `build-<run>` 预发布 Release。
+分支和 Pull Request 使用内部 debug 签名，只上传 Actions Artifact。`main` push 使用 `Production` 正式签名，但仍只生成待验收 Artifact；在同一已验证提交上手动运行并选择 `publish_release` 后，才会在 [GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases) 创建 `build-<run>` 预发布 Release。
 
 ## 4. 签名与覆盖安装
 
@@ -74,12 +74,12 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 
 | Secret | 说明 |
 |--------|------|
-| `ANDROID_KEYSTORE_BASE64` | 现有发布 keystore 的 base64 |
+| `ANDROID_KEYSTORE_BASE64` | 生产发布 keystore 的 base64 |
 | `ANDROID_KEYSTORE_PASSWORD` | keystore 密码 |
 | `ANDROID_KEY_ALIAS` | 密钥别名 |
 | `ANDROID_KEY_PASSWORD` | 密钥密码 |
 
-仓库变量 `ANDROID_RELEASE_CERT_SHA256` 必须固定为生产证书的 SHA-256；CI 会拒绝任何使用其他证书的 release APK。普通分支使用不含密钥的 `CI` environment，`Production` 通常只允许 `main`；需要验证候选分支时，只临时允许该精确分支并手动选择 `use_production_signing`，验证后立即移除规则。
+仓库变量 `ANDROID_RELEASE_CERT_SHA256` 必须固定为生产证书的 SHA-256；CI 会拒绝任何使用其他证书的 release APK。普通分支使用不含密钥的 `CI` environment，`Production` 只允许 `main`。生产密钥不会注入功能分支或 Pull Request。
 
 四项完整时生成 release-signed APK；四项全空时生成明确标记为 `internal-debug` 的内部测试 Artifact，不能覆盖正式签名版本、不能用于公开分发，也不会创建 GitHub Release。只配置部分 Secret 会让工作流失败，防止误标签名。keystore 仅解码到 GitHub Runner 临时目录，不进入 Artifact 或仓库。
 
@@ -101,7 +101,8 @@ Kotlin APK 要覆盖旧安装，包名和签名必须同时保持一致。首次
 2. 使用真实设备检查首页/发现/漫画/书架/我的、搜索筛选、登录退出、收藏历史及继续阅读。
 3. 检查一条 MP4、一条 HLS、前贴片、暂停广告、播放错误重试和返回后的方向恢复。
 4. 检查短章、长章、坏图重试、缩放、快速拖页、章节切换、广告和后台恢复。
-5. 合入 `main` 后确认 `build-*` Release 的签名模式及五个 APK 均存在；现代手机优先使用 `arm64-v8a`，无法判断架构时使用 universal。
-6. 后台 **系统设置 → 移动端下载** 填入地址和链接文字；前台页脚只在地址为 `http://` 或 `https://` 时显示。
+5. 快进 `main` 后先下载正式签名 Actions Artifact，确认五个 APK、`SHA256SUMS`、固定证书指纹和安装结果。
+6. 在同一 `main` 提交上手动运行 **Build Android APK** 并选择 `publish_release`，确认 `build-*` Release 含五个 APK；现代手机优先使用 `arm64-v8a`，无法判断架构时使用 universal。
+7. 后台 **系统设置 → 移动端下载** 填入地址和链接文字；前台页脚只在地址为 `http://` 或 `https://` 时显示。
 
 Android 实际编译、Lint 和自动化测试结果只能由 GitHub Actions 确认；未看到远程工作流成功前，不应把代码审查或根项目测试视为 APK 已验证。

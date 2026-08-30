@@ -74,6 +74,6 @@ CI 发布：
 
 ## 7. Android APK
 
-APK 不进 App 镜像。`mobile/**` 或 Android 工作流变更在任意分支、Pull Request 和手动运行时都会远程完成格式检查、Lint、单元测试、Release 构建及包名/版本/签名校验；只有 `main` 的非 Pull Request 运行且使用正式签名时，才会在 GitHub Release `build-<run>` 挂上 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 和 `universal` 五个 APK。现代 Android 手机推荐 `arm64-v8a`，无法判断架构时使用 universal。
+APK 不进 App 镜像。`mobile/**` 或 Android 工作流变更在任意分支、Pull Request 和手动运行时都会远程完成格式检查、Lint、单元测试、Release 构建及包名/版本/签名校验；`main` push 只生成正式签名待验收 Artifact，在同一已验证 `main` 提交上手动选择 `publish_release` 后，才会在 GitHub Release `build-<run>` 挂上 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 和 `universal` 五个 APK。现代 Android 手机推荐 `arm64-v8a`，无法判断架构时使用 universal。
 
 生产分发前必须在受 `main` 分支规则保护的 `Production` environment 配置四个 Android 签名 Secrets，并用仓库变量 `ANDROID_RELEASE_CERT_SHA256` 固定证书指纹；普通分支的 `CI` environment 不持有密钥。未配置时产物使用 debug 签名并明确标记为仅限内部测试 Artifact，不创建 GitHub Release，部分配置或证书不匹配则直接失败。Build 39 及更早版本使用公开 Expo debug 证书，首次安装新生产签名版本前必须卸载旧版。把 Release 资源 URL 填进后台「移动端下载」，前台页脚才会显示。步骤见 [移动端文档](./mobile.md)。

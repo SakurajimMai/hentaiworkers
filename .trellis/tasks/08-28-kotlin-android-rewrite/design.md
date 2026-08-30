@@ -187,7 +187,7 @@ checkout -> JDK/Android SDK/Gradle cache
          -> release only on main
 ```
 
-增加 `pull_request` 和 `workflow_dispatch` 验证入口，使分支可以完全远程编译而不创建公开 Release。根部署测试改为断言无 Expo/Node 步骤、存在 Gradle checks、构建与条件发布。
+增加 `pull_request` 和 `workflow_dispatch` 验证入口，使分支可以完全远程编译而不接触生产密钥。`main` push 先生成正式签名待验收 Artifact，只有在同一提交上显式选择 `publish_release` 才创建公开 Release。根部署测试改为断言无 Expo/Node 步骤、存在 Gradle checks、构建与条件发布。
 
 ## 12. Testing Strategy
 

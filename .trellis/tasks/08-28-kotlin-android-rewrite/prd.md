@@ -65,7 +65,7 @@
 
 - 开发机只需编辑代码，不要求安装 JDK、Gradle 或 Android SDK，也不在本地执行 Android 编译。
 - GitHub Actions 负责 Kotlin 格式/静态检查、Android Lint、单元测试和 Release APK 编译。
-- `main` 上通过验证后继续创建 `build-<run_number>` 预发布 Release；非 `main` 分支可以验证构建但不得发布 Release。
+- `main` push 先生成正式签名待验收 Artifact；在同一已验证提交上显式选择 `publish_release` 后创建 `build-<run_number>` 预发布 Release，非 `main` 分支不得接触生产密钥或发布 Release。
 - `versionCode` 继续来自 GitHub run number；生产 API 默认继续为 `https://www.ixacg.de`。
 - 继续支持现有四个签名 Secret；未配置发布密钥时只允许生成明确标记为内部测试的 debug-signed 产物。
 - Actions Artifact 与正式 GitHub Release 同时提供真实的 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` split 和 universal APK，并在发布说明中标明适用设备。
@@ -87,7 +87,7 @@
 - [ ] 条漫长列表、页级加载/重试、缩放、进度拖动、目录与章节切换通过验证，长章节无明显内存失控。
 - [ ] 登录、退出、本地回退、登录后合并、收藏和两类进度 API 通过契约测试。
 - [ ] 信息流、阅读页和播放器广告配置保持与 `/api/ads` 相同的启用与间隔规则。
-- [ ] GitHub Actions 在非发布分支完成检查与五种 APK 构建，在 `main` 创建包含全部五个 APK 的可下载 `build-*` Release。
+- [ ] GitHub Actions 在非发布分支完成检查与五种 APK 构建，在已验证的 `main` 提交上显式发布包含全部五个 APK 的可下载 `build-*` Release。
 - [ ] APK 保持 `de.ixacg.animestream`，生产 API、签名 Secret、图标和下载发布链路不变。
 - [ ] 根应用的 lint、typecheck、测试、边界检查和构建不因移动端重写回归。
 - [ ] `README.md`、`docs/mobile.md`、`docs/development.md`、`docs/deployment.md`、`docs/architecture.md` 和变更日志不再把客户端描述为 Expo。

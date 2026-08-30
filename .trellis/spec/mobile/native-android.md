@@ -20,8 +20,9 @@ scope, Docker image, production Compose services, and server-private imports.
 - Builds 39 and earlier used the public Expo template debug certificate. It must not be reused as
   the production key; users must uninstall those builds before installing the first securely
   signed native release.
-- A `main` build may create a GitHub Release only when all four release-signing secrets are
-  present. Partial signing configuration must fail.
+- A `main` push produces a signed artifact for verification but does not publish. A GitHub Release
+  requires an explicit `workflow_dispatch` with `publish_release`, all four release-signing
+  secrets, and the same pinned certificate. Partial signing configuration must fail.
 - The first native launch must idempotently import the five known `RKStorage` values without
   deleting the old database or overwriting newer native rows.
 

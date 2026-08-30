@@ -79,7 +79,7 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /name: Build Android APK/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /use_production_signing:/);
+  assert.match(workflow, /publish_release:/);
   assert.match(workflow, /type: boolean/);
   assert.match(
     parsedWorkflow.jobs.build.environment.name,
@@ -87,6 +87,7 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   );
   assert.match(parsedWorkflow.jobs.build.environment.name, /Production/);
   assert.match(parsedWorkflow.jobs.build.environment.name, /CI/);
+  assert.doesNotMatch(parsedWorkflow.jobs.build.environment.name, /workflow_dispatch/);
   assert.match(workflow, /working-directory: mobile\/android/);
   assert.match(workflow, /ktlintCheck lintRelease testDebugUnitTest assembleRelease/);
   assert.match(workflow, /versionCode='\$\{GITHUB_RUN_NUMBER\}'/);
@@ -124,7 +125,8 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
     ANDROID_KEY_PASSWORD: '${{ secrets.ANDROID_KEY_PASSWORD }}',
   });
   assert.match(parsedWorkflow.jobs.release.if, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(parsedWorkflow.jobs.release.if, /github\.event_name != 'pull_request'/);
+  assert.match(parsedWorkflow.jobs.release.if, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(parsedWorkflow.jobs.release.if, /inputs\.publish_release/);
   assert.match(parsedWorkflow.jobs.release.if, /needs\.build\.outputs\.signing_mode == 'release'/);
   assert.equal(downloadStep?.with?.name, 'AnimeStream-apk-${{ github.run_number }}');
   assert.equal(downloadStep?.with?.path, 'mobile/artifacts');
