@@ -101,37 +101,133 @@ jobs:
           mkdir -p app/build/reports
           git -C "$GITHUB_WORKSPACE" diff --binary -- mobile/android > app/build/reports/ktlint-format.patch
 
-      - name: Validate APK identity and contents
+      - name: Validate APK identity, ABI and contents
         run: |
-          apk="app/build/outputs/apk/release/app-release.apk"
-          test -s "$apk"
-          unzip -tq "$apk"
-
           aapt_bin=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
           apksigner_bin=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -x "$aapt_bin"
           test -x "$apksigner_bin"
+          output_dir="app/build/outputs/apk/release"
+          metadata="$output_dir/output-metadata.json"
+          output_map="$RUNNER_TEMP/apk-outputs.tsv"
+          target_abis=(arm64-v8a armeabi-v7a x86_64 x86)
+          test -s "$metadata"
 
-          badging=$($aapt_bin dump badging "$apk")
-          printf '%s\n' "$badging" | grep -F "package: name='de.ixacg.animestream' versionCode='${GITHUB_RUN_NUMBER}'"
-          printf '%s\n' "$badging" | grep -F "launchable-activity: name='de.ixacg.animestream.MainActivity'"
-          "$apksigner_bin" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk-signature.txt"
+          python3 - "$metadata" "$output_map" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
 
-          unzip -Z1 "$apk" > "$RUNNER_TEMP/apk-entries.txt"
-          if grep -Eqi 'index\.android\.bundle|\.hbc$|lib(reactnative|hermes|reanimated|worklets|gesturehandler)\.so' "$RUNNER_TEMP/apk-entries.txt"; then
-            echo "APK still contains a JavaScript runtime or React Native bundle"
-            exit 1
-          fi
+          metadata_path = Path(sys.argv[1])
+          output_path = Path(sys.argv[2])
+          expected_variants = ["arm64-v8a", "armeabi-v7a", "x86_64", "x86", "universal"]
+          payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+          records = {}
 
-      - name: Prepare universal artifact
+          for element in payload.get("elements", []):
+              filters = element.get("filters", [])
+              if any(item.get("filterType") != "ABI" for item in filters):
+                  raise SystemExit(f"APK output has a non-ABI filter: {element}")
+              abi_filters = [
+                  item.get("value")
+                  for item in filters
+                  if item.get("filterType") == "ABI"
+              ]
+              if len(abi_filters) > 1:
+                  raise SystemExit(f"APK output has multiple ABI filters: {element}")
+              variant = abi_filters[0] if abi_filters else "universal"
+              filename = element.get("outputFile", "")
+              if variant in records or not filename or Path(filename).name != filename:
+                  raise SystemExit(f"Invalid APK output metadata: {element}")
+              records[variant] = filename
+
+          if set(records) != set(expected_variants):
+              raise SystemExit(
+                  f"Expected APK variants {expected_variants}, got {sorted(records)}"
+              )
+
+          output_path.write_text(
+              "".join(f"{variant}\t{records[variant]}\n" for variant in expected_variants),
+              encoding="utf-8",
+          )
+          PY
+
+          apk_hashes=()
+          certificate_digest_ref=""
+
+          while IFS=$'\t' read -r variant output_file; do
+            apk="$output_dir/$output_file"
+            entries="app/build/reports/apk-entries-${variant}.txt"
+            signature_report="app/build/reports/apk-signature-${variant}.txt"
+            test -s "$apk"
+            unzip -tq "$apk"
+            unzip -Z1 "$apk" > "$entries"
+
+            badging=$($aapt_bin dump badging "$apk")
+            printf '%s\n' "$badging" | grep -F "package: name='de.ixacg.animestream' versionCode='${GITHUB_RUN_NUMBER}'"
+            printf '%s\n' "$badging" | grep -F "launchable-activity: name='de.ixacg.animestream.MainActivity'"
+            "$apksigner_bin" verify --verbose --print-certs "$apk" > "$signature_report"
+            certificate_digest=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$signature_report" | head -1)
+            test -n "$certificate_digest"
+            if [ -z "$certificate_digest_ref" ]; then
+              certificate_digest_ref="$certificate_digest"
+            else
+              test "$certificate_digest" = "$certificate_digest_ref"
+            fi
+            apk_hashes+=("$(sha256sum "$apk" | cut -d ' ' -f 1)")
+
+            if grep -Eqi 'index\.android\.bundle|\.hbc$|lib(reactnative|hermes|reanimated|worklets|gesturehandler)\.so' "$entries"; then
+              echo "$variant APK still contains a JavaScript runtime or React Native bundle"
+              exit 1
+            fi
+
+            if [ "$variant" = "universal" ]; then
+              for abi in "${target_abis[@]}"; do
+                printf '%s\n' "$badging" | grep -E "^native-code: .*'${abi}'"
+                grep -q "^lib/${abi}/" "$entries"
+              done
+              if grep '^lib/' "$entries" | grep -Ev '^lib/(arm64-v8a|armeabi-v7a|x86_64|x86)/'; then
+                echo "Universal APK contains an unexpected ABI"
+                exit 1
+              fi
+            else
+              printf '%s\n' "$badging" | grep -Fx "native-code: '${variant}'"
+              grep -q "^lib/${variant}/" "$entries"
+              if grep '^lib/' "$entries" | grep -Ev "^lib/${variant}/"; then
+                echo "$variant APK contains an unexpected ABI"
+                exit 1
+              fi
+            fi
+          done < "$output_map"
+
+          unique_hash_count=$(printf '%s\n' "${apk_hashes[@]}" | LC_ALL=C sort -u | wc -l)
+          test "$unique_hash_count" -eq 5
+
+          for abi in "${target_abis[@]}"; do
+            grep "^lib/${abi}/" "app/build/reports/apk-entries-universal.txt" | LC_ALL=C sort > "$RUNNER_TEMP/universal-${abi}-libs.txt"
+            grep "^lib/${abi}/" "app/build/reports/apk-entries-${abi}.txt" | LC_ALL=C sort > "$RUNNER_TEMP/split-${abi}-libs.txt"
+            diff -u "$RUNNER_TEMP/universal-${abi}-libs.txt" "$RUNNER_TEMP/split-${abi}-libs.txt"
+          done
+
+      - name: Prepare ABI artifacts
         run: |
           mkdir -p ../artifacts
-          cp app/build/outputs/apk/release/app-release.apk "../artifacts/AnimeStream-${GITHUB_RUN_NUMBER}-universal.apk"
+          while IFS=$'\t' read -r variant output_file; do
+            cp "app/build/outputs/apk/release/$output_file" \
+              "../artifacts/AnimeStream-${GITHUB_RUN_NUMBER}-${variant}.apk"
+          done < "$RUNNER_TEMP/apk-outputs.tsv"
+          artifact_count=$(find ../artifacts -maxdepth 1 -type f -name 'AnimeStream-*.apk' | wc -l)
+          test "$artifact_count" -eq 5
+          (
+            cd ../artifacts
+            sha256sum AnimeStream-*.apk > SHA256SUMS
+          )
           {
             echo "versionCode=${GITHUB_RUN_NUMBER}"
             echo "package=de.ixacg.animestream"
             echo "signing=${SIGNING_MODE}"
             echo "api=${ANIMESTREAM_API_BASE_URL}"
+            echo "variants=arm64-v8a,armeabi-v7a,x86_64,x86,universal"
           } > ../artifacts/build-info.txt
 
       - name: Upload APK artifact
@@ -141,6 +237,7 @@ jobs:
           path: |
             mobile/artifacts/AnimeStream-*.apk
             mobile/artifacts/build-info.txt
+            mobile/artifacts/SHA256SUMS
           retention-days: 30
 
       - name: Upload Android reports
@@ -178,10 +275,24 @@ jobs:
           name: AnimeStream-apk-${{ github.run_number }}
           path: mobile/artifacts
 
+      - name: Validate release assets
+        run: |
+          variants=(arm64-v8a armeabi-v7a x86_64 x86 universal)
+          for variant in "${variants[@]}"; do
+            test -s "mobile/artifacts/AnimeStream-${GITHUB_RUN_NUMBER}-${variant}.apk"
+          done
+          artifact_count=$(find mobile/artifacts -maxdepth 1 -type f -name 'AnimeStream-*.apk' | wc -l)
+          test "$artifact_count" -eq 5
+          (
+            cd mobile/artifacts
+            sha256sum -c SHA256SUMS
+          )
+
       - name: Generate release notes
         run: |
           previous_tag=$(git tag --sort=-creatordate | grep '^build-' | grep -v "^build-${{ github.run_number }}$" | head -1 || true)
           signing=$(sed -n 's/^signing=//p' mobile/artifacts/build-info.txt)
+          build=${{ github.run_number }}
           {
             echo "## Changes"
             echo
@@ -194,18 +305,30 @@ jobs:
             echo
             echo "## Android"
             echo
-            echo "- Native Kotlin / Jetpack Compose universal APK"
+            echo "Pick the APK matching your device CPU. The universal APK contains all supported ABIs but is larger."
+            echo
+            echo "- \`AnimeStream-${build}-arm64-v8a.apk\` - most modern Android phones (recommended)"
+            echo "- \`AnimeStream-${build}-armeabi-v7a.apk\` - older 32-bit phones"
+            echo "- \`AnimeStream-${build}-x86_64.apk\` - 64-bit emulators and rare Intel devices"
+            echo "- \`AnimeStream-${build}-x86.apk\` - 32-bit emulators and rare Intel devices"
+            echo "- \`AnimeStream-${build}-universal.apk\` - contains all four supported ABIs; use when the CPU ABI is unknown"
+            echo
+            echo "Checksums for all APKs are available in \`SHA256SUMS\`."
+            echo
             echo "- Signing mode: \`$signing\`"
           } > release-notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: build-${{ github.run_number }}
           name: AnimeStream Build ${{ github.run_number }}
-          files: mobile/artifacts/AnimeStream-*.apk
+          files: |
+            mobile/artifacts/AnimeStream-*.apk
+            mobile/artifacts/SHA256SUMS
           body_path: release-notes.md
           draft: false
           prerelease: true
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

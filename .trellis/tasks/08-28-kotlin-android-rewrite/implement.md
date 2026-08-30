@@ -105,7 +105,7 @@ Validation gate:
 - [ ] 更新边界/部署测试；保持 root Docker context、TypeScript 和 ESLint 排除。
 - [ ] 运行全部允许的本地非 Android 检查。
 - [ ] 推送最终分支，等待 GitHub Actions lint、tests、release build 与 artifact checks 全绿。
-- [ ] 审查 APK artifact 名、包名、versionCode、签名状态和 Release 条件。
+- [ ] 审查五个 APK artifact 名、真实 ABI 内容、包名、versionCode、签名状态和 Release 条件。
 - [ ] 执行功能矩阵人工 smoke 并记录结果。
 - [ ] 运行 Trellis check、更新必要 spec、提交并完成任务。
 

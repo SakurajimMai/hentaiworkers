@@ -51,10 +51,28 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
       build: {
         steps: Array<{ name?: string; env?: Record<string, string> }>;
       };
+      release: {
+        if: string;
+        steps: Array<{
+          name?: string;
+          uses?: string;
+          run?: string;
+          with?: Record<string, string | boolean>;
+        }>;
+      };
     };
   };
   const qualityStep = parsedWorkflow.jobs.build.steps.find(
     (step) => step.name === 'Format, lint, test and assemble',
+  );
+  const releasePreflight = parsedWorkflow.jobs.release.steps.find(
+    (step) => step.name === 'Validate release assets',
+  );
+  const downloadStep = parsedWorkflow.jobs.release.steps.find(
+    (step) => step.name === 'Download APK artifact',
+  );
+  const releaseStep = parsedWorkflow.jobs.release.steps.find(
+    (step) => step.name === 'Create GitHub Release',
   );
 
   assert.match(workflow, /name: Build Android APK/);
@@ -64,6 +82,21 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /ktlintCheck lintRelease testDebugUnitTest assembleRelease/);
   assert.match(workflow, /versionCode='\$\{GITHUB_RUN_NUMBER\}'/);
   assert.match(workflow, /de\.ixacg\.animestream\.MainActivity/);
+  assert.match(workflow, /output-metadata\.json/);
+  assert.match(
+    workflow,
+    /expected_variants = \["arm64-v8a", "armeabi-v7a", "x86_64", "x86", "universal"\]/,
+  );
+  assert.match(workflow, /target_abis=\(arm64-v8a armeabi-v7a x86_64 x86\)/);
+  assert.match(workflow, /Expected APK variants/);
+  assert.match(workflow, /native-code: '\$\{variant\}'/);
+  assert.match(workflow, /Universal APK contains an unexpected ABI/);
+  assert.match(workflow, /certificate SHA-256 digest/);
+  assert.match(workflow, /unique_hash_count/);
+  assert.match(workflow, /test "\$artifact_count" -eq 5/);
+  assert.match(workflow, /SHA256SUMS/);
+  assert.match(workflow, /most modern Android phones \(recommended\)/);
+  assert.match(workflow, /contains all four supported ABIs/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /tag_name: build-\$\{\{ github\.run_number \}\}/);
   assert.match(workflow, /ANIMESTREAM_API_BASE_URL: https:\/\/www\.ixacg\.de/);
@@ -74,6 +107,18 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
     ANDROID_KEY_ALIAS: '${{ secrets.ANDROID_KEY_ALIAS }}',
     ANDROID_KEY_PASSWORD: '${{ secrets.ANDROID_KEY_PASSWORD }}',
   });
+  assert.match(parsedWorkflow.jobs.release.if, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(parsedWorkflow.jobs.release.if, /github\.event_name != 'pull_request'/);
+  assert.match(parsedWorkflow.jobs.release.if, /needs\.build\.outputs\.signing_mode == 'release'/);
+  assert.equal(downloadStep?.with?.name, 'AnimeStream-apk-${{ github.run_number }}');
+  assert.equal(downloadStep?.with?.path, 'mobile/artifacts');
+  assert.match(releasePreflight?.run ?? '', /variants=\(arm64-v8a armeabi-v7a x86_64 x86 universal\)/);
+  assert.match(releasePreflight?.run ?? '', /sha256sum -c SHA256SUMS/);
+  assert.match(releasePreflight?.run ?? '', /test "\$artifact_count" -eq 5/);
+  assert.equal(releaseStep?.uses, 'softprops/action-gh-release@v3');
+  assert.match(String(releaseStep?.with?.files), /mobile\/artifacts\/AnimeStream-\*\.apk/);
+  assert.match(String(releaseStep?.with?.files), /mobile\/artifacts\/SHA256SUMS/);
+  assert.equal(releaseStep?.with?.fail_on_unmatched_files, true);
   assert.doesNotMatch(workflow, /setup-node|npm ci|expo prebuild|EXPO_PUBLIC/);
 });
 
@@ -106,6 +151,10 @@ test('mobile is a native Kotlin application without a JavaScript runtime', () =>
   assert.match(appGradle, /alias\(libs\.plugins\.room\)/);
   assert.match(appGradle, /room\s*\{\s*schemaDirectory\("\$projectDir\/schemas"\)/);
   assert.doesNotMatch(appGradle, /arg\("room\.schemaLocation"/);
+  assert.match(
+    appGradle,
+    /splits\s*\{\s*abi\s*\{\s*isEnable = true\s*reset\(\)\s*include\(\s*"arm64-v8a",\s*"armeabi-v7a",\s*"x86_64",\s*"x86",\s*\)\s*isUniversalApk = true/,
+  );
   assert.match(versions, /telephoto = "0\.16\.0"/);
   assert.match(manifest, /android:name="\.MainActivity"/);
   assert.match(manifest, /android:scheme="animestream"/);

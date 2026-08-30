@@ -53,15 +53,20 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon --stacktrace
 ```
 
-随后会验证 APK 可解压、包名为 `de.ixacg.animestream`、`versionCode` 等于 GitHub run number、launcher 为原生 `MainActivity`、签名有效，并确认 APK 不含 JavaScript bundle 或旧客户端运行时。所有验证成功后上传：
+随后会验证五个 APK 均可解压、包名为 `de.ixacg.animestream`、`versionCode` 等于 GitHub run number、launcher 为原生 `MainActivity`、签名有效，并确认 APK 不含 JavaScript bundle 或旧客户端运行时。四个 ABI split 必须只包含目标架构的原生库，并与 universal 中同架构的库清单一致。所有验证成功后上传：
 
 | 产物 | 说明 |
 |------|------|
-| `AnimeStream-<run>-universal.apk` | 单一通用安装包；不伪造 ABI 拆分 |
+| `AnimeStream-<run>-arm64-v8a.apk` | 大多数现代 Android 手机，推荐优先下载 |
+| `AnimeStream-<run>-armeabi-v7a.apk` | 较旧的 32 位 Android 手机 |
+| `AnimeStream-<run>-x86_64.apk` | 64 位 Intel 模拟器及少量 Intel 设备 |
+| `AnimeStream-<run>-x86.apk` | 32 位 Intel 模拟器及少量 Intel 设备 |
+| `AnimeStream-<run>-universal.apk` | 包含全部四种 ABI，无法判断架构时使用 |
+| `SHA256SUMS` | 五个 APK 的 SHA-256 校验和 |
 | `build-info.txt` | 包名、版本、API origin 与签名模式 |
 | Android reports | Lint、测试结果和诊断报告，保留 14 天 |
 
-分支、Pull Request 和非 `main` 手动运行只上传 Actions Artifact，不创建 Release。只有 `main` 的非 Pull Request 运行且使用正式签名时，才会创建 `build-<run>` 预发布 Release。
+分支、Pull Request 和非 `main` 手动运行只上传 Actions Artifact，不创建 Release。只有 `main` 的非 Pull Request 运行且使用正式签名时，才会在 [GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases) 创建 `build-<run>` 预发布 Release。
 
 ## 4. 签名与覆盖安装
 
@@ -92,7 +97,7 @@ Kotlin APK 要覆盖旧安装，包名和签名必须同时保持一致。首次
 2. 使用真实设备检查首页/发现/漫画/书架/我的、搜索筛选、登录退出、收藏历史及继续阅读。
 3. 检查一条 MP4、一条 HLS、前贴片、暂停广告、播放错误重试和返回后的方向恢复。
 4. 检查短章、长章、坏图重试、缩放、快速拖页、章节切换、广告和后台恢复。
-5. 合入 `main` 后确认 `build-*` Release 的签名模式，再复制 universal APK 地址。
+5. 合入 `main` 后确认 `build-*` Release 的签名模式及五个 APK 均存在；现代手机优先使用 `arm64-v8a`，无法判断架构时使用 universal。
 6. 后台 **系统设置 → 移动端下载** 填入地址和链接文字；前台页脚只在地址为 `http://` 或 `https://` 时显示。
 
 Android 实际编译、Lint 和自动化测试结果只能由 GitHub Actions 确认；未看到远程工作流成功前，不应把代码审查或根项目测试视为 APK 已验证。

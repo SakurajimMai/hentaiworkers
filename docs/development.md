@@ -68,7 +68,7 @@ ADMIN_BOOTSTRAP_PASSWORD=replace-with-at-least-12-characters
 
 原生客户端工程位于 `mobile/android/`，使用 Kotlin、Jetpack Compose、Media3、Room 和 DataStore。开发机只负责编辑源码与资源，不要求安装 JDK、Gradle 或 Android SDK，也不要在本机运行 `gradlew`、Android Studio build、模拟器或 Android 编译。
 
-提交 `mobile/**` 或 Android 工作流改动后，GitHub Actions 会在分支、Pull Request 和手动运行中执行 Kotlin 格式检查、Android Lint、单元测试与 Release APK 构建。只有 `main` 的非 Pull Request 运行且配置正式签名时才会发布 `build-*` Release；debug-signed 构建只保留为内部 Artifact。允许在本机运行的仍是根项目的非 Android 检查命令。说明见 [移动端](./mobile.md)。
+提交 `mobile/**` 或 Android 工作流改动后，GitHub Actions 会在分支、Pull Request 和手动运行中执行 Kotlin 格式检查、Android Lint、单元测试与 Release APK 构建，并生成四种 ABI split 及 universal APK。只有 `main` 的非 Pull Request 运行且配置正式签名时才会发布 `build-*` Release；debug-signed 构建只保留为内部 Artifact。允许在本机运行的仍是根项目的非 Android 检查命令。说明见 [移动端](./mobile.md)。
 
 ## 7. 约束
 

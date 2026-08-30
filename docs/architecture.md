@@ -75,4 +75,4 @@ Android 客户端是独立的单 Activity Compose 应用。Retrofit/OkHttp 调�
 
 ## 7. 部署
 
-GitHub Actions 从根目录 `Dockerfile` 构建并发布 App 镜像；`mobile/` 变更会另外触发 Android 检查与 APK 构建。只有 `main` 上使用正式签名的非 Pull Request 运行创建 Release；未配置签名 Secrets 时仅保留内部测试 Artifact。Compose 拉取公开镜像、读取 `.env`、暴露健康检查，并默认绑定 `127.0.0.1`。详见 [部署指南](./deployment.md) 与 [移动端](./mobile.md)。
+GitHub Actions 从根目录 `Dockerfile` 构建并发布 App 镜像；`mobile/` 变更会另外触发 Android 检查，并构建 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 与 universal APK。只有 `main` 上使用正式签名的非 Pull Request 运行创建 Release；未配置签名 Secrets 时仅保留内部测试 Artifact。Compose 拉取公开镜像、读取 `.env`、暴露健康检查，并默认绑定 `127.0.0.1`。详见 [部署指南](./deployment.md) 与 [移动端](./mobile.md)。

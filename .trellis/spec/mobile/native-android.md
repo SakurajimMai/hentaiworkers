@@ -51,7 +51,11 @@ Android build environment and must:
 2. Run Kotlin formatting, Android Lint, JVM/Robolectric tests, and `assembleRelease`.
 3. Verify APK package, versionCode, launcher activity, archive integrity, and signature.
 4. Reject React Native, Hermes, Metro, Expo, or JavaScript bundle remnants.
-5. Upload one universal APK and diagnostic reports; publish only a formally signed `main` APK.
+5. Build and validate real `arm64-v8a`, `armeabi-v7a`, `x86_64`, and `x86` splits plus a
+   universal APK. Every split must contain only its target ABI and match the corresponding native
+   libraries in the universal APK.
+6. Upload all five APKs and diagnostic reports; publish them to GitHub Releases only from a
+   formally signed `main` build.
 
 Release-signing values validated by the configure step must also be scoped to the Gradle build
 step; exporting only the keystore path silently falls back to debug signing. Room schemas use the

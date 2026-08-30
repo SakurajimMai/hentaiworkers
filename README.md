@@ -56,7 +56,7 @@ npm run build
 
 移动端源码位于 `mobile/android/`。开发机只编辑 Kotlin、Compose 和资源文件，不要求安装 JDK、Gradle 或 Android SDK，也不要在本机运行 Android 编译。推送分支或提交 Pull Request 后，**Build Android APK** 会在 GitHub Actions 完成格式检查、Lint、单元测试和 Release APK 构建；只有 `main` 上通过验证、使用正式签名的非 Pull Request 运行会创建 `build-<run>` 预发布 Release。未配置签名 Secrets 时只上传明确标记为内部测试的 Actions Artifact。
 
-把 Release 中的 universal APK 地址填进后台「系统设置 → 移动端下载」，页脚「浏览」栏就会出现下载入口。详见 [移动端文档](./docs/mobile.md)。
+[GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases) 同时提供 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 和 universal APK；现代 Android 手机推荐 `arm64-v8a`，无法判断架构时使用 universal。把选定 APK 的 Release 地址填进后台「系统设置 → 移动端下载」，页脚「浏览」栏就会出现下载入口。详见 [移动端文档](./docs/mobile.md)。
 
 ## Docker
 

@@ -7,7 +7,7 @@
 - `mobile/android/` 改为单 Activity 的 Kotlin + Jetpack Compose 应用，包名、`animestream` scheme、图标、最低 Android 版本和现有服务端契约保持不变。
 - 目录、搜索筛选、详情、收藏/历史、账号同步、Media3 MP4/HLS 播放、全部广告位和纵向漫画阅读均迁移到原生实现；阅读页使用支持子采样的图片缩放组件，避免长章节一次性解码。
 - 首次覆盖安装会幂等、只读地迁移旧 `RKStorage` 的会话、里番/漫画收藏和历史；损坏条目单独跳过，旧数据库不删除。未登录时在新客户端新增的本地数据不保证旧版本可见。
-- Android 格式检查、Lint、单元测试、Release 构建和 APK 身份/签名检查只在 GitHub Actions 执行。分支和 Pull Request 只验证；`main` 也只有使用正式签名时才发布单一 universal APK，签名 Secrets 全空时只上传内部测试 Artifact。
+- Android 格式检查、Lint、单元测试、Release 构建和 APK 身份/签名检查只在 GitHub Actions 执行。原生依赖包含四种 ABI 的 `.so`，因此 Actions 和正式 Release 会生成真实的 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` split 以及 universal APK；分支和 Pull Request 只验证，`main` 也只有使用正式签名时才公开发布。
 - API origin 继续默认为 `https://www.ixacg.de`；空值、非法值、非 HTTP(S) 值或带路径/查询的配置会规范化或回退到默认站点。
 
 ## 2026-08 — Android 构建解阻
