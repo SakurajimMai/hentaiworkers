@@ -207,9 +207,10 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         ) {
             return
         }
-        adsJob = viewModelScope.launch {
-            mutableAdsState.value = AdsState(config = adsRepository.load(force), ready = true)
-        }
+        adsJob =
+            viewModelScope.launch {
+                mutableAdsState.value = AdsState(config = adsRepository.load(force), ready = true)
+            }
     }
 
     fun loadTags(force: Boolean = false) {
