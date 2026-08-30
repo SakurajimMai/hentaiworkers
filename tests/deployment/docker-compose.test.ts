@@ -91,7 +91,10 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /Expected APK variants/);
   assert.match(workflow, /native-code: '\$\{variant\}'/);
   assert.match(workflow, /Universal APK contains an unexpected ABI/);
-  assert.match(workflow, /certificate SHA-256 digest/);
+  assert.match(
+    workflow,
+    /sed -n 's\/\^\.\*certificate SHA-256 digest: \/\/p'/,
+  );
   assert.match(workflow, /unique_hash_count/);
   assert.match(workflow, /test "\$artifact_count" -eq 5/);
   assert.match(workflow, /SHA256SUMS/);

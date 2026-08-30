@@ -167,7 +167,7 @@ jobs:
             printf '%s\n' "$badging" | grep -F "package: name='de.ixacg.animestream' versionCode='${GITHUB_RUN_NUMBER}'"
             printf '%s\n' "$badging" | grep -F "launchable-activity: name='de.ixacg.animestream.MainActivity'"
             "$apksigner_bin" verify --verbose --print-certs "$apk" > "$signature_report"
-            certificate_digest=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$signature_report" | head -1)
+            certificate_digest=$(sed -n 's/^.*certificate SHA-256 digest: //p' "$signature_report" | head -1)
             test -n "$certificate_digest"
             if [ -z "$certificate_digest_ref" ]; then
               certificate_digest_ref="$certificate_digest"
