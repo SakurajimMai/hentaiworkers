@@ -84,3 +84,24 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 修复 Android 首屏超时与服务端目录降级
+
+**Date**: 2026-08-30
+**Task**: 修复 Android 首屏超时与服务端目录降级
+**Branch**: `feat/kotlin-android-client`
+
+### Summary
+
+定位 Build 62 首屏串行发布与生产 MariaDB TLS reset；实现 Kotlin 首页渐进提交、部分失败内联重试、启动请求收敛、深链广告按需加载和 25 秒调用预算；为四个公开目录加入严格有界 stale 缓存、同键单飞与 5 秒连接预算。根应用 181 项测试、Lint、类型、边界和生产构建通过，隔离生产镜像完成冷/热请求及断网 stale 实测；待 GitHub Actions Android 编译、部署与真机复测。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `32f1412` | (see git log) |
+
+### Status
+
+[OK] **Completed**
