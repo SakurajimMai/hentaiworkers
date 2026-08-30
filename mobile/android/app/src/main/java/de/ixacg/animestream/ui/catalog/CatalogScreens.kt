@@ -41,6 +41,7 @@ import de.ixacg.animestream.ui.AnimeStreamViewModel
 import de.ixacg.animestream.ui.components.AnimePosterCard
 import de.ixacg.animestream.ui.components.CatalogSearch
 import de.ixacg.animestream.ui.components.FeedAdCard
+import de.ixacg.animestream.ui.components.InlineRetryMessage
 import de.ixacg.animestream.ui.components.MangaPosterCard
 import de.ixacg.animestream.ui.components.ScreenHeader
 import de.ixacg.animestream.ui.components.statePane
@@ -62,11 +63,16 @@ fun HomeScreen(
         modifier = Modifier.fillMaxSize(),
     ) {
         val content = state.value
+        val inlineError = state.error.takeIf { content != null }
         if (
             statePane(
                 loading = state.loading && content == null,
                 error = state.error.takeIf { content == null },
-                empty = content != null && content.animes.isEmpty() && content.mangas.isEmpty(),
+                empty =
+                    state.error == null &&
+                        content != null &&
+                        content.animes.isEmpty() &&
+                        content.mangas.isEmpty(),
                 emptyText = "暂时没有可浏览的内容",
                 onRetry = { viewModel.refreshHome() },
             )
@@ -90,6 +96,14 @@ fun HomeScreen(
                         "今晚想看点什么",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            if (inlineError != null) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "home-inline-error") {
+                    InlineRetryMessage(
+                        message = inlineError,
+                        onRetry = { viewModel.refreshHome() },
                     )
                 }
             }

@@ -35,7 +35,7 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 
 本地不要求安装 JDK、Gradle、Android SDK 或模拟器，不要运行 `gradlew`、Android Studio build、设备测试或任何 Android 编译。可以运行根项目的非 Android lint、typecheck、测试、边界检查与构建；Android 反馈以 GitHub Actions 为准。
 
-生产 API origin 由工作流环境变量/Gradle property `ANIMESTREAM_API_BASE_URL` 注入，默认是 `https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询与 fragment；空值、非法值或非 HTTP(S) 值会回退到默认站点，避免错误 CI 配置导致启动崩溃。
+生产 API origin 由工作流环境变量/Gradle property `ANIMESTREAM_API_BASE_URL` 注入，默认是 `https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询与 fragment；空值、非法值或非 HTTP(S) 值会回退到默认站点，避免错误 CI 配置导致启动崩溃。API 请求使用 15 秒连接、45 秒读取、30 秒写入和 60 秒整次调用上限，以容忍移动网络抖动；超时会显示可重试的中文提示，首页刷新失败不会清除已经加载的内容。
 
 ## 3. GitHub Actions 构建
 

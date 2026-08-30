@@ -14,6 +14,8 @@ import de.ixacg.animestream.core.model.MangaSummary
 import de.ixacg.animestream.core.model.PublicAdsConfig
 import de.ixacg.animestream.core.model.Tag
 import de.ixacg.animestream.data.repository.SessionState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 data class Loadable<T>(
     val value: T? = null,
@@ -34,6 +37,56 @@ data class HomeContent(
     val animes: List<Anime> = emptyList(),
     val mangas: List<MangaSummary> = emptyList(),
 )
+
+internal fun resolveHomeLoad(
+    previous: HomeContent?,
+    animeResult: Result<List<Anime>>,
+    mangaResult: Result<List<MangaSummary>>,
+): Loadable<HomeContent> {
+    val freshAnimes = animeResult.getOrNull()
+    val freshMangas = mangaResult.getOrNull()
+    val hasSuccessfulRequest = freshAnimes != null || freshMangas != null
+    val mergedContent =
+        if (hasSuccessfulRequest) {
+            HomeContent(
+                animes = freshAnimes ?: previous?.animes.orEmpty(),
+                mangas = freshMangas ?: previous?.mangas.orEmpty(),
+            )
+        } else {
+            previous
+        }
+    val visibleContent = mergedContent?.takeIf { it.animes.isNotEmpty() || it.mangas.isNotEmpty() }
+    val error =
+        when {
+            animeResult.isFailure && mangaResult.isFailure -> animeResult.exceptionOrNull()?.userMessage()
+            animeResult.isFailure && mergedContent?.animes.isNullOrEmpty() ->
+                animeResult.exceptionOrNull()?.userMessage()
+            visibleContent == null && mangaResult.isFailure -> mangaResult.exceptionOrNull()?.userMessage()
+            else -> null
+        }
+    val resolvedValue =
+        when {
+            !hasSuccessfulRequest -> previous
+            visibleContent != null || (animeResult.isSuccess && mangaResult.isSuccess) -> mergedContent
+            else -> null
+        }
+
+    return Loadable(
+        value = resolvedValue,
+        error = error,
+    )
+}
+
+private suspend fun <T> Deferred<T>.awaitResult(): Result<T> =
+    try {
+        Result.success(await())
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        Result.failure(error)
+    }
+
+private fun Throwable.userMessage(): String = message?.takeIf(String::isNotBlank) ?: "请求失败，请重试"
 
 data class AdsState(
     val config: PublicAdsConfig = PublicAdsConfig.Empty,
@@ -126,6 +179,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     private var discoverJob: Job? = null
     private var mangaJob: Job? = null
+    private var homeJob: Job? = null
     private var detailJob: Job? = null
     private var mangaDetailJob: Job? = null
     private var playerJob: Job? = null
@@ -144,21 +198,23 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     fun refreshHome(forceAds: Boolean = false) {
         if (forceAds) refreshAds(force = true)
-        viewModelScope.launch {
-            mutableHome.update { it.copy(loading = true, error = null) }
-            runCatching {
-                coroutineScope {
-                    val animes = async { catalog.animes(page = 1, limit = HOME_ANIME_LIMIT, sort = "popular") }
-                    val mangas =
-                        async {
-                            runCatching { catalog.mangas(page = 1, limit = HOME_MANGA_LIMIT).data }
-                                .getOrDefault(emptyList())
-                        }
-                    HomeContent(animes.await().data, mangas.await())
-                }
-            }.onSuccess { mutableHome.value = Loadable(value = it) }
-                .onFailure { mutableHome.value = Loadable(error = it.userMessage()) }
-        }
+        homeJob?.cancel()
+        homeJob =
+            viewModelScope.launch {
+                val previous = mutableHome.value.value
+                mutableHome.update { it.copy(loading = true, error = null) }
+                val next =
+                    supervisorScope {
+                        val animes = async { catalog.animes(page = 1, limit = HOME_ANIME_LIMIT, sort = "popular").data }
+                        val mangas = async { catalog.mangas(page = 1, limit = HOME_MANGA_LIMIT).data }
+                        resolveHomeLoad(
+                            previous = previous,
+                            animeResult = animes.awaitResult(),
+                            mangaResult = mangas.awaitResult(),
+                        )
+                    }
+                mutableHome.value = next
+            }
     }
 
     fun refreshAds(force: Boolean = false) {
@@ -545,8 +601,6 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                 }.onFailure { error -> mutableReader.update { it.copy(error = error.userMessage()) } }
         }
     }
-
-    private fun Throwable.userMessage(): String = message?.takeIf(String::isNotBlank) ?: "请求失败，请重试"
 
     companion object {
         private const val HOME_ANIME_LIMIT = 30

@@ -9,6 +9,7 @@
 - 首次覆盖安装会幂等、只读地迁移旧 `RKStorage` 的会话、里番/漫画收藏和历史；损坏条目单独跳过，旧数据库不删除。未登录时在新客户端新增的本地数据不保证旧版本可见。
 - Android 格式检查、Lint、单元测试、Release 构建和 APK 身份/签名检查只在 GitHub Actions 执行。原生依赖包含四种 ABI 的 `.so`，因此 Actions 和正式 Release 会生成真实的 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` split 以及 universal APK；分支和 Pull Request 只验证，`main` 也只有使用正式签名时才公开发布。
 - API origin 继续默认为 `https://www.ixacg.de`；空值、非法值、非 HTTP(S) 值或带路径/查询的配置会规范化或回退到默认站点。
+- 修复原生客户端沿用 OkHttp 默认 10 秒读取超时导致弱网首页显示 `Read timed out` 且内容被清空的问题；API 现在使用显式的有界弱网超时、中文可重试提示，并在刷新失败时保留已经加载的首页内容。
 
 ## 2026-08 — Android 构建解阻
 

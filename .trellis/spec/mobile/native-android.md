@@ -30,6 +30,9 @@ scope, Docker image, production Compose services, and server-private imports.
 
 - Retrofit/OkHttp DTOs follow the existing public API; do not change server responses for the
   client rewrite.
+- Configure explicit, bounded API connect/read/write/call timeouts that tolerate mobile-network
+  latency; do not fall back to OkHttp's 10-second defaults or expose raw transport exception text
+  to users. A failed refresh must preserve already-rendered home content.
 - Invalid API origins and media URLs fail closed or use the documented production fallback.
 - Logged-out library data uses Room; the target-site session and migration version use
   DataStore; login performs best-effort local-to-cloud merging.

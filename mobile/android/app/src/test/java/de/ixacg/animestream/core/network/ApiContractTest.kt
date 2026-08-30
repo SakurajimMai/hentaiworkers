@@ -3,6 +3,10 @@ package de.ixacg.animestream.core.network
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import de.ixacg.animestream.data.repository.SessionRepository
+import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
@@ -78,6 +82,59 @@ class ApiContractTest {
             assertEquals("/api/auth/login", loginRequest.path)
             assertTrue(loginRequest.body.readUtf8().contains("\"emailOrUsername\":\"mei\""))
             assertEquals("animestream_session=test-token", meRequest.getHeader("Cookie"))
+        }
+
+    @Test
+    fun `api client uses resilient bounded timeouts`() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val cookies = SessionCookieStore(context, server.url("/"), backgroundScope)
+            val client = ApiClient.createHttpClient(cookies)
+
+            assertEquals(TimeUnit.SECONDS.toMillis(15), client.connectTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(45), client.readTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(30), client.writeTimeoutMillis.toLong())
+            assertEquals(TimeUnit.SECONDS.toMillis(60), client.callTimeoutMillis.toLong())
+            assertTrue(client.retryOnConnectionFailure)
+        }
+
+    @Test
+    fun `socket timeout is mapped to actionable localized error`() =
+        runTest {
+            val error =
+                runCatching {
+                    apiCall<Unit> { throw SocketTimeoutException("Read timed out") }
+                }.exceptionOrNull() as ApiError
+
+            assertEquals(0, error.status)
+            assertEquals("服务器响应超时，请检查网络后重试", error.message)
+        }
+
+    @Test
+    fun `network failures are localized without catching cancellation`() =
+        runTest {
+            val callTimeout =
+                runCatching {
+                    apiCall<Unit> { throw InterruptedIOException("timeout") }
+                }.exceptionOrNull() as ApiError
+            val interrupted =
+                runCatching {
+                    apiCall<Unit> { throw InterruptedIOException("interrupted") }
+                }.exceptionOrNull() as ApiError
+            val englishFailure =
+                runCatching {
+                    apiCall<Unit> { throw IOException("Failed to connect") }
+                }.exceptionOrNull() as ApiError
+            val cancellation = CancellationException("cancelled")
+            val cancellationResult =
+                runCatching {
+                    apiCall<Unit> { throw cancellation }
+                }.exceptionOrNull()
+
+            assertEquals("服务器响应超时，请检查网络后重试", callTimeout.message)
+            assertEquals("网络连接失败，请检查网络后重试", interrupted.message)
+            assertEquals("网络连接失败，请检查网络后重试", englishFailure.message)
+            assertTrue(cancellationResult === cancellation)
         }
 
     private fun kotlinx.coroutines.test.TestScope.createApi(): AnimeStreamApi {
