@@ -208,8 +208,9 @@ internal object UpdatePolicy {
             SHA256.matches(checksums.sha256)
     }
 
-    private fun isValidPublishedAt(value: String): Boolean = PUBLISHED_AT.matches(value) &&
-        runCatching { Instant.parse(value) }.isSuccess
+    private fun isValidPublishedAt(value: String): Boolean {
+        return PUBLISHED_AT.matches(value) && runCatching { Instant.parse(value) }.isSuccess
+    }
 
     private fun withinWindow(
         timestamp: Long,

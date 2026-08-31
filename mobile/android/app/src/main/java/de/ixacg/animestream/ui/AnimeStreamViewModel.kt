@@ -363,15 +363,16 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
             viewModelScope.launch {
                 val request = mutableDiscover.value
                 mutableDiscover.update { it.copy(loading = true, loadingMore = false, error = null) }
-                val result = captureResult {
-                    catalog.animes(
-                        page = 1,
-                        limit = ANIME_PAGE_SIZE,
-                        tagId = request.selectedTag?.id,
-                        search = request.query,
-                        sort = request.sort,
-                    )
-                }
+                val result =
+                    captureResult {
+                        catalog.animes(
+                            page = 1,
+                            limit = ANIME_PAGE_SIZE,
+                            tagId = request.selectedTag?.id,
+                            search = request.query,
+                            sort = request.sort,
+                        )
+                    }
                 if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) {
                     return@launch
                 }
@@ -406,15 +407,16 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         discoverLoadMoreJob =
             viewModelScope.launch {
                 mutableDiscover.update { it.copy(loadingMore = true) }
-                val result = captureResult {
-                    catalog.animes(
-                        page = state.page + 1,
-                        limit = ANIME_PAGE_SIZE,
-                        tagId = state.selectedTag?.id,
-                        search = state.query,
-                        sort = state.sort,
-                    )
-                }
+                val result =
+                    captureResult {
+                        catalog.animes(
+                            page = state.page + 1,
+                            limit = ANIME_PAGE_SIZE,
+                            tagId = state.selectedTag?.id,
+                            search = state.query,
+                            sort = state.sort,
+                        )
+                    }
                 if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) {
                     return@launch
                 }
@@ -517,15 +519,16 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
             viewModelScope.launch {
                 val request = mutableMangaCatalog.value
                 mutableMangaCatalog.update { it.copy(loading = true, loadingMore = false, error = null) }
-                val result = captureResult {
-                    catalog.mangas(
-                        page = 1,
-                        limit = MANGA_PAGE_SIZE,
-                        query = request.query,
-                        tag = request.selectedTag,
-                        rank = request.rank,
-                    )
-                }
+                val result =
+                    captureResult {
+                        catalog.mangas(
+                            page = 1,
+                            limit = MANGA_PAGE_SIZE,
+                            query = request.query,
+                            tag = request.selectedTag,
+                            rank = request.rank,
+                        )
+                    }
                 if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) {
                     return@launch
                 }
@@ -560,15 +563,16 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         mangaLoadMoreJob =
             viewModelScope.launch {
                 mutableMangaCatalog.update { it.copy(loadingMore = true) }
-                val result = captureResult {
-                    catalog.mangas(
-                        page = state.page + 1,
-                        limit = MANGA_PAGE_SIZE,
-                        query = state.query,
-                        tag = state.selectedTag,
-                        rank = state.rank,
-                    )
-                }
+                val result =
+                    captureResult {
+                        catalog.mangas(
+                            page = state.page + 1,
+                            limit = MANGA_PAGE_SIZE,
+                            query = state.query,
+                            tag = state.selectedTag,
+                            rank = state.rank,
+                        )
+                    }
                 if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) {
                     return@launch
                 }
