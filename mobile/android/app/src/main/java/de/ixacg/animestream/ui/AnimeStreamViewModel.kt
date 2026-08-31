@@ -372,7 +372,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         sort = request.sort,
                     )
                 }
-                if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) return@launch
+                if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) {
+                    return@launch
+                }
                 result.onSuccess { response ->
                     mutableDiscover.update {
                         it.copy(
@@ -413,7 +415,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         sort = state.sort,
                     )
                 }
-                if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) return@launch
+                if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) {
+                    return@launch
+                }
                 result.onSuccess { response ->
                     mutableDiscover.update { current ->
                         if (
@@ -522,7 +526,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         rank = request.rank,
                     )
                 }
-                if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) return@launch
+                if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) {
+                    return@launch
+                }
                 result.onSuccess { response ->
                     mutableMangaCatalog.update {
                         it.copy(
@@ -563,7 +569,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         rank = state.rank,
                     )
                 }
-                if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) return@launch
+                if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) {
+                    return@launch
+                }
                 result.onSuccess { response ->
                     mutableMangaCatalog.update { current ->
                         if (
