@@ -135,7 +135,7 @@ Android 命令仅写入 GitHub Actions，不在本地执行：
 - [x] 首页两个目录改为渐进提交，任一有效内容先返回时停止全屏 spinner，并覆盖完成顺序与部分失败测试。
 - [x] 延后广告与标签启动请求；无登录 Cookie 时跳过 `/api/me`，广告消费页直达时按需补载。
 - [x] 将目录 API 调用预算收紧到 connect 8s、read/write 20s、call 25s，并更新错误契约测试与文档。
-- [ ] 运行根应用全套检查，通过 GitHub Actions Android 检查/签名构建后再发布五个 ABI APK。
+- [x] 运行根应用全套检查，通过 GitHub Actions Android 检查/签名构建后再发布五个 ABI APK。
 - [x] 部署无 schema 变更的服务端镜像，验证 `/api/live`、四个公开目录、断网陈旧缓存和生产日志。
 - [ ] 安装新 Release 执行真机首屏、播放器、登录/同步和漫画章节 smoke。
 
@@ -148,8 +148,8 @@ Android 命令仅写入 GitHub Actions，不在本地执行：
 - [x] Slider 拖动/点击时实时预览和跳页，取消过时 seek，松手提交最终页并补 ReaderLogic 测试。
 - [x] 新增无数据库的 `/api/android/update`、严格 GitHub Release 解析、短超时、单键缓存、OpenAPI 与服务端测试。
 - [x] 新增 Android UpdateRepository/DataStore/policy、首页完成后自动检查、根级弹窗和“我的”手动检查，补 ABI/频控/API 测试。
-- [ ] 运行根应用全套检查，推送分支并要求 Android Actions 全绿。
-- [ ] 部署服务端 endpoint，验证缓存/失败降级；在同一 main 提交发布五 ABI 新 Release。
+- [x] 运行根应用全套检查，推送分支并要求 Android Actions 全绿。
+- [x] 部署服务端 endpoint，验证缓存/失败降级；在同一 main 提交发布五 ABI 新 Release。
 - [ ] 真机验证空标签恢复、刘海安全区、实时拖页和下一版本更新提醒。
 
 ## Rollback Points

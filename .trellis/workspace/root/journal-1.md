@@ -105,3 +105,43 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: 修复 Android 目录、阅读器并发布更新提醒
+
+**Date**: 2026-08-31
+**Task**: 修复 Android 目录、阅读器并发布更新提醒
+**Branch**: `feat/kotlin-android-client`
+
+### Summary
+
+修复空标签刷新卡住、章节标题冗余、刘海安全区和拖页反馈；新增服务端更新清单与 Android 非阻塞更新提醒。根应用与 Android Actions 全绿，生产服务已部署，production-signed Build 72 已发布五个 ABI APK。
+
+### Main Changes
+
+- 目录请求增加取消、代际隔离与可恢复空状态，标签 API 仅返回有效关联标签。
+- 阅读器适配安全区、章节仅显示第几话，Slider 拖动时实时识别并跳页。
+- 新增严格校验、缓存降级的更新 endpoint，以及 ABI 匹配、频控与稍后提醒。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3e38a7b` | (see git log) |
+| `f70b56c` | (see git log) |
+| `92813d0` | (see git log) |
+| `1ff6127` | (see git log) |
+
+### Testing
+
+- [OK] 根应用 lint、typecheck、33 个测试文件、legacy、boundaries、build 与 diff check 全部通过。
+- [OK] Android Actions Build 72 的 ktlint、lintRelease、单测、assemble、签名证书和五 ABI 内容校验全部通过。
+- [OK] 生产 live、ready、tags 与 android/update 均为 200；更新清单返回 Build 72 和完整五 ABI。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 在有刘海的真机安装 Build 72，复测空标签、实时拖页，并在 Build 73 验证更新提醒。
