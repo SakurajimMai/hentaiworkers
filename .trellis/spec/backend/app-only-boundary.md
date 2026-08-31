@@ -77,6 +77,11 @@ reuse or be confused with the catalog cache's 30-second fresh policy. A cold ups
 a short timeout and propagates failure through the documented public error contract; a cached
 stale manifest remains available during a temporary GitHub failure.
 
+Trusted Android and Docker workflow runs must finish with a repository-wide Actions retention
+job. Sort every paginated workflow run by creation time and id, retain the latest five overall,
+and delete only older completed runs. Keep `actions: write` scoped to that cleanup job, serialize
+the two cleanup jobs with one shared concurrency group, and skip write access for pull requests.
+
 ## 4. Validation & Error Matrix
 
 | Condition | Required result |

@@ -363,3 +363,63 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    name: Retain latest five Actions runs
+    needs: [build, release]
+    if: ${{ always() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    concurrency:
+      group: repository-actions-retention
+      cancel-in-progress: false
+
+    steps:
+      - name: Delete older completed runs
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const retainedRunCount = 5;
+            const { owner, repo } = context.repo;
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, per_page: 100 },
+              (response) => response.data.workflow_runs,
+            );
+
+            runs.sort((left, right) =>
+              Date.parse(right.created_at) - Date.parse(left.created_at) ||
+              right.id - left.id
+            );
+
+            const retainedIds = new Set(
+              runs.slice(0, retainedRunCount).map((run) => run.id),
+            );
+            const candidates = runs.filter((run) =>
+              !retainedIds.has(run.id) &&
+              String(run.id) !== String(context.runId) &&
+              run.status === 'completed'
+            );
+
+            for (const run of candidates) {
+              try {
+                await github.rest.actions.deleteWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                core.info(`Deleted Actions run ${run.id}`);
+              } catch (error) {
+                if (error?.status === 404) {
+                  core.info(`Actions run ${run.id} was already deleted`);
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            core.info(
+              `Retained ${Math.min(retainedRunCount, runs.length)} latest Actions runs`,
+            );

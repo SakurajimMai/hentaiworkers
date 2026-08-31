@@ -200,6 +200,77 @@ test('Docker Hub workflow publishes only the application image', () => {
   assert.doesNotMatch(workflow, /WORKER_IMAGE|crawler\/Dockerfile|scope=worker/);
 });
 
+test('trusted workflows retain only the latest five repository Actions runs', () => {
+  const workflows = [
+    {
+      path: '.github/workflows/build-android.yml',
+      needs: ['build', 'release'],
+    },
+    {
+      path: '.github/workflows/docker-publish.yml',
+      needs: 'publish',
+    },
+  ] as const;
+  const cleanupScripts: string[] = [];
+
+  for (const workflow of workflows) {
+    const source = readFileSync(join(root, workflow.path), 'utf8');
+    const parsed = parse(source) as {
+      jobs: {
+        cleanup: {
+          name: string;
+          needs: string | string[];
+          if: string;
+          permissions: Record<string, string>;
+          concurrency: {
+            group: string;
+            'cancel-in-progress': boolean;
+          };
+          steps: Array<{
+            name?: string;
+            uses?: string;
+            with?: { script?: string };
+          }>;
+        };
+      };
+    };
+    const cleanup = parsed.jobs.cleanup;
+    const cleanupStep = cleanup.steps.find(
+      (step) => step.name === 'Delete older completed runs',
+    );
+    const script = cleanupStep?.with?.script ?? '';
+
+    assert.equal(cleanup.name, 'Retain latest five Actions runs');
+    assert.deepEqual(cleanup.needs, workflow.needs);
+    assert.match(cleanup.if, /always\(\)/);
+    assert.match(cleanup.if, /github\.event_name != 'pull_request'/);
+    assert.deepEqual(cleanup.permissions, { actions: 'write' });
+    assert.equal(cleanup.concurrency.group, 'repository-actions-retention');
+    assert.equal(cleanup.concurrency['cancel-in-progress'], false);
+    assert.equal(cleanupStep?.uses, 'actions/github-script@v9');
+    assert.match(script, /const retainedRunCount = 5/);
+    assert.match(script, /github\.paginate\(/);
+    assert.match(script, /actions\.listWorkflowRunsForRepo/);
+    assert.match(script, /per_page: 100/);
+    assert.match(script, /response\.data\.workflow_runs/);
+    assert.match(script, /runs\.sort\(/);
+    assert.match(script, /created_at/);
+    assert.match(script, /right\.id - left\.id/);
+    assert.match(script, /slice\(0, retainedRunCount\)/);
+    assert.match(script, /run\.status === 'completed'/);
+    assert.match(script, /context\.runId/);
+    assert.match(script, /actions\.deleteWorkflowRun/);
+    assert.match(script, /run_id: run\.id/);
+    assert.match(script, /error\?\.status === 404/);
+    assert.match(script, /throw error/);
+    assert.doesNotMatch(script, /workflow_id:/);
+    assert.doesNotMatch(script, /actions\.listWorkflowRuns\s*\(/);
+    cleanupScripts.push(script);
+  }
+
+  assert.equal(cleanupScripts[0], cleanupScripts[1]);
+});
+
 test('deployment files keep secrets outside the image', () => {
   const dockerIgnore = readFileSync(join(root, '.dockerignore'), 'utf8');
   const gitIgnore = readFileSync(join(root, '.gitignore'), 'utf8');
