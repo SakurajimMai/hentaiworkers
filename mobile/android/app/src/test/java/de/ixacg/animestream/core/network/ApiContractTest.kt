@@ -74,7 +74,24 @@ class ApiContractTest {
                 MockResponse()
                     .setHeader("Content-Type", "application/json")
                     .setBody(
-                        """{"schemaVersion":1,"packageName":"de.ixacg.animestream","versionCode":$versionCode,"releaseTag":"$releaseTag","releaseName":"AnimeStream Build $versionCode","publishedAt":"2026-08-31T00:00:00Z","releasePageUrl":"$releaseOrigin/tag/$releaseTag","apks":{$apks},"checksums":{"name":"SHA256SUMS","url":"$releaseOrigin/download/$releaseTag/SHA256SUMS","size":500,"sha256":"$sha256"}}""",
+                        """
+                        {
+                          "schemaVersion": 1,
+                          "packageName": "de.ixacg.animestream",
+                          "versionCode": $versionCode,
+                          "releaseTag": "$releaseTag",
+                          "releaseName": "AnimeStream Build $versionCode",
+                          "publishedAt": "2026-08-31T00:00:00Z",
+                          "releasePageUrl": "$releaseOrigin/tag/$releaseTag",
+                          "apks": {$apks},
+                          "checksums": {
+                            "name": "SHA256SUMS",
+                            "url": "$releaseOrigin/download/$releaseTag/SHA256SUMS",
+                            "size": 500,
+                            "sha256": "$sha256"
+                          }
+                        }
+                        """.trimIndent(),
                     ),
             )
 
