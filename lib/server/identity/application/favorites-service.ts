@@ -1,9 +1,11 @@
 import { AppError } from '../../shared/errors';
 import type {
+  FavoriteAnimePage,
   FavoriteAnimeListItem,
   FavoritesRepository,
 } from '../ports/favorites-repository';
 import type { IdentityService } from './identity-service';
+import { getPageWindow, LIBRARY_PAGE_SIZE } from '../../shared/pagination';
 
 export class FavoritesService {
   constructor(
@@ -14,6 +16,18 @@ export class FavoritesService {
   async listMine(): Promise<ReadonlyArray<FavoriteAnimeListItem>> {
     const user = await this.identity.requireUser();
     return this.favorites.listWithAnime(user.id);
+  }
+
+  async listMinePage(
+    page = 1,
+    pageSize = LIBRARY_PAGE_SIZE,
+  ): Promise<FavoriteAnimePage> {
+    const user = await this.identity.requireUser();
+    const request = getPageWindow(page, Number.MAX_SAFE_INTEGER, pageSize);
+    return this.favorites.listWithAnimePage(user.id, {
+      page: request.page,
+      pageSize: request.pageSize,
+    });
   }
 
   async isFavorite(animeId: number): Promise<boolean> {

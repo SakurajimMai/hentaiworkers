@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation';
 import { TurnstileField } from '@/components/turnstile-field';
 import { getIdentityService } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
+import {
+  buildPublicLoginHref,
+  normalizePublicNext,
+} from '@/lib/server/shared/auth-navigation';
 import { actionPublicRegister } from '../auth/actions';
 
 import type { Metadata } from 'next';
@@ -26,15 +30,23 @@ const ERRORS: Record<string, string> = {
   '1': '注册失败，请稍后重试。',
 };
 
+type AuthSearchValue = string | readonly string[] | undefined;
+
+function firstValue(value: AuthSearchValue): string | undefined {
+  return typeof value === 'string' ? value : value?.[0];
+}
+
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: AuthSearchValue; next?: AuthSearchValue }>;
 }) {
   const sp = await searchParams;
+  const error = firstValue(sp.error);
+  const next = normalizePublicNext(sp.next, '/favorites');
   const user = await getIdentityService().getCurrentUser();
   if (user) {
-    redirect(user.role === 'admin' ? '/admin' : (sp.next?.startsWith('/') ? sp.next : '/favorites'));
+    redirect(user.role === 'admin' ? '/admin' : next);
   }
 
   const auth = await getSystemSettingsService().getPublicAuthConfig();
@@ -55,20 +67,20 @@ export default async function RegisterPage({
       {!auth.registrationOpen ? (
         <div className="surface-panel p-6 space-y-4">
           <p className="font-ui text-sm text-soft">当前未开放注册，请联系管理员。</p>
-          <Link href="/login" className="btn-ink inline-flex">
+          <Link href={buildPublicLoginHref(next)} className="btn-ink inline-flex">
             去登录
           </Link>
         </div>
       ) : (
         <>
-          {sp.error && (
+          {error && (
             <div className="mb-4 notice-error !text-sm">
-              {ERRORS[sp.error] ?? ERRORS['1']}
+              {ERRORS[error] ?? ERRORS['1']}
             </div>
           )}
 
           <form action={actionPublicRegister} className="surface-panel p-6 sm:p-7 space-y-4">
-            <input type="hidden" name="next" value={sp.next || '/favorites'} />
+            <input type="hidden" name="next" value={next} />
             <div>
               <label className="admin-label" htmlFor="email">
                 邮箱 *
@@ -124,7 +136,7 @@ export default async function RegisterPage({
       <p className="mt-6 font-ui text-sm text-soft text-center">
         已有账号？{' '}
         <Link
-          href={`/login${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ''}`}
+          href={buildPublicLoginHref(next)}
           className="text-ink font-medium underline underline-offset-2 decoration-line hover:decoration-ink"
         >
           登录

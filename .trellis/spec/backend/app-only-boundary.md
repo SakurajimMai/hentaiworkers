@@ -63,6 +63,13 @@ single-flight and must not refill state after `clear()`. Preserve the existing J
 propagate cold-load failures, bound stale lifetime, and never apply this cache to identity, library,
 progress, administration, or other private reads.
 
+Private favorites and progress pages must use one repeatable-read, read-only transaction to count
+the visible collection, clamp the requested page, and issue a bounded `LIMIT/OFFSET` query. Order
+by the activity timestamp and a unique record ID so equal timestamps cannot duplicate or omit rows
+across page boundaries. Web Server Components consume these paged services directly and expose page
+state in the URL. A legacy mobile endpoint may retain its documented full-list default response for
+compatibility, but web rendering must not use that unbounded path.
+
 `GET /api/android/update` is a database-free public read from the fixed
 `SakurajimMai/hentaiworkers` GitHub Releases source. Include prereleases, but accept only
 non-draft `build-N` releases targeting `main`; require exactly one uploaded, non-empty asset for

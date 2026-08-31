@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation';
 import { TurnstileField } from '@/components/turnstile-field';
 import { getIdentityService } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
+import {
+  buildPublicRegisterHref,
+  normalizePublicNext,
+} from '@/lib/server/shared/auth-navigation';
 import { actionPublicLogin } from '../auth/actions';
 
 import type { Metadata } from 'next';
@@ -22,16 +26,25 @@ const ERRORS: Record<string, string> = {
   rate: '尝试次数过多，请稍后再试。',
 };
 
+type AuthSearchValue = string | readonly string[] | undefined;
+
+function firstValue(value: AuthSearchValue): string | undefined {
+  return typeof value === 'string' ? value : value?.[0];
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string; ok?: string }>;
+  searchParams: Promise<{ error?: AuthSearchValue; next?: AuthSearchValue; ok?: AuthSearchValue }>;
 }) {
   const sp = await searchParams;
+  const error = firstValue(sp.error);
+  const ok = firstValue(sp.ok);
+  const next = normalizePublicNext(sp.next, '/favorites');
   const user = await getIdentityService().getCurrentUser();
   if (user) {
     const fallback = user.role === 'admin' ? '/' : '/favorites';
-    redirect(sp.next?.startsWith('/') && !sp.next.startsWith('//') ? sp.next : fallback);
+    redirect(normalizePublicNext(sp.next, fallback));
   }
 
   const auth = await getSystemSettingsService().getPublicAuthConfig();
@@ -46,29 +59,29 @@ export default async function LoginPage({
         </p>
       </div>
 
-      {sp.ok === 'verify' && (
+      {ok === 'verify' && (
         <div className="mb-4 notice-success !text-sm">
           注册成功。请查收验证邮件，完成验证后再登录。
         </div>
       )}
-      {sp.ok === 'verified' && (
+      {ok === 'verified' && (
         <div className="mb-4 notice-success !text-sm">
           邮箱已验证，你已登录。
         </div>
       )}
-      {sp.ok === 'password' && (
+      {ok === 'password' && (
         <div className="mb-4 notice-success !text-sm">
           密码已更新，请使用新密码重新登录。
         </div>
       )}
-      {sp.error && (
+      {error && (
         <div className="mb-4 notice-error !text-sm">
-          {ERRORS[sp.error] ?? ERRORS['1']}
+          {ERRORS[error] ?? ERRORS['1']}
         </div>
       )}
 
       <form action={actionPublicLogin} className="surface-panel p-6 sm:p-7 space-y-4">
-        <input type="hidden" name="next" value={sp.next || '/favorites'} />
+        <input type="hidden" name="next" value={next} />
         <div>
           <label className="admin-label" htmlFor="email">
             邮箱
@@ -116,7 +129,7 @@ export default async function LoginPage({
       <p className="mt-6 font-ui text-sm text-soft text-center">
         还没有账号？{' '}
         <Link
-          href={`/register${sp.next ? `?next=${encodeURIComponent(sp.next)}` : ''}`}
+          href={buildPublicRegisterHref(next)}
           className="text-ink font-medium underline underline-offset-2 decoration-line hover:decoration-ink"
         >
           注册

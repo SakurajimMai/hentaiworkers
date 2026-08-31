@@ -151,3 +151,28 @@ export async function withDbRetry<T>(fn: () => Promise<T>, retries = 2): Promise
   }
   throw last;
 }
+
+/** Keep count + page reads on one repeatable snapshot without blocking writers. */
+export function withConsistentRead<T>(
+  fn: (connection: mysql.PoolConnection) => Promise<T>,
+): Promise<T> {
+  return withDbRetry(async () => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      await connection.query('START TRANSACTION READ ONLY');
+      const value = await fn(connection);
+      await connection.commit();
+      return value;
+    } catch (error) {
+      try {
+        await connection.rollback();
+      } catch {
+        // Preserve the original query failure.
+      }
+      throw error;
+    } finally {
+      connection.release();
+    }
+  });
+}

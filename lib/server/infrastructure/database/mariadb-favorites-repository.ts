@@ -1,7 +1,10 @@
 import type { RowDataPacket } from 'mysql2';
-import { pool, withDbRetry } from '@/lib/db';
+import { pool, withConsistentRead, withDbRetry } from '@/lib/db';
+import { getPageWindow } from '../../shared/pagination';
 import type {
+  FavoriteAnimePage,
   FavoriteAnimeListItem,
+  FavoritePageRequest,
   FavoritesRepository,
 } from '../../identity/ports/favorites-repository';
 
@@ -17,6 +20,17 @@ function asIso(value: unknown): string {
   const s = String(value);
   if (s.includes('T')) return s;
   return `${s.replace(' ', 'T')}Z`;
+}
+
+function mapFavoriteAnime(row: RowDataPacket): FavoriteAnimeListItem {
+  return {
+    id: Number(row.id),
+    title: String(row.title ?? ''),
+    cover: row.cover == null ? null : String(row.cover),
+    viewCount: row.view_count == null ? null : Number(row.view_count),
+    titleEnglish: row.title_english == null ? null : String(row.title_english),
+    favoritedAt: asIso(row.favorited_at),
+  };
 }
 
 async function ensureFavoritesListId(userId: number): Promise<number> {
@@ -71,7 +85,7 @@ export class MariaDbFavoritesRepository implements FavoritesRepository {
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT anime_id FROM user_list_items
          WHERE list_id = ?
-         ORDER BY created_at DESC`,
+         ORDER BY created_at DESC, id DESC`,
         [listId],
       );
       return rows.map((r) => Number(r.anime_id));
@@ -86,17 +100,56 @@ export class MariaDbFavoritesRepository implements FavoritesRepository {
          FROM user_list_items i
          INNER JOIN animes a ON a.id = i.anime_id
          WHERE i.list_id = ?
-         ORDER BY i.created_at DESC`,
+         ORDER BY i.created_at DESC, i.id DESC`,
         [listId],
       );
-      return rows.map((row) => ({
-        id: Number(row.id),
-        title: String(row.title ?? ''),
-        cover: row.cover == null ? null : String(row.cover),
-        viewCount: row.view_count == null ? null : Number(row.view_count),
-        titleEnglish: row.title_english == null ? null : String(row.title_english),
-        favoritedAt: asIso(row.favorited_at),
-      }));
+      return rows.map(mapFavoriteAnime);
+    });
+  }
+
+  async listWithAnimePage(
+    userId: number,
+    request: FavoritePageRequest,
+  ): Promise<FavoriteAnimePage> {
+    const listId = await withDbRetry(() => ensureFavoritesListId(userId));
+    return withConsistentRead(async (connection) => {
+      const [countRows] = await connection.query<RowDataPacket[]>(
+        `SELECT COUNT(*) AS total
+         FROM user_list_items i
+         INNER JOIN animes a ON a.id = i.anime_id
+         WHERE i.list_id = ?`,
+        [listId],
+      );
+      const total = Math.max(0, Number(countRows[0]?.total ?? 0));
+      const window = getPageWindow(request.page, total, request.pageSize);
+
+      if (total === 0) {
+        return {
+          items: [],
+          page: window.page,
+          pageSize: window.pageSize,
+          total: window.total,
+          totalPages: window.totalPages,
+        };
+      }
+
+      const [rows] = await connection.query<RowDataPacket[]>(
+        `SELECT a.id, a.title, a.cover, a.view_count, a.title_english, i.created_at AS favorited_at
+         FROM user_list_items i
+         INNER JOIN animes a ON a.id = i.anime_id
+         WHERE i.list_id = ?
+         ORDER BY i.created_at DESC, i.id DESC
+         LIMIT ? OFFSET ?`,
+        [listId, window.pageSize, window.offset],
+      );
+
+      return {
+        items: rows.map(mapFavoriteAnime),
+        page: window.page,
+        pageSize: window.pageSize,
+        total: window.total,
+        totalPages: window.totalPages,
+      };
     });
   }
 

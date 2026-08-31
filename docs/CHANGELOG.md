@@ -2,6 +2,14 @@
 
 面向运维与开发的产品范围变更说明。细粒度历史以 Git 为准。
 
+## 2026-08 — 收藏与历史分页
+
+- `/favorites` 的里番与漫画分别使用 `animePage` / `mangaPage`，每类每页 20 条；服务端执行真实计数和有界查询，不再把全部收藏发送到页面。
+- `/history` 取消里番、漫画各 100 条的截断，改为按最近活动时间合并的统一时间线；超过 100 条的旧记录可继续翻页访问。
+- 非法或越界页码会回到有效页面，删除末页最后一项后自动回退；查询失败显示重试状态，不再伪装为空列表。
+- 账户页只查询收藏总数，首页推荐最多读取最近 100 条收藏。现有无参数 `/api/me/favorites` 返回结构保持不变，以兼容已发布 APK。
+- 新增 `drizzle/migrations/0019-library-pagination-indexes.sql`，为两类收藏与两类历史增加时间 + ID 的稳定分页索引；生产环境仍须人工审核并执行迁移。
+
 ## 2026-08 — 原生 Kotlin Android 客户端
 
 - `mobile/android/` 改为单 Activity 的 Kotlin + Jetpack Compose 应用，包名、`animestream` scheme、图标、最低 Android 版本和现有服务端契约保持不变。

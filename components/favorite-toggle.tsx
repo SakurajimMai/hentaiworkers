@@ -125,7 +125,7 @@ function FavoriteControl({
         disabled={pending}
         aria-pressed={on}
         aria-label={on ? '取消收藏' : '收藏'}
-        className="grid h-8 w-8 place-items-center rounded-full bg-ink/70 text-[15px] leading-none text-white shadow-ink backdrop-blur-sm transition hover:bg-ink/85 active:scale-95 disabled:opacity-70"
+        className="grid h-8 w-8 place-items-center rounded-full bg-ink/70 text-[15px] leading-none text-white shadow-ink backdrop-blur-sm transition hover:bg-ink/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 active:scale-95 disabled:opacity-70"
       >
         {on ? '♥' : '♡'}
       </button>

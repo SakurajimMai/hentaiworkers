@@ -5,6 +5,15 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { AppError, isAuthRequiredError } from '@/lib/server/shared/errors';
 import {
+  buildPublicLoginHref,
+  buildPublicRegisterHref,
+  normalizePublicNext,
+} from '@/lib/server/shared/auth-navigation';
+import {
+  normalizeHistoryReturnTo,
+  withHistoryError,
+} from '@/lib/server/shared/library-navigation';
+import {
   getFavoritesService,
   getWatchProgressService,
 } from '@/lib/server/identity';
@@ -40,18 +49,32 @@ export async function actionPublicRegister(formData: FormData): Promise<void> {
   } catch (error) {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof AppError) {
-      if (error.code === 'SOURCE_RATE_LIMITED') redirect('/register?error=rate');
-      if (error.code === 'RESULT_CONFLICT') redirect('/register?error=exists');
-      if (error.details?.field === 'email') redirect('/register?error=email');
-      if (error.details?.field === 'password') redirect('/register?error=password');
-      if (error.details?.field === 'whitelist') redirect('/register?error=whitelist');
-      if (error.details?.field === 'registration') redirect('/register?error=closed');
-      if (error.details?.field === 'turnstile') redirect('/register?error=turnstile');
+      if (error.code === 'SOURCE_RATE_LIMITED') {
+        redirect(buildPublicRegisterHref(next, { error: 'rate' }));
+      }
+      if (error.code === 'RESULT_CONFLICT') {
+        redirect(buildPublicRegisterHref(next, { error: 'exists' }));
+      }
+      if (error.details?.field === 'email') {
+        redirect(buildPublicRegisterHref(next, { error: 'email' }));
+      }
+      if (error.details?.field === 'password') {
+        redirect(buildPublicRegisterHref(next, { error: 'password' }));
+      }
+      if (error.details?.field === 'whitelist') {
+        redirect(buildPublicRegisterHref(next, { error: 'whitelist' }));
+      }
+      if (error.details?.field === 'registration') {
+        redirect(buildPublicRegisterHref(next, { error: 'closed' }));
+      }
+      if (error.details?.field === 'turnstile') {
+        redirect(buildPublicRegisterHref(next, { error: 'turnstile' }));
+      }
     }
-    redirect('/register?error=1');
+    redirect(buildPublicRegisterHref(next, { error: '1' }));
   }
 
-  redirect(safeNext(next, '/favorites'));
+  redirect(normalizePublicNext(next, '/favorites'));
 }
 
 export async function actionPublicLogin(formData: FormData): Promise<void> {
@@ -68,19 +91,25 @@ export async function actionPublicLogin(formData: FormData): Promise<void> {
       remoteIp: await clientIp(),
     });
     if (!user) {
-      redirect('/login?error=1');
+      redirect(buildPublicLoginHref(next, { error: '1' }));
     }
     // Admins land on the site like everyone else; the header user menu
     // exposes 管理中心. /admin stays reachable directly.
-    redirect(safeNext(next, user.role === 'admin' ? '/' : '/favorites'));
+    redirect(normalizePublicNext(next, user.role === 'admin' ? '/' : '/favorites'));
   } catch (error) {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof AppError) {
-      if (error.code === 'SOURCE_RATE_LIMITED') redirect('/login?error=rate');
-      if (error.details?.field === 'verify') redirect('/login?error=verify');
-      if (error.details?.field === 'turnstile') redirect('/login?error=turnstile');
+      if (error.code === 'SOURCE_RATE_LIMITED') {
+        redirect(buildPublicLoginHref(next, { error: 'rate' }));
+      }
+      if (error.details?.field === 'verify') {
+        redirect(buildPublicLoginHref(next, { error: 'verify' }));
+      }
+      if (error.details?.field === 'turnstile') {
+        redirect(buildPublicLoginHref(next, { error: 'turnstile' }));
+      }
     }
-    redirect('/login?error=1');
+    redirect(buildPublicLoginHref(next, { error: '1' }));
   }
 }
 
@@ -142,7 +171,10 @@ export async function actionToggleFavoriteState(animeId: number, returnTo = `/wa
     return { ok: true as const, favorited: result.favorited };
   } catch (error) {
     if (isAuthRequiredError(error)) {
-      return { ok: false as const, login: `/login?next=${encodeURIComponent(safeNext(returnTo, `/watch/${animeId}`))}` };
+      return {
+        ok: false as const,
+        login: buildPublicLoginHref(returnTo, { fallback: `/watch/${animeId}` }),
+      };
     }
     return { ok: false as const };
   }
@@ -156,7 +188,10 @@ export async function actionToggleMangaFavoriteState(mangaId: number, returnTo =
     return { ok: true as const, favorited: result.favorited };
   } catch (error) {
     if (isAuthRequiredError(error)) {
-      return { ok: false as const, login: `/login?next=${encodeURIComponent(safeNext(returnTo, `/manga/${mangaId}`))}` };
+      return {
+        ok: false as const,
+        login: buildPublicLoginHref(returnTo, { fallback: `/manga/${mangaId}` }),
+      };
     }
     return { ok: false as const };
   }
@@ -164,17 +199,18 @@ export async function actionToggleMangaFavoriteState(mangaId: number, returnTo =
 
 export async function actionClearWatchProgress(formData: FormData): Promise<void> {
   const animeId = parseInt(String(formData.get('animeId') || ''), 10);
+  const returnTo = normalizeHistoryReturnTo(String(formData.get('returnTo') || ''));
   try {
     await getWatchProgressService().deleteMine(animeId);
   } catch (error) {
     if (isAuthRequiredError(error)) {
-      redirect('/login?next=/history');
+      redirect(`/login?next=${encodeURIComponent(returnTo)}`);
     }
-    redirect('/history?error=1');
+    redirect(withHistoryError(returnTo));
   }
   revalidatePath('/history');
   revalidatePath('/');
-  redirect('/history');
+  redirect(returnTo);
 }
 
 export async function actionClearAllWatchProgress(): Promise<void> {
@@ -227,10 +263,4 @@ export async function actionResetPassword(formData: FormData): Promise<void> {
     }
     redirect(`/reset-password?token=${encodeURIComponent(token)}&error=1`);
   }
-}
-
-function safeNext(candidate: string, fallback: string): string {
-  if (!candidate.startsWith('/') || candidate.startsWith('//')) return fallback;
-  if (candidate.startsWith('/admin')) return fallback;
-  return candidate;
 }

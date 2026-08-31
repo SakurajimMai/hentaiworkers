@@ -51,11 +51,11 @@ export default async function HomePage() {
       .then((enabled) => (enabled ? listMangas({ page: 1, limit: 8 }) : null))
       .then((result) => result?.data ?? [])
       .catch(() => [] as Awaited<ReturnType<typeof listMangas>>['data']);
-    const [pop, lat, progress, favorites, mangaData, system] = await Promise.all([
+    const [pop, lat, progress, favoritesPage, mangaData, system] = await Promise.all([
       listAnimes({ page: 1, limit: 12, sort: 'popular' }),
       listAnimes({ page: 1, limit: 18, sort: 'latest' }),
       user ? getWatchProgressService().listMine(24) : Promise.resolve([]),
-      user ? getFavoritesService().listMine() : Promise.resolve([]),
+      user ? getFavoritesService().listMinePage(1, 100) : Promise.resolve(null),
       mangaPromise,
       getSystemSettingsService().getSettings(),
     ]);
@@ -67,6 +67,7 @@ export default async function HomePage() {
       system.ads.feedSlots.find((slot) => slot.enabled && slot.html.trim())?.html.trim() || '';
     continueWatching = progress.filter((p) => !p.completed && p.positionSeconds > 5);
     const completedIds = progress.filter((p) => p.completed).map((p) => p.animeId);
+    const favorites = favoritesPage?.items ?? [];
     const seedIds = [
       ...favorites.map((f) => f.id),
       ...progress.map((p) => p.animeId),

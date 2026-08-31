@@ -33,12 +33,12 @@ npm run dev
 - `drizzle/baseline/0000-production-schema.sql`：核心表基线。
 - `drizzle/migrations/0003–0009`：当前主站能力的增量迁移。
 - `drizzle/migrations/0010–0013`：历史兼容迁移，主站不读写其 works 表。
-- `drizzle/migrations/0014–0017`：漫画表、元数据、收藏与榜单计数。
+- `drizzle/migrations/0014–0019`：漫画表、元数据、收藏、榜单计数、阅读进度与收藏/历史分页索引。
 - `npm run db:baseline`：从指定数据库导出核心表结构基线。
 - `npm run db:push`：明确禁用，防止未经审核直接修改数据库。
 - `npm run db:studio`：启动 Drizzle Studio。
 
-生产变更应审核 SQL、备份数据库、在维护窗口执行并验证 `/api/ready`。迁移不会由 App 容器自动运行。
+生产变更应审核 SQL、备份数据库、在维护窗口执行并验证 `/api/ready`。迁移不会由 App 容器自动运行。`0019-library-pagination-indexes.sql` 只新增复合索引，并会在每条 DDL 前查询 `information_schema`，可在部分成功后重新执行；大表执行前仍应确认可用磁盘空间与 DDL 锁影响。
 
 ## 4. 管理员
 

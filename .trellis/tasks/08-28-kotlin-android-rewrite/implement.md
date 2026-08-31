@@ -164,6 +164,17 @@ Android 命令仅写入 GitHub Actions，不在本地执行：
 - [x] 推送 `main` 并要求 Android Actions 的 lint、单测、assemble、签名、ABI 与资源表校验全绿。
 - [x] 发布五个 production-signed APK，并核对 Release 文件、SHA256 与更新清单。
 
+## Web Library Pagination Follow-up
+
+- [x] `/history` 使用统一的里番/漫画活动时间线，在数据库中计数、稳定排序并按 20 条分页。
+- [x] `/favorites` 保留里番与漫画两个分区，分别使用 `animePage` / `mangaPage` 做独立数据库分页。
+- [x] 非法与越界页码规范化；删除末页最后一项后回到新的最后一页，操作后保留有效 URL 状态。
+- [x] 收藏计数与首页推荐种子不再读取完整收藏；现有无参数 `/api/me/favorites` 响应保持兼容。
+- [x] 新增分页排序复合索引迁移，查询使用时间与记录 ID 的确定性顺序。
+- [x] 分页导航支持当前页语义、键盘焦点、移动端换行与其他查询参数保留。
+- [x] 查询失败显示可重试错误，不再伪装为空列表；未登录本机历史也只渲染当前页。
+- [x] 补充页码边界、超过 100 条历史、双分页参数、末页删除与 API 兼容测试，并运行根项目检查。
+
 ## Rollback Points
 
 - Phase 1 失败：恢复原 `.github/workflows/build-android.yml`，Expo 源码尚未删除。

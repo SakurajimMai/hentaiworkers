@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
+import { LibraryPagination } from '@/components/library-pagination';
 import { MediaImage } from '@/components/media-image';
 import {
   clearLocalWatchProgress,
@@ -89,12 +91,25 @@ export function GuestContinueWatching({ cardWidth }: { cardWidth: string }) {
   );
 }
 
-export function GuestHistoryList() {
+const GUEST_HISTORY_PAGE_SIZE = 20;
+
+export function GuestHistoryList({ initialPage = 1 }: { initialPage?: number }) {
   const [rows, setRows] = useState<LocalWatchProgress[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setRows(readLocalWatchProgress());
+    setLoaded(true);
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / GUEST_HISTORY_PAGE_SIZE));
+  const page = Math.min(totalPages, Math.max(1, Math.trunc(initialPage) || 1));
+
+  useEffect(() => {
+    if (!loaded || page === initialPage) return;
+    router.replace(page > 1 ? `/history?page=${page}` : '/history', { scroll: false });
+  }, [initialPage, loaded, page, router]);
 
   if (!rows.length) {
     return (
@@ -109,9 +124,15 @@ export function GuestHistoryList() {
     );
   }
 
+  const visibleRows = rows.slice(
+    (page - 1) * GUEST_HISTORY_PAGE_SIZE,
+    page * GUEST_HISTORY_PAGE_SIZE,
+  );
+
   return (
-    <ul className="space-y-3">
-      {rows.map((r) => {
+    <div className="space-y-6">
+      <ul className="space-y-3">
+        {visibleRows.map((r) => {
         const pct =
           r.durationSeconds > 0
             ? Math.min(100, Math.round((r.positionSeconds / r.durationSeconds) * 100))
@@ -121,9 +142,9 @@ export function GuestHistoryList() {
         return (
           <li
             key={r.animeId}
-            className="surface-card p-3.5 sm:p-4 flex items-center gap-4 justify-between"
+            className="surface-card flex items-center justify-between gap-4 p-3.5 sm:p-4"
           >
-            <Link href={`/watch/${r.animeId}`} className="flex items-center gap-3 min-w-0 flex-1">
+            <Link href={`/watch/${r.animeId}`} className="flex min-w-0 flex-1 items-center gap-3">
               <div className="h-16 w-12 shrink-0 overflow-hidden rounded-xl border border-border">
                 <MediaImage
                   src={r.cover}
@@ -133,10 +154,10 @@ export function GuestHistoryList() {
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-ui text-sm font-medium text-ink truncate">
+                <p className="truncate font-ui text-sm font-medium text-ink">
                   {r.title || `#${r.animeId}`}
                 </p>
-                <p className="mt-0.5 font-meta text-[11px] normal-case tracking-normal text-soft">
+                <p className="font-meta mt-0.5 text-[11px] normal-case tracking-normal text-soft">
                   {r.completed ? '已看完' : pct > 0 ? `进度 ${pct}%` : `进度 ${Math.floor(r.positionSeconds)}s`}
                 </p>
                 {(pct > 0 || r.completed) && (
@@ -151,7 +172,7 @@ export function GuestHistoryList() {
             </Link>
             <button
               type="button"
-              className="rounded-full px-3 py-1.5 font-ui text-[12px] text-soft hover:bg-secondary hover:text-destructive shrink-0 transition"
+              className="shrink-0 rounded-full px-3 py-1.5 font-ui text-[12px] text-soft transition hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               onClick={() => {
                 const next = rows.filter((x) => x.animeId !== r.animeId);
                 writeLocalWatchProgress(next);
@@ -162,8 +183,16 @@ export function GuestHistoryList() {
             </button>
           </li>
         );
-      })}
-      <li className="pt-1">
+        })}
+      </ul>
+      <div className="flex flex-col items-center gap-4">
+        <LibraryPagination
+          page={page}
+          totalPages={totalPages}
+          total={rows.length}
+          basePath="/history"
+          ariaLabel="本机观看历史分页"
+        />
         <button
           type="button"
           className="btn-danger !text-[13px]"
@@ -174,7 +203,7 @@ export function GuestHistoryList() {
         >
           清除本机全部历史
         </button>
-      </li>
-    </ul>
+      </div>
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import { getFavoritesService, getIdentityService } from '@/lib/server/identity';
 import { listMangaFavorites, toggleMangaFavorite, isMangaFavorite } from '@/lib/server/manga-favorites';
 import { AppError } from '@/lib/server/shared/errors';
 import { meError, meJson } from '../http';
+import { buildMobileFavoritesResponse } from './response';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,20 +14,7 @@ export async function GET() {
       getFavoritesService().listMine(),
       listMangaFavorites(),
     ]);
-    return meJson({
-      animes: animes.map((item) => ({
-        id: item.id,
-        title: item.title,
-        cover: item.cover,
-        favoritedAt: item.favoritedAt,
-      })),
-      mangas: mangas.map((item) => ({
-        id: item.mangaId,
-        title: item.title,
-        coverUrl: item.coverUrl,
-        favoritedAt: item.favoritedAt,
-      })),
-    });
+    return meJson(buildMobileFavoritesResponse(animes, mangas));
   } catch (error) {
     return meError(error);
   }

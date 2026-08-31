@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { IconBookmark, IconHistory, IconShield } from '@/components/icons';
 import { getFavoritesService, getIdentityService } from '@/lib/server/identity';
-import { listMangaFavorites } from '@/lib/server/manga-favorites';
+import { listMangaFavoritesPage } from '@/lib/server/manga-favorites';
 import {
   actionChangeMyPassword,
   actionPublicLogout,
@@ -43,11 +43,10 @@ export default async function AccountPage({
     redirect('/login?next=/account');
   }
 
-  const [animes, mangaFavorites] = await Promise.all([
-    getFavoritesService().listMine().catch(() => []),
-    listMangaFavorites().catch(() => []),
+  const [animeFavorites, mangaFavorites] = await Promise.all([
+    getFavoritesService().listMinePage(1, 1).catch(() => null),
+    listMangaFavoritesPage(1, 1).catch(() => null),
   ]);
-  const animeFavoriteCount = animes.length;
   const isAdmin = user.role === 'admin';
 
   return (
@@ -103,7 +102,7 @@ export default async function AccountPage({
           <span className="min-w-0">
             <span className="block font-ui text-[13px] font-medium text-ink">我的收藏</span>
             <span className="block font-meta text-[11px] normal-case tracking-normal">
-              里番 {animeFavoriteCount} · 漫画 {mangaFavorites.length}
+              里番 {animeFavorites?.total ?? '—'} · 漫画 {mangaFavorites?.total ?? '—'}
             </span>
           </span>
         </Link>

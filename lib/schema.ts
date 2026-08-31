@@ -125,6 +125,7 @@ export const userWatchProgress = mysqlTable(
   (t) => [
     uniqueIndex('user_watch_progress_user_anime_uidx').on(t.userId, t.animeId),
     index('user_watch_progress_user_last_idx').on(t.userId, t.lastWatchedAt),
+    index('user_watch_progress_user_last_id_idx').on(t.userId, t.lastWatchedAt, t.id),
     index('user_watch_progress_anime_id_idx').on(t.animeId),
   ],
 );
@@ -268,6 +269,7 @@ export const mangaReadingProgress = mysqlTable(
   (t) => [
     uniqueIndex('manga_reading_progress_user_manga_uidx').on(t.userId, t.mangaId),
     index('manga_reading_progress_user_last_idx').on(t.userId, t.lastReadAt),
+    index('manga_reading_progress_user_last_id_idx').on(t.userId, t.lastReadAt, t.id),
     index('manga_reading_progress_manga_id_idx').on(t.mangaId),
   ],
 );

@@ -1,7 +1,12 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
-import { pool, withDbRetry } from '@/lib/db';
+import { pool, withConsistentRead, withDbRetry } from '@/lib/db';
 import { getIdentityService } from '@/lib/server/identity';
 import { AppError } from '@/lib/server/shared/errors';
+import {
+  getPageWindow,
+  LIBRARY_PAGE_SIZE,
+  type PageResult,
+} from '@/lib/server/shared/pagination';
 
 export type MangaFavoriteItem = Readonly<{
   mangaId: number;
@@ -11,6 +16,21 @@ export type MangaFavoriteItem = Readonly<{
   pageCount: number;
   favoritedAt: string;
 }>;
+
+export type MangaFavoritePage = PageResult<MangaFavoriteItem>;
+
+function mapMangaFavorite(row: RowDataPacket): MangaFavoriteItem {
+  return {
+    mangaId: Number(row.manga_id),
+    slug: String(row.slug),
+    title: String(row.title),
+    coverUrl: row.cover_url == null ? null : String(row.cover_url),
+    pageCount: Number(row.page_count ?? 0),
+    favoritedAt: row.created_at instanceof Date
+      ? row.created_at.toISOString()
+      : String(row.created_at ?? ''),
+  };
+}
 
 function assertMangaId(mangaId: number): void {
   if (!Number.isInteger(mangaId) || mangaId <= 0) {
@@ -68,18 +88,56 @@ export async function listMangaFavorites(): Promise<ReadonlyArray<MangaFavoriteI
        FROM manga_favorites f
        INNER JOIN mangas m ON m.id = f.manga_id
        WHERE f.user_id = ? AND m.is_published = 1
-       ORDER BY f.created_at DESC`,
+       ORDER BY f.created_at DESC, f.id DESC`,
       [user.id],
     );
-    return rows.map((row) => ({
-      mangaId: Number(row.manga_id),
-      slug: String(row.slug),
-      title: String(row.title),
-      coverUrl: row.cover_url == null ? null : String(row.cover_url),
-      pageCount: Number(row.page_count ?? 0),
-      favoritedAt: row.created_at instanceof Date
-        ? row.created_at.toISOString()
-        : String(row.created_at ?? ''),
-    }));
+    return rows.map(mapMangaFavorite);
+  });
+}
+
+export async function listMangaFavoritesPage(
+  requestedPage = 1,
+  requestedPageSize = LIBRARY_PAGE_SIZE,
+): Promise<MangaFavoritePage> {
+  const user = await requireMangaUser();
+
+  return withConsistentRead(async (connection) => {
+    const [countRows] = await connection.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total
+       FROM manga_favorites f
+       INNER JOIN mangas m ON m.id = f.manga_id
+       WHERE f.user_id = ? AND m.is_published = 1`,
+      [user.id],
+    );
+    const total = Math.max(0, Number(countRows[0]?.total ?? 0));
+    const window = getPageWindow(requestedPage, total, requestedPageSize);
+
+    if (total === 0) {
+      return {
+        items: [],
+        page: window.page,
+        pageSize: window.pageSize,
+        total: window.total,
+        totalPages: window.totalPages,
+      };
+    }
+
+    const [rows] = await connection.query<RowDataPacket[]>(
+      `SELECT f.manga_id, f.created_at, m.slug, m.title, m.cover_url, m.page_count
+       FROM manga_favorites f
+       INNER JOIN mangas m ON m.id = f.manga_id
+       WHERE f.user_id = ? AND m.is_published = 1
+       ORDER BY f.created_at DESC, f.id DESC
+       LIMIT ? OFFSET ?`,
+      [user.id, window.pageSize, window.offset],
+    );
+
+    return {
+      items: rows.map(mapMangaFavorite),
+      page: window.page,
+      pageSize: window.pageSize,
+      total: window.total,
+      totalPages: window.totalPages,
+    };
   });
 }
