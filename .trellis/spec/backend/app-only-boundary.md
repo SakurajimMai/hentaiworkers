@@ -27,6 +27,7 @@ GET /api/animes*
 GET /api/mangas*
 GET /api/tags
 GET /api/ads
+GET /api/android/update
 GET /api/{live,ready,health}
 GET|PUT|DELETE /api/me/watch-progress*
 ```
@@ -62,6 +63,20 @@ single-flight and must not refill state after `clear()`. Preserve the existing J
 propagate cold-load failures, bound stale lifetime, and never apply this cache to identity, library,
 progress, administration, or other private reads.
 
+`GET /api/android/update` is a database-free public read from the fixed
+`SakurajimMai/hentaiworkers` GitHub Releases source. Include prereleases, but accept only
+non-draft `build-N` releases targeting `main`; require exactly one uploaded, non-empty asset for
+each of `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`, and `universal`, plus `SHA256SUMS`.
+Every accepted asset must carry a valid SHA-256 digest and the exact HTTPS filename/path under
+that repository's release tag. Select the greatest complete `N`; malformed or incomplete newer
+releases must not hide an older complete release.
+
+The Android update manifest uses its own one-key process-local stale-while-revalidate cache:
+15 minutes fresh, 24 hours stale, same-key single-flight, and bounded failure backoff. It must not
+reuse or be confused with the catalog cache's 30-second fresh policy. A cold upstream request has
+a short timeout and propagates failure through the documented public error contract; a cached
+stale manifest remains available during a temporary GitHub failure.
+
 ## 4. Validation & Error Matrix
 
 | Condition | Required result |
@@ -72,6 +87,7 @@ progress, administration, or other private reads.
 | Removed route is requested | Normal Next.js 404; no compatibility handler |
 | Existing database still contains removed tables | Ignore; do not issue destructive SQL |
 | Catalog contains a removed local-media URL | Correct operationally; do not read host files from App |
+| GitHub update release is draft, non-main, incomplete, or has an invalid asset path/digest | Ignore it and select the greatest older complete `build-N`; return the documented upstream error only when no cached valid manifest exists |
 | `crawler/**/production_config.yml` exists locally | Keep ignored; commit only a sanitized example |
 
 ## 5. Good / Base / Bad Cases

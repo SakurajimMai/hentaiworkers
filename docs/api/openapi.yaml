@@ -6,7 +6,8 @@ info:
     AnimeStream 公开只读 REST API。
 
     - 无需鉴权
-    - 数据源：远程 MySQL（经 Next.js Route Handlers）
+    - 目录数据源：远程 MySQL（经 Next.js Route Handlers）
+    - Android 更新清单来自固定 GitHub Releases 仓库，不访问数据库
     - 默认仅返回上架作品（`is_active = 1` 或 `NULL`）
     - 漫画接口仅返回已发布作品；栏目关闭时返回 404
   contact:
@@ -24,6 +25,7 @@ tags:
   - name: Animes
   - name: Tags
   - name: Mangas
+  - name: Android
 
 paths:
   /api/health:
@@ -62,6 +64,29 @@ paths:
                 $ref: "#/components/schemas/PublicAdsConfig"
         "500":
           $ref: "#/components/responses/ServerError"
+
+  /api/android/update:
+    get:
+      tags: [Android]
+      summary: Latest verified Android release
+      description: |
+        Returns the largest complete `build-N` release from the fixed public GitHub
+        repository. Drafts, non-main targets, incomplete assets, untrusted download
+        paths, empty files, and assets without a SHA-256 digest are ignored.
+      operationId: getAndroidUpdate
+      responses:
+        "200":
+          description: Verified APK manifest for all supported ABIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AndroidUpdateManifest"
+        "502":
+          description: No cached manifest and GitHub metadata is unavailable or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /api/animes:
     get:
@@ -157,11 +182,20 @@ paths:
   /api/tags:
     get:
       tags: [Tags]
-      summary: List all tags
+      summary: List tags used by active animes
       operationId: listTags
+      parameters:
+        - name: limit
+          in: query
+          description: Response size, clamped to 1..100
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
       responses:
         "200":
-          description: Tags ordered by name
+          description: Distinct tags linked to active animes, ordered by name
           content:
             application/json:
               schema:
@@ -420,6 +454,67 @@ components:
             pauseAd:
               $ref: "#/components/schemas/PublicPlayerPauseAd"
 
+    AndroidUpdateAsset:
+      type: object
+      required: [name, url, size, sha256]
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+          pattern: "^https://github\\.com/SakurajimMai/hentaiworkers/releases/download/build-[1-9][0-9]*/"
+        size:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+
+    AndroidUpdateManifest:
+      type: object
+      required: [schemaVersion, packageName, versionCode, releaseTag, releaseName, publishedAt, releasePageUrl, apks, checksums]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        packageName:
+          type: string
+          enum: [de.ixacg.animestream]
+        versionCode:
+          type: integer
+          minimum: 1
+          maximum: 2100000000
+        releaseTag:
+          type: string
+          pattern: "^build-[1-9][0-9]*$"
+        releaseName:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        releasePageUrl:
+          type: string
+          format: uri
+          pattern: "^https://github\\.com/SakurajimMai/hentaiworkers/releases/tag/build-[1-9][0-9]*$"
+        apks:
+          type: object
+          required: [arm64-v8a, armeabi-v7a, x86_64, x86, universal]
+          additionalProperties: false
+          properties:
+            arm64-v8a:
+              $ref: "#/components/schemas/AndroidUpdateAsset"
+            armeabi-v7a:
+              $ref: "#/components/schemas/AndroidUpdateAsset"
+            x86_64:
+              $ref: "#/components/schemas/AndroidUpdateAsset"
+            x86:
+              $ref: "#/components/schemas/AndroidUpdateAsset"
+            universal:
+              $ref: "#/components/schemas/AndroidUpdateAsset"
+        checksums:
+          $ref: "#/components/schemas/AndroidUpdateAsset"
+
     Pagination:
       type: object
       required: [page, limit, total, totalPages]
@@ -661,7 +756,7 @@ components:
 
   responses:
     ServerError:
-      description: Unexpected server or database error
+      description: Unexpected server, database, or upstream error
       content:
         application/json:
           schema:

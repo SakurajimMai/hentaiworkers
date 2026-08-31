@@ -43,6 +43,18 @@ class ReaderLogicTest {
     }
 
     @Test
+    fun `maps slider preview to nearest bounded page`() {
+        assertEquals(0, ReaderLogic.pageFromSlider(-10f, 6))
+        assertEquals(0, ReaderLogic.pageFromSlider(0.49f, 6))
+        assertEquals(1, ReaderLogic.pageFromSlider(0.5f, 6))
+        assertEquals(3, ReaderLogic.pageFromSlider(3.49f, 6))
+        assertEquals(4, ReaderLogic.pageFromSlider(3.5f, 6))
+        assertEquals(5, ReaderLogic.pageFromSlider(99f, 6))
+        assertEquals(0, ReaderLogic.pageFromSlider(Float.NaN, 6))
+        assertEquals(0, ReaderLogic.pageFromSlider(3f, 0))
+    }
+
+    @Test
     fun `keeps extreme long page aspect ratio without allocating its bitmap`() {
         assertEquals(0.004f, ReaderLogic.pageAspectRatio(width = 1_000, height = 250_000), 0.00001f)
         assertEquals(0.001f, ReaderLogic.pageAspectRatio(width = 1_000, height = 2_000_000), 0.00001f)

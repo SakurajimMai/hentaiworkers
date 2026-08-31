@@ -1,5 +1,7 @@
 package de.ixacg.animestream.reader
 
+import kotlin.math.roundToInt
+
 data class VisibleReaderPage(
     val index: Int,
     val visiblePixels: Int,
@@ -21,6 +23,15 @@ object ReaderLogic {
         requested: Int,
         pageCount: Int,
     ): Int = requested.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+
+    fun pageFromSlider(
+        previewValue: Float,
+        pageCount: Int,
+    ): Int {
+        if (previewValue.isNaN()) return 0
+        val maximum = (pageCount - 1).coerceAtLeast(0).toFloat()
+        return boundedPage(previewValue.coerceIn(0f, maximum).roundToInt(), pageCount)
+    }
 
     fun pageAspectRatio(
         width: Int,

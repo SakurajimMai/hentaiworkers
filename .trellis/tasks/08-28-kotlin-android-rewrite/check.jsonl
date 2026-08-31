@@ -1,3 +1,4 @@
 {"file": ".trellis/spec/backend/app-only-boundary.md", "reason": "Verify mobile remains outside root application runtime and deployment boundaries."}
+{"file": ".trellis/spec/mobile/native-android.md", "reason": "Verify catalog empty states, reader insets/live seek, update policy, signing and CI-only Android validation."}
 {"file": ".trellis/tasks/08-28-kotlin-android-rewrite/research/feature-parity.md", "reason": "Check every existing user workflow and hidden data behavior for parity."}
 {"file": ".trellis/tasks/08-28-kotlin-android-rewrite/research/tachiyomij2k.md", "reason": "Check the reader against the chosen J2K interaction subset and license boundary."}

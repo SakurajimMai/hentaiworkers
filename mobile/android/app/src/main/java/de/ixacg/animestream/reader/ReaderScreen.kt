@@ -12,16 +12,19 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -79,6 +82,7 @@ import de.ixacg.animestream.core.model.MangaPage
 import de.ixacg.animestream.ui.AnimeStreamViewModel
 import de.ixacg.animestream.ui.components.HtmlAd
 import de.ixacg.animestream.ui.library.formatChapter
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -110,8 +114,21 @@ fun ReaderScreen(
     var chapterSheetVisible by remember { mutableStateOf(false) }
     var sliderValue by remember { mutableFloatStateOf(initialPage.toFloat()) }
     var sliderDragging by remember { mutableStateOf(false) }
+    var seekJob by remember { mutableStateOf<Job?>(null) }
     val topAdEnabled = ads.reader.top.enabled && ads.reader.top.html.isNotBlank()
     val pageStartIndex = if (topAdEnabled) 1 else 0
+
+    fun seekToPage(
+        page: Int,
+        force: Boolean = false,
+    ) {
+        val boundedPage = ReaderLogic.boundedPage(page, pages.size)
+        if (!force && sliderValue.toInt() == boundedPage) return
+        sliderValue = boundedPage.toFloat()
+        viewModel.setReaderPage(boundedPage)
+        seekJob?.cancel()
+        seekJob = scope.launch { listState.scrollToItem(pageStartIndex + boundedPage) }
+    }
 
     BackHandler(onBack = onBack)
     ReaderSystemBarsEffect(chromeVisible)
@@ -231,7 +248,12 @@ fun ReaderScreen(
         ) {
             Surface(color = Color(0xE6111111)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 64.dp).padding(horizontal = 8.dp),
+                    modifier =
+                        Modifier.fillMaxWidth().windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                            ),
+                        ).heightIn(min = 64.dp).padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
@@ -271,7 +293,13 @@ fun ReaderScreen(
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Surface(color = Color(0xE6111111)) {
-                Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(
+                    Modifier.fillMaxWidth().windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
+                        ),
+                    ).padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { content?.previousChapter?.let { onChapter(it.number) } },
@@ -282,15 +310,16 @@ fun ReaderScreen(
                         }
                         Slider(
                             value = sliderValue.coerceIn(0f, (pages.size - 1).coerceAtLeast(1).toFloat()),
-                            onValueChange = {
+                            onValueChange = { value ->
                                 sliderDragging = true
-                                sliderValue = it
+                                seekToPage(ReaderLogic.pageFromSlider(value, pages.size))
                             },
                             onValueChangeFinished = {
                                 sliderDragging = false
-                                val page = ReaderLogic.boundedPage(sliderValue.toInt(), pages.size)
-                                viewModel.setReaderPage(page)
-                                scope.launch { listState.scrollToItem(pageStartIndex + page) }
+                                seekToPage(
+                                    ReaderLogic.pageFromSlider(sliderValue, pages.size),
+                                    force = true,
+                                )
                             },
                             valueRange = 0f..(pages.size - 1).coerceAtLeast(1).toFloat(),
                             steps = (pages.size - 2).coerceAtLeast(0),
@@ -307,7 +336,7 @@ fun ReaderScreen(
                         }
                     }
                     Text(
-                        "第 ${(content?.currentPage ?: 0) + 1} / ${pages.size} 页",
+                        "第 ${ReaderLogic.pageFromSlider(sliderValue, pages.size) + 1} / ${pages.size} 页",
                         color = Color.White,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.align(Alignment.CenterHorizontally),

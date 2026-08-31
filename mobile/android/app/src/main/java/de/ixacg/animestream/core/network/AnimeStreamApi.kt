@@ -4,6 +4,7 @@ import de.ixacg.animestream.BuildConfig
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
 import de.ixacg.animestream.core.model.Anime
 import de.ixacg.animestream.core.model.AnimeListResponse
+import de.ixacg.animestream.core.model.AndroidUpdateManifest
 import de.ixacg.animestream.core.model.FavoriteBody
 import de.ixacg.animestream.core.model.FavoriteResult
 import de.ixacg.animestream.core.model.FavoritesEnvelope
@@ -45,6 +46,9 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface AnimeStreamApi {
+    @GET("api/android/update")
+    suspend fun androidUpdate(): AndroidUpdateManifest
+
     @GET("api/animes")
     suspend fun animes(
         @Query("page") page: Int,

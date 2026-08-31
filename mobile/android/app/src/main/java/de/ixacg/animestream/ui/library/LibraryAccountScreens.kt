@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.ixacg.animestream.BuildConfig
 import de.ixacg.animestream.core.model.LibrarySnapshot
 import de.ixacg.animestream.ui.AnimeStreamViewModel
 import de.ixacg.animestream.ui.components.RemoteImage
@@ -262,6 +264,7 @@ fun AccountScreen(
     onLogin: () -> Unit,
 ) {
     val session by viewModel.sessionState.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     Column(
         modifier =
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -297,6 +300,30 @@ fun AccountScreen(
                 Spacer(Modifier.width(8.dp))
                 Text("退出登录")
             }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+        Text("应用版本", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "${BuildConfig.VERSION_NAME} · Build ${BuildConfig.VERSION_CODE}",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = { viewModel.checkForUpdate(force = true) },
+            enabled = !updateState.checking,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) {
+            if (updateState.checking) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("正在检查")
+            } else {
+                Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("检查更新")
+            }
+        }
+        updateState.message?.let { message ->
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

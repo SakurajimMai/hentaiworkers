@@ -209,6 +209,27 @@ data class PublicAdsConfig(
 }
 
 @Serializable
+data class AndroidUpdateApk(
+    val name: String,
+    val url: String,
+    val size: Long,
+    val sha256: String,
+)
+
+@Serializable
+data class AndroidUpdateManifest(
+    val schemaVersion: Int,
+    val packageName: String,
+    val versionCode: Int,
+    val releaseTag: String,
+    val releaseName: String,
+    val publishedAt: String,
+    val releasePageUrl: String,
+    val apks: Map<String, AndroidUpdateApk> = emptyMap(),
+    val checksums: AndroidUpdateApk,
+)
+
+@Serializable
 data class UserEnvelope(
     val user: AuthUser? = null,
     val error: String? = null,

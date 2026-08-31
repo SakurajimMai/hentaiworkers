@@ -58,6 +58,36 @@ class ApiContractTest {
         }
 
     @Test
+    fun `android update manifest uses the same origin contract`() =
+        runTest {
+            val versionCode = 67
+            val releaseTag = "build-$versionCode"
+            val releaseOrigin = "https://github.com/SakurajimMai/hentaiworkers/releases"
+            val sha256 = "a".repeat(64)
+            val apks =
+                listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86", "universal")
+                    .joinToString(",") { abi ->
+                        val name = "AnimeStream-$versionCode-$abi.apk"
+                        """"$abi":{"name":"$name","url":"$releaseOrigin/download/$releaseTag/$name","size":16000000,"sha256":"$sha256"}"""
+                    }
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(
+                        """{"schemaVersion":1,"packageName":"de.ixacg.animestream","versionCode":$versionCode,"releaseTag":"$releaseTag","releaseName":"AnimeStream Build $versionCode","publishedAt":"2026-08-31T00:00:00Z","releasePageUrl":"$releaseOrigin/tag/$releaseTag","apks":{$apks},"checksums":{"name":"SHA256SUMS","url":"$releaseOrigin/download/$releaseTag/SHA256SUMS","size":500,"sha256":"$sha256"}}""",
+                    ),
+            )
+
+            val result = createApi().androidUpdate()
+            val request = requireNotNull(server.takeRequest(2, TimeUnit.SECONDS))
+
+            assertEquals("/api/android/update", request.path)
+            assertEquals(versionCode, result.versionCode)
+            assertEquals("AnimeStream-67-arm64-v8a.apk", result.apks["arm64-v8a"]?.name)
+            assertEquals("SHA256SUMS", result.checksums.name)
+        }
+
+    @Test
     fun `session cookie persists from login and is sent to me`() =
         runTest {
             server.enqueue(

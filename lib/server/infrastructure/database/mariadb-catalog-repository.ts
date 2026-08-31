@@ -152,8 +152,11 @@ export class MariaDbCatalogRepository
   listTags(): Promise<ReadonlyArray<TagSummary>> {
     return withDbRetry(() =>
       db
-        .select({ id: tags.id, name: tags.name })
+        .selectDistinct({ id: tags.id, name: tags.name })
         .from(tags)
+        .innerJoin(animeTags, eq(tags.id, animeTags.tagId))
+        .innerJoin(animes, eq(animeTags.animeId, animes.id))
+        .where(activeAnimeCondition())
         .orderBy(tags.name),
     );
   }

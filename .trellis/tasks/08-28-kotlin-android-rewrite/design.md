@@ -222,3 +222,23 @@ checkout -> JDK/Android SDK/Gradle cache
 | CI 首次构建才发现依赖问题 | 先完成 Gradle/CI vertical slice，再扩展页面 |
 | 远程数据库 TLS 连接短暂重置 | 公开目录有界陈旧缓存、同键请求合并、客户端渐进首屏与短等待预算 |
 | 生产 API 仅有单 IPv4 路由 | 保持可重试错误；只有部署并验证第二个 JSON API 源后才启用客户端 origin 回退 |
+
+## 15. Post-Release Catalog And Reader Corrections
+
+目录筛选页面始终呈现搜索、排序和标签控件。初始加载、空结果与错误作为网格中的全宽状态项显示；空结果的主动作清除 query/tag 后重新请求第一页，而不是重复相同筛选。目录状态增加显式成功完成标记，不再用 `page > 0` 猜测是否已完成。刷新与加载更多分离 Job，并用递增 request generation 只允许当前筛选请求提交状态；取消异常必须继续传播。
+
+`/api/tags` 只返回与当前有效里番存在关联的标签，并对可选 `limit` 做有界解析。生产缓存仍缓存完整有效标签集合，handler 在响应阶段切片，避免按 limit 扩大缓存键空间。
+
+漫画详情保留章节 DTO 的 `title` 以兼容 HTTP 契约，但 APK 章节行不渲染它。阅读器 chrome 单独消费 `WindowInsets.safeDrawing`：顶部使用 Top + Horizontal，底部使用 Bottom + Horizontal；漫画 LazyColumn 不加安全区，从而保持沉浸画布。
+
+Slider 的本地预览值按最近整数映射到有界页码。拖动中只保留一个可取消 seek Job，页码变化时立即更新 ViewModel 并 `scrollToItem`；结束回调再次提交最终页。既有 800ms 进度防抖继续承担持久化合并。
+
+## 16. Non-Blocking Android Update Reminder
+
+App 新增同源 `GET /api/android/update`。服务端从固定公开仓库的 GitHub Releases 列表选择最大的合法 `build-N`：必须非 draft、目标为 `main`、包含五个精确 ABI APK 与 `SHA256SUMS`，APK URL、大小和 SHA-256 digest 都通过严格验证。GitHub 请求使用短超时；模块级单键缓存保持 15 分钟 fresh、24 小时 stale 和失败退避。公开响应允许 CDN 缓存 5 分钟，不访问数据库。
+
+Android 使用独立 `UpdateRepository` 与 `animestream_update` DataStore。自动成功检查后 24 小时内不重复，失败后 6 小时退避；手动检查绕过频控。请求另有约 4 秒 coroutine 上限，并且只在首页两个目录完成后启动，状态与首页完全分离。
+
+发现新版本时先保留内存提醒，不立即写入成功频控；只有用户关闭提醒或成功打开下载后，才原子写入该版本的 24 小时 snooze 与成功时间。这样系统在弹窗呈现前杀死进程也不会吞掉提醒。DataStore 读写失败只降级为更新检查失败或无法持久化频控，继续传播协程取消，但不得从 `viewModelScope` 逸出影响 App。
+
+客户端只比较整数 `BuildConfig.VERSION_CODE`。根据 `Build.SUPPORTED_ABIS` 依次选择 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86`，否则使用 universal；同时校验包名、release tag、HTTPS GitHub 固定路径、文件名与 digest。主导航根层显示 Material3 更新弹窗，player/reader 等沉浸页面不弹；“我的”显示当前 Build 和手动检查入口。点击更新交给浏览器下载及 Android 安装器确认，不申请静默安装权限。

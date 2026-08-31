@@ -17,3 +17,19 @@ test('作品查询在 MariaDB 适配器中复用兼容 NULL 的有效状态条�
   assert.doesNotMatch(facade, /drizzle-orm/);
   assert.match(facade, /getCatalogQueryService/);
 });
+
+test('公开标签只来自关联当前有效里番的去重关系', () => {
+  const adapter = readFileSync(
+    'lib/server/infrastructure/database/mariadb-catalog-repository.ts',
+    'utf8',
+  );
+  const listTags = adapter.slice(
+    adapter.indexOf('listTags(): Promise<ReadonlyArray<TagSummary>>'),
+    adapter.indexOf('getSitemapData(): Promise<SitemapData>'),
+  );
+
+  assert.match(listTags, /selectDistinct/);
+  assert.match(listTags, /innerJoin\(animeTags/);
+  assert.match(listTags, /innerJoin\(animes/);
+  assert.match(listTags, /where\(activeAnimeCondition\(\)\)/);
+});

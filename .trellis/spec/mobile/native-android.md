@@ -36,6 +36,9 @@ scope, Docker image, production Compose services, and server-private imports.
 - Home catalog sections publish in completion order. The first non-empty section must replace the
   full-screen spinner while the other request continues; a later partial failure keeps content and
   exposes inline retry, while only a no-content failure may use the full-screen error state.
+- Catalog controls remain visible for initial loading, errors, and successful empty responses.
+  Empty filtered results provide a clear-filter action. Refresh and pagination use separate jobs,
+  propagate cancellation, and reject responses from an older filter generation.
 - Do not restore an unconditional startup burst for tags, ads, or `/api/me`. Tags load on discovery,
   `/api/me` requires a persisted session cookie, and ads load after useful home content or on demand
   from any directly entered player, reader, or catalog screen that consumes ads.
@@ -55,6 +58,19 @@ scope, Docker image, production Compose services, and server-private imports.
   image, clip away unreachable content, or request an intrinsic million-pixel layout height.
 - Reader progress uses stable page keys, a visible-page fallback for unusually tall pages,
   and the established debounce before persistence.
+- APK chapter rows display only the normalized chapter number. Reader chrome consumes
+  `safeDrawing` top/bottom plus horizontal insets while the manga canvas remains edge-to-edge.
+  Slider changes map to a bounded discrete page and cancel the previous seek immediately during
+  dragging; releasing the thumb commits the final page again.
+- Update checks run independently after home catalog loading finishes and never mutate home state.
+  Successful automatic checks are limited to once per 24 hours, failures back off for 6 hours,
+  manual checks bypass both windows, and dismissing one version snoozes it for 24 hours. The client
+  validates the fixed package, `build-N` tag, GitHub URLs, names, sizes, SHA-256 values, and all five
+  ABI assets before selecting the first device ABI or falling back to universal. Browser download
+  and the Android package installer remain user-confirmed; no silent-install permission is allowed.
+  Finding an available update is not persisted as a successful check until the user dismisses or
+  opens it, so process death before presentation cannot suppress the reminder. DataStore failures
+  remain inside the update subsystem and must never escape into `viewModelScope`.
 
 ## 4. Build And Verification Boundary
 
@@ -86,6 +102,9 @@ official Room Gradle plugin and are checked in. Do not point concurrent kapt var
   production persistence boundary instead of scheduler-idle heuristics.
 - Reader/player/ads changes: extract deterministic policy into pure unit tests; validate real
   media and gestures with the remote APK on a device.
+- Catalog state changes must cover successful empty results and stale-generation suppression.
+  Update policy tests must cover timing windows, snoozing, ABI fallback, strict manifest rejection,
+  and the exact Retrofit endpoint; automatic failure must remain outside home state.
 - Workflow changes: parse YAML in root tests and assert checks, identity validation, signing
   mode, release gate, and absence of the JavaScript runtime.
 - Final task validation: root quality commands, `git diff --check`, remote Android workflow,

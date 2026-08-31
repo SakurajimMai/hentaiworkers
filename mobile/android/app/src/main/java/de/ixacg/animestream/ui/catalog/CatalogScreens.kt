@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -15,10 +17,15 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -166,7 +173,14 @@ fun DiscoverScreen(
         remember(state.items, ads.config.feedSlots) {
             AdsRepository.interleave(state.items, ads.config.feedSlots) { anime, _ -> "anime-${anime.id}" }
         }
-    LaunchedEffect(gridState, entries.size, state.totalPages) {
+    val pane =
+        catalogPaneState(
+            itemCount = state.items.size,
+            hasLoaded = state.hasLoaded,
+            loading = state.loading,
+            error = state.error,
+        )
+    LaunchedEffect(gridState, entries.size, state.page, state.totalPages) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .distinctUntilChanged()
             .collect { index ->
@@ -179,17 +193,6 @@ fun DiscoverScreen(
         onRefresh = { viewModel.refreshDiscover(forceAds = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (
-            statePane(
-                loading = state.loading && state.items.isEmpty(),
-                error = state.error.takeIf { state.items.isEmpty() },
-                empty = !state.loading && state.error == null && state.items.isEmpty() && state.page > 0,
-                emptyText = "没有找到符合条件的里番",
-                onRetry = { viewModel.refreshDiscover() },
-            )
-        ) {
-            return@PullToRefreshBox
-        }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(112.dp),
             state = gridState,
@@ -242,14 +245,34 @@ fun DiscoverScreen(
                     }
                 }
             }
-            items(
-                items = entries,
-                key = { it.key },
-                span = { entry -> if (entry is FeedEntry.Ad) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
-            ) { entry ->
-                when (entry) {
-                    is FeedEntry.Content -> AnimePosterCard(entry.value, onClick = { onAnime(entry.value.id) })
-                    is FeedEntry.Ad -> FeedAdCard(entry.value)
+            when (pane) {
+                CatalogPaneState.Content -> {
+                    state.error?.let { message ->
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "anime-inline-error") {
+                            InlineRetryMessage(message = message, onRetry = viewModel::refreshDiscover)
+                        }
+                    }
+                    items(
+                        items = entries,
+                        key = { it.key },
+                        span = { entry -> if (entry is FeedEntry.Ad) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
+                    ) { entry ->
+                        when (entry) {
+                            is FeedEntry.Content -> AnimePosterCard(entry.value, onClick = { onAnime(entry.value.id) })
+                            is FeedEntry.Ad -> FeedAdCard(entry.value)
+                        }
+                    }
+                }
+                else -> {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "anime-catalog-state") {
+                        CatalogPane(
+                            state = pane,
+                            emptyText = "没有找到符合条件的里番",
+                            canClear = state.query.isNotBlank() || state.selectedTag != null,
+                            onRetry = viewModel::refreshDiscover,
+                            onClear = viewModel::clearAnimeFilters,
+                        )
+                    }
                 }
             }
             if (state.loadingMore) {
@@ -286,7 +309,14 @@ fun MangaCatalogScreen(
         remember(state.items, ads.config.feedSlots) {
             AdsRepository.interleave(state.items, ads.config.feedSlots) { manga, _ -> "manga-${manga.id}" }
         }
-    LaunchedEffect(gridState, entries.size, state.totalPages) {
+    val pane =
+        catalogPaneState(
+            itemCount = state.items.size,
+            hasLoaded = state.hasLoaded,
+            loading = state.loading,
+            error = state.error,
+        )
+    LaunchedEffect(gridState, entries.size, state.page, state.totalPages) {
         snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .distinctUntilChanged()
             .collect { index ->
@@ -299,17 +329,6 @@ fun MangaCatalogScreen(
         onRefresh = { viewModel.refreshMangas(forceAds = true) },
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (
-            statePane(
-                loading = state.loading && state.items.isEmpty(),
-                error = state.error.takeIf { state.items.isEmpty() },
-                empty = !state.loading && state.error == null && state.items.isEmpty() && state.page > 0,
-                emptyText = "没有找到符合条件的漫画",
-                onRetry = { viewModel.refreshMangas() },
-            )
-        ) {
-            return@PullToRefreshBox
-        }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(112.dp),
             state = gridState,
@@ -355,14 +374,34 @@ fun MangaCatalogScreen(
                     }
                 }
             }
-            items(
-                items = entries,
-                key = { it.key },
-                span = { entry -> if (entry is FeedEntry.Ad) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
-            ) { entry ->
-                when (entry) {
-                    is FeedEntry.Content -> MangaPosterCard(entry.value, onClick = { onManga(entry.value.id) })
-                    is FeedEntry.Ad -> FeedAdCard(entry.value)
+            when (pane) {
+                CatalogPaneState.Content -> {
+                    state.error?.let { message ->
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "manga-inline-error") {
+                            InlineRetryMessage(message = message, onRetry = viewModel::refreshMangas)
+                        }
+                    }
+                    items(
+                        items = entries,
+                        key = { it.key },
+                        span = { entry -> if (entry is FeedEntry.Ad) GridItemSpan(maxLineSpan) else GridItemSpan(1) },
+                    ) { entry ->
+                        when (entry) {
+                            is FeedEntry.Content -> MangaPosterCard(entry.value, onClick = { onManga(entry.value.id) })
+                            is FeedEntry.Ad -> FeedAdCard(entry.value)
+                        }
+                    }
+                }
+                else -> {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "manga-catalog-state") {
+                        CatalogPane(
+                            state = pane,
+                            emptyText = "没有找到符合条件的漫画",
+                            canClear = state.query.isNotBlank() || state.selectedTag != null,
+                            onRetry = viewModel::refreshMangas,
+                            onClear = viewModel::clearMangaFilters,
+                        )
+                    }
                 }
             }
             if (state.loadingMore) {
@@ -372,6 +411,46 @@ fun MangaCatalogScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CatalogPane(
+    state: CatalogPaneState,
+    emptyText: String,
+    canClear: Boolean,
+    onRetry: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp).padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+    ) {
+        when (state) {
+            CatalogPaneState.Loading -> CircularProgressIndicator()
+            CatalogPaneState.Empty -> {
+                Text(emptyText, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (canClear) {
+                    OutlinedButton(onClick = onClear, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("清除筛选")
+                    }
+                } else {
+                    OutlinedButton(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Text("刷新")
+                    }
+                }
+            }
+            is CatalogPaneState.Error -> {
+                Text(state.message, color = MaterialTheme.colorScheme.error)
+                Button(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Text("重试")
+                }
+            }
+            CatalogPaneState.Content -> Unit
         }
     }
 }

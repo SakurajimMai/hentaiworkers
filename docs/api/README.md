@@ -5,7 +5,7 @@
 - 协议：HTTPS（生产）/ HTTP（本地）
 - 格式：JSON，`Content-Type: application/json`
 - 鉴权：公开只读接口**无需**登录；`/api/me/*` 需前台会话 Cookie
-- 范围：里番目录（`animes` / `tags`）与已发布漫画（`mangas`）。无独立「动漫 / works」公开 API
+- 范围：里番目录（`animes` / `tags`）、已发布漫画（`mangas`）与 Android 更新清单。无独立「动漫 / works」公开 API
 - 机读规范：[openapi.yaml](./openapi.yaml)
 
 ## 端点一览
@@ -19,6 +19,7 @@
 | GET | `/api/animes/{id}` | 里番详情（含标签） |
 | GET | `/api/animes/{id}/similar` | 相似推荐 |
 | GET | `/api/tags` | 里番标签字典 |
+| GET | `/api/android/update` | 最新完整 Android GitHub Release 清单 |
 | GET | `/api/mangas` | 已发布漫画分页列表 |
 | GET | `/api/mangas/{id}` | 漫画详情（含章节摘要） |
 | GET | `/api/mangas/{id}/chapters/{number}` | 章节图片；同时记一次榜单浏览 |
@@ -188,7 +189,7 @@ JSON 数组（最多约 12 条）：
 ## 5. 标签列表
 
 ```http
-GET /api/tags
+GET /api/tags?limit=20
 ```
 
 ### 成功 `200`
@@ -200,9 +201,58 @@ GET /api/tags
 ]
 ```
 
-按名称排序。
+只返回至少关联一部当前有效里番（`is_active = 1` 或 `NULL`）的去重标签，按名称排序。`limit` 默认为 `100`，并始终钳制到 `1..100`；历史孤立标签和只关联下架里番的标签不会出现在公开列表中。
 
-## 6. 漫画列表
+## 6. Android 更新清单
+
+```http
+GET /api/android/update
+```
+
+该接口不访问数据库。服务端以 5 秒上游超时读取固定仓库
+`SakurajimMai/hentaiworkers` 的 GitHub Releases（包含 prerelease），忽略 draft、
+非 `main` 目标和资产不完整的版本，并选择数值最大的合法 `build-N`。每个合法
+Release 必须包含五个精确命名的 APK 与 `SHA256SUMS`，所有资产必须是已上传的
+非空文件，带 GitHub SHA-256 digest，并使用固定 HTTPS 下载路径。
+
+### 成功 `200`
+
+```json
+{
+  "schemaVersion": 1,
+  "packageName": "de.ixacg.animestream",
+  "versionCode": 66,
+  "releaseTag": "build-66",
+  "releaseName": "AnimeStream Build 66",
+  "publishedAt": "2026-08-30T15:35:02Z",
+  "releasePageUrl": "https://github.com/SakurajimMai/hentaiworkers/releases/tag/build-66",
+  "apks": {
+    "arm64-v8a": {
+      "name": "AnimeStream-66-arm64-v8a.apk",
+      "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/AnimeStream-66-arm64-v8a.apk",
+      "size": 16194840,
+      "sha256": "671c8be3b9d9b3aedd31f2fc3774764554f08f4d48bfe31b14f1f5c8937a2086"
+    }
+  },
+  "checksums": {
+    "name": "SHA256SUMS",
+    "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/SHA256SUMS",
+    "size": 468,
+    "sha256": "61ed90914b56c27b96a65ad45b8f776934507890cdf41be631eea17bf88f3e88"
+  }
+}
+```
+
+`apks` 始终同时包含 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 和
+`universal`。进程缓存 15 分钟 fresh，并可在 GitHub 暂时失败时继续返回最多
+24 小时的 stale 数据；公开响应允许 CDN 缓存 5 分钟。冷缓存且无合法上游清单时
+返回 `502`：
+
+```json
+{ "error": "Update metadata unavailable" }
+```
+
+## 7. 漫画列表
 
 ```http
 GET /api/mangas?page=1&limit=24&q=关键词&tag=NTR&rank=week
@@ -238,7 +288,7 @@ GET /api/mangas?page=1&limit=24&q=关键词&tag=NTR&rank=week
 }
 ```
 
-## 7. 漫画详情与章节
+## 8. 漫画详情与章节
 
 ```http
 GET /api/mangas/17
@@ -251,22 +301,23 @@ GET /api/mangas/17/chapters/1
 curl -s "https://www.ixacg.de/api/mangas?limit=2&rank=week"
 ```
 
-## 8. 错误约定
+## 9. 错误约定
 
 | HTTP | 含义 |
 |------|------|
 | 200 | 成功 |
 | 404 | 资源不存在（详情） |
 | 500 | 服务端 / 数据库异常，`{ "error": string }` |
+| 502 | 更新清单上游不可用且没有可用缓存 |
 
 当前公开接口无速率限制中间件；生产建议在反向代理层配置限流。
 
-## 9. 与后台的关系
+## 10. 与后台的关系
 
 - 管理后台写操作通过 **Server Actions**（`app/admin/actions.ts`），**不是**本公开 REST 的一部分。
 - 修改 `is_active`、标题、标签后，公开 API 读到的是同一 MySQL 库的最新数据。
 
-## 10. OpenAPI 使用
+## 11. OpenAPI 使用
 
 ```bash
 # 使用 Redocly / Swagger UI 等加载

@@ -14,6 +14,8 @@ import de.ixacg.animestream.data.repository.AdsRepository
 import de.ixacg.animestream.data.repository.CatalogRepository
 import de.ixacg.animestream.data.repository.LibraryRepository
 import de.ixacg.animestream.data.repository.SessionRepository
+import de.ixacg.animestream.data.repository.UpdateCheckStore
+import de.ixacg.animestream.data.repository.UpdateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +33,8 @@ class AppContainer(context: Context) {
     val sessionRepository = SessionRepository(api, cookieStore)
     val catalogRepository = CatalogRepository(api)
     val adsRepository = AdsRepository(api)
+    val updateCheckStore = UpdateCheckStore(applicationContext)
+    val updateRepository = UpdateRepository(api, updateCheckStore, Build.SUPPORTED_ABIS.toList())
     val libraryRepository = LibraryRepository(database, api, sessionRepository)
     val legacyStorageMigrator = LegacyStorageMigrator(applicationContext, database, cookieStore)
 

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "packageName": "de.ixacg.animestream",
+  "versionCode": 66,
+  "releaseTag": "build-66",
+  "releaseName": "AnimeStream Build 66",
+  "publishedAt": "2026-08-30T15:35:02Z",
+  "releasePageUrl": "https://github.com/SakurajimMai/hentaiworkers/releases/tag/build-66",
+  "apks": {
+    "arm64-v8a": {
+      "name": "AnimeStream-66-arm64-v8a.apk",
+      "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/AnimeStream-66-arm64-v8a.apk",
+      "size": 16194840,
+      "sha256": "671c8be3b9d9b3aedd31f2fc3774764554f08f4d48bfe31b14f1f5c8937a2086"
+    },
+    "armeabi-v7a": {
+      "name": "AnimeStream-66-armeabi-v7a.apk",
+      "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/AnimeStream-66-armeabi-v7a.apk",
+      "size": 16192148,
+      "sha256": "23ed08577111b5d9d40bf107c8b2dbe1d667cdec750640273fb9b17472e6113b"
+    },
+    "x86_64": {
+      "name": "AnimeStream-66-x86_64.apk",
+      "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/AnimeStream-66-x86_64.apk",
+      "size": 16193946,
+      "sha256": "a3ae271354e95e7d85c721015ccc765e00f0af6eddefbbb6920eaee15d7800f1"
+    },
+    "x86": {
+      "name": "AnimeStream-66-x86.apk",
+      "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/AnimeStream-66-x86.apk",
+      "size": 16192864,
+      "sha256": "713f38412ffeaf089ccf1e6f9959069f8e7139606fdbc76a2cdcc45b0c0ab8d4"
+    },
+    "universal": {
+      "name": "AnimeStream-66-universal.apk",
+      "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/AnimeStream-66-universal.apk",
+      "size": 16292776,
+      "sha256": "c1b8bc181508d2a95ce9b2c0bb7a7ac325ae4b2ef67334bbcc5a08a76da08614"
+    }
+  },
+  "checksums": {
+    "name": "SHA256SUMS",
+    "url": "https://github.com/SakurajimMai/hentaiworkers/releases/download/build-66/SHA256SUMS",
+    "size": 468,
+    "sha256": "61ed90914b56c27b96a65ad45b8f776934507890cdf41be631eea17bf88f3e88"
+  }
+}

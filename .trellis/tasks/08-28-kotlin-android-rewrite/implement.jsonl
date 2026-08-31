@@ -1,3 +1,4 @@
 {"file": ".trellis/spec/backend/app-only-boundary.md", "reason": "Keep the native client outside the App runtime, image, and private server boundary."}
+{"file": ".trellis/spec/mobile/native-android.md", "reason": "Implement catalog state, reader safe-area/slider behavior, and CI-only Android update checks within the native client contract."}
 {"file": ".trellis/tasks/08-28-kotlin-android-rewrite/research/feature-parity.md", "reason": "Authoritative inventory of Expo behaviors that the Kotlin rewrite must preserve."}
 {"file": ".trellis/tasks/08-28-kotlin-android-rewrite/research/tachiyomij2k.md", "reason": "Reader interaction research, scope limits, pinned upstream reference, and license notes."}

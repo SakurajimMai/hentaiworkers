@@ -39,6 +39,32 @@ export type TagSummary = {
   name: string;
 };
 
+export type AndroidUpdateAbi =
+  | 'arm64-v8a'
+  | 'armeabi-v7a'
+  | 'x86_64'
+  | 'x86'
+  | 'universal';
+
+export type AndroidUpdateAsset = {
+  name: string;
+  url: string;
+  size: number;
+  sha256: string;
+};
+
+export type AndroidUpdateManifest = {
+  schemaVersion: number;
+  packageName: string;
+  versionCode: number;
+  releaseTag: string;
+  releaseName: string;
+  publishedAt: string;
+  releasePageUrl: string;
+  apks: Record<AndroidUpdateAbi, AndroidUpdateAsset>;
+  checksums: AndroidUpdateAsset;
+};
+
 export type AnimeDetail = {
   id: number;
   title: string;

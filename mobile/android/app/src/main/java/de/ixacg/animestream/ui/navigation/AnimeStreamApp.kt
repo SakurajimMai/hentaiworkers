@@ -1,5 +1,8 @@
 package de.ixacg.animestream.ui.navigation
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -22,11 +26,14 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -68,6 +75,8 @@ private val mainDestinations =
 fun AnimeStreamApp(viewModel: AnimeStreamViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val route = backStackEntry?.destination?.route
     val showNavigation = mainDestinations.any { destination -> route == destination.route }
     val immersive = route?.startsWith("player/") == true || route?.startsWith("reader/") == true
@@ -107,7 +116,48 @@ fun AnimeStreamApp(viewModel: AnimeStreamViewModel) {
             AppNavHost(navController, viewModel, contentModifier)
         }
     }
+
+    if (showNavigation) {
+        updateState.available?.let { update ->
+            AlertDialog(
+                onDismissRequest = viewModel::snoozeUpdate,
+                title = { Text("发现新版本") },
+                text = {
+                    Column {
+                        Text("${update.releaseName} 已发布。")
+                        Text("将下载适合此设备的 ${update.abi} 安装包，安装时请按系统提示确认。")
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val opened =
+                                openExternalUrl(context, update.apk.url) ||
+                                    openExternalUrl(context, update.releasePageUrl)
+                            if (opened) viewModel.snoozeUpdate()
+                        },
+                    ) {
+                        Text("立即更新")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = viewModel::snoozeUpdate) {
+                        Text("稍后提醒")
+                    }
+                },
+            )
+        }
+    }
 }
+
+private fun openExternalUrl(
+    context: Context,
+    url: String,
+): Boolean =
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        true
+    }.getOrDefault(false)
 
 @Composable
 private fun MainNavigationBar(

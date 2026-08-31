@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.ixacg.animestream.AppContainer
+import de.ixacg.animestream.BuildConfig
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
 import de.ixacg.animestream.core.model.Anime
 import de.ixacg.animestream.core.model.LibrarySnapshot
@@ -13,7 +14,9 @@ import de.ixacg.animestream.core.model.MangaRank
 import de.ixacg.animestream.core.model.MangaSummary
 import de.ixacg.animestream.core.model.PublicAdsConfig
 import de.ixacg.animestream.core.model.Tag
+import de.ixacg.animestream.data.repository.AvailableUpdate
 import de.ixacg.animestream.data.repository.SessionState
+import de.ixacg.animestream.data.repository.UpdateCheckResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -53,6 +56,12 @@ data class AdsState(
     val ready: Boolean = false,
 )
 
+data class AppUpdateState(
+    val checking: Boolean = false,
+    val available: AvailableUpdate? = null,
+    val message: String? = null,
+)
+
 internal fun shouldStartAdsLoad(
     ready: Boolean,
     active: Boolean,
@@ -66,6 +75,7 @@ data class AnimeCatalogState(
     val sort: String = "latest",
     val page: Int = 0,
     val totalPages: Int = 1,
+    val hasLoaded: Boolean = false,
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
     val error: String? = null,
@@ -78,6 +88,7 @@ data class MangaCatalogState(
     val rank: MangaRank = MangaRank.Latest,
     val page: Int = 0,
     val totalPages: Int = 1,
+    val hasLoaded: Boolean = false,
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
     val error: String? = null,
@@ -110,11 +121,15 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private val catalog = container.catalogRepository
     private val library = container.libraryRepository
     private val adsRepository = container.adsRepository
+    private val updateRepository = container.updateRepository
 
     val sessionState: StateFlow<SessionState> = container.sessionRepository.state
 
     private val mutableAdsState = MutableStateFlow(AdsState())
     val adsState: StateFlow<AdsState> = mutableAdsState.asStateFlow()
+
+    private val mutableUpdateState = MutableStateFlow(AppUpdateState())
+    val updateState: StateFlow<AppUpdateState> = mutableUpdateState.asStateFlow()
 
     private val mutableHome = MutableStateFlow(Loadable<HomeContent>())
     val home: StateFlow<Loadable<HomeContent>> = mutableHome.asStateFlow()
@@ -144,7 +159,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     val reader: StateFlow<Loadable<ReaderContent>> = mutableReader.asStateFlow()
 
     private var discoverJob: Job? = null
+    private var discoverLoadMoreJob: Job? = null
     private var mangaJob: Job? = null
+    private var mangaLoadMoreJob: Job? = null
     private var homeJob: Job? = null
     private var adsJob: Job? = null
     private var detailJob: Job? = null
@@ -152,6 +169,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private var playerJob: Job? = null
     private var readerJob: Job? = null
     private var progressJob: Job? = null
+    private var updateJob: Job? = null
+    private var discoverRequestGeneration = 0L
+    private var mangaRequestGeneration = 0L
 
     init {
         viewModelScope.launch {
@@ -234,32 +254,116 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     ) {
         mutableHome.value = update.state
         if (update.shouldLoadAds) refreshAds(force = forceAds)
+        if (!update.state.loading) checkForUpdate()
+    }
+
+    fun checkForUpdate(force: Boolean = false) {
+        if (updateJob?.isActive == true) return
+        if (!force && mutableUpdateState.value.available != null) return
+        mutableUpdateState.update { it.copy(checking = true, message = if (force) null else it.message) }
+        updateJob =
+            viewModelScope.launch {
+                val result =
+                    captureResult { updateRepository.check(BuildConfig.VERSION_CODE, force) }
+                        .getOrDefault(UpdateCheckResult.Failed)
+                when (result) {
+                    UpdateCheckResult.Skipped -> mutableUpdateState.update { it.copy(checking = false) }
+                    UpdateCheckResult.Current ->
+                        mutableUpdateState.update {
+                            it.copy(
+                                checking = false,
+                                message = if (force) "已是最新版本（Build ${BuildConfig.VERSION_CODE}）" else null,
+                            )
+                        }
+                    is UpdateCheckResult.Available ->
+                        mutableUpdateState.value = AppUpdateState(available = result.update)
+                    UpdateCheckResult.Failed ->
+                        mutableUpdateState.update {
+                            it.copy(
+                                checking = false,
+                                message = if (force) "检查更新失败，请稍后重试" else null,
+                            )
+                        }
+                }
+            }
+    }
+
+    fun snoozeUpdate() {
+        val update = mutableUpdateState.value.available ?: return
+        mutableUpdateState.update { it.copy(available = null) }
+        viewModelScope.launch { captureResult { updateRepository.snooze(update.versionCode) } }
     }
 
     fun searchAnimes(query: String) {
-        mutableDiscover.update { it.copy(query = query) }
+        mutableDiscover.update {
+            it.copy(
+                items = emptyList(),
+                query = query,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
         refreshDiscover()
     }
 
     fun setAnimeSort(sort: String) {
         if (mutableDiscover.value.sort == sort) return
-        mutableDiscover.update { it.copy(sort = sort) }
+        mutableDiscover.update {
+            it.copy(
+                items = emptyList(),
+                sort = sort,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
         refreshDiscover()
     }
 
     fun setAnimeTag(tag: Tag?) {
-        mutableDiscover.update { it.copy(selectedTag = tag) }
+        if (mutableDiscover.value.selectedTag?.id == tag?.id) return
+        mutableDiscover.update {
+            it.copy(
+                items = emptyList(),
+                selectedTag = tag,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
+        refreshDiscover()
+    }
+
+    fun clearAnimeFilters() {
+        mutableDiscover.update {
+            it.copy(
+                items = emptyList(),
+                query = "",
+                selectedTag = null,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
         refreshDiscover()
     }
 
     fun refreshDiscover(forceAds: Boolean = false) {
         if (forceAds) refreshAds(force = true)
         discoverJob?.cancel()
+        discoverLoadMoreJob?.cancel()
+        discoverRequestGeneration += 1
+        val requestGeneration = discoverRequestGeneration
         discoverJob =
             viewModelScope.launch {
                 val request = mutableDiscover.value
                 mutableDiscover.update { it.copy(loading = true, loadingMore = false, error = null) }
-                runCatching {
+                val result = captureResult {
                     catalog.animes(
                         page = 1,
                         limit = ANIME_PAGE_SIZE,
@@ -267,12 +371,15 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         search = request.query,
                         sort = request.sort,
                     )
-                }.onSuccess { response ->
+                }
+                if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) return@launch
+                result.onSuccess { response ->
                     mutableDiscover.update {
                         it.copy(
                             items = response.data.distinctBy(Anime::id),
                             page = response.pagination.page,
                             totalPages = response.pagination.totalPages,
+                            hasLoaded = true,
                             loading = false,
                             error = null,
                         )
@@ -285,11 +392,19 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     fun loadMoreAnimes() {
         val state = mutableDiscover.value
-        if (state.loading || state.loadingMore || state.page >= state.totalPages) return
-        discoverJob =
+        if (
+            state.loading ||
+            state.loadingMore ||
+            discoverLoadMoreJob?.isActive == true ||
+            state.page >= state.totalPages
+        ) {
+            return
+        }
+        val requestGeneration = discoverRequestGeneration
+        discoverLoadMoreJob =
             viewModelScope.launch {
                 mutableDiscover.update { it.copy(loadingMore = true) }
-                runCatching {
+                val result = captureResult {
                     catalog.animes(
                         page = state.page + 1,
                         limit = ANIME_PAGE_SIZE,
@@ -297,14 +412,27 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         search = state.query,
                         sort = state.sort,
                     )
-                }.onSuccess { response ->
+                }
+                if (!isCurrentCatalogRequest(requestGeneration, discoverRequestGeneration)) return@launch
+                result.onSuccess { response ->
                     mutableDiscover.update { current ->
-                        current.copy(
-                            items = (current.items + response.data).distinctBy(Anime::id),
-                            page = response.pagination.page,
-                            totalPages = response.pagination.totalPages,
-                            loadingMore = false,
-                        )
+                        if (
+                            shouldAppendCatalogPage(
+                                requestGeneration = requestGeneration,
+                                currentGeneration = discoverRequestGeneration,
+                                currentPage = current.page,
+                                responsePage = response.pagination.page,
+                            )
+                        ) {
+                            current.copy(
+                                items = (current.items + response.data).distinctBy(Anime::id),
+                                page = response.pagination.page,
+                                totalPages = response.pagination.totalPages,
+                                loadingMore = false,
+                            )
+                        } else {
+                            current.copy(loadingMore = false)
+                        }
                     }
                 }.onFailure { error ->
                     mutableDiscover.update { it.copy(loadingMore = false, error = error.userMessage()) }
@@ -317,29 +445,75 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun searchMangas(query: String) {
-        mutableMangaCatalog.update { it.copy(query = query) }
+        mutableMangaCatalog.update {
+            it.copy(
+                items = emptyList(),
+                query = query,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
         refreshMangas()
     }
 
     fun setMangaTag(tag: String?) {
-        mutableMangaCatalog.update { it.copy(selectedTag = tag) }
+        if (mutableMangaCatalog.value.selectedTag == tag) return
+        mutableMangaCatalog.update {
+            it.copy(
+                items = emptyList(),
+                selectedTag = tag,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
+        refreshMangas()
+    }
+
+    fun clearMangaFilters() {
+        mutableMangaCatalog.update {
+            it.copy(
+                items = emptyList(),
+                query = "",
+                selectedTag = null,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
         refreshMangas()
     }
 
     fun setMangaRank(rank: MangaRank) {
         if (mutableMangaCatalog.value.rank == rank) return
-        mutableMangaCatalog.update { it.copy(rank = rank) }
+        mutableMangaCatalog.update {
+            it.copy(
+                items = emptyList(),
+                rank = rank,
+                page = 0,
+                totalPages = 1,
+                hasLoaded = false,
+                error = null,
+            )
+        }
         refreshMangas()
     }
 
     fun refreshMangas(forceAds: Boolean = false) {
         if (forceAds) refreshAds(force = true)
         mangaJob?.cancel()
+        mangaLoadMoreJob?.cancel()
+        mangaRequestGeneration += 1
+        val requestGeneration = mangaRequestGeneration
         mangaJob =
             viewModelScope.launch {
                 val request = mutableMangaCatalog.value
                 mutableMangaCatalog.update { it.copy(loading = true, loadingMore = false, error = null) }
-                runCatching {
+                val result = captureResult {
                     catalog.mangas(
                         page = 1,
                         limit = MANGA_PAGE_SIZE,
@@ -347,12 +521,15 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         tag = request.selectedTag,
                         rank = request.rank,
                     )
-                }.onSuccess { response ->
+                }
+                if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) return@launch
+                result.onSuccess { response ->
                     mutableMangaCatalog.update {
                         it.copy(
                             items = response.data.distinctBy(MangaSummary::id),
                             page = response.pagination.page,
                             totalPages = response.pagination.totalPages,
+                            hasLoaded = true,
                             loading = false,
                             error = null,
                         )
@@ -365,11 +542,19 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     fun loadMoreMangas() {
         val state = mutableMangaCatalog.value
-        if (state.loading || state.loadingMore || state.page >= state.totalPages) return
-        mangaJob =
+        if (
+            state.loading ||
+            state.loadingMore ||
+            mangaLoadMoreJob?.isActive == true ||
+            state.page >= state.totalPages
+        ) {
+            return
+        }
+        val requestGeneration = mangaRequestGeneration
+        mangaLoadMoreJob =
             viewModelScope.launch {
                 mutableMangaCatalog.update { it.copy(loadingMore = true) }
-                runCatching {
+                val result = captureResult {
                     catalog.mangas(
                         page = state.page + 1,
                         limit = MANGA_PAGE_SIZE,
@@ -377,14 +562,27 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         tag = state.selectedTag,
                         rank = state.rank,
                     )
-                }.onSuccess { response ->
+                }
+                if (!isCurrentCatalogRequest(requestGeneration, mangaRequestGeneration)) return@launch
+                result.onSuccess { response ->
                     mutableMangaCatalog.update { current ->
-                        current.copy(
-                            items = (current.items + response.data).distinctBy(MangaSummary::id),
-                            page = response.pagination.page,
-                            totalPages = response.pagination.totalPages,
-                            loadingMore = false,
-                        )
+                        if (
+                            shouldAppendCatalogPage(
+                                requestGeneration = requestGeneration,
+                                currentGeneration = mangaRequestGeneration,
+                                currentPage = current.page,
+                                responsePage = response.pagination.page,
+                            )
+                        ) {
+                            current.copy(
+                                items = (current.items + response.data).distinctBy(MangaSummary::id),
+                                page = response.pagination.page,
+                                totalPages = response.pagination.totalPages,
+                                loadingMore = false,
+                            )
+                        } else {
+                            current.copy(loadingMore = false)
+                        }
                     }
                 }.onFailure { error ->
                     mutableMangaCatalog.update { it.copy(loadingMore = false, error = error.userMessage()) }

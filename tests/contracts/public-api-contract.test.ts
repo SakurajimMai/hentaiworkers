@@ -23,7 +23,11 @@ import {
 import {
   createTagsDependency,
   createTagsHandler,
+  DEFAULT_TAG_LIMIT,
+  MAX_TAG_LIMIT,
+  parseTagsLimit,
 } from '../../app/api/tags/handler';
+import { createAndroidUpdateHandler } from '../../app/api/android/update/handler';
 import {
   createAdsDependency,
   createAdsHandler,
@@ -37,6 +41,7 @@ import type {
   AnimeDetail,
   AnimeListResponse,
   AnimeSimilarItem,
+  AndroidUpdateManifest,
   HealthError,
   HealthOk,
   ListAnimesOptions,
@@ -44,8 +49,10 @@ import type {
   TagSummary,
 } from '../../lib/public-api-types';
 import type { MangaListResult } from '../../lib/manga-service';
+import { ANDROID_UPDATE_CACHE_CONTROL } from '../../lib/server/android-update';
 import { PUBLIC_READ_CACHE_CONTROL } from '../../lib/server/shared/stale-read-cache';
 import adsFixtureJson from './fixtures/ads.json';
+import androidUpdateFixtureJson from './fixtures/android-update.json';
 import detailFixtureJson from './fixtures/anime-detail.json';
 import listFixtureJson from './fixtures/animes-list.json';
 import healthFixtureJson from './fixtures/health.json';
@@ -69,6 +76,7 @@ const detailFixture = detailFixtureJson satisfies AnimeDetail;
 const similarFixture = similarFixtureJson satisfies AnimeSimilarItem[];
 const tagsFixture = tagsFixtureJson satisfies TagSummary[];
 const adsFixture = adsFixtureJson satisfies PublicAdsConfig;
+const androidUpdateFixture = androidUpdateFixtureJson satisfies AndroidUpdateManifest;
 const mangaListFixture = mangaListFixtureJson;
 const mangaServiceFixture = {
   data: mangaListFixture.data.map((item) => ({
@@ -86,7 +94,16 @@ const healthFixture = healthFixtureJson satisfies {
 };
 
 async function loadRouteModules() {
-  const [listRoute, detailRoute, similarRoute, tagsRoute, healthRoute, adsRoute, mangaListRoute] = await Promise.all([
+  const [
+    listRoute,
+    detailRoute,
+    similarRoute,
+    tagsRoute,
+    healthRoute,
+    adsRoute,
+    mangaListRoute,
+    androidUpdateRoute,
+  ] = await Promise.all([
     import('../../app/api/animes/route'),
     import('../../app/api/animes/[id]/route'),
     import('../../app/api/animes/[id]/similar/route'),
@@ -94,6 +111,7 @@ async function loadRouteModules() {
     import('../../app/api/health/route'),
     import('../../app/api/ads/route'),
     import('../../app/api/mangas/route'),
+    import('../../app/api/android/update/route'),
   ]);
 
   return {
@@ -104,6 +122,7 @@ async function loadRouteModules() {
     healthRoute,
     adsRoute,
     mangaListRoute,
+    androidUpdateRoute,
   };
 }
 
@@ -155,7 +174,7 @@ test('TypeScript 测试脚本使用跨平台递归测试入口', () => {
   assert.equal(packageJson.scripts?.['test:ts'], 'node scripts/run-tests.mjs');
 });
 
-test('七个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
+test('八个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
   const databaseUrl = process.env.DATABASE_URL;
   delete process.env.DATABASE_URL;
   let routes: Awaited<ReturnType<typeof loadRouteModules>>;
@@ -181,6 +200,7 @@ test('七个公开路由不初始化数据库且使用同源可注入 handler �
     createHealthHandler,
     createAdsHandler,
     createListMangasHandler,
+    createAndroidUpdateHandler,
   ]) {
     assert.equal(typeof factory, 'function');
   }
@@ -393,14 +413,54 @@ test('标签列表保持 200 黄金响应和 500 错误结构', async () => {
     throw new Error('synthetic tags failure');
   });
 
-  const successResponse = await success();
-  const failureResponse = await failure();
+  const successResponse = await success(
+    new NextRequest('http://fixture.invalid/api/tags?limit=1'),
+  );
+  const failureResponse = await failure(
+    new NextRequest('http://fixture.invalid/api/tags'),
+  );
 
   assert.equal(successResponse.status, 200);
-  assert.deepEqual(await responseJson(successResponse), tagsFixture);
+  assert.deepEqual(await responseJson(successResponse), tagsFixture.slice(0, 1));
   assert.equal(successResponse.headers.get('cache-control'), PUBLIC_READ_CACHE_CONTROL);
   assert.equal(failureResponse.status, 500);
   assert.deepEqual(await responseJson(failureResponse), { error: 'synthetic tags failure' });
+});
+
+test('标签 limit 缺省、非法和越界值始终钳制到有界范围', async () => {
+  assert.equal(parseTagsLimit(null), DEFAULT_TAG_LIMIT);
+  assert.equal(parseTagsLimit('invalid'), DEFAULT_TAG_LIMIT);
+  assert.equal(parseTagsLimit('-5'), 1);
+  assert.equal(parseTagsLimit('0'), 1);
+  assert.equal(parseTagsLimit('999'), MAX_TAG_LIMIT);
+  assert.equal(parseTagsLimit('2'), 2);
+
+  const manyTags = Array.from({ length: MAX_TAG_LIMIT + 5 }, (_, index) => ({
+    id: index + 1,
+    name: `tag-${index + 1}`,
+  }));
+  const response = await createTagsHandler(async () => manyTags)(
+    new NextRequest('http://fixture.invalid/api/tags?limit=999'),
+  );
+  assert.equal((await responseJson(response) as unknown[]).length, MAX_TAG_LIMIT);
+});
+
+test('Android 更新清单保持 200 黄金响应、缓存头和 502 错误结构', async () => {
+  const success = createAndroidUpdateHandler(async () => androidUpdateFixture);
+  const failure = createAndroidUpdateHandler(async () => {
+    throw new Error('synthetic GitHub failure');
+  });
+
+  const successResponse = await success();
+  const failureResponse = await withMutedConsoleError(() => failure());
+
+  assert.equal(successResponse.status, 200);
+  assert.deepEqual(await responseJson(successResponse), androidUpdateFixture);
+  assert.equal(successResponse.headers.get('cache-control'), ANDROID_UPDATE_CACHE_CONTROL);
+  assert.equal(failureResponse.status, 502);
+  assert.deepEqual(await responseJson(failureResponse), {
+    error: 'Update metadata unavailable',
+  });
 });
 
 test('公开广告配置保持 200 黄金响应和 500 错误结构', async () => {
@@ -559,6 +619,18 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
       'muted',
     ],
     PublicPlayerPauseAd: ['enabled', 'videoUrl', 'imageUrl', 'html', 'clickUrl', 'muted'],
+    AndroidUpdateAsset: ['name', 'url', 'size', 'sha256'],
+    AndroidUpdateManifest: [
+      'schemaVersion',
+      'packageName',
+      'versionCode',
+      'releaseTag',
+      'releaseName',
+      'publishedAt',
+      'releasePageUrl',
+      'apks',
+      'checksums',
+    ],
   } as const;
 
   for (const [schemaName, keys] of Object.entries(required)) {
@@ -579,5 +651,10 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
   assertOwnKeys(adsFixture.reader.top, required.PublicReaderAdSlot);
   assertOwnKeys(adsFixture.player.preRollAd, required.PublicPlayerPreRollAd);
   assertOwnKeys(adsFixture.player.pauseAd, required.PublicPlayerPauseAd);
+  assertOwnKeys(androidUpdateFixture, required.AndroidUpdateManifest);
+  for (const apk of Object.values(androidUpdateFixture.apks)) {
+    assertOwnKeys(apk, required.AndroidUpdateAsset);
+  }
+  assertOwnKeys(androidUpdateFixture.checksums, required.AndroidUpdateAsset);
   assert.equal(schemas.AnimeSimilarItem.required?.includes('matches'), false);
 });
