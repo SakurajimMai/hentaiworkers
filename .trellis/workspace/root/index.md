@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-08-31
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~147 | Active |
+| `journal-1.md` | ~168 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-08-31 | 重塑 Android 与网站品牌图标 | `fee7842` | `main` |
 | 5 | 2026-08-31 | 修复 Android 目录、阅读器并发布更新提醒 | `3e38a7b`, `f70b56c`, `92813d0`, `1ff6127` | `feat/kotlin-android-client` |
 | 4 | 2026-08-30 | 修复 Android 首屏超时与服务端目录降级 | `32f1412` | `feat/kotlin-android-client` |
 | 3 | 2026-08-30 | Fix Android weak-network timeout | `34540b9` | `feat/kotlin-android-client` |

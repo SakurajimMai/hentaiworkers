@@ -145,3 +145,24 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 ### Next Steps
 
 - 在有刘海的真机安装 Build 72，复测空标签、实时拖页，并在 Build 73 验证更新提醒。
+
+
+## Session 6: 重塑 Android 与网站品牌图标
+
+**Date**: 2026-08-31
+**Task**: 重塑 Android 与网站品牌图标
+**Branch**: `main`
+
+### Summary
+
+以网站纸白、墨黑、余烬橙重设计余烬折页 SVG 品牌标记；同步 Android adaptive/legacy/monochrome/splash 与 Web favicon、Manifest、Apple、OG、页眉资源，移除旧紫色资源；新增确定性生成器、品牌契约及 APK 资源表 CI 校验。本地 lint、typecheck、195 项测试、legacy、boundaries、build、HTTP 和桌面/手机截图验证通过，待远程 Android Actions 与 Release。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fee7842` | (see git log) |
+
+### Status
+
+[OK] **Completed**
