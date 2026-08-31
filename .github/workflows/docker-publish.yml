@@ -79,7 +79,6 @@ jobs:
             const runs = await github.paginate(
               github.rest.actions.listWorkflowRunsForRepo,
               { owner, repo, per_page: 100 },
-              (response) => response.data.workflow_runs,
             );
 
             runs.sort((left, right) =>

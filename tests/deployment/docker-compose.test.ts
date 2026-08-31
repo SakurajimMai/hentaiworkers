@@ -252,7 +252,7 @@ test('trusted workflows retain only the latest five repository Actions runs', ()
     assert.match(script, /github\.paginate\(/);
     assert.match(script, /actions\.listWorkflowRunsForRepo/);
     assert.match(script, /per_page: 100/);
-    assert.match(script, /response\.data\.workflow_runs/);
+    assert.doesNotMatch(script, /response\.data\.workflow_runs/);
     assert.match(script, /runs\.sort\(/);
     assert.match(script, /created_at/);
     assert.match(script, /right\.id - left\.id/);
