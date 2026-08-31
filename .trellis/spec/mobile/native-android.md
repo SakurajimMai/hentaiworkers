@@ -25,6 +25,10 @@ scope, Docker image, production Compose services, and server-private imports.
   secrets, and the same pinned certificate. Partial signing configuration must fail.
 - The first native launch must idempotently import the five known `RKStorage` values without
   deleting the old database or overwriting newer native rows.
+- Launcher branding uses the AnimeStream paper/ink/ember mark. Adaptive icons keep the solid
+  background and transparent VectorDrawable foreground as separate layers; do not flatten a
+  rounded square into the foreground. Keep legacy square/round density WebP files, an Android 13
+  monochrome layer, and a dedicated splash vector derived from the same master geometry.
 
 ## 3. Runtime Contracts
 
@@ -87,6 +91,8 @@ Android build environment and must:
    libraries in the universal APK.
 6. Upload all five APKs and diagnostic reports; publish them to GitHub Releases only from a
    formally signed `main` build.
+7. Inspect every assembled APK resource table for the launcher foreground, monochrome mark,
+   splash icon, and normal/round launcher entries.
 
 Release-signing values validated by the configure step must also be scoped to the Gradle build
 step; exporting only the keystore path silently falls back to debug signing. Room schemas use the

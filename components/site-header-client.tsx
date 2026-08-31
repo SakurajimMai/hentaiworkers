@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { IconMenu, IconPlay, IconSearch, IconX } from '@/components/icons';
+import { BrandMark } from '@/components/brand-mark';
+import { IconMenu, IconSearch, IconX } from '@/components/icons';
 import { ThemeMenu } from '@/components/theme-menu';
 import {
   clearSearchHistory,
@@ -76,9 +77,13 @@ export function SiteHeaderClient({
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-background/90 backdrop-blur-md">
       <div className="page-shell flex min-h-14 items-center gap-2.5 sm:gap-4 !max-w-6xl">
-        <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition group-hover:scale-[1.03]">
-            <IconPlay size={12} className="ml-px" />
+        <Link
+          href="/"
+          aria-label="AnimeStream 首页"
+          className="flex items-center gap-2.5 shrink-0 group"
+        >
+          <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-[8px] bg-[#121318] transition group-hover:scale-[1.03]">
+            <BrandMark className="h-8 w-8" />
           </span>
           <span className="hidden sm:inline font-ui text-[14px] font-semibold tracking-tight text-ink">
             AnimeStream

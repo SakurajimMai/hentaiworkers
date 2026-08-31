@@ -171,14 +171,24 @@ jobs:
           while IFS=$'\t' read -r variant output_file; do
             apk="$output_dir/$output_file"
             entries="app/build/reports/apk-entries-${variant}.txt"
+            resources_report="app/build/reports/apk-resources-${variant}.txt"
             signature_report="app/build/reports/apk-signature-${variant}.txt"
             test -s "$apk"
             unzip -tq "$apk"
             unzip -Z1 "$apk" > "$entries"
 
             badging=$($aapt_bin dump badging "$apk")
+            "$aapt_bin" dump resources "$apk" > "$resources_report"
             printf '%s\n' "$badging" | grep -F "package: name='de.ixacg.animestream' versionCode='${GITHUB_RUN_NUMBER}'"
             printf '%s\n' "$badging" | grep -F "launchable-activity: name='de.ixacg.animestream.MainActivity'"
+            for resource_name in \
+              drawable/ic_launcher_foreground \
+              drawable/ic_launcher_monochrome \
+              drawable/splashscreen_icon \
+              mipmap/ic_launcher \
+              mipmap/ic_launcher_round; do
+              grep -F "de.ixacg.animestream:${resource_name}" "$resources_report"
+            done
             "$apksigner_bin" verify --verbose --print-certs "$apk" > "$signature_report"
             certificate_digest=$(sed -n 's/^.*certificate SHA-256 digest: //p' "$signature_report" | head -1)
             test -n "$certificate_digest"

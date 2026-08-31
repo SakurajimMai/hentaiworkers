@@ -152,6 +152,18 @@ Android 命令仅写入 GitHub Actions，不在本地执行：
 - [x] 部署服务端 endpoint，验证缓存/失败降级；在同一 main 提交发布五 ABI 新 Release。
 - [ ] 真机验证空标签恢复、刘海安全区、实时拖页和下一版本更新提醒。
 
+## Brand Icon Follow-up
+
+- [x] 从网站实际设计系统提取纸白 `#F6F4EF`、墨黑 `#121318` 与余烬橙 `#D36322`。
+- [x] 设计并验证“余烬折页”SVG 母版在 16/24px、圆形与自适应蒙版下的辨识度。
+- [x] Android 使用独立背景、VectorDrawable 前景、Android 13 monochrome 与独立 splash 矢量。
+- [x] 生成五密度方形/圆形无损 WebP，删除旧紫色、Expo 与扁平化前景资源。
+- [x] 同步 favicon、页眉、Open Graph、Apple Touch Icon 与 Web App Manifest 安装图标。
+- [x] 添加确定性资源生成器、品牌契约测试与 APK 内部资源表 CI 校验。
+- [x] 根项目 lint、typecheck、195 项测试、legacy、boundaries、build 与 HTTP/截图验证通过。
+- [ ] 推送 `main` 并要求 Android Actions 的 lint、单测、assemble、签名、ABI 与资源表校验全绿。
+- [ ] 发布五个 production-signed APK，并核对 Release 文件、SHA256 与更新清单。
+
 ## Rollback Points
 
 - Phase 1 失败：恢复原 `.github/workflows/build-android.yml`，Expo 源码尚未删除。
