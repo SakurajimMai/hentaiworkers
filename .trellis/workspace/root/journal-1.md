@@ -155,13 +155,20 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 
 ### Summary
 
-以网站纸白、墨黑、余烬橙重设计余烬折页 SVG 品牌标记；同步 Android adaptive/legacy/monochrome/splash 与 Web favicon、Manifest、Apple、OG、页眉资源，移除旧紫色资源；新增确定性生成器、品牌契约及 APK 资源表 CI 校验。本地 lint、typecheck、195 项测试、legacy、boundaries、build、HTTP 和桌面/手机截图验证通过，待远程 Android Actions 与 Release。
+以网站纸白、墨黑、余烬橙重设计余烬折页 SVG 品牌标记；同步 Android adaptive/legacy/monochrome/splash 与 Web favicon、Manifest、Apple、OG、页眉资源，移除旧紫色资源；新增确定性生成器、品牌契约及 APK 资源表 CI 校验。本地与远程验证通过，production-signed Build 76 已发布五个 ABI APK，网站品牌镜像已部署。
 
 ### Git Commits
 
 | Hash | Message |
 |------|---------|
 | `fee7842` | (see git log) |
+
+### Testing
+
+- [OK] 根应用 lint、typecheck、195 项测试、legacy、boundaries、build、HTTP 与桌面/手机截图验证通过。
+- [OK] Android Actions Run 76 的 ktlint、lintRelease、单测、assemble、生产签名、五 ABI 与品牌资源表校验通过。
+- [OK] 生产 favicon、Manifest、live 与 update endpoint 为 200；Release API、SHA256SUMS 和实下载 arm64 APK 摘要一致。
+- [OK] GitHub 保持最新五条 Actions 与最新五个 Releases。
 
 ### Status
 

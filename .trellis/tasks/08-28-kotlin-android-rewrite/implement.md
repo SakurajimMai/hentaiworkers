@@ -161,8 +161,8 @@ Android 命令仅写入 GitHub Actions，不在本地执行：
 - [x] 同步 favicon、页眉、Open Graph、Apple Touch Icon 与 Web App Manifest 安装图标。
 - [x] 添加确定性资源生成器、品牌契约测试与 APK 内部资源表 CI 校验。
 - [x] 根项目 lint、typecheck、195 项测试、legacy、boundaries、build 与 HTTP/截图验证通过。
-- [ ] 推送 `main` 并要求 Android Actions 的 lint、单测、assemble、签名、ABI 与资源表校验全绿。
-- [ ] 发布五个 production-signed APK，并核对 Release 文件、SHA256 与更新清单。
+- [x] 推送 `main` 并要求 Android Actions 的 lint、单测、assemble、签名、ABI 与资源表校验全绿。
+- [x] 发布五个 production-signed APK，并核对 Release 文件、SHA256 与更新清单。
 
 ## Rollback Points
 
