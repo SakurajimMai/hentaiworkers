@@ -1,5 +1,6 @@
 package de.ixacg.animestream.reader
 
+import de.ixacg.animestream.core.model.MangaPage
 import kotlin.math.roundToInt
 
 data class VisibleReaderPage(
@@ -23,6 +24,27 @@ object ReaderLogic {
         requested: Int,
         pageCount: Int,
     ): Int = requested.coerceIn(0, (pageCount - 1).coerceAtLeast(0))
+
+    fun initialItemIndex(
+        restoredPage: Int,
+        pageCount: Int,
+        hasTopAd: Boolean,
+    ): Int = boundedPage(restoredPage, pageCount) + if (hasTopAd) 1 else 0
+
+    fun prefetchPages(
+        pages: List<MangaPage>,
+        currentPage: Int,
+        currentPageDisplayed: Boolean,
+        scheduledUrls: Set<String>,
+        window: Int = 2,
+    ): List<MangaPage> {
+        if (!currentPageDisplayed || pages.isEmpty() || window <= 0) return emptyList()
+        val start = boundedPage(currentPage, pages.size) + 1
+        return pages.drop(start)
+            .take(window)
+            .filterNot { it.imageUrl in scheduledUrls }
+            .distinctBy(MangaPage::imageUrl)
+    }
 
     fun pageFromSlider(
         previewValue: Float,
@@ -56,4 +78,31 @@ object ReaderLogic {
     private const val MIN_PAGE_ASPECT_RATIO = 0.001f
     private const val MAX_PAGE_ASPECT_RATIO = 4f
     private const val MAX_UNBOUNDED_VIEWPORT_HEIGHTS = 8
+}
+
+internal class ReaderPrefetchRegistry {
+    private val scheduled = linkedSetOf<String>()
+    private val cancellations = linkedMapOf<String, () -> Unit>()
+
+    val scheduledUrls: Set<String>
+        get() = scheduled.toSet()
+
+    fun reserve(url: String): Boolean = scheduled.add(url)
+
+    fun register(
+        url: String,
+        cancel: () -> Unit,
+    ) {
+        if (url in scheduled) {
+            cancellations[url] = cancel
+        } else {
+            cancel()
+        }
+    }
+
+    fun cancelAll() {
+        cancellations.values.forEach { cancel -> runCatching(cancel) }
+        cancellations.clear()
+        scheduled.clear()
+    }
 }

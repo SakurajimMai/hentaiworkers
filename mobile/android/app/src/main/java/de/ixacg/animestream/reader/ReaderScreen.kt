@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -84,6 +86,7 @@ import de.ixacg.animestream.ui.components.HtmlAd
 import de.ixacg.animestream.ui.library.formatChapter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.ZoomSpec
@@ -97,6 +100,7 @@ fun ReaderScreen(
     mangaId: Long,
     chapterNumber: Double,
     initialPage: Int,
+    readerRequestId: String,
     viewModel: AnimeStreamViewModel,
     onBack: () -> Unit,
     onChapter: (Double) -> Unit,
@@ -107,7 +111,22 @@ fun ReaderScreen(
     val content = state.value?.takeIf { it.manga.id == mangaId && it.chapter.number == chapterNumber }
     val pages = content?.chapter?.pages.orEmpty()
     val nextChapter = content?.nextChapter
-    val listState = rememberLazyListState()
+    val chapterKey = content?.let { "${it.manga.id}:${it.chapter.id}:${it.chapter.number}" }
+    val topAdEnabled = ads.reader.top.enabled && ads.reader.top.html.isNotBlank()
+    val pageStartIndex = if (topAdEnabled) 1 else 0
+    val initialListIndex =
+        content?.let {
+            ReaderLogic.initialItemIndex(
+                restoredPage = initialPage,
+                pageCount = pages.size,
+                hasTopAd = topAdEnabled,
+            )
+        } ?: 0
+    val listState =
+        key(readerRequestId, chapterKey, initialPage) {
+            rememberLazyListState(initialFirstVisibleItemIndex = initialListIndex)
+        }
+    val prefetchRegistry = remember(readerRequestId, chapterKey) { ReaderPrefetchRegistry() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var chromeVisible by remember { mutableStateOf(true) }
@@ -115,8 +134,8 @@ fun ReaderScreen(
     var sliderValue by remember { mutableFloatStateOf(initialPage.toFloat()) }
     var sliderDragging by remember { mutableStateOf(false) }
     var seekJob by remember { mutableStateOf<Job?>(null) }
-    val topAdEnabled = ads.reader.top.enabled && ads.reader.top.html.isNotBlank()
-    val pageStartIndex = if (topAdEnabled) 1 else 0
+    var displayedPages by remember(readerRequestId, chapterKey) { mutableStateOf(emptySet<Int>()) }
+    var appliedTopAd by remember(readerRequestId, chapterKey) { mutableStateOf(topAdEnabled) }
 
     fun seekToPage(
         page: Int,
@@ -132,13 +151,17 @@ fun ReaderScreen(
 
     BackHandler(onBack = onBack)
     ReaderSystemBarsEffect(chromeVisible)
-    LaunchedEffect(viewModel) { viewModel.ensureAdsLoaded() }
-    LaunchedEffect(mangaId, chapterNumber, initialPage) {
-        viewModel.loadReader(mangaId, chapterNumber, initialPage)
+    DisposableEffect(prefetchRegistry) {
+        onDispose { prefetchRegistry.cancelAll() }
     }
-    LaunchedEffect(content?.chapter?.id, topAdEnabled) {
-        if (content != null && pages.isNotEmpty()) {
+    LaunchedEffect(viewModel) { viewModel.ensureAdsLoaded() }
+    LaunchedEffect(readerRequestId, mangaId, chapterNumber, initialPage) {
+        viewModel.loadReader(mangaId, chapterNumber, initialPage, readerRequestId)
+    }
+    LaunchedEffect(readerRequestId, chapterKey, topAdEnabled) {
+        if (content != null && pages.isNotEmpty() && appliedTopAd != topAdEnabled) {
             listState.scrollToItem(pageStartIndex + content.currentPage.coerceIn(pages.indices))
+            appliedTopAd = topAdEnabled
         }
     }
     LaunchedEffect(content?.currentPage, sliderDragging) {
@@ -169,16 +192,29 @@ fun ReaderScreen(
             .distinctUntilChanged()
             .collect { page -> if (page != null) viewModel.setReaderPage(page) }
     }
-    LaunchedEffect(content?.currentPage, pages) {
-        val current = content?.currentPage ?: 0
-        pages.drop(current + 1).take(4).forEach { page ->
-            context.imageLoader.enqueue(
-                ImageRequest.Builder(context)
-                    .data(page.imageUrl)
-                    .size(64, 64)
-                    .memoryCachePolicy(CachePolicy.DISABLED)
-                    .build(),
+    LaunchedEffect(readerRequestId, chapterKey, content?.currentPage, pages, displayedPages) {
+        val current = content?.currentPage ?: return@LaunchedEffect
+        val candidates =
+            ReaderLogic.prefetchPages(
+                pages = pages,
+                currentPage = current,
+                currentPageDisplayed = current in displayedPages,
+                scheduledUrls = prefetchRegistry.scheduledUrls,
             )
+        candidates.forEach { page ->
+            if (prefetchRegistry.reserve(page.imageUrl)) {
+                val disposable =
+                    context.imageLoader.enqueue(
+                        ImageRequest.Builder(context)
+                            .data(page.imageUrl)
+                            .diskCacheKey(page.imageUrl)
+                            .size(64, 64)
+                            .memoryCachePolicy(CachePolicy.DISABLED)
+                            .crossfade(false)
+                            .build(),
+                    )
+                prefetchRegistry.register(page.imageUrl, disposable::dispose)
+            }
         }
     }
 
@@ -186,16 +222,16 @@ fun ReaderScreen(
         when {
             state.loading || content == null && state.error == null ->
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            state.error != null ->
+            state.error != null && content == null ->
                 ReaderError(
                     message = state.error.orEmpty(),
-                    onRetry = { viewModel.loadReader(mangaId, chapterNumber, initialPage) },
+                    onRetry = { viewModel.loadReader(mangaId, chapterNumber, initialPage, readerRequestId) },
                     modifier = Modifier.align(Alignment.Center),
                 )
             pages.isEmpty() ->
                 ReaderError(
                     message = "本章节没有可显示的图片",
-                    onRetry = { viewModel.loadReader(mangaId, chapterNumber, initialPage) },
+                    onRetry = { viewModel.loadReader(mangaId, chapterNumber, initialPage, readerRequestId) },
                     modifier = Modifier.align(Alignment.Center),
                 )
             else -> {
@@ -205,12 +241,20 @@ fun ReaderScreen(
                             HtmlAd(ads.reader.top.html, modifier = Modifier.padding(vertical = 12.dp))
                         }
                     }
-                    itemsIndexed(pages, key = { index, _ -> "page-$index" }) { _, page ->
-                        ZoomableReaderPage(
-                            page = page,
-                            onTap = { chromeVisible = !chromeVisible },
-                            onZoomChanged = { zoomed -> if (zoomed) chromeVisible = false },
-                        )
+                    itemsIndexed(pages, key = { index, _ -> "page-$index" }) { index, page ->
+                        key(page.imageUrl) {
+                            ZoomableReaderPage(
+                                pagePosition = index,
+                                page = page,
+                                onDisplayed = { displayedPage ->
+                                    if (displayedPage !in displayedPages) {
+                                        displayedPages = displayedPages + displayedPage
+                                    }
+                                },
+                                onTap = { chromeVisible = !chromeVisible },
+                                onZoomChanged = { zoomed -> if (zoomed) chromeVisible = false },
+                            )
+                        }
                     }
                     item(key = "chapter-end") {
                         Column(
@@ -394,7 +438,9 @@ fun ReaderScreen(
 
 @Composable
 private fun ZoomableReaderPage(
+    pagePosition: Int,
     page: MangaPage,
+    onDisplayed: (Int) -> Unit,
     onTap: () -> Unit,
     onZoomChanged: (Boolean) -> Unit,
 ) {
@@ -419,11 +465,19 @@ private fun ZoomableReaderPage(
                         val height = result.drawable.intrinsicHeight
                         imageSize = IntSize(width.coerceAtLeast(0), height.coerceAtLeast(0))
                         ratio = ReaderLogic.pageAspectRatio(width, height)
-                        loadState = PageLoadState.Ready
                     },
                     onError = { _, _ -> loadState = PageLoadState.Error },
                 ).build()
         }
+    LaunchedEffect(imageState, page.imageUrl, retry) {
+        snapshotFlow { imageState.isImageDisplayed }
+            .distinctUntilChanged()
+            .first { displayed -> displayed }
+        loadState = PageLoadState.Ready
+        withFrameNanos { }
+        withFrameNanos { }
+        if (imageState.isImageDisplayed) onDisplayed(pagePosition)
+    }
     LaunchedEffect(zoomableState) {
         snapshotFlow { zoomableState.zoomFraction }
             .distinctUntilChanged()

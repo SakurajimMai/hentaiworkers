@@ -28,6 +28,7 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -55,6 +56,8 @@ import de.ixacg.animestream.ui.detail.MangaDetailScreen
 import de.ixacg.animestream.ui.library.AccountScreen
 import de.ixacg.animestream.ui.library.LibraryScreen
 import de.ixacg.animestream.ui.library.LoginScreen
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 private data class MainDestination(
     val route: String,
@@ -72,7 +75,10 @@ private val mainDestinations =
     )
 
 @Composable
-fun AnimeStreamApp(viewModel: AnimeStreamViewModel) {
+fun AnimeStreamApp(
+    viewModel: AnimeStreamViewModel,
+    incomingDeepLinks: Flow<Intent> = emptyFlow(),
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
@@ -80,6 +86,9 @@ fun AnimeStreamApp(viewModel: AnimeStreamViewModel) {
     val route = backStackEntry?.destination?.route
     val showNavigation = mainDestinations.any { destination -> route == destination.route }
     val immersive = route?.startsWith("player/") == true || route?.startsWith("reader/") == true
+    LaunchedEffect(navController, incomingDeepLinks) {
+        incomingDeepLinks.collect { intent -> navController.handleDeepLink(intent) }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 700.dp && showNavigation
         if (useRail) {
@@ -321,6 +330,7 @@ private fun AppNavHost(
                 mangaId = id,
                 chapterNumber = chapter,
                 initialPage = page,
+                readerRequestId = entry.id,
                 viewModel = viewModel,
                 onBack = navController::navigateUp,
                 onChapter = { next ->

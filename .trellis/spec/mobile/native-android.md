@@ -57,6 +57,15 @@ scope, Docker image, production Compose services, and server-private imports.
 - The reader remains a continuous vertical reader. Use lazy page composition and a proven
   subsampling/zoom library; prefetch only a bounded preview into the disk cache so long images
   are not decoded eagerly into memory.
+- Treat the successful chapter response as the reader's only critical bootstrap result. Publish
+  its pages immediately; full manga details, favorite state, history, ads, and other optional work
+  may merge later but must neither block nor erase already published pages. Guard late results by
+  the active reader generation and chapter key.
+- Initialize reader list state at the bounded restored page instead of composing page zero and
+  seeking afterward. Consider the current page readable only when Telephoto reports
+  `isImageDisplayed`; only then prefetch the next two pages. Explicit prefetch is unique per chapter
+  URL and all outstanding Coil disposables are released when the reader entry changes or leaves
+  composition.
 - An image whose scaled height can exceed practical Compose item constraints must use a finite
   subsampling viewport with base-scale vertical pan and nested-scroll handoff. Do not squash the
   image, clip away unreachable content, or request an intrinsic million-pixel layout height.

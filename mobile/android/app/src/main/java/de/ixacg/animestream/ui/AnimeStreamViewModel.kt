@@ -9,6 +9,8 @@ import de.ixacg.animestream.core.media.MediaUrlNormalizer
 import de.ixacg.animestream.core.model.Anime
 import de.ixacg.animestream.core.model.LibrarySnapshot
 import de.ixacg.animestream.core.model.MangaChapterDetail
+import de.ixacg.animestream.core.model.MangaChapterResponse
+import de.ixacg.animestream.core.model.MangaChapterSummary
 import de.ixacg.animestream.core.model.MangaDetail
 import de.ixacg.animestream.core.model.MangaRank
 import de.ixacg.animestream.core.model.MangaSummary
@@ -111,11 +113,47 @@ data class ReaderContent(
     val chapter: MangaChapterDetail,
     val favorite: Boolean,
     val currentPage: Int = 0,
+    val mangaLoaded: Boolean = true,
+    val favoriteLoaded: Boolean = true,
 ) {
     val chapterIndex: Int = manga.chapters.indexOfFirst { it.number == chapter.number }
     val previousChapter = manga.chapters.getOrNull(chapterIndex - 1)
     val nextChapter = manga.chapters.getOrNull(chapterIndex + 1)
 }
+
+private fun MangaDetail.withReaderChapter(chapter: MangaChapterDetail): MangaDetail {
+    if (chapters.any { it.id == chapter.id || it.number == chapter.number }) return this
+    val updatedChapters =
+        (chapters +
+            MangaChapterSummary(
+                id = chapter.id,
+                number = chapter.number,
+                title = chapter.title,
+                pageCount = maxOf(chapter.pageCount, chapter.pages.size),
+            )).sortedBy(MangaChapterSummary::number)
+    return copy(
+        chapters = updatedChapters,
+        chapterCount = maxOf(chapterCount, updatedChapters.size),
+    )
+}
+
+private fun MangaChapterResponse.readerManga(chapter: MangaChapterDetail): MangaDetail =
+    MangaDetail(
+        id = manga.id,
+        title = manga.title,
+        coverUrl = manga.coverUrl,
+        chapterCount = 1,
+        pageCount = maxOf(chapter.pageCount, chapter.pages.size),
+        chapters =
+            listOf(
+                MangaChapterSummary(
+                    id = chapter.id,
+                    number = chapter.number,
+                    title = chapter.title,
+                    pageCount = maxOf(chapter.pageCount, chapter.pages.size),
+                ),
+            ),
+    )
 
 class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private val catalog = container.catalogRepository
@@ -172,6 +210,8 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private var updateJob: Job? = null
     private var discoverRequestGeneration = 0L
     private var mangaRequestGeneration = 0L
+    private var readerRequestGeneration = 0L
+    private var activeReaderRequestId: String? = null
 
     init {
         viewModelScope.launch {
@@ -657,7 +697,12 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                 .onSuccess { next ->
                     mutableMangaDetail.update { it.copy(value = detail.copy(favorite = next), error = null) }
                     mutableReader.update { reader ->
-                        reader.copy(value = reader.value?.copy(favorite = next))
+                        val current = reader.value
+                        if (current?.manga?.id == detail.manga.id) {
+                            reader.copy(value = current.copy(favorite = next, favoriteLoaded = true))
+                        } else {
+                            reader
+                        }
                     }
                 }.onFailure { error ->
                     mutableMangaDetail.update { it.copy(error = error.userMessage()) }
@@ -743,39 +788,160 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         mangaId: Long,
         chapterNumber: Double,
         initialPage: Int = 0,
+        requestId: String? = null,
     ) {
+        if (
+            requestId != null &&
+            requestId == activeReaderRequestId &&
+            mutableReader.value.loading &&
+            readerJob?.isActive == true
+        ) {
+            return
+        }
+        val isNewReaderRequest = shouldApplyReaderRestore(activeReaderRequestId, requestId)
+        val previous = mutableReader.value.value?.takeIf { it.manga.id == mangaId }
+        if (
+            previous?.chapter?.number == chapterNumber &&
+            previous.chapter.pages.isNotEmpty()
+        ) {
+            val restoredPage = initialPage.coerceIn(0, previous.chapter.pages.lastIndex)
+            val shouldRecordRestore = isNewReaderRequest && restoredPage != previous.currentPage
+            mutableReader.update { state ->
+                val current = state.value
+                if (current?.manga?.id == mangaId && current.chapter.number == chapterNumber) {
+                    state.copy(
+                        value = current.copy(
+                            currentPage = if (isNewReaderRequest) restoredPage else current.currentPage,
+                        ),
+                        loading = false,
+                        error = null,
+                    )
+                } else {
+                    state
+                }
+            }
+            if (shouldRecordRestore) {
+                progressJob?.cancel()
+                progressJob =
+                    viewModelScope.launch {
+                        captureResult {
+                            library.recordMangaHistory(
+                                previous.manga.asSummary(),
+                                previous.chapter.number,
+                                restoredPage,
+                            )
+                        }
+                    }
+            }
+            activeReaderRequestId = requestId
+            return
+        }
+        val detail = mutableMangaDetail.value.value?.takeIf { it.manga.id == mangaId }
+        val cachedManga = detail?.manga ?: previous?.manga
+        val cachedMangaLoaded = detail != null || previous?.mangaLoaded == true
+        val cachedFavorite = detail?.favorite ?: previous?.favorite ?: false
+        val cachedFavoriteLoaded = detail != null || previous?.favoriteLoaded == true
+
         readerJob?.cancel()
         progressJob?.cancel()
+        activeReaderRequestId = requestId
+        val identity = ReaderLoadIdentity(++readerRequestGeneration, mangaId, chapterNumber)
         readerJob =
             viewModelScope.launch {
                 mutableReader.value = Loadable(loading = true)
-                runCatching {
+                captureResult {
                     coroutineScope {
-                        val manga = async { catalog.manga(mangaId) }
-                        val chapter = async { catalog.chapter(mangaId, chapterNumber) }
-                        val favorite = async { library.isMangaFavorite(mangaId) }
-                        val mangaValue = manga.await()
-                        val chapterValue = chapter.await().chapter
+                        val response = catalog.chapter(mangaId, chapterNumber)
+                        val chapterValue = response.chapter
                         val pages =
                             chapterValue.pages.mapNotNull { page ->
                                 MediaUrlNormalizer.normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
                             }.distinctBy { it.index }
-                        ReaderContent(
-                            manga = mangaValue,
-                            chapter = chapterValue.copy(pages = pages),
-                            favorite = favorite.await(),
-                            currentPage = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
-                        )
+                        val normalizedChapter = chapterValue.copy(pages = pages)
+                        val content =
+                            ReaderContent(
+                                manga =
+                                    (cachedManga ?: response.readerManga(normalizedChapter))
+                                        .withReaderChapter(normalizedChapter),
+                                chapter = normalizedChapter,
+                                favorite = cachedFavorite,
+                                currentPage = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
+                                mangaLoaded = cachedMangaLoaded,
+                                favoriteLoaded = cachedFavoriteLoaded,
+                            )
+                        if (identity.generation != readerRequestGeneration) return@coroutineScope
+
+                        mutableReader.value = Loadable(value = content)
+                        progressJob?.cancel()
+                        progressJob =
+                            launch {
+                                captureResult {
+                                    library.recordMangaHistory(
+                                        content.manga.asSummary(),
+                                        content.chapter.number,
+                                        content.currentPage,
+                                    )
+                                }
+                            }
+                        if (!cachedMangaLoaded) {
+                            launch {
+                                captureResult { catalog.manga(mangaId) }.onSuccess { manga ->
+                                    if (manga.id == mangaId) {
+                                        updateReader(identity) { current ->
+                                            if (current.mangaLoaded) {
+                                                current
+                                            } else {
+                                                current.copy(
+                                                    manga = manga.withReaderChapter(current.chapter),
+                                                    mangaLoaded = true,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (!cachedFavoriteLoaded) {
+                            launch {
+                                captureResult { library.isMangaFavorite(mangaId) }.onSuccess { favorite ->
+                                    updateReader(identity) { current ->
+                                        if (current.favoriteLoaded) {
+                                            current
+                                        } else {
+                                            current.copy(favorite = favorite, favoriteLoaded = true)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }.onSuccess { content ->
-                    mutableReader.value = Loadable(value = content)
-                    library.recordMangaHistory(
-                        content.manga.asSummary(),
-                        content.chapter.number,
-                        content.currentPage,
-                    )
-                }.onFailure { mutableReader.value = Loadable(error = it.userMessage()) }
+                }.onFailure { error ->
+                    if (identity.generation == readerRequestGeneration) {
+                        mutableReader.value = Loadable(error = error.userMessage())
+                    }
+                }
             }
+    }
+
+    private fun updateReader(
+        identity: ReaderLoadIdentity,
+        transform: (ReaderContent) -> ReaderContent,
+    ) {
+        mutableReader.update { state ->
+            val content = state.value
+            if (
+                content == null ||
+                !identity.matches(
+                    activeGeneration = readerRequestGeneration,
+                    activeMangaId = content.manga.id,
+                    activeChapterNumber = content.chapter.number,
+                )
+            ) {
+                state
+            } else {
+                state.copy(value = transform(content), loading = false, error = null)
+            }
+        }
     }
 
     fun setReaderPage(index: Int) {
@@ -801,13 +967,34 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     fun toggleReaderFavorite() {
         val content = mutableReader.value.value ?: return
+        val mangaId = content.manga.id
         viewModelScope.launch {
             runCatching { library.toggleMangaFavorite(content.manga.asSummary()) }
                 .onSuccess { next ->
                     mutableReader.update { state ->
-                        state.copy(value = state.value?.copy(favorite = next), error = null)
+                        val current = state.value
+                        if (current?.manga?.id == mangaId) {
+                            state.copy(
+                                value = current.copy(favorite = next, favoriteLoaded = true),
+                                error = null,
+                            )
+                        } else {
+                            state
+                        }
                     }
-                }.onFailure { error -> mutableReader.update { it.copy(error = error.userMessage()) } }
+                    mutableMangaDetail.update { state ->
+                        val current = state.value
+                        if (current?.manga?.id == mangaId) {
+                            state.copy(value = current.copy(favorite = next), error = null)
+                        } else {
+                            state
+                        }
+                    }
+                }.onFailure { error ->
+                    mutableReader.update { state ->
+                        if (state.value?.manga?.id == mangaId) state.copy(error = error.userMessage()) else state
+                    }
+                }
         }
     }
 

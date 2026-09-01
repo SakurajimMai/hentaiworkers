@@ -1,5 +1,6 @@
 package de.ixacg.animestream.reader
 
+import de.ixacg.animestream.core.model.MangaPage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -40,6 +41,100 @@ class ReaderLogicTest {
         assertEquals(0, ReaderLogic.boundedPage(-5, 12))
         assertEquals(11, ReaderLogic.boundedPage(50, 12))
         assertEquals(0, ReaderLogic.boundedPage(1, 0))
+    }
+
+    @Test
+    fun `initial list item starts at restored page with optional ad offset`() {
+        assertEquals(
+            7,
+            ReaderLogic.initialItemIndex(restoredPage = 7, pageCount = 20, hasTopAd = false),
+        )
+        assertEquals(
+            8,
+            ReaderLogic.initialItemIndex(restoredPage = 7, pageCount = 20, hasTopAd = true),
+        )
+        assertEquals(
+            20,
+            ReaderLogic.initialItemIndex(restoredPage = 99, pageCount = 20, hasTopAd = true),
+        )
+        assertEquals(
+            0,
+            ReaderLogic.initialItemIndex(restoredPage = 7, pageCount = 0, hasTopAd = false),
+        )
+    }
+
+    @Test
+    fun `prefetch waits for current page display and returns only next two unscheduled urls`() {
+        val pages = (0 until 6).map { MangaPage(index = it, imageUrl = "https://example.test/$it.jpg") }
+
+        assertTrue(
+            ReaderLogic.prefetchPages(
+                pages = pages,
+                currentPage = 2,
+                currentPageDisplayed = false,
+                scheduledUrls = emptySet(),
+            ).isEmpty(),
+        )
+        assertEquals(
+            listOf("https://example.test/3.jpg", "https://example.test/4.jpg"),
+            ReaderLogic.prefetchPages(
+                pages = pages,
+                currentPage = 2,
+                currentPageDisplayed = true,
+                scheduledUrls = emptySet(),
+            ).map(MangaPage::imageUrl),
+        )
+        assertEquals(
+            listOf("https://example.test/4.jpg"),
+            ReaderLogic.prefetchPages(
+                pages = pages,
+                currentPage = 2,
+                currentPageDisplayed = true,
+                scheduledUrls = setOf("https://example.test/3.jpg"),
+            ).map(MangaPage::imageUrl),
+        )
+    }
+
+    @Test
+    fun `prefetch registry reserves each url once and cancels retained requests`() {
+        val registry = ReaderPrefetchRegistry()
+        var cancellations = 0
+
+        assertTrue(registry.reserve("page-1"))
+        assertFalse(registry.reserve("page-1"))
+        assertTrue(registry.reserve("page-2"))
+        registry.register("page-1") { cancellations++ }
+        registry.register("page-2") { cancellations++ }
+
+        assertEquals(setOf("page-1", "page-2"), registry.scheduledUrls)
+        registry.cancelAll()
+        assertEquals(2, cancellations)
+        assertTrue(registry.scheduledUrls.isEmpty())
+    }
+
+    @Test
+    fun `forty sequential pages enqueue each future url at most once`() {
+        val pages = (0 until 40).map { MangaPage(index = it, imageUrl = "page-$it") }
+        val registry = ReaderPrefetchRegistry()
+        var enqueueCount = 0
+
+        pages.indices.forEach { currentPage ->
+            ReaderLogic.prefetchPages(
+                pages = pages,
+                currentPage = currentPage,
+                currentPageDisplayed = true,
+                scheduledUrls = registry.scheduledUrls,
+            ).forEach { page ->
+                if (registry.reserve(page.imageUrl)) {
+                    enqueueCount++
+                    registry.register(page.imageUrl) { }
+                }
+            }
+        }
+
+        assertEquals(39, enqueueCount)
+        assertEquals(39, registry.scheduledUrls.size)
+        assertFalse("page-0" in registry.scheduledUrls)
     }
 
     @Test
