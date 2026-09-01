@@ -1,0 +1,13 @@
+{"file":".trellis/spec/frontend/index.md","reason":"Verify required frontend quality gate."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Review reader rendering and component boundaries."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Review observer/effect cleanup and stale state handling."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review user-facing performance and accessibility behavior."}
+{"file":".trellis/spec/backend/index.md","reason":"Review route/service contract and query behavior."}
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"Ensure no forbidden product/runtime boundary regression."}
+{"file":".trellis/spec/mobile/index.md","reason":"Verify required mobile quality gate."}
+{"file":".trellis/spec/mobile/native-android.md","reason":"Review Compose, Coil/Telephoto and Android lifecycle behavior."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review shared API compatibility across Web and APK."}
+{"file":".trellis/tasks/09-01-manga-reader-performance/research/web.md","reason":"Compare implementation against confirmed Web evidence."}
+{"file":".trellis/tasks/09-01-manga-reader-performance/research/android.md","reason":"Compare implementation against confirmed Android evidence."}
+{"file":".trellis/tasks/09-01-manga-reader-performance/research/backend.md","reason":"Compare query and deployment behavior against baseline."}
+{"file":".trellis/tasks/09-01-manga-reader-performance/research/measurement.md","reason":"Verify metrics use actual image readability rather than Loading timing."}
