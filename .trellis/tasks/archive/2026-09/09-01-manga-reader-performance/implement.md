@@ -48,7 +48,7 @@
 - [x] 执行两路独立代码检查；修复 MySQL collation slug 回归并重跑相关验证。
 - [x] 将 viewport/prefetch、恢复滚动和 Android progressive bootstrap 约束写回 `.trellis/spec/`。
 - [x] 向用户给出精确 commit plan 并取得批准后提交；不得包含用户未跟踪的根目录 `design.md`。
-- [ ] 运行 Trellis finish/archive 流程并记录 session。
+- [x] 运行 Trellis finish/archive 流程并记录 session。
 
 ## Rollback points
 
