@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
+import { horizontalCarouselItemClass } from '@/components/horizontal-carousel-model';
 import { LibraryPagination } from '@/components/library-pagination';
 import { MediaImage } from '@/components/media-image';
 import {
@@ -60,7 +61,7 @@ function ProgressCard({
   );
 }
 
-export function GuestContinueWatching({ cardWidth }: { cardWidth: string }) {
+export function GuestContinueWatching() {
   const [rows, setRows] = useState<LocalWatchProgress[]>([]);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export function GuestContinueWatching({ cardWidth }: { cardWidth: string }) {
   return (
     <HorizontalCarousel title="继续观看" viewAllHref="/history">
       {rows.map((r) => (
-        <div key={r.animeId} className={`shrink-0 snap-start ${cardWidth}`}>
+        <div key={r.animeId} className={horizontalCarouselItemClass}>
           <ProgressCard
             href={`/watch/${r.animeId}`}
             title={r.title || `作品 #${r.animeId}`}

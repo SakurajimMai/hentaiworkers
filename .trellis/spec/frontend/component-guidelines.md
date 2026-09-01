@@ -38,22 +38,26 @@ Questions to answer:
 
 ## Styling Patterns
 
-<!-- How styles are applied (CSS modules, styled-components, Tailwind, etc.) -->
-
-(To be filled by the team)
+- Shared components use Tailwind utility classes and expose domain props rather than accepting
+  arbitrary layout fragments from each caller.
+- Horizontal card rails derive item basis from the track width so each supported breakpoint shows
+  only complete cards. The homepage convention is 2 columns by default, 3 at `sm`, 4 at `md`, and
+  5 at `lg`; the item width must account for every inter-card gap.
+- Keep the rail item sizing class in one shared module and apply it to every direct flex child,
+  including client-rendered guest history items.
 
 ---
 
 ## Accessibility
 
-<!-- A11y requirements and patterns -->
-
-(To be filled by the team)
+- Label carousel regions from their visible heading. Arrow controls need explicit labels and an
+  `aria-controls` relationship to the scroll track.
+- Touch scrolling and scroll snapping remain available even when desktop arrow controls are hidden.
 
 ---
 
 ## Common Mistakes
 
-<!-- Component-related mistakes your team has made -->
-
-(To be filled by the team)
+- Do not give carousel cards fixed pixel widths inside a responsive container. Any remainder exposes
+  a clipped next card and makes page-sized arrow movement misalign with snap points.
+- Do not size logged-in and guest variants independently when they render in the same rail.

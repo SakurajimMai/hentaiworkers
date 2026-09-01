@@ -3,6 +3,7 @@ import { AnimeCard } from '@/components/AnimeCard';
 import { GuestContinueWatching } from '@/components/continue-watching-client';
 import { HeroCarousel, type HeroItem } from '@/components/hero-carousel';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
+import { horizontalCarouselItemClass } from '@/components/horizontal-carousel-model';
 import { HtmlAd } from '@/components/html-ad';
 import { MangaCard } from '@/components/MangaCard';
 import { MediaImage } from '@/components/media-image';
@@ -129,7 +130,6 @@ export default async function HomePage() {
     error = e instanceof Error ? e.message : '加载失败';
   }
 
-  const cardWidth = 'w-[140px] sm:w-[156px] md:w-[168px]';
   const siteUrl = resolveSiteUrl(process.env.SITE_URL);
 
   return (
@@ -190,7 +190,7 @@ export default async function HomePage() {
                   ? Math.min(100, Math.round((p.positionSeconds / p.durationSeconds) * 100))
                   : 0;
               return (
-                <div key={p.animeId} className={`shrink-0 snap-start ${cardWidth}`}>
+                <div key={p.animeId} className={horizontalCarouselItemClass}>
                   <Link href={`/watch/${p.animeId}`} className="group block space-y-2">
                     <div className="poster-frame aspect-[2/3]">
                       <MediaImage
@@ -221,12 +221,12 @@ export default async function HomePage() {
           </HorizontalCarousel>
         )}
 
-        {!loggedIn && <GuestContinueWatching cardWidth={cardWidth} />}
+        {!loggedIn && <GuestContinueWatching />}
 
         {loggedIn && forYou.length > 0 && (
           <HorizontalCarousel title="根据收藏推荐" viewAllHref="/browse?sort=popular">
             {forYou.map((a) => (
-              <div key={a.id} className={`shrink-0 snap-start ${cardWidth}`}>
+              <div key={a.id} className={horizontalCarouselItemClass}>
                 <AnimeCard anime={a} />
               </div>
             ))}
@@ -236,7 +236,7 @@ export default async function HomePage() {
         {popular.length > 0 && (
           <HorizontalCarousel title="热门" viewAllHref="/browse?sort=popular">
             {popular.map((a) => (
-              <div key={a.id} className={`shrink-0 snap-start ${cardWidth}`}>
+              <div key={a.id} className={horizontalCarouselItemClass}>
                 <AnimeCard anime={a} />
               </div>
             ))}
@@ -246,7 +246,7 @@ export default async function HomePage() {
         {latest.length > 0 && (
           <HorizontalCarousel title="最近更新" viewAllHref="/browse">
             {latest.map((a) => (
-              <div key={a.id} className={`shrink-0 snap-start ${cardWidth}`}>
+              <div key={a.id} className={horizontalCarouselItemClass}>
                 <AnimeCard anime={a} />
               </div>
             ))}
@@ -256,7 +256,7 @@ export default async function HomePage() {
         {mangas.length > 0 && (
           <HorizontalCarousel title="漫画更新" viewAllHref="/manga">
             {mangas.map((manga) => (
-              <div key={manga.id} className={`shrink-0 snap-start ${cardWidth}`}>
+              <div key={manga.id} className={horizontalCarouselItemClass}>
                 <MangaCard
                   manga={{
                     id: manga.id,
