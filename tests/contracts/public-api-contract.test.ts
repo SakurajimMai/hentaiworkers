@@ -37,6 +37,7 @@ import {
   createListMangasHandler,
   type ListMangasOptions,
 } from '../../app/api/mangas/handler';
+import { createMangaChapterHandler } from '../../app/api/mangas/[id]/chapters/[number]/handler';
 import type {
   AnimeDetail,
   AnimeListResponse,
@@ -102,6 +103,7 @@ async function loadRouteModules() {
     healthRoute,
     adsRoute,
     mangaListRoute,
+    mangaChapterRoute,
     androidUpdateRoute,
   ] = await Promise.all([
     import('../../app/api/animes/route'),
@@ -111,6 +113,7 @@ async function loadRouteModules() {
     import('../../app/api/health/route'),
     import('../../app/api/ads/route'),
     import('../../app/api/mangas/route'),
+    import('../../app/api/mangas/[id]/chapters/[number]/route'),
     import('../../app/api/android/update/route'),
   ]);
 
@@ -122,6 +125,7 @@ async function loadRouteModules() {
     healthRoute,
     adsRoute,
     mangaListRoute,
+    mangaChapterRoute,
     androidUpdateRoute,
   };
 }
@@ -174,7 +178,7 @@ test('TypeScript 测试脚本使用跨平台递归测试入口', () => {
   assert.equal(packageJson.scripts?.['test:ts'], 'node scripts/run-tests.mjs');
 });
 
-test('八个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
+test('九个公开路由不初始化数据库且使用同源可注入 handler 工厂', async () => {
   const databaseUrl = process.env.DATABASE_URL;
   delete process.env.DATABASE_URL;
   let routes: Awaited<ReturnType<typeof loadRouteModules>>;
@@ -200,6 +204,7 @@ test('八个公开路由不初始化数据库且使用同源可注入 handler �
     createHealthHandler,
     createAdsHandler,
     createListMangasHandler,
+    createMangaChapterHandler,
     createAndroidUpdateHandler,
   ]) {
     assert.equal(typeof factory, 'function');

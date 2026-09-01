@@ -67,6 +67,17 @@ export type ChapterDetail = ChapterSummary & {
   pages: MangaPage[];
 };
 
+export type MangaReaderData = {
+  manga: MangaDetail;
+  chapter: ChapterDetail;
+};
+
+export type MangaReaderDataSource = {
+  resolvePublishedManga: (identifier: string) => Promise<MangaSummary | null>;
+  listPublishedChapters: (mangaId: number) => Promise<ChapterSummary[]>;
+  listChapterPages: (chapterId: number) => Promise<MangaPage[]>;
+};
+
 export type MangaListResult = {
   data: MangaSummary[];
   page: number;
@@ -92,6 +103,35 @@ function normalizeSlug(value: string): string {
   return normalized.normalize('NFKC');
 }
 
+export type MangaIdentifier = {
+  slug: string;
+  numericId: number | null;
+};
+
+export function parseMangaIdentifier(value: string): MangaIdentifier {
+  const slug = normalizeSlug(value);
+  if (!/^\d+$/.test(slug)) return { slug, numericId: null };
+  const numericId = Number(slug);
+  return {
+    slug,
+    numericId: Number.isSafeInteger(numericId) ? numericId : null,
+  };
+}
+
+export function selectMangaIdentifierMatch<
+  T extends { id: number; slugMatches: number | boolean },
+>(
+  identifier: MangaIdentifier,
+  candidates: readonly T[],
+): T | null {
+  const slugMatch = candidates.find(
+    (candidate) => candidate.slugMatches === true || candidate.slugMatches === 1,
+  );
+  if (slugMatch) return slugMatch;
+  if (identifier.numericId === null) return null;
+  return candidates.find((candidate) => candidate.id === identifier.numericId) ?? null;
+}
+
 function slugify(value: string, maxLength = 80): string {
   const normalized = value
     .normalize('NFKC')
@@ -105,7 +145,22 @@ function slugify(value: string, maxLength = 80): string {
   return base.slice(0, maxLength);
 }
 
-function mapManga(row: typeof mangas.$inferSelect): MangaSummary {
+type MangaSummaryRow = Pick<
+  typeof mangas.$inferSelect,
+  | 'id'
+  | 'slug'
+  | 'title'
+  | 'author'
+  | 'tags'
+  | 'description'
+  | 'coverUrl'
+  | 'chapterCount'
+  | 'pageCount'
+  | 'sourceChatTitle'
+  | 'updatedAt'
+>;
+
+function mapManga(row: MangaSummaryRow): MangaSummary {
   return {
     id: row.id,
     slug: row.slug,
@@ -119,6 +174,98 @@ function mapManga(row: typeof mangas.$inferSelect): MangaSummary {
     sourceChatTitle: row.sourceChatTitle,
     updatedAt: row.updatedAt ?? null,
   };
+}
+
+async function resolvePublishedManga(identifierValue: string): Promise<MangaSummary | null> {
+  const identifier = parseMangaIdentifier(identifierValue);
+  const slugMatches = sql<number>`CASE WHEN ${mangas.slug} = ${identifier.slug} THEN 1 ELSE 0 END`;
+  const identifierCondition = identifier.numericId === null
+    ? eq(mangas.slug, identifier.slug)
+    : or(eq(mangas.slug, identifier.slug), eq(mangas.id, identifier.numericId));
+  const candidates = await db
+    .select({
+      id: mangas.id,
+      slug: mangas.slug,
+      title: mangas.title,
+      author: mangas.author,
+      tags: mangas.tags,
+      description: mangas.description,
+      coverUrl: mangas.coverUrl,
+      chapterCount: mangas.chapterCount,
+      pageCount: mangas.pageCount,
+      sourceChatTitle: mangas.sourceChatTitle,
+      updatedAt: mangas.updatedAt,
+      slugMatches,
+    })
+    .from(mangas)
+    .where(and(eq(mangas.isPublished, 1), identifierCondition))
+    .limit(identifier.numericId === null ? 1 : 2);
+  const row = selectMangaIdentifierMatch(identifier, candidates);
+  return row ? mapManga(row) : null;
+}
+
+async function listPublishedChapters(mangaId: number): Promise<ChapterSummary[]> {
+  const rows = await db
+    .select({
+      id: mangaChapters.id,
+      number: mangaChapters.number,
+      title: mangaChapters.title,
+      pageCount: mangaChapters.pageCount,
+      createdAt: mangaChapters.createdAt,
+    })
+    .from(mangaChapters)
+    .where(and(eq(mangaChapters.mangaId, mangaId), eq(mangaChapters.isPublished, 1)))
+    .orderBy(mangaChapters.number);
+  return rows.map((chapter) => ({
+    id: chapter.id,
+    number: chapter.number,
+    title: chapter.title,
+    pageCount: chapter.pageCount ?? 0,
+    createdAt: chapter.createdAt ?? null,
+  }));
+}
+
+async function listChapterPages(chapterId: number): Promise<MangaPage[]> {
+  return db
+    .select({ index: mangaPages.index, imageUrl: mangaPages.imageUrl })
+    .from(mangaPages)
+    .where(eq(mangaPages.chapterId, chapterId))
+    .orderBy(mangaPages.index);
+}
+
+export function createMangaReaderDataLoader(source: MangaReaderDataSource) {
+  return async function loadMangaReaderData(
+    identifier: string,
+    chapterNumber: number,
+  ): Promise<MangaReaderData | null> {
+    const manga = await source.resolvePublishedManga(identifier);
+    if (!manga) return null;
+
+    const chapters = [...await source.listPublishedChapters(manga.id)]
+      .sort((left, right) => left.number - right.number);
+    const chapter = chapters.find((candidate) => candidate.number === chapterNumber);
+    if (!chapter) return null;
+
+    const pages = [...await source.listChapterPages(chapter.id)]
+      .sort((left, right) => left.index - right.index);
+    return {
+      manga: { ...manga, chapters },
+      chapter: { ...chapter, pages },
+    };
+  };
+}
+
+const loadMangaReaderData = createMangaReaderDataLoader({
+  resolvePublishedManga,
+  listPublishedChapters,
+  listChapterPages,
+});
+
+export function getMangaReaderData(
+  identifier: string,
+  chapterNumber: number,
+): Promise<MangaReaderData | null> {
+  return loadMangaReaderData(identifier, chapterNumber);
 }
 
 export async function listMangas(params?: {
@@ -218,42 +365,15 @@ export async function listPublishedMangaSitemapData(): Promise<
 }
 
 export async function getMangaBySlug(slug: string): Promise<MangaDetail | null> {
-  const normalizedSlug = normalizeSlug(slug);
-  const [row] = await db
-    .select()
-    .from(mangas)
-    .where(and(eq(mangas.slug, normalizedSlug), eq(mangas.isPublished, 1)))
-    .limit(1);
-  if (!row) {
-    if (/^\d+$/.test(normalizedSlug)) {
-      const [byId] = await db
-        .select()
-        .from(mangas)
-        .where(and(eq(mangas.id, parseInt(normalizedSlug, 10)), eq(mangas.isPublished, 1)))
-        .limit(1);
-      if (!byId) return null;
-      return attachChapters(byId);
-    }
-    return null;
-  }
-  return attachChapters(row);
+  const manga = await resolvePublishedManga(slug);
+  return manga ? attachChapters(manga) : null;
 }
 
-async function attachChapters(row: typeof mangas.$inferSelect): Promise<MangaDetail> {
-  const chapters = await db
-    .select()
-    .from(mangaChapters)
-    .where(and(eq(mangaChapters.mangaId, row.id), eq(mangaChapters.isPublished, 1)))
-    .orderBy(mangaChapters.number);
+async function attachChapters(manga: MangaSummary): Promise<MangaDetail> {
+  const chapters = await listPublishedChapters(manga.id);
   return {
-    ...mapManga(row),
-    chapters: chapters.map((c) => ({
-      id: c.id,
-      number: c.number,
-      title: c.title,
-      pageCount: c.pageCount ?? 0,
-      createdAt: c.createdAt ?? null,
-    })),
+    ...manga,
+    chapters,
   };
 }
 
@@ -261,33 +381,7 @@ export async function getChapter(
   slug: string,
   number: number,
 ): Promise<ChapterDetail | null> {
-  const manga = await getMangaBySlug(slug);
-  if (!manga) return null;
-  const [chapter] = await db
-    .select()
-    .from(mangaChapters)
-    .where(
-      and(
-        eq(mangaChapters.mangaId, manga.id),
-        eq(mangaChapters.number, number),
-        eq(mangaChapters.isPublished, 1),
-      ),
-    )
-    .limit(1);
-  if (!chapter) return null;
-  const pages = await db
-    .select()
-    .from(mangaPages)
-    .where(eq(mangaPages.chapterId, chapter.id))
-    .orderBy(mangaPages.index);
-  return {
-    id: chapter.id,
-    number: chapter.number,
-    title: chapter.title,
-    pageCount: chapter.pageCount ?? 0,
-    createdAt: chapter.createdAt ?? null,
-    pages: pages.map((p) => ({ index: p.index, imageUrl: p.imageUrl })),
-  };
+  return (await getMangaReaderData(slug, number))?.chapter ?? null;
 }
 
 export type PublishMangaInput = {

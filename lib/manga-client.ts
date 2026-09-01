@@ -8,10 +8,12 @@ export {
   listPublishedMangaSitemapData,
   getMangaBySlug as getManga,
   getChapter,
+  getMangaReaderData,
   type MangaSummary,
   type MangaDetail,
   type ChapterSummary,
   type ChapterDetail,
+  type MangaReaderData,
   type MangaPage,
   type MangaListResult as MangaListResponse,
 } from '@/lib/manga-service';
