@@ -173,3 +173,40 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: 修复站点分页与首页轮播
+
+**Date**: 2026-09-01
+**Task**: 修复站点分页与首页轮播
+**Branch**: `main`
+
+### Summary
+
+修复收藏与历史页面的大数据量分页，并消除首页横向列表固定卡宽造成的半张卡片；五个响应式宽度完成真实浏览器几何验证。
+
+### Main Changes
+
+- 收藏与历史改为服务端分页、确定性排序和越界回退。
+- 首页轮播按容器宽度精确显示 2/3/4/5 张完整卡片，并按整页对称翻动。
+- 游客与登录态继续观看复用统一卡片尺寸及可访问轮播控件。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d4fe12d` | (see git log) |
+| `2880536` | (see git log) |
+
+### Testing
+
+- [OK] 根应用 lint、typecheck、218 项测试、legacy、boundaries 与 production build 通过。
+- [OK] Chrome 在 320、375、768、1024、1440 宽度验证零半卡、零横向溢出，箭头翻页后仍完整对齐。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 部署 main 到正式环境并验证 live、ready 与首页轮播。
