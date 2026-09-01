@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"Check the diagram against the App-only runtime and production deployment contract."}
+{"file":".trellis/spec/mobile/native-android.md","reason":"Check Android, update, signing, release, and client persistence claims."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/app-runtime.md","reason":"Verify every App-side component and connection against cited source evidence."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/production-deployment.md","reason":"Verify production ingress, bind-address drift, ownership, CI, and deployment claims."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/mobile-runtime.md","reason":"Verify mobile runtime, media, local state, and release update relationships."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/candidate-layout.md","reason":"Cross-check the final topology against the independent component, relationship, ownership, and evidence proposal."}

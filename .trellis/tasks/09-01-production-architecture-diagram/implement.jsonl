@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"Defines the single-App runtime, deployment boundary, cache/update contracts, and prohibited invented services."}
+{"file":".trellis/spec/mobile/native-android.md","reason":"Defines Android runtime, local persistence, media, update, signing, ABI, and release boundaries."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/app-runtime.md","reason":"Evidence-backed App process, request, database, cache, auth, health, and integration topology."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/production-deployment.md","reason":"Evidence-backed production host, Caddy, Compose, image publication, manual rollout, and port-binding topology."}
+{"file":".trellis/tasks/09-01-production-architecture-diagram/research/mobile-runtime.md","reason":"Evidence-backed Android API, local-state, media, update discovery, and GitHub Release topology."}

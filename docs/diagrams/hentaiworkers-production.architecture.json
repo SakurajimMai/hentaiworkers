@@ -1,0 +1,383 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "hentaiworkers 正式生产架构",
+    "output": "docs/diagrams/hentaiworkers-production.architecture.html",
+    "locale": "zh-CN",
+    "animation": "none",
+    "quality_profile": "showcase",
+    "engineering_profile": "deployment-ownership",
+    "repository": {
+      "url": "https://github.com/SakurajimMai/hentaiworkers",
+      "revision": "d26dbed234bdd67be12a28eed33780158c53cf03"
+    }
+  },
+  "components": [
+    {
+      "id": "web_browser",
+      "type": "external",
+      "label": "Web 浏览器",
+      "sublabel": "公开站点 + 管理后台",
+      "tag": "最终用户",
+      "pos": [40, 270],
+      "size": [150, 72],
+      "sources": [
+        { "path": "docs/architecture.md", "line": 12, "end_line": 19, "label": "生产请求入口" },
+        { "path": "docs/architecture.md", "line": 54, "end_line": 63, "label": "Web 与 API 入口" }
+      ]
+    },
+    {
+      "id": "android_app",
+      "type": "frontend",
+      "label": "AnimeStream Android",
+      "sublabel": "Compose · Retrofit",
+      "tag": "移动端 / 用户设备",
+      "pos": [40, 415],
+      "size": [150, 82],
+      "sources": [
+        { "path": "docs/architecture.md", "line": 61, "end_line": 65, "label": "原生客户端边界" },
+        { "path": "mobile/android/app/src/main/java/de/ixacg/animestream/core/network/AnimeStreamApi.kt", "line": 52, "end_line": 165, "label": "HTTP API 契约" },
+        { "path": "mobile/android/app/src/main/java/de/ixacg/animestream/data/repository/UpdateRepository.kt", "line": 129, "end_line": 209, "label": "更新校验与 ABI 选择" }
+      ]
+    },
+    {
+      "id": "device_state",
+      "type": "database",
+      "label": "设备本地状态",
+      "sublabel": "Room + DataStore",
+      "tag": "Android 私有",
+      "pos": [40, 620],
+      "size": [150, 78],
+      "sources": [
+        { "path": "mobile/android/app/src/main/java/de/ixacg/animestream/core/database/LibraryDatabase.kt", "line": 19, "end_line": 145, "label": "收藏与历史" },
+        { "path": "mobile/android/app/src/main/java/de/ixacg/animestream/core/network/SessionCookieStore.kt", "line": 20, "end_line": 124, "label": "Session Cookie 持久化" },
+        { "path": "docs/architecture.md", "line": 65, "end_line": 65, "label": "移动端状态边界" }
+      ]
+    },
+    {
+      "id": "caddy_edge",
+      "type": "security",
+      "label": "Caddy HTTPS 入口",
+      "sublabel": "TLS · HSTS · :443",
+      "tag": "生产运维 / 独立 Compose",
+      "pos": [270, 335],
+      "size": [150, 82],
+      "sources": [
+        { "path": "docs/deployment.md", "line": 42, "end_line": 51, "label": "反向代理契约" },
+        { "path": "docs/architecture.md", "line": 9, "end_line": 21, "label": "声明运行拓扑" }
+      ]
+    },
+    {
+      "id": "app_compose",
+      "type": "cloud",
+      "label": "App Compose",
+      "sublabel": "1 App · 实测 0.0.0.0:13000",
+      "tag": "生产运维 / App Compose",
+      "pos": [540, 330],
+      "size": [180, 92],
+      "sources": [
+        { "path": "deploy/docker-compose.yml", "line": 7, "end_line": 31, "label": "单服务 Compose" },
+        { "path": "deploy/README.md", "line": 27, "end_line": 46, "label": "人工部署与就绪检查" },
+        { "path": "docs/deployment.md", "line": 23, "end_line": 40, "label": "启动契约" }
+      ]
+    },
+    {
+      "id": "next_app",
+      "type": "backend",
+      "label": "Next.js 模块化单体",
+      "sublabel": "UI · API · services · adapters",
+      "tag": "应用团队 / 单 Node 进程",
+      "pos": [840, 326],
+      "size": [200, 100],
+      "sources": [
+        { "path": "Dockerfile", "line": 15, "end_line": 30, "label": "standalone 运行镜像" },
+        { "path": "docs/architecture.md", "line": 23, "end_line": 34, "label": "应用代码分层" },
+        { "path": "lib/server/identity/session-config.ts", "line": 3, "end_line": 49, "label": "Cookie Session" }
+      ]
+    },
+    {
+      "id": "remote_mariadb",
+      "type": "database",
+      "label": "外部 MySQL / MariaDB",
+      "sublabel": "catalog · identity · library",
+      "tag": "独立数据库运维 / 区域未知",
+      "pos": [1140, 332],
+      "size": [180, 88],
+      "sources": [
+        { "path": "docs/architecture.md", "line": 36, "end_line": 52, "label": "持久化数据" },
+        { "path": "docs/deployment.md", "line": 3, "end_line": 21, "label": "外部数据库与 TLS" },
+        { "path": "app/api/health/handler.ts", "line": 16, "end_line": 40, "label": "数据库健康探针" }
+      ]
+    },
+    {
+      "id": "media_origins",
+      "type": "external",
+      "label": "外部媒体来源",
+      "sublabel": "image proxy + data URLs",
+      "tag": "外部供应方 / 实现未知",
+      "pos": [1140, 130],
+      "size": [180, 88],
+      "sources": [
+        { "path": "app/cdn-img/[...path]/route.ts", "line": 3, "end_line": 57, "label": "固定图片代理" },
+        { "path": "mobile/android/app/src/main/java/de/ixacg/animestream/core/media/MediaUrlNormalizer.kt", "line": 26, "end_line": 64, "label": "图片与媒体 URL" },
+        { "path": "mobile/android/app/src/main/java/de/ixacg/animestream/player/PlayerScreen.kt", "line": 95, "end_line": 205, "label": "Media3 直连播放" }
+      ]
+    },
+    {
+      "id": "github_actions",
+      "type": "cloud",
+      "label": "GitHub Actions",
+      "sublabel": "Web image CI + Android CI",
+      "tag": "仓库维护者 / GitHub Runner",
+      "pos": [850, 675],
+      "size": [180, 92],
+      "sources": [
+        { "path": ".github/workflows/docker-publish.yml", "line": 1, "end_line": 58, "label": "Docker 发布流水线" },
+        { "path": ".github/workflows/build-android.yml", "line": 1, "end_line": 108, "label": "Android 构建门禁" },
+        { "path": ".github/workflows/build-android.yml", "line": 226, "end_line": 375, "label": "签名、ABI 与 Release" }
+      ]
+    },
+    {
+      "id": "docker_hub",
+      "type": "cloud",
+      "label": "Docker Hub",
+      "sublabel": "OCI images · SHA tags",
+      "tag": "外部镜像仓库",
+      "pos": [540, 681],
+      "size": [180, 80],
+      "sources": [
+        { "path": ".github/workflows/docker-publish.yml", "line": 29, "end_line": 58, "label": "镜像标签与 push" },
+        { "path": "docs/deployment.md", "line": 66, "end_line": 75, "label": "发布标签契约" }
+      ]
+    },
+    {
+      "id": "production_ops",
+      "type": "external",
+      "label": "正式环境运维",
+      "sublabel": "pin/pull · compose up · verify",
+      "tag": "正式环境所有者 / 人工闸门",
+      "pos": [540, 535],
+      "size": [180, 80],
+      "sources": [
+        { "path": "docs/deployment.md", "line": 23, "end_line": 40, "label": "人工启动与检查" },
+        { "path": "docs/deployment.md", "line": 53, "end_line": 75, "label": "升级、回滚与镜像选择" },
+        { "path": "deploy/docker-compose.yml", "line": 7, "end_line": 31, "label": "App Compose 所有权" }
+      ]
+    },
+    {
+      "id": "github_releases",
+      "type": "cloud",
+      "label": "GitHub Releases",
+      "sublabel": "build-N · 5 APK + checksums",
+      "tag": "GitHub / 手动发布闸门",
+      "pos": [1130, 676],
+      "size": [190, 90],
+      "sources": [
+        { "path": ".github/workflows/build-android.yml", "line": 293, "end_line": 375, "label": "正式 APK 发布" },
+        { "path": "lib/server/android-update.ts", "line": 7, "end_line": 22, "label": "固定更新上游" },
+        { "path": "lib/server/android-update.ts", "line": 93, "end_line": 196, "label": "完整 Release 校验" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Android 用户设备 · 客户端本地",
+      "wraps": ["android_app", "device_state"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "Android 用户设备边界",
+      "wraps": ["android_app", "device_state"],
+      "pad": 18
+    },
+    {
+      "kind": "region",
+      "label": "正式宿主机 · 供应商/区域未记录",
+      "wraps": ["caddy_edge", "app_compose", "next_app"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "App 容器与单进程边界",
+      "wraps": ["next_app"],
+      "pad": 14
+    },
+    {
+      "kind": "region",
+      "label": "外部数据库 · 供应商/区域未记录",
+      "wraps": ["remote_mariadb"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "数据库访问边界 · TLS/凭据",
+      "wraps": ["remote_mariadb"],
+      "pad": 12
+    },
+    {
+      "kind": "region",
+      "label": "GitHub 托管控制面",
+      "wraps": ["github_actions", "github_releases"],
+      "pad": 20
+    },
+    {
+      "kind": "region",
+      "label": "Docker Hub 托管服务",
+      "wraps": ["docker_hub"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser_to_caddy",
+      "from": "web_browser",
+      "to": "caddy_edge",
+      "label": "HTTPS :443",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [230, 350]
+    },
+    {
+      "id": "android_to_caddy",
+      "from": "android_app",
+      "to": "caddy_edge",
+      "label": "HTTPS JSON",
+      "variant": "emphasis",
+      "route": "auto"
+    },
+    {
+      "id": "android_to_local_state",
+      "from": "android_app",
+      "to": "device_state",
+      "label": "游客库 + Session/更新状态",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "orthogonal-v"
+    },
+    {
+      "id": "caddy_to_compose",
+      "from": "caddy_edge",
+      "to": "app_compose",
+      "label": "HTTP loopback",
+      "variant": "security",
+      "route": "straight"
+    },
+    {
+      "id": "compose_to_next",
+      "from": "app_compose",
+      "to": "next_app",
+      "label": "NAT :3000",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "next_to_database",
+      "from": "next_app",
+      "to": "remote_mariadb",
+      "label": "MySQL/TLS",
+      "variant": "security",
+      "route": "straight"
+    },
+    {
+      "id": "next_to_media",
+      "from": "next_app",
+      "to": "media_origins",
+      "label": "/cdn-img/* -> 固定图片上游",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "orthogonal-v"
+    },
+    {
+      "id": "actions_to_dockerhub",
+      "from": "github_actions",
+      "to": "docker_hub",
+      "label": "push OCI",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "dockerhub_to_ops",
+      "from": "docker_hub",
+      "to": "production_ops",
+      "label": "选择 image tag/digest",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "orthogonal-v"
+    },
+    {
+      "id": "ops_to_compose",
+      "from": "production_ops",
+      "to": "app_compose",
+      "label": "人工/仓库外 rollout",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "orthogonal-v"
+    },
+    {
+      "id": "actions_to_releases",
+      "from": "github_actions",
+      "to": "github_releases",
+      "label": "手动发布闸门",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "next_to_releases",
+      "from": "next_app",
+      "to": "github_releases",
+      "label": "GitHub API · 5s",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [[940, 530], [1080, 530], [1080, 620], [1225, 620]],
+      "labelAt": [1150, 530]
+    },
+    {
+      "id": "android_to_releases",
+      "from": "android_app",
+      "to": "github_releases",
+      "label": "用户确认 · 匹配 ABI 或 universal",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "bottom",
+      "via": [[0, 456], [0, 840], [1225, 840]],
+      "labelAt": [620, 840]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "运行与安全",
+      "items": [
+        "单 Node：UI/API/services/adapters；live=进程，ready/health=DB",
+        "7 天 Secure/HttpOnly Cookie；DB/Session/AES-GCM secrets 由 .env 注入",
+        "缓存 30s/15m 与 15m/24h；无 Redis/queue；可选 Turnstile/SMTP 外呼"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "正式部署事实与偏差",
+      "items": [
+        "Caddy 与 App 分属独立 Compose；反代 127.0.0.1:13000",
+        "实测 App 发布 0.0.0.0:13000；公网绕过性取决于未记录防火墙",
+        "App revision d26dbed（完整 SHA 见证据）；Compose 不 migrate/seed"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "交付、媒体与边界",
+      "items": [
+        "Docker CI 只发布镜像；正式更新由人工或仓库外执行",
+        "Android 发布需 main + 手动闸门 + 生产签名；只保留最新 5 次 Actions 运行",
+        "crawler/ 在 App 外；/cdn-img/* 代理图片，其余媒体按数据 URL 直连"
+      ]
+    }
+  ]
+}
