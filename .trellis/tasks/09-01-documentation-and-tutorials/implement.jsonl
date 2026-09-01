@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"Preserve the App-only runtime, deployment, database, update-manifest, pagination, and Actions-retention contracts while documenting them."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Document the actual URL-owned pagination and guest/server library state boundaries."}
+{"file":".trellis/spec/mobile/native-android.md","reason":"Preserve Android identity, signing, runtime, update, reader/player, and CI-only verification contracts."}
+{"file":".trellis/tasks/09-01-documentation-and-tutorials/research/web-usage.md","reason":"Evidence-backed Web route, state, pagination, and user-guide audit."}
+{"file":".trellis/tasks/09-01-documentation-and-tutorials/research/android-usage.md","reason":"Evidence-backed Android install, sync, playback, reader, update, and troubleshooting audit."}
+{"file":".trellis/tasks/09-01-documentation-and-tutorials/research/operations-development.md","reason":"Evidence-backed admin, environment, database, deployment, architecture, API, and Actions audit."}

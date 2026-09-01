@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"Check that docs retain the App-only and production behavior boundaries."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check Web pagination and local/cloud state claims against the project contract."}
+{"file":".trellis/spec/mobile/native-android.md","reason":"Check Android installation, signing, update, playback/reader, and CI claims."}
+{"file":".trellis/tasks/09-01-documentation-and-tutorials/research/web-usage.md","reason":"Verify final Web documentation against audited code evidence."}
+{"file":".trellis/tasks/09-01-documentation-and-tutorials/research/android-usage.md","reason":"Verify final Android documentation against audited code evidence."}
+{"file":".trellis/tasks/09-01-documentation-and-tutorials/research/operations-development.md","reason":"Verify final operator/developer/API documentation against audited code evidence."}
