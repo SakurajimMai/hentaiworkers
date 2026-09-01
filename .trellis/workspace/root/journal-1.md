@@ -210,3 +210,42 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 ### Next Steps
 
 - 部署 main 到正式环境并验证 live、ready 与首页轮播。
+
+
+## Session 8: 优化漫画阅读首图与连续滚动性能
+
+**Date**: 2026-09-01
+**Task**: 优化漫画阅读首图与连续滚动性能
+**Branch**: `main`
+
+### Summary
+
+缩短 Web 与 Android 阅读器当前漫画图可读时间，分离视口进度与预取，并记录生产等价基准。
+
+### Main Changes
+
+- Web reader 使用独立 layout、共享 reader-data、单一高优先级首图和 decode+2RAF 预取门禁。
+- Android 章节响应优先发布，恢复页直接初始化，Telephoto 显示后预取后两页并管理取消。
+- 修复 MySQL collation 下大小写 slug 兼容，并将防回归规则写入 Trellis spec。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7a36f06` | (see git log) |
+| `4b1b93a` | (see git log) |
+| `b60d6ec` | (see git log) |
+| `1ce3174` | (see git log) |
+
+### Testing
+
+- [OK] npm run test: 241/241 passed; typecheck, boundaries, legacy, production Docker build and diff check passed.
+- [OK] 390x844@3x cold-cache P1 median readable 1918.9ms; P201 restore 5/5 exact at 2853.2ms.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Monitor pushed GitHub Actions; Android Gradle and real-device TTIR remain remote verification items.

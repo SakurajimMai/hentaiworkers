@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-09-01
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~212 | Active |
+| `journal-1.md` | ~251 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-09-01 | 优化漫画阅读首图与连续滚动性能 | `7a36f06`, `4b1b93a`, `b60d6ec`, `1ce3174` | `main` |
 | 7 | 2026-09-01 | 修复站点分页与首页轮播 | `d4fe12d`, `2880536` | `main` |
 | 6 | 2026-08-31 | 重塑 Android 与网站品牌图标 | `fee7842` | `main` |
 | 5 | 2026-08-31 | 修复 Android 目录、阅读器并发布更新提醒 | `3e38a7b`, `f70b56c`, `92813d0`, `1ff6127` | `feat/kotlin-android-client` |
