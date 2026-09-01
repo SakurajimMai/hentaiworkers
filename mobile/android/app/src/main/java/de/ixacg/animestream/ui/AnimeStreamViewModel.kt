@@ -124,13 +124,15 @@ data class ReaderContent(
 private fun MangaDetail.withReaderChapter(chapter: MangaChapterDetail): MangaDetail {
     if (chapters.any { it.id == chapter.id || it.number == chapter.number }) return this
     val updatedChapters =
-        (chapters +
-            MangaChapterSummary(
-                id = chapter.id,
-                number = chapter.number,
-                title = chapter.title,
-                pageCount = maxOf(chapter.pageCount, chapter.pages.size),
-            )).sortedBy(MangaChapterSummary::number)
+        (
+            chapters +
+                MangaChapterSummary(
+                    id = chapter.id,
+                    number = chapter.number,
+                    title = chapter.title,
+                    pageCount = maxOf(chapter.pageCount, chapter.pages.size),
+                )
+        ).sortedBy(MangaChapterSummary::number)
     return copy(
         chapters = updatedChapters,
         chapterCount = maxOf(chapterCount, updatedChapters.size),
@@ -810,9 +812,10 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                 val current = state.value
                 if (current?.manga?.id == mangaId && current.chapter.number == chapterNumber) {
                     state.copy(
-                        value = current.copy(
-                            currentPage = if (isNewReaderRequest) restoredPage else current.currentPage,
-                        ),
+                        value =
+                            current.copy(
+                                currentPage = if (isNewReaderRequest) restoredPage else current.currentPage,
+                            ),
                         loading = false,
                         error = null,
                     )
