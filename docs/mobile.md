@@ -1,57 +1,211 @@
 # 原生 Android 客户端
 
-`mobile/android/` 是独立的 Kotlin + Jetpack Compose Android 应用，不进入根 Next.js 的依赖、TypeScript/ESLint 范围、Docker 镜像或生产 Compose 服务。应用名保持 `AnimeStream`，包名保持 `de.ixacg.animestream`，自定义链接 scheme 保持 `animestream`。
+`mobile/android/` 是独立的 Kotlin + Jetpack Compose 应用，应用名为 `AnimeStream`，包名为
+`de.ixacg.animestream`。它通过现有 HTTP API 访问目录、账号和进度，不进入根 Next.js 的
+依赖、TypeScript/ESLint 范围、Docker 镜像或生产 Compose 服务。
 
-客户端通过现有 HTTP API 工作：匿名目录使用 `/api/animes*`、`/api/tags`、`/api/mangas*` 和 `/api/ads`；登录后使用 `/api/me/favorites`、`/api/me/watch-progress` 和 `/api/me/manga-progress`。未登录时收藏和历史保存在 Room，目标站点会话与迁移版本保存在 DataStore，登录成功后会尽力把本地数据合并到网页账号。
+- 系统要求：Android 7.0（API 24）或更高版本。
+- 公开下载源：[GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases)。
+- 快速操作：[Android 安装与更新教程](./tutorials/android-install-update.md)。
 
-## 1. 功能与导航
+不要把 GitHub Actions 中的内部 Artifact 当作公开安装包。公开 Release 必须经过 `main`
+正式签名发布流程。
 
-| 底栏 | 作用 |
+## 1. 下载、安装与覆盖升级
+
+每个完整 Release 同时提供五种 APK：
+
+| 文件名结尾 | 适用设备 | 选择建议 |
+|------------|----------|----------|
+| `arm64-v8a.apk` | 大多数现代 Android 手机和平板 | 推荐优先选择 |
+| `armeabi-v7a.apk` | 较旧的 32 位 ARM 手机 | 仅用于旧设备 |
+| `x86_64.apk` | 64 位 Intel 模拟器和少量 Intel 设备 | 实机通常不用 |
+| `x86.apk` | 32 位 Intel 模拟器和少量 Intel 设备 | 实机通常不用 |
+| `universal.apk` | 包含以上四种 ABI | 无法判断架构时使用，文件更大 |
+
+从最新且资源完整的 `build-<数字>` Release 的 **Assets** 下载对应 APK。工作流把公开版本标为
+prerelease；这不等于分支构建使用内部 debug 签名的 Actions Artifact。首次安装时，Android
+可能要求允许侧载：Android 7.0/7.1 通常使用系统安全设置中的全局“未知来源”开关，Android
+8.0 及以上通常对当前浏览器或文件管理器授予“安装未知应用”权限。入口名称因系统厂商而异；
+安装结束后可撤销刚才启用的开关或来源权限。
+
+覆盖升级同时要求包名和签名一致。来自正式 GitHub Release、且使用同一生产证书签名的后续
+版本可以直接覆盖安装。
+
+> **Build 39 及以前版本的签名断点**
+>
+> Build 39 及以前使用 Expo 模板的公开 debug 证书，不能直接覆盖为新的生产签名版本。
+> 先在旧版登录并确认可同步数据，或自行备份，再卸载旧版并安装新版本。卸载会删除 Cookie、
+> 未同步收藏和历史等本地数据。不要依赖首次启动迁移来跨过这次签名断点，因为卸载本身会
+> 删除旧应用存储。
+
+原生版本首次启动时，如果设备上仍保留可读取的旧 `RKStorage/catalystLocalStorage`，会尝试
+只读迁移旧 Cookie、里番/漫画收藏和历史。迁移按单项容错、不会删除旧库，也不会覆盖时间更新
+的原生记录；它只适用于 Android 允许保留原应用数据的安装路径。
+
+Release 同时提供 `SHA256SUMS`。需要校验下载完整性时，可把本机 APK 的 SHA-256 与其中同名
+文件的值比较。App 会验证更新清单的固定仓库、文件名、大小和哈希字段，但浏览器下载完成后
+不会由 App 再次读取 APK 并计算哈希。
+
+## 2. 页面与常用操作
+
+手机使用五项底栏，宽屏和平板在宽度达到 700dp 时改用侧栏和自适应网格。
+
+| 导航 | 作用 |
 |------|------|
 | 首页 | 热门里番、漫画横滑入口与信息流广告 |
-| 发现 | 里番搜索、标签筛选、最近更新/热门排序与无限加载 |
-| 漫画 | 搜索、日/周/月/总榜、标签筛选与无限加载 |
-| 书架 | 里番/漫画收藏与历史、编辑删除、清空和继续观看/阅读 |
-| 我的 | 会话恢复、网站账号登录与退出、当前 Build 与手动检查更新 |
+| 发现 | 里番搜索、标签筛选、最近更新/热门排序与继续加载 |
+| 漫画 | 搜索、日/周/月/总榜、标签筛选与继续加载 |
+| 书架 | 里番/漫画收藏与历史、编辑删除和清空历史 |
+| 我的 | 网站账号登录/退出、当前 Build 和手动检查更新 |
 
-里番详情保留元数据、简介、标签、收藏、播放、剧照灯箱和相似推荐。漫画详情保留作者、页数/章节数、简介、标签、收藏、章节目录、开始阅读和推荐。
+发现和漫画页在加载、错误和空结果时仍保留搜索、排序与标签控件。筛选成功但没有内容时会结束
+加载并显示清除筛选入口，不需要等待刷新动画。
 
-播放器使用 Media3，支持 MP4/HLS、播放/暂停、拖动、倍速、画面比例、横屏全屏、错误重试、前贴片与暂停广告。前贴片会等待该作品的广告配置完成后只决定一次，不会因异步加载直接跳过正片前广告；离开页面会释放播放器并恢复竖屏。
+### 2.1 播放里番
 
-阅读器参考 TachiyomiJ2K 的内容优先交互，保持纵向连续条漫。页面由 `LazyColumn` 按可见窗口组合，Telephoto + Coil 自动进行高分辨率图片子采样，支持双指缩放、缩放时嵌套滚动、单页加载/失败重试和后续 4 页预取。轻点切换工具栏；底部进度条、章节目录、上一话/下一话、章节末提示和顶部/底部广告均保留。章节行只显示“第 N 话”。顶部与底部工具栏避开刘海、挖孔、瀑布边缘和系统导航区，漫画画布仍全屏铺边；拖动或点击进度条时会实时更新页码、取消旧跳页并定位，松手再次提交最终页。阅读进度优先在页面至少可见 40% 时切换；超长页无法达到该阈值时按最大可见区域回退，并以 800ms 防抖写入章节与页码。
+里番详情提供元数据、简介、标签、收藏、播放、剧照和相似推荐。播放器基于 Media3，支持
+MP4/HLS、播放/暂停、拖动、错误重试、前贴片和暂停广告：
 
-手机使用 5 项底栏，宽屏和平板使用导航栏与自适应网格。按钮和图标操作区至少为 48dp，并适配系统安全区、字体缩放和 TalkBack 标签。
+- 倍速按钮按 `1x -> 1.25x -> 1.5x -> 2x` 循环。
+- 画面比例按钮在适应、填充和裁切之间循环。
+- 播放页进入传感器横屏并隐藏系统栏；退出后释放播放器并恢复竖屏。
+- 前贴片会等待广告配置完成后只决定一次；系统生命周期暂停不会误弹暂停广告。
 
-## 2. 本地工作方式
+**当前限制：** Android 端只在作品进入播放器且媒体地址有效时写入一条“观看标记”。它不保存
+Media3 的真实播放秒数，书架中的里番历史只会返回作品详情。因此不能承诺像 Web 播放器一样
+按秒续播或跨设备恢复视频位置。
+
+### 2.2 阅读漫画
+
+漫画详情提供作者、页数/章节数、简介、标签、收藏、章节目录、开始阅读和推荐。阅读器使用
+纵向连续布局：
+
+- 上下滚动阅读；滚动会隐藏工具栏，轻点未缩放页面可切换工具栏。
+- 支持双指缩放、超长页受限视口、单页失败重试和后续四页预取。
+- 顶部和底部工具栏避开刘海、挖孔、瀑布边缘及系统导航区，漫画画布保持全屏铺边。
+- 拖动或点击底部进度条时会实时更新页码并定位；松手后再次提交最终页。
+- 章节目录只显示“第 N 话”，并提供上一话、下一话与章节末提示。
+
+Android 会保存漫画章节与页码，书架历史可回到该位置；登录后会尽力同步到网站账号。
+**当前 Web 阅读器不会自动消费云端 `pageIndex` 来定位页面**，所以“已同步”不等于 Web 已能
+自动跳到 Android 的精确页码。
+
+## 3. 网站账号、本地数据与云端
+
+浏览目录和播放/阅读无需登录。App 的“我的 -> 登录”接受网站账号的用户名或邮箱与密码。
+App 内没有注册、忘记密码或重置密码入口；请先在网站完成这些操作，详见
+[前台使用指南](./user-guide.md)。
+
+| 状态 | 收藏与历史行为 |
+|------|----------------|
+| 未登录 | 收藏和历史保存在本机 Room；里番历史与漫画历史各保留最近 50 条 |
+| 登录后 | 优先读取云端收藏、观看标记和漫画进度，并尽力把登录前的本机数据合并到账号；Android 书架只展示云端里番历史与漫画历史最近各 50 条 |
+| 云端请求失败 | 书架回退到本机已有数据；这不代表全部云端书架已离线缓存 |
+| 退出登录 | 清除本机网站会话，之后书架回到本地视图 |
+| 卸载 App | Android 会删除 App 的 Room、DataStore 和未同步本地数据 |
+
+会话 Cookie 保存在 DataStore，并只发送给配置的 API 主机。冷启动时若 `/api/me` 因弱网验证
+失败，本次运行可能暂时显示未登录，但该失败路径不会主动删除已持久化 Cookie。恢复网络后可
+重启 App 或重新进入“我的”确认状态，不要把一次验证失败误认为账号已被删除。
+
+登录后的同步是尽力而为，不是离线优先的完整双向复制：
+
+- 登录成功后，本机收藏、里番观看标记、漫画章节和页码会逐项尝试合并到云端。
+- Android 每次只请求云端里番历史与漫画历史最近各 50 条；更早记录仍保留在账号中，可在 Web
+  `/history` 分页查看，不应把 Android 未展示理解为记录已删除。
+- 云端书架读取任一部分失败时，当前快照会回退到本机已有记录。
+- 云端返回的数据不会全部批量写入 Room，因此断网时可能只看到曾在本机产生或镜像的数据。
+- 里番只同步观看标记，不同步真实秒数；漫画同步章节与页码。
+
+## 4. 更新提醒
+
+首页目录加载完成后，App 会独立请求 `/api/android/update`。更新请求约四秒超时，失败不会清除
+首页内容，也不会弹出自动错误。确认当前版本已是最新后，24 小时内不重复自动检查；失败后
+退避六小时。“我的 -> 检查更新”可随时手动检查并绕过这两个时间窗口。
+
+发现更高 Build 时，提醒只在首页、发现、漫画、书架或我的主页面显示：
+
+1. App 验证固定包名、`build-N` 标签、GitHub URL、五个 ABI 资源、文件大小和 SHA-256 字段。
+2. App 选择设备支持的第一个 ABI；无法识别时选择 universal。
+3. 点“立即更新”会打开外部浏览器中的 APK 下载地址，失败时改开 Release 页面。
+4. 浏览器下载后，仍需按 Android 系统安装器提示确认。
+5. 新版在用户操作前不会被记成一次已完成提醒；点“立即更新”成功打开链接或点“稍后提醒”后，
+   会对该 Build 暂停提醒 24 小时。
+
+这是一种**启动后的非阻塞拉取检查和弹窗提醒**，不是推送通知、后台下载、静默安装或强制
+升级。Manifest 没有静默安装权限。首次安装带更新检查机制的版本后，它才能提醒后续版本。
+
+## 5. 按症状排查
+
+手机能访问其他网站，只能证明通用网络可用；站点 API、DNS、代理、图片 CDN、GitHub 或单个
+媒体源仍可能分别失败。先确认失败范围，再处理。
+
+| 症状 | 判断与处理 |
+|------|------------|
+| 一直加载后显示“服务器响应超时” | 默认目录请求有 8 秒连接、20 秒读取和 25 秒整次调用上限。点重试；用同一手机浏览器打开站点；分别测试 Wi-Fi 与移动数据；比较启用/停用代理、VPN 或私有 DNS 后的结果。持续失败时记录 Build、页面和完整错误文案交给管理员 |
+| 显示“网络连接失败” | 检查飞行模式、网络切换、DNS、代理/VPN、系统日期与 HTTPS；若浏览器也打不开站点，先解决网络或站点可达性 |
+| 显示“服务器暂时不可用” | 服务端返回 5xx。稍后重试；不要反复卸载 App |
+| 显示“响应不是合法 JSON” | API 可能被登录门户、代理或服务端错误页替换。完成 Wi-Fi 门户登录，停用异常代理后重试，并把错误交给管理员 |
+| 首页只有一个栏目或局部错误 | 里番与漫画独立加载；已返回内容会保留。使用栏目内重试，无需等待全屏动画 |
+| 筛选后没有内容 | 这是成功空结果。点“清除筛选”或更换搜索词/标签，不要持续刷新 |
+| 目录正常但封面/漫画图片失败 | 图片请求与目录 JSON 不是同一层。重试本页，切换网络并检查图片/CDN 可达性 |
+| 目录正常但某部视频失败 | 该作品媒体 URL 可能失效或当前网络无法访问。先重试，再测试其他作品；只有单部失败时向管理员报告作品名 |
+| 只有更新检查失败 | 更新还依赖站点更新清单和 GitHub Releases。稍后在“我的”手动检查，或直接打开公开 Releases 页面 |
+| 冷启动暂时显示未登录 | `/api/me` 会话验证可能在弱网下失败。恢复网络后重启或重新检查；Cookie 不一定已被清除 |
+| 系统阻止安装 | 确认 Android 7.0+ 和存储空间；Android 7.0/7.1 检查全局“未知来源”，Android 8.0+ 检查当前浏览器/文件管理器的“安装未知应用”权限，安装后再撤销 |
+| 提示签名冲突或无法覆盖 | Build 39 及以前先同步/备份再卸载；若已是新生产签名版本，先确认 APK 来自正式 Release，不要为来源不明的包盲目卸载正式版 |
+
+故障报告至少应包含：App 的 `versionName` 与 Build（“我的”页可见）、设备 Android 版本、
+所用网络、失败页面或作品、完整错误文案，以及网页端是否能访问同一内容。不要发送密码或
+Cookie。
+
+## 6. 实现与网络边界
+
+客户端使用以下 API：
+
+- 匿名目录：`/api/animes*`、`/api/tags`、`/api/mangas*`、`/api/ads`。
+- 更新清单：`/api/android/update`。
+- 网站会话：`/api/auth/login`、`/api/auth/logout`、`/api/me`。
+- 登录书架：`/api/me/favorites*`、`/api/me/watch-progress*`、
+  `/api/me/manga-progress*`。
+
+生产 API origin 由 Gradle property 或环境变量 `ANIMESTREAM_API_BASE_URL` 注入，默认是
+`https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询和 fragment；非法值
+回退到默认站点。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用上限，启用连接
+失败重试；HTTP 5xx 不向用户暴露服务端内部错误。
+
+首页里番与漫画并行加载：任一栏目先返回有效内容即可结束全屏等待，另一栏目继续补齐；局部
+失败不会清除已显示内容。广告在首批内容后或播放器、阅读器等入口按需加载，标签进入发现页
+时加载；没有本地登录 Cookie 时不请求 `/api/me`。
+
+媒体地址允许 HTTP(S) 外部源；`image.ixacg.de` 图片会改写到同源 `/cdn-img`。因此不能把
+“目录 API 可用”推导为“所有图片和视频源均可用”，也不能概括为所有媒体均由本站托管。
+
+## 7. 本地开发边界
 
 开发机只编辑以下内容，不参与 Android 编译：
 
 ```text
-mobile/android/app/src/main/       Kotlin、Manifest、资源与第三方声明
-mobile/android/app/src/test/       JVM/Robolectric 单元与契约测试
-mobile/android/gradle/             版本目录和 Gradle wrapper
+mobile/android/app/src/main/        Kotlin、Manifest、资源与第三方声明
+mobile/android/app/src/test/        JVM/Robolectric 单元与契约测试
+mobile/android/gradle/              版本目录和 Gradle wrapper
 .github/workflows/build-android.yml 远程验证与发布
 ```
 
-本地不要求安装 JDK、Gradle、Android SDK 或模拟器，不要运行 `gradlew`、Android Studio build、设备测试或任何 Android 编译。可以运行根项目的非 Android lint、typecheck、测试、边界检查与构建；Android 反馈以 GitHub Actions 为准。
+本项目不要求开发机安装 JDK、Gradle、Android SDK 或模拟器，也不在本机运行 `gradlew`、
+Android Studio build、设备测试或任何 Android 编译。可以运行根项目的非 Android lint、
+typecheck、测试、边界检查与构建；Android 结果以 GitHub Actions 为准。
 
-生产 API origin 由工作流环境变量/Gradle property `ANIMESTREAM_API_BASE_URL` 注入，默认是 `https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询与 fragment；空值、非法值或非 HTTP(S) 值会回退到默认站点，避免错误 CI 配置导致启动崩溃。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用上限；超时会显示可重试的中文提示，HTTP 5xx 不会暴露服务端内部错误。
+## 8. GitHub Actions 构建与产物
 
-首页同时请求里番和漫画，但不再互相阻塞：任一栏目先返回有效内容就立即结束全屏等待，另一个栏目继续补齐；单栏失败不会清除或遮挡已返回内容，而是在内容上方提供内联重试。启动阶段不再同时请求广告和标签，广告在首批内容后或播放器、阅读器及广告目录直达时按需加载，标签进入发现页时加载；本地没有登录 Cookie 时也不会请求 `/api/me`。
-
-发现和漫画筛选页始终保留搜索、排序与标签控件。成功的空列表会结束加载并显示“清除筛选”，快速连续切换筛选时只有最后一代请求可以提交；公开里番标签也只返回至少关联一部有效作品的标签。
-
-首页目录完成后会独立请求 `/api/android/update`，该请求约 4 秒超时，失败不会改变首页内容或显示自动错误。成功后 24 小时内不重复自动检查，失败后退避 6 小时；“我的”可随时手动检查。发现更高 Build 时只在主导航页弹出可关闭提醒，按设备 ABI 选择 GitHub Release APK，无法识别时使用 universal，并继续交由浏览器和 Android 系统安装器确认。首次安装含此机制的版本后，它才能提醒后续发布的版本。
-
-## 3. GitHub Actions 构建
-
-工作流：[`.github/workflows/build-android.yml`](../.github/workflows/build-android.yml)
+工作流：[`.github/workflows/build-android.yml`](../.github/workflows/build-android.yml)。
 
 触发条件：
 
-- 任意分支推送并改动 `mobile/**` 或工作流文件
-- 改动上述路径的 Pull Request
-- 在 GitHub Actions 手动运行 **Build Android APK**；只有 `main` 可以显式选择 `publish_release` 创建公开 Release
+- 任意分支推送并改动 `mobile/**` 或工作流文件。
+- 改动上述路径的 Pull Request。
+- 手动运行 **Build Android APK**；只有 `main` 可以勾选 `publish_release` 创建公开 Release。
 
 远程构建执行：
 
@@ -59,56 +213,48 @@ mobile/android/gradle/             版本目录和 Gradle wrapper
 ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon --stacktrace
 ```
 
-随后会验证五个 APK 均可解压、包名为 `de.ixacg.animestream`、`versionCode` 等于 GitHub run number、launcher 为原生 `MainActivity`、签名有效，并确认 APK 不含 JavaScript bundle 或旧客户端运行时。四个 ABI split 必须只包含目标架构的原生库，并与 universal 中同架构的库清单一致。所有验证成功后上传：
+工作流随后验证五个 APK 的归档完整性、包名、GitHub run number 对应的 `versionCode`、原生
+`MainActivity` launcher、签名和图标资源，并确认不含 JavaScript bundle 或旧客户端运行时。
+四个 ABI split 只能包含目标架构的原生库，并须与 universal 中对应架构的库清单一致。
 
-| 产物 | 说明 |
-|------|------|
-| `AnimeStream-<run>-arm64-v8a.apk` | 大多数现代 Android 手机，推荐优先下载 |
-| `AnimeStream-<run>-armeabi-v7a.apk` | 较旧的 32 位 Android 手机 |
-| `AnimeStream-<run>-x86_64.apk` | 64 位 Intel 模拟器及少量 Intel 设备 |
-| `AnimeStream-<run>-x86.apk` | 32 位 Intel 模拟器及少量 Intel 设备 |
-| `AnimeStream-<run>-universal.apk` | 包含全部四种 ABI，无法判断架构时使用 |
-| `SHA256SUMS` | 五个 APK 的 SHA-256 校验和 |
-| `build-info.txt` | 包名、版本、API origin 与签名模式 |
-| Android reports | Lint、测试结果和诊断报告，保留 14 天 |
+构建 Artifact 包含五个 `AnimeStream-<run>-<abi>.apk`、`SHA256SUMS` 和
+`build-info.txt`，保留 30 天；Android reports 包含 Lint、测试与诊断资料，保留 14 天。
+分支和 PR 使用内部 debug 签名，仅供内部测试。`main` push 进入 `Production` environment：
+四项签名 Secret 完整时生成正式签名的待验收 Artifact，四项全空时仍只生成标记为
+`internal-debug` 的内部 Artifact。手动勾选 `publish_release` 的任务会重新构建、验证，并且只
+在正式签名门禁通过后发布 `build-<run>` 预发布 Release。
 
-分支和 Pull Request 使用内部 debug 签名，只上传 Actions Artifact。`main` push 使用 `Production` 正式签名，但仍只生成待验收 Artifact；在同一已验证提交上手动运行并选择 `publish_release` 后，才会在 [GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases) 创建 `build-<run>` 预发布 Release。
+清理任务在非 PR 运行结束后，按创建时间只保留仓库级最新五次 Actions workflow runs，并删除
+更早且已完成的 runs。它**不会**自动只保留五个 GitHub Releases，也不会清理容器镜像标签。
 
-## 4. 签名与覆盖安装
+## 9. 生产签名
 
 正式分发必须在受分支规则保护的 `Production` environment 中完整配置：
 
-| Secret | 说明 |
-|--------|------|
+| Secret / variable | 说明 |
+|-------------------|------|
 | `ANDROID_KEYSTORE_BASE64` | 生产发布 keystore 的 base64 |
 | `ANDROID_KEYSTORE_PASSWORD` | keystore 密码 |
 | `ANDROID_KEY_ALIAS` | 密钥别名 |
 | `ANDROID_KEY_PASSWORD` | 密钥密码 |
+| `ANDROID_RELEASE_CERT_SHA256` | 仓库变量，固定生产证书 SHA-256 |
 
-仓库变量 `ANDROID_RELEASE_CERT_SHA256` 必须固定为生产证书的 SHA-256；CI 会拒绝任何使用其他证书的 release APK。普通分支使用不含密钥的 `CI` environment，`Production` 只允许 `main`。生产密钥不会注入功能分支或 Pull Request。
+四项 Secret 全部存在时生成生产签名 APK；四项全空时生成明确标记为 `internal-debug` 的内部
+Artifact，不能覆盖正式版、不能公开分发，也不会创建 Release。只配置部分 Secret 会让工作流
+失败。生产证书摘要不匹配固定变量时，工作流同样拒绝发布。keystore 只解码到 GitHub Runner
+临时目录，不进入仓库或 Artifact。
 
-四项完整时生成 release-signed APK；四项全空时生成明确标记为 `internal-debug` 的内部测试 Artifact，不能覆盖正式签名版本、不能用于公开分发，也不会创建 GitHub Release。只配置部分 Secret 会让工作流失败，防止误标签名。keystore 仅解码到 GitHub Runner 临时目录，不进入 Artifact 或仓库。
+## 10. 发布验收
 
-Build 39 及更早版本使用 Expo 模板中的公开 debug 证书，不是可延续的生产签名。首次安装新生产签名版本前必须卸载旧版；卸载会删除未同步的本地数据，应先登录同步或自行备份。后续版本必须一直使用同一份新生产 keystore，才能直接覆盖升级。
+1. 在分支或 PR 等待 **Build Android APK** 全绿，使用内部 Artifact 做安装验收。
+2. 在真实设备检查五项导航、搜索/筛选、空结果、登录/退出、收藏/历史和漫画精确续读。
+3. 检查一条 MP4、一条 HLS、前贴片、暂停广告、播放错误重试和退出后的方向恢复。
+4. 检查短章、长章、坏图重试、缩放、快速拖页、章节切换、安全区、广告和后台恢复。
+5. 合并到 `main` 后验证正式签名 Artifact、五个 APK、`SHA256SUMS` 和固定证书指纹。
+6. 在目标 `main` ref 上手动运行工作流并勾选 `publish_release`，确认公开 `build-*` Release
+   含五个 APK 和 `SHA256SUMS`。
+7. 后台“系统设置 -> 移动端下载”填写正式 Release 地址与链接文字；前台页脚只接受
+   `http://` 或 `https://` 地址。
 
-Kotlin APK 要覆盖旧安装，包名和签名必须同时保持一致。首次启动会检查旧 `RKStorage` 的 `catalystLocalStorage` 表，并只读迁移以下键：
-
-- `@auth/cookie`
-- `@anime/history`
-- `@anime/favorites`
-- `@manga/history`
-- `@manga/favorites`
-
-迁移按单项容错并在事务成功后记录版本：损坏行不会阻塞其他合法数据，重复启动不会重复导入或覆盖时间更新的原生记录，旧 SQLite 数据库始终保留。全新安装找不到旧表时只记录迁移完成，不创建虚假内容。回滚到旧版本仍能看到迁移前数据；新版本中仅保存在本机且未同步账号的数据不保证能被旧版本读取。
-
-## 5. 发布与验收
-
-1. 在分支或 Pull Request 等待 **Build Android APK** 全绿，下载 Actions Artifact 做内部安装验证。
-2. 使用真实设备检查首页/发现/漫画/书架/我的、搜索筛选、登录退出、收藏历史及继续阅读。
-3. 检查一条 MP4、一条 HLS、前贴片、暂停广告、播放错误重试和返回后的方向恢复。
-4. 检查短章、长章、坏图重试、缩放、快速拖页、章节切换、广告和后台恢复。
-5. 快进 `main` 后先下载正式签名 Actions Artifact，确认五个 APK、`SHA256SUMS`、固定证书指纹和安装结果。
-6. 在同一 `main` 提交上手动运行 **Build Android APK** 并选择 `publish_release`，确认 `build-*` Release 含五个 APK；现代手机优先使用 `arm64-v8a`，无法判断架构时使用 universal。
-7. 后台 **系统设置 → 移动端下载** 填入地址和链接文字；前台页脚只在地址为 `http://` 或 `https://` 时显示。
-
-Android 实际编译、Lint 和自动化测试结果只能由 GitHub Actions 确认；未看到远程工作流成功前，不应把代码审查或根项目测试视为 APK 已验证。
+Android 实际编译、Lint 和自动化测试只能由 GitHub Actions 确认。未看到远程工作流成功前，
+不要把代码审查或根项目测试视为 APK 已验证。

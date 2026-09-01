@@ -1,23 +1,40 @@
 # AnimeStream
 
-AnimeStream 是基于 Next.js 15、React 19、Drizzle ORM 与 MySQL/MariaDB 的里番与漫画站点，包含公开浏览、MP4 播放、漫画阅读、账号体系、管理后台，以及 `mobile/android/` 中的原生 Kotlin Android 客户端。
+AnimeStream 是基于 Next.js 15、React 19、Drizzle ORM 与 MySQL/MariaDB 的里番与漫画站点，
+包含公开浏览、媒体播放、漫画阅读、账号、收藏与历史、管理后台，以及
+`mobile/android/` 中的原生 Kotlin Android 客户端。
 
-本仓库包含主站与 `crawler/` 独立工程空间。数据抓取和媒体下载不属于主站运行时，也不与主站共享依赖、配置、容器或内部 API。
+根 Next.js 工程保持 App-only。`crawler/` 是独立数据生产空间，不导入主站私有模块，也不
+进入主站依赖、镜像、Compose 服务、运行时配置或控制面 API。
+
+## 文档入口
+
+| 目标 | 从这里开始 |
+|------|------------|
+| 第一次使用网站 | [Web 快速上手](./docs/tutorials/web-getting-started.md) |
+| 下载、安装或更新 APK | [Android 安装与更新](./docs/tutorials/android-install-update.md) |
+| 管理内容、账号和系统设置 | [后台管理手册](./docs/admin-guide.md) |
+| 本地开发 | [开发指南](./docs/development.md) |
+| 发布或升级生产环境 | [生产发布教程](./docs/tutorials/production-rollout.md) |
+| 调用匿名公开 API | [API 快速上手](./docs/tutorials/api-quickstart.md) |
+| 理解系统边界 | [架构说明](./docs/architecture.md) / [生产架构图](./docs/diagrams/hentaiworkers-production.architecture.html) |
+
+完整入口见 [文档中心](./docs/README.md)。
 
 ## 功能
 
-- 公开里番目录、统一搜索、标签筛选、详情与 ArtPlayer 播放
-- 漫画目录、漫画标签、日/周/月/总榜与滚动阅读
-- 登录、注册、邮箱验证、密码找回
-- 里番与漫画收藏、观看历史、继续观看
-- 里番、漫画、标签、用户和系统设置后台
-- 后台可配置页脚 Android 下载地址
-- 公开只读 API（里番 + 漫画）与健康检查
-- `mobile/android/` Kotlin + Jetpack Compose 客户端；APK 只由 GitHub Actions 构建并发布到 Release
+- 里番目录、统一搜索、标签筛选、详情、推荐与 ArtPlayer 播放
+- 漫画目录、漫画标签、日/周/月/总榜与纵向连续阅读
+- 登录、注册、邮箱验证、密码找回与用户中心
+- 里番/漫画收藏、统一云端历史及游客本机观看记录
+- 里番、漫画、标签、用户、广告和系统设置后台
+- 公开匿名 API、客户端会话 API 与健康检查
+- Kotlin + Jetpack Compose Android 客户端及五种 APK
 
 ## 本地启动
 
-要求 Node.js 22+ 和 MySQL/MariaDB。
+要求 Node.js 22+、npm，以及一个已经按项目 schema 准备好的 MySQL/MariaDB 数据库。仓库
+不提供本地数据库 Compose，也不会在应用启动时自动执行完整迁移链。
 
 ```bash
 npm ci
@@ -33,13 +50,14 @@ npm run dev
 - `APP_ENCRYPTION_CURRENT_KEY_ID`
 - `SITE_URL`
 
-打开 `http://localhost:3000`。首次创建管理员前，在 `.env` 增加 `ADMIN_BOOTSTRAP_USER` 与至少 12 位的 `ADMIN_BOOTSTRAP_PASSWORD`，然后运行：
+可分别用 `openssl rand -base64 48` 和 `openssl rand -base64 32` 生成 Session secret 与
+32 字节加密密钥。Keyring 是 JSON 对象，例如把生成值放入
+`{"primary":"生成的 32 字节 Base64 密钥"}`，并设置
+`APP_ENCRYPTION_CURRENT_KEY_ID=primary`。不要提交 `.env` 或复用文档中的示例文本。
 
-```bash
-npm run seed:admin
-```
-
-数据库基线位于 `drizzle/baseline/`，主站的增量 SQL 位于 `drizzle/migrations/`。生产数据库迁移应通过受控流程人工审核执行，项目禁止直接运行 `drizzle-kit push`。
+打开 `http://localhost:3000`。数据库初始化、TLS、本地配置和管理员创建的安全顺序见
+[开发指南](./docs/development.md)。当前数据库基线尚未完成跨 MySQL/MariaDB 的空库导入验证，
+不要把它当成无需审核的一键生产建库脚本。
 
 ## 质量检查
 
@@ -52,38 +70,51 @@ npm run check:boundaries
 npm run build
 ```
 
-## 移动端
+## Android APK
 
-移动端源码位于 `mobile/android/`。开发机只编辑 Kotlin、Compose 和资源文件，不要求安装 JDK、Gradle 或 Android SDK，也不要在本机运行 Android 编译。推送分支或提交 Pull Request 后，**Build Android APK** 会在 GitHub Actions 完成格式检查、Lint、单元测试和 Release APK 构建；`main` push 先生成正式签名待验收 Artifact，在同一提交上手动选择 `publish_release` 后才会创建 `build-<run>` 预发布 Release。未配置签名 Secrets 时只上传明确标记为内部测试的 Actions Artifact。
+公开安装包只从 [GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases)
+下载。支持 Android 7.0 及以上：
 
-[GitHub Releases](https://github.com/SakurajimMai/hentaiworkers/releases) 同时提供 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 和 universal APK；现代 Android 手机推荐 `arm64-v8a`，无法判断架构时使用 universal。把选定 APK 的 Release 地址填进后台「系统设置 → 移动端下载」，页脚「浏览」栏就会出现下载入口。详见 [移动端文档](./docs/mobile.md)。
+| APK | 适用设备 |
+|-----|----------|
+| `arm64-v8a` | 大多数现代 Android 手机，推荐 |
+| `armeabi-v7a` | 较旧的 32 位 Android 手机 |
+| `x86_64` / `x86` | 模拟器和少量 Intel 设备 |
+| `universal` | 无法判断架构时的兼容选择，文件更大 |
+
+APK 更新是应用启动后的非阻塞检查与弹窗，不是通知推送、自动下载或静默安装。完整的安装、
+旧签名迁移、更新和排障步骤见 [Android 安装与更新](./docs/tutorials/android-install-update.md)。
 
 ## Docker
 
-根目录与 `deploy/` 的 Compose 清单都只启动 App：
+根目录与 `deploy/` 的 Compose 清单都只启动 App。若使用已发布镜像，必须显式选择 tag 与
+拉取策略；清单自身的 fallback 是本地 `manga` tag 和 `pull_policy: never`。
 
 ```bash
 cp deploy/.env.example deploy/.env
 cd deploy
-docker compose up -d
+IMAGE_TAG=latest PULL_POLICY=always docker compose pull app
+IMAGE_TAG=latest PULL_POLICY=always docker compose up -d
 ```
 
-默认镜像为 `sakurajiamai/hentaiworkers-app:latest`，默认仅绑定 `127.0.0.1`。生产环境应在前方配置 HTTPS 反向代理。
+复制环境模板后默认绑定 `127.0.0.1:13000`。Compose 不迁移数据库、不创建管理员，也不
+配置 HTTPS 反向代理。生产环境应优先固定已验证的不可变镜像标签，并按
+[部署指南](./docs/deployment.md) 完成迁移审核、烟测与回滚准备。
 
 ## 目录
 
 ```text
 app/                 Next.js 页面、Server Actions 与 Route Handlers
 components/          前台和后台组件
-lib/                 主站业务、漫画目录、SEO 与公开 API 适配
-lib/server/          catalog、identity、system 业务模块与基础设施
-drizzle/             数据库基线和历史迁移（含 0014–0017 漫画表）
+lib/                 主站业务、漫画目录、SEO 与 API 适配
+lib/server/          catalog、identity、system 及基础设施
+drizzle/             数据库基线和历史迁移
 mobile/android/      Kotlin / Jetpack Compose Android 客户端
 scripts/             主站维护与质量检查脚本
 tests/               TypeScript 测试
-crawler/             独立数据采集工程；不进入主站构建和部署
+crawler/             独立数据生产工程，不进入主站构建和部署
 deploy/              App-only 生产 Compose 清单
-docs/                架构、开发、部署、管理、API 与移动端文档
+docs/                参考文档、教程、API 与架构图
 ```
 
-更多信息见 [文档索引](./docs/README.md) 和 [变更记录](./docs/CHANGELOG.md)。
+产品与运维行为变化见 [变更记录](./docs/CHANGELOG.md)。
