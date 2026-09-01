@@ -3,12 +3,13 @@ info:
   title: AnimeStream Public API
   version: 1.0.0
   description: |
-    AnimeStream 公开只读 REST API。
+    AnimeStream 匿名公开 REST API。章节读取会记录一次榜单浏览。
 
     - 无需鉴权
     - 目录数据源：远程 MySQL（经 Next.js Route Handlers）
     - Android 更新清单来自固定 GitHub Releases 仓库，不访问数据库
-    - 默认仅返回上架作品（`is_active = 1` 或 `NULL`）
+    - 里番列表默认仅返回上架作品（`is_active = 1` 或 `NULL`）
+    - 里番详情按 id 直查，当前不使用 `is_active` 作为访问控制
     - 漫画接口仅返回已发布作品；栏目关闭时返回 404
   contact:
     name: AnimeStream
@@ -28,6 +29,43 @@ tags:
   - name: Android
 
 paths:
+  /api/live:
+    get:
+      tags: [System]
+      summary: Process liveness
+      description: Confirms that the application process can handle requests; no dependencies are checked.
+      operationId: getLive
+      responses:
+        "200":
+          description: Process is live
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveStatus"
+
+  /api/ready:
+    get:
+      tags: [System]
+      summary: Dependency readiness
+      description: |
+        Runs `SELECT 1` when `DATABASE_URL` is configured. Without `DATABASE_URL`,
+        the current implementation reports ready. This does not validate migrations
+        or application tables.
+      operationId: getReady
+      responses:
+        "200":
+          description: Configured readiness checks passed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyStatus"
+        "503":
+          description: A configured dependency check failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotReadyStatus"
+
   /api/health:
     get:
       tags: [System]
@@ -58,6 +96,9 @@ paths:
       responses:
         "200":
           description: Public ads config (no secrets)
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/PublicReadCacheControl"
           content:
             application/json:
               schema:
@@ -77,6 +118,9 @@ paths:
       responses:
         "200":
           description: Verified APK manifest for all supported ABIs
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/AndroidUpdateCacheControl"
           content:
             application/json:
               schema:
@@ -109,7 +153,7 @@ paths:
             default: 48
         - name: sort
           in: query
-          description: "`latest` by created time; `popular` by view_count"
+          description: "`latest` by updated_at with created_at fallback; `popular` by view_count"
           schema:
             type: string
             enum: [latest, popular]
@@ -119,14 +163,18 @@ paths:
           description: Filter by tag id
           schema:
             type: integer
+            minimum: 1
         - name: search
           in: query
-          description: Fuzzy match title / title_japanese
+          description: Fuzzy match title, title_japanese, title_english, or description
           schema:
             type: string
       responses:
         "200":
           description: Paginated anime list
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/PublicReadCacheControl"
           content:
             application/json:
               schema:
@@ -138,6 +186,7 @@ paths:
     get:
       tags: [Animes]
       summary: Get anime detail
+      description: Direct id lookup; the current handler does not filter by `is_active`.
       operationId: getAnime
       parameters:
         - $ref: "#/components/parameters/AnimeId"
@@ -163,7 +212,8 @@ paths:
       summary: Similar animes
       operationId: getSimilarAnimes
       description: |
-        Series-prefix match first, then shared tags, then popular fallback.
+        Series-prefix match first. If the current anime has tags, shared-tag
+        matches fill the remainder; popular items are used only when it has no tags.
         Invalid id returns empty array.
       parameters:
         - $ref: "#/components/parameters/AnimeId"
@@ -196,6 +246,9 @@ paths:
       responses:
         "200":
           description: Distinct tags linked to active animes, ordered by name
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/PublicReadCacheControl"
           content:
             application/json:
               schema:
@@ -242,6 +295,9 @@ paths:
       responses:
         "200":
           description: Manga list
+          headers:
+            Cache-Control:
+              $ref: "#/components/headers/PublicReadCacheControl"
           content:
             application/json:
               schema:
@@ -263,10 +319,11 @@ paths:
       parameters:
         - name: id
           in: path
+          description: Published manga slug; a numeric database id is also accepted
           required: true
           schema:
-            type: integer
-            minimum: 1
+            type: string
+            minLength: 1
       responses:
         "200":
           description: Manga with chapter summaries
@@ -291,10 +348,11 @@ paths:
       parameters:
         - name: id
           in: path
+          description: Published manga slug; a numeric database id is also accepted
           required: true
           schema:
-            type: integer
-            minimum: 1
+            type: string
+            minLength: 1
         - name: number
           in: path
           required: true
@@ -318,6 +376,18 @@ paths:
           $ref: "#/components/responses/ServerError"
 
 components:
+  headers:
+    PublicReadCacheControl:
+      description: Shared-cache policy for public catalog lists, tags, and ads
+      schema:
+        type: string
+        example: "public, max-age=30, stale-while-revalidate=120, stale-if-error=900"
+    AndroidUpdateCacheControl:
+      description: Shared-cache policy for the Android release manifest
+      schema:
+        type: string
+        example: "public, max-age=300, stale-while-revalidate=900, stale-if-error=86400"
+
   parameters:
     AnimeId:
       name: id
@@ -335,6 +405,35 @@ components:
         error:
           type: string
 
+    LiveStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [live]
+
+    ReadyStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+
+    NotReadyStatus:
+      type: object
+      additionalProperties: false
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [not_ready]
+        reason:
+          type: string
+
     HealthOk:
       type: object
       required: [ok, database, result, version]
@@ -349,6 +448,12 @@ components:
           type: array
           items:
             type: object
+            additionalProperties: false
+            required: [ok]
+            properties:
+              ok:
+                type: integer
+                example: 1
         version:
           type: string
           example: "1.0.0"
@@ -373,6 +478,8 @@ components:
           type: string
         interval:
           type: integer
+          minimum: 1
+          maximum: 40
         href:
           type: string
         html:
@@ -388,6 +495,8 @@ components:
           type: string
         interval:
           type: integer
+          minimum: 1
+          maximum: 50
 
     PublicPlayerPreRollAd:
       type: object
@@ -405,8 +514,12 @@ components:
           type: string
         playDuration:
           type: integer
+          minimum: 0
+          maximum: 120
         totalDuration:
           type: integer
+          minimum: 0
+          maximum: 180
         muted:
           type: boolean
 
@@ -657,7 +770,18 @@ components:
 
     MangaSummary:
       type: object
-      required: [id, slug, title, tags, chapterCount, pageCount]
+      required:
+        - id
+        - slug
+        - title
+        - author
+        - tags
+        - description
+        - coverUrl
+        - chapterCount
+        - pageCount
+        - sourceChatTitle
+        - updatedAt
       properties:
         id:
           type: integer
@@ -682,6 +806,13 @@ components:
           type: integer
         pageCount:
           type: integer
+        sourceChatTitle:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
 
     MangaListResponse:
       type: object
@@ -696,7 +827,7 @@ components:
 
     MangaChapterSummary:
       type: object
-      required: [id, number, pageCount]
+      required: [id, number, title, pageCount, createdAt]
       properties:
         id:
           type: integer
@@ -707,6 +838,10 @@ components:
           nullable: true
         pageCount:
           type: integer
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
 
     MangaDetail:
       allOf:
@@ -734,7 +869,7 @@ components:
       properties:
         manga:
           type: object
-          required: [id, title]
+          required: [id, title, coverUrl]
           properties:
             id:
               type: integer
