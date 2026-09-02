@@ -36,8 +36,7 @@ internal class ReaderPreviewPreloader(
             .distinctUntilChanged()
 
     @Synchronized
-    fun currentState(memoryCacheKey: String): ReaderPreviewState =
-        states.value[memoryCacheKey] ?: ReaderPreviewState.Idle
+    fun currentState(memoryCacheKey: String): ReaderPreviewState = states.value[memoryCacheKey] ?: ReaderPreviewState.Idle
 
     @Synchronized
     fun warm(

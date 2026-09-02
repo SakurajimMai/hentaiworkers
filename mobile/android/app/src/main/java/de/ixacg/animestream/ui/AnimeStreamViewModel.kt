@@ -1023,11 +1023,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         )
     }
 
-    internal fun readerPreviewState(memoryCacheKey: String): Flow<ReaderPreviewState> =
-        readerPreviewPreloader.state(memoryCacheKey)
+    internal fun readerPreviewState(memoryCacheKey: String): Flow<ReaderPreviewState> = readerPreviewPreloader.state(memoryCacheKey)
 
-    internal fun currentReaderPreviewState(memoryCacheKey: String): ReaderPreviewState =
-        readerPreviewPreloader.currentState(memoryCacheKey)
+    internal fun currentReaderPreviewState(memoryCacheKey: String): ReaderPreviewState = readerPreviewPreloader.currentState(memoryCacheKey)
 
     private fun updateReader(
         identity: ReaderLoadIdentity,

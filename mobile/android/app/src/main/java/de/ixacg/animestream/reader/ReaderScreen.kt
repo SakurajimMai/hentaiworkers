@@ -588,7 +588,8 @@ private fun ZoomableReaderPage(
                     }
                 }
                 PageLoadState.Preview,
-                PageLoadState.Ready -> Unit
+                PageLoadState.Ready,
+                -> Unit
             }
         }
     }
