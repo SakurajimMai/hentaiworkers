@@ -30,6 +30,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -234,17 +236,31 @@ object ApiClient {
     fun create(
         cookieStore: SessionCookieStore,
         baseUrl: String = MediaUrlNormalizer.origin,
+        connectionPool: ConnectionPool? = null,
+        dispatcher: Dispatcher? = null,
+        baseClient: OkHttpClient? = null,
     ): AnimeStreamApi {
         return Retrofit.Builder()
             .baseUrl("${MediaUrlNormalizer.validatedOrigin(baseUrl)}/")
-            .client(createHttpClient(cookieStore))
+            .client(createHttpClient(cookieStore, connectionPool, dispatcher, baseClient))
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(AnimeStreamApi::class.java)
     }
 
-    internal fun createHttpClient(cookieStore: SessionCookieStore): OkHttpClient =
-        OkHttpClient.Builder()
+    internal fun createHttpClient(
+        cookieStore: SessionCookieStore,
+        connectionPool: ConnectionPool? = null,
+        dispatcher: Dispatcher? = null,
+        baseClient: OkHttpClient? = null,
+    ): OkHttpClient =
+        (baseClient?.newBuilder() ?: OkHttpClient.Builder())
+            .apply {
+                if (baseClient == null) {
+                    connectionPool?.let { this.connectionPool(it) }
+                    dispatcher?.let { this.dispatcher(it) }
+                }
+            }
             .cookieJar(cookieStore)
             .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)

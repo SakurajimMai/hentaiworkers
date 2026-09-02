@@ -9,6 +9,9 @@ import java.net.SocketTimeoutException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -147,6 +150,36 @@ class ApiContractTest {
             assertEquals(TimeUnit.SECONDS.toMillis(20), client.writeTimeoutMillis.toLong())
             assertEquals(TimeUnit.SECONDS.toMillis(25), client.callTimeoutMillis.toLong())
             assertTrue(client.retryOnConnectionFailure)
+        }
+
+    @Test
+    fun `api client reuses injected network resources without replacing its cookie store`() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val cookies = SessionCookieStore(context, server.url("/"), backgroundScope)
+            val connectionPool = ConnectionPool()
+            val dispatcher = Dispatcher()
+
+            val client = ApiClient.createHttpClient(cookies, connectionPool, dispatcher)
+
+            assertTrue(client.connectionPool === connectionPool)
+            assertTrue(client.dispatcher === dispatcher)
+            assertTrue(client.cookieJar === cookies)
+        }
+
+    @Test
+    fun `api client derived from a base client can reuse its tls connections`() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val cookies = SessionCookieStore(context, server.url("/"), backgroundScope)
+            val baseClient = OkHttpClient()
+
+            val client = ApiClient.createHttpClient(cookies, baseClient = baseClient)
+
+            assertTrue(client.connectionPool === baseClient.connectionPool)
+            assertTrue(client.dispatcher === baseClient.dispatcher)
+            assertTrue(client.sslSocketFactory === baseClient.sslSocketFactory)
+            assertTrue(client.cookieJar === cookies)
         }
 
     @Test

@@ -11,6 +11,14 @@ import org.junit.Test
 
 class HomeLoadCoordinatorTest {
     @Test
+    fun `cold home loads only when its destination enters composition`() {
+        assertTrue(shouldStartHomeLoad(hasContent = false, loading = false, active = false))
+        assertFalse(shouldStartHomeLoad(hasContent = true, loading = false, active = false))
+        assertFalse(shouldStartHomeLoad(hasContent = false, loading = true, active = false))
+        assertFalse(shouldStartHomeLoad(hasContent = false, loading = false, active = true))
+    }
+
+    @Test
     fun `anime content is published before manga completes`() {
         val coordinator = HomeLoadCoordinator(previous = null)
 

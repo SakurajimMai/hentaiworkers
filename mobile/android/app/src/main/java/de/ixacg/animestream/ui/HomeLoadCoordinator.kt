@@ -8,6 +8,12 @@ internal data class HomeLoadUpdate(
     val shouldLoadAds: Boolean,
 )
 
+internal fun shouldStartHomeLoad(
+    hasContent: Boolean,
+    loading: Boolean,
+    active: Boolean,
+): Boolean = !hasContent && !loading && !active
+
 internal class HomeLoadCoordinator(private val previous: HomeContent?) {
     private var animeResult: Result<List<Anime>>? = null
     private var mangaResult: Result<List<MangaSummary>>? = null

@@ -12,6 +12,7 @@ import de.ixacg.animestream.core.model.MangaChapterDetail
 import de.ixacg.animestream.core.model.MangaChapterResponse
 import de.ixacg.animestream.core.model.MangaChapterSummary
 import de.ixacg.animestream.core.model.MangaDetail
+import de.ixacg.animestream.core.model.MangaPage
 import de.ixacg.animestream.core.model.MangaRank
 import de.ixacg.animestream.core.model.MangaSummary
 import de.ixacg.animestream.core.model.PublicAdsConfig
@@ -19,11 +20,17 @@ import de.ixacg.animestream.core.model.Tag
 import de.ixacg.animestream.data.repository.AvailableUpdate
 import de.ixacg.animestream.data.repository.SessionState
 import de.ixacg.animestream.data.repository.UpdateCheckResult
+import de.ixacg.animestream.reader.ReaderLogic
+import de.ixacg.animestream.reader.ReaderPreparationKey
+import de.ixacg.animestream.reader.ReaderPreparationStore
+import de.ixacg.animestream.reader.ReaderPreviewPreloader
+import de.ixacg.animestream.reader.ReaderPreviewState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -157,11 +164,26 @@ private fun MangaChapterResponse.readerManga(chapter: MangaChapterDetail): Manga
             ),
     )
 
+private fun MangaChapterResponse.normalizedForReader(): MangaChapterResponse {
+    val normalizedPages =
+        chapter.pages.mapNotNull { page ->
+            MediaUrlNormalizer.normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
+        }.distinctBy { it.index }
+    return copy(chapter = chapter.copy(pages = normalizedPages))
+}
+
 class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private val catalog = container.catalogRepository
     private val library = container.libraryRepository
     private val adsRepository = container.adsRepository
     private val updateRepository = container.updateRepository
+    private val readerPreparations = ReaderPreparationStore<MangaChapterResponse>(scope = viewModelScope)
+    private val readerPreviewPreloader =
+        ReaderPreviewPreloader(
+            context = container.applicationContext,
+            imageLoader = container.imageLoader,
+            scope = viewModelScope,
+        )
 
     val sessionState: StateFlow<SessionState> = container.sessionRepository.state
 
@@ -208,6 +230,9 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private var mangaDetailJob: Job? = null
     private var playerJob: Job? = null
     private var readerJob: Job? = null
+    private var readerPreparationJob: Job? = null
+    private var readerPreparationKey: ReaderPreparationKey? = null
+    private var readerPreparationPage: Int? = null
     private var progressJob: Job? = null
     private var updateJob: Job? = null
     private var discoverRequestGeneration = 0L
@@ -219,6 +244,18 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             runCatching { container.legacyStorageMigrator.migrateIfNeeded() }
             container.sessionRepository.hydrate()
+        }
+    }
+
+    fun ensureHomeLoaded() {
+        if (
+            !shouldStartHomeLoad(
+                hasContent = mutableHome.value.value != null,
+                loading = mutableHome.value.loading,
+                active = homeJob?.isActive == true,
+            )
+        ) {
+            return
         }
         refreshHome()
     }
@@ -786,12 +823,43 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
             }
     }
 
+    fun prepareReader(
+        mangaId: Long,
+        chapterNumber: Double,
+        initialPage: Int = 0,
+    ) {
+        if (!chapterNumber.isFinite()) return
+        val key = ReaderPreparationKey.of(mangaId, chapterNumber)
+        val targetPage = initialPage.coerceAtLeast(0)
+        if (
+            readerPreparationKey == key &&
+            readerPreparationPage == targetPage &&
+            readerPreparationJob?.isActive == true
+        ) {
+            return
+        }
+        readerPreparationJob?.cancel()
+        readerPreparationKey = key
+        readerPreparationPage = targetPage
+        readerPreparationJob =
+            viewModelScope.launch {
+                captureResult { preparedReaderChapter(key, mangaId, chapterNumber) }
+                    .onSuccess { response ->
+                        warmReaderTarget(response, mangaId, chapterNumber, targetPage)
+                    }
+            }
+    }
+
     fun loadReader(
         mangaId: Long,
         chapterNumber: Double,
         initialPage: Int = 0,
         requestId: String? = null,
     ) {
+        if (!chapterNumber.isFinite()) {
+            mutableReader.value = Loadable(error = "章节编号无效")
+            return
+        }
         if (
             requestId != null &&
             requestId == activeReaderRequestId &&
@@ -836,6 +904,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         }
                     }
             }
+            warmReaderTarget(previous.chapter.pages, mangaId, chapterNumber, restoredPage)
             activeReaderRequestId = requestId
             return
         }
@@ -854,13 +923,12 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                 mutableReader.value = Loadable(loading = true)
                 captureResult {
                     coroutineScope {
-                        val response = catalog.chapter(mangaId, chapterNumber)
+                        val preparationKey = ReaderPreparationKey.of(mangaId, chapterNumber)
+                        val response = preparedReaderChapter(preparationKey, mangaId, chapterNumber)
                         val chapterValue = response.chapter
-                        val pages =
-                            chapterValue.pages.mapNotNull { page ->
-                                MediaUrlNormalizer.normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
-                            }.distinctBy { it.index }
-                        val normalizedChapter = chapterValue.copy(pages = pages)
+                        val pages = chapterValue.pages
+                        val normalizedChapter = chapterValue
+                        warmReaderTarget(response, mangaId, chapterNumber, initialPage)
                         val content =
                             ReaderContent(
                                 manga =
@@ -925,6 +993,41 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                 }
             }
     }
+
+    private suspend fun preparedReaderChapter(
+        key: ReaderPreparationKey,
+        mangaId: Long,
+        chapterNumber: Double,
+    ): MangaChapterResponse =
+        readerPreparations.getOrLoad(key) {
+            catalog.chapter(mangaId, chapterNumber).normalizedForReader()
+        }
+
+    private fun warmReaderTarget(
+        response: MangaChapterResponse,
+        mangaId: Long,
+        chapterNumber: Double,
+        requestedPage: Int,
+    ) = warmReaderTarget(response.chapter.pages, mangaId, chapterNumber, requestedPage)
+
+    private fun warmReaderTarget(
+        pages: List<MangaPage>,
+        mangaId: Long,
+        chapterNumber: Double,
+        requestedPage: Int,
+    ) {
+        val target = ReaderLogic.targetPage(pages, requestedPage) ?: return
+        readerPreviewPreloader.warm(
+            imageUrl = target.imageUrl,
+            memoryCacheKey = ReaderLogic.previewMemoryCacheKey(mangaId, chapterNumber, target),
+        )
+    }
+
+    internal fun readerPreviewState(memoryCacheKey: String): Flow<ReaderPreviewState> =
+        readerPreviewPreloader.state(memoryCacheKey)
+
+    internal fun currentReaderPreviewState(memoryCacheKey: String): ReaderPreviewState =
+        readerPreviewPreloader.currentState(memoryCacheKey)
 
     private fun updateReader(
         identity: ReaderLoadIdentity,

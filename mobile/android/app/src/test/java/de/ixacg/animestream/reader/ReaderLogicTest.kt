@@ -3,6 +3,7 @@ package de.ixacg.animestream.reader
 import de.ixacg.animestream.core.model.MangaPage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,23 +65,23 @@ class ReaderLogicTest {
     }
 
     @Test
-    fun `prefetch waits for current page display and returns only next two unscheduled urls`() {
+    fun `prefetch uses one page for preview and two for full readiness`() {
         val pages = (0 until 6).map { MangaPage(index = it, imageUrl = "https://example.test/$it.jpg") }
 
         assertTrue(
             ReaderLogic.prefetchPages(
                 pages = pages,
                 currentPage = 2,
-                currentPageDisplayed = false,
+                readiness = ReaderPageReadiness.Loading,
                 scheduledUrls = emptySet(),
             ).isEmpty(),
         )
         assertEquals(
-            listOf("https://example.test/3.jpg", "https://example.test/4.jpg"),
+            listOf("https://example.test/3.jpg"),
             ReaderLogic.prefetchPages(
                 pages = pages,
                 currentPage = 2,
-                currentPageDisplayed = true,
+                readiness = ReaderPageReadiness.Preview,
                 scheduledUrls = emptySet(),
             ).map(MangaPage::imageUrl),
         )
@@ -89,14 +90,14 @@ class ReaderLogicTest {
             ReaderLogic.prefetchPages(
                 pages = pages,
                 currentPage = 2,
-                currentPageDisplayed = true,
+                readiness = ReaderPageReadiness.Full,
                 scheduledUrls = setOf("https://example.test/3.jpg"),
             ).map(MangaPage::imageUrl),
         )
     }
 
     @Test
-    fun `prefetch registry reserves each url once and cancels retained requests`() {
+    fun `prefetch registry keeps successes deduplicated and releases failures`() {
         val registry = ReaderPrefetchRegistry()
         var cancellations = 0
 
@@ -107,9 +108,27 @@ class ReaderLogicTest {
         registry.register("page-2") { cancellations++ }
 
         assertEquals(setOf("page-1", "page-2"), registry.scheduledUrls)
+        registry.succeed("page-1")
+        assertFalse(registry.reserve("page-1"))
+        registry.fail("page-2")
+        assertTrue(registry.reserve("page-2"))
+        registry.register("page-2") { cancellations++ }
         registry.cancelAll()
-        assertEquals(2, cancellations)
+        assertEquals(1, cancellations)
         assertTrue(registry.scheduledUrls.isEmpty())
+    }
+
+    @Test
+    fun `prefetch registry disposes a request registered after completion`() {
+        val registry = ReaderPrefetchRegistry()
+        var cancellations = 0
+
+        assertTrue(registry.reserve("page-1"))
+        registry.succeed("page-1")
+        registry.register("page-1") { cancellations++ }
+
+        assertEquals(1, cancellations)
+        assertFalse(registry.reserve("page-1"))
     }
 
     @Test
@@ -122,7 +141,7 @@ class ReaderLogicTest {
             ReaderLogic.prefetchPages(
                 pages = pages,
                 currentPage = currentPage,
-                currentPageDisplayed = true,
+                readiness = ReaderPageReadiness.Full,
                 scheduledUrls = registry.scheduledUrls,
             ).forEach { page ->
                 if (registry.reserve(page.imageUrl)) {
@@ -135,6 +154,61 @@ class ReaderLogicTest {
         assertEquals(39, enqueueCount)
         assertEquals(39, registry.scheduledUrls.size)
         assertFalse("page-0" in registry.scheduledUrls)
+    }
+
+    @Test
+    fun `restored target selection starts at requested page rather than page zero`() {
+        val pages = (0 until 240).map { MangaPage(index = it, imageUrl = "page-$it") }
+
+        assertEquals("page-200", ReaderLogic.targetPage(pages, requestedPage = 200)?.imageUrl)
+        assertEquals("page-239", ReaderLogic.targetPage(pages, requestedPage = 999)?.imageUrl)
+        assertNull(ReaderLogic.targetPage(emptyList(), requestedPage = 200))
+    }
+
+    @Test
+    fun `preview keys are stable and isolated by chapter and page`() {
+        val page = MangaPage(index = 3, imageUrl = "https://example.test/page.jpg")
+
+        assertEquals(
+            ReaderLogic.previewMemoryCacheKey(8, 1.0, page),
+            ReaderLogic.previewMemoryCacheKey(8, 1.00, page),
+        )
+        assertNotEquals(
+            ReaderLogic.previewMemoryCacheKey(8, 1.0, page),
+            ReaderLogic.previewMemoryCacheKey(8, 2.0, page),
+        )
+        assertNotEquals(
+            ReaderLogic.previewMemoryCacheKey(8, 1.0, page),
+            ReaderLogic.previewMemoryCacheKey(8, 1.0, page.copy(index = 4)),
+        )
+    }
+
+    @Test
+    fun `preview gate never delays an already cached original`() {
+        assertTrue(
+            ReaderLogic.shouldWaitForPreparedPreview(
+                previewState = ReaderPreviewState.Loading,
+                originalCached = false,
+            ),
+        )
+        assertFalse(
+            ReaderLogic.shouldWaitForPreparedPreview(
+                previewState = ReaderPreviewState.Loading,
+                originalCached = true,
+            ),
+        )
+        assertFalse(
+            ReaderLogic.shouldWaitForPreparedPreview(
+                previewState = ReaderPreviewState.Ready,
+                originalCached = false,
+            ),
+        )
+        assertFalse(
+            ReaderLogic.shouldWaitForPreparedPreview(
+                previewState = ReaderPreviewState.Idle,
+                originalCached = false,
+            ),
+        )
     }
 
     @Test

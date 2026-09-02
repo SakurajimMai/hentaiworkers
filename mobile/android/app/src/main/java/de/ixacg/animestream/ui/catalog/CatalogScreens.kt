@@ -64,6 +64,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.home.collectAsStateWithLifecycle()
     val ads by viewModel.adsState.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.ensureHomeLoaded() }
     PullToRefreshBox(
         isRefreshing = state.loading && state.value != null,
         onRefresh = { viewModel.refreshHome(forceAds = true) },

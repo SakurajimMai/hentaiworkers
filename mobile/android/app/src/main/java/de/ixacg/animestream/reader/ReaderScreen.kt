@@ -77,6 +77,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.imageLoader
+import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import de.ixacg.animestream.core.model.MangaChapterSummary
@@ -85,6 +86,7 @@ import de.ixacg.animestream.ui.AnimeStreamViewModel
 import de.ixacg.animestream.ui.components.HtmlAd
 import de.ixacg.animestream.ui.library.formatChapter
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -134,6 +136,7 @@ fun ReaderScreen(
     var sliderValue by remember { mutableFloatStateOf(initialPage.toFloat()) }
     var sliderDragging by remember { mutableStateOf(false) }
     var seekJob by remember { mutableStateOf<Job?>(null) }
+    var previewedPages by remember(readerRequestId, chapterKey) { mutableStateOf(emptySet<Int>()) }
     var displayedPages by remember(readerRequestId, chapterKey) { mutableStateOf(emptySet<Int>()) }
     var appliedTopAd by remember(readerRequestId, chapterKey) { mutableStateOf(topAdEnabled) }
 
@@ -154,9 +157,11 @@ fun ReaderScreen(
     DisposableEffect(prefetchRegistry) {
         onDispose { prefetchRegistry.cancelAll() }
     }
-    LaunchedEffect(viewModel) { viewModel.ensureAdsLoaded() }
     LaunchedEffect(readerRequestId, mangaId, chapterNumber, initialPage) {
         viewModel.loadReader(mangaId, chapterNumber, initialPage, readerRequestId)
+    }
+    LaunchedEffect(displayedPages.isNotEmpty()) {
+        if (displayedPages.isNotEmpty()) viewModel.ensureAdsLoaded()
     }
     LaunchedEffect(readerRequestId, chapterKey, topAdEnabled) {
         if (content != null && pages.isNotEmpty() && appliedTopAd != topAdEnabled) {
@@ -192,13 +197,19 @@ fun ReaderScreen(
             .distinctUntilChanged()
             .collect { page -> if (page != null) viewModel.setReaderPage(page) }
     }
-    LaunchedEffect(readerRequestId, chapterKey, content?.currentPage, pages, displayedPages) {
+    LaunchedEffect(readerRequestId, chapterKey, content?.currentPage, pages, previewedPages, displayedPages) {
         val current = content?.currentPage ?: return@LaunchedEffect
+        val readiness =
+            when (current) {
+                in displayedPages -> ReaderPageReadiness.Full
+                in previewedPages -> ReaderPageReadiness.Preview
+                else -> ReaderPageReadiness.Loading
+            }
         val candidates =
             ReaderLogic.prefetchPages(
                 pages = pages,
                 currentPage = current,
-                currentPageDisplayed = current in displayedPages,
+                readiness = readiness,
                 scheduledUrls = prefetchRegistry.scheduledUrls,
             )
         candidates.forEach { page ->
@@ -211,6 +222,10 @@ fun ReaderScreen(
                             .size(64, 64)
                             .memoryCachePolicy(CachePolicy.DISABLED)
                             .crossfade(false)
+                            .listener(
+                                onSuccess = { _, _ -> prefetchRegistry.succeed(page.imageUrl) },
+                                onError = { _, _ -> prefetchRegistry.fail(page.imageUrl) },
+                            )
                             .build(),
                     )
                 prefetchRegistry.register(page.imageUrl, disposable::dispose)
@@ -220,7 +235,7 @@ fun ReaderScreen(
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when {
-            state.loading || content == null && state.error == null ->
+            content == null && state.error == null ->
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             state.error != null && content == null ->
                 ReaderError(
@@ -243,9 +258,25 @@ fun ReaderScreen(
                     }
                     itemsIndexed(pages, key = { index, _ -> "page-$index" }) { index, page ->
                         key(page.imageUrl) {
+                            val previewMemoryCacheKey =
+                                ReaderLogic.previewMemoryCacheKey(mangaId, chapterNumber, page)
+                            val previewState =
+                                remember(viewModel, previewMemoryCacheKey) {
+                                    viewModel.readerPreviewState(previewMemoryCacheKey)
+                                }
+                            val initialPreviewState =
+                                viewModel.currentReaderPreviewState(previewMemoryCacheKey)
                             ZoomableReaderPage(
                                 pagePosition = index,
                                 page = page,
+                                previewMemoryCacheKey = previewMemoryCacheKey,
+                                preparedPreviewState = previewState,
+                                initialPreparedPreviewState = initialPreviewState,
+                                onPreview = { previewedPage ->
+                                    if (previewedPage !in previewedPages) {
+                                        previewedPages = previewedPages + previewedPage
+                                    }
+                                },
                                 onDisplayed = { displayedPage ->
                                     if (displayedPage !in displayedPages) {
                                         displayedPages = displayedPages + displayedPage
@@ -440,6 +471,10 @@ fun ReaderScreen(
 private fun ZoomableReaderPage(
     pagePosition: Int,
     page: MangaPage,
+    previewMemoryCacheKey: String,
+    preparedPreviewState: Flow<ReaderPreviewState>,
+    initialPreparedPreviewState: ReaderPreviewState,
+    onPreview: (Int) -> Unit,
     onDisplayed: (Int) -> Unit,
     onTap: () -> Unit,
     onZoomChanged: (Boolean) -> Unit,
@@ -449,26 +484,43 @@ private fun ZoomableReaderPage(
     var imageSize by remember(page.imageUrl) { mutableStateOf(IntSize.Zero) }
     var retry by remember(page.imageUrl) { mutableIntStateOf(0) }
     var loadState by remember(page.imageUrl) { mutableStateOf(PageLoadState.Loading) }
+    val previewState by
+        preparedPreviewState.collectAsStateWithLifecycle(initialValue = initialPreparedPreviewState)
     val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 4f))
     val imageState = rememberZoomableImageState(zoomableState)
     val request =
-        remember(page.imageUrl, retry) {
-            ImageRequest.Builder(context)
-                .data(page.imageUrl)
-                .memoryCacheKey("${page.imageUrl}-$retry")
-                .diskCacheKey(page.imageUrl)
-                .crossfade(false)
-                .listener(
-                    onStart = { loadState = PageLoadState.Loading },
-                    onSuccess = { _, result ->
-                        val width = result.drawable.intrinsicWidth
-                        val height = result.drawable.intrinsicHeight
-                        imageSize = IntSize(width.coerceAtLeast(0), height.coerceAtLeast(0))
-                        ratio = ReaderLogic.pageAspectRatio(width, height)
-                    },
-                    onError = { _, _ -> loadState = PageLoadState.Error },
-                ).build()
+        remember(page.imageUrl, retry, previewState) {
+            val originalMemoryCacheKey = ReaderLogic.originalMemoryCacheKey(page.imageUrl, retry)
+            val originalCached =
+                context.imageLoader.memoryCache?.get(MemoryCache.Key(originalMemoryCacheKey)) != null
+            if (ReaderLogic.shouldWaitForPreparedPreview(previewState, originalCached)) {
+                null
+            } else {
+                ImageRequest.Builder(context)
+                    .data(page.imageUrl)
+                    .memoryCacheKey(originalMemoryCacheKey)
+                    .placeholderMemoryCacheKey(previewMemoryCacheKey)
+                    .diskCacheKey(page.imageUrl)
+                    .crossfade(false)
+                    .listener(
+                        onStart = { loadState = PageLoadState.Loading },
+                        onSuccess = { _, result ->
+                            val width = result.drawable.intrinsicWidth
+                            val height = result.drawable.intrinsicHeight
+                            imageSize = IntSize(width.coerceAtLeast(0), height.coerceAtLeast(0))
+                            ratio = ReaderLogic.pageAspectRatio(width, height)
+                        },
+                        onError = { _, _ -> loadState = PageLoadState.Error },
+                    ).build()
+            }
         }
+    LaunchedEffect(imageState, page.imageUrl, retry) {
+        snapshotFlow { imageState.isPlaceholderDisplayed }
+            .distinctUntilChanged()
+            .first { displayed -> displayed }
+        if (loadState == PageLoadState.Loading) loadState = PageLoadState.Preview
+        onPreview(pagePosition)
+    }
     LaunchedEffect(imageState, page.imageUrl, retry) {
         snapshotFlow { imageState.isImageDisplayed }
             .distinctUntilChanged()
@@ -535,6 +587,7 @@ private fun ZoomableReaderPage(
                         }
                     }
                 }
+                PageLoadState.Preview,
                 PageLoadState.Ready -> Unit
             }
         }
@@ -543,6 +596,7 @@ private fun ZoomableReaderPage(
 
 private enum class PageLoadState {
     Loading,
+    Preview,
     Ready,
     Error,
 }

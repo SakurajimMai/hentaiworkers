@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
@@ -262,9 +263,11 @@ private fun rows(
 fun AccountScreen(
     viewModel: AnimeStreamViewModel,
     onLogin: () -> Unit,
+    onRegister: () -> Boolean,
 ) {
     val session by viewModel.sessionState.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    var registrationError by rememberSaveable { mutableStateOf<String?>(null) }
     Column(
         modifier =
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -283,6 +286,29 @@ fun AccountScreen(
                 Icon(Icons.Default.Login, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("登录")
+            }
+            OutlinedButton(
+                onClick = {
+                    registrationError =
+                        if (runCatching(onRegister).getOrDefault(false)) {
+                            null
+                        } else {
+                            REGISTRATION_LAUNCH_ERROR
+                        }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) {
+                Icon(Icons.Default.PersonAdd, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("注册账号")
+            }
+            Text(
+                "注册和邮箱验证将在浏览器中完成，完成后请返回 App 登录。",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            registrationError?.let { error ->
+                Text(error, color = MaterialTheme.colorScheme.error)
             }
         } else {
             Text(
@@ -333,11 +359,13 @@ fun LoginScreen(
     viewModel: AnimeStreamViewModel,
     onBack: () -> Unit,
     onSuccess: () -> Unit,
+    onRegister: () -> Boolean,
 ) {
     val session by viewModel.sessionState.collectAsStateWithLifecycle()
     var identity by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var localError by rememberSaveable { mutableStateOf<String?>(null) }
+    var registrationError by rememberSaveable { mutableStateOf<String?>(null) }
     Column(
         modifier =
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -384,7 +412,33 @@ fun LoginScreen(
                 Text("登录")
             }
         }
+        OutlinedButton(
+            onClick = {
+                registrationError =
+                    if (runCatching(onRegister).getOrDefault(false)) {
+                        null
+                    } else {
+                        REGISTRATION_LAUNCH_ERROR
+                    }
+            },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            enabled = !session.busy,
+        ) {
+            Icon(Icons.Default.PersonAdd, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("注册账号")
+        }
+        registrationError?.let { error ->
+            Text(error, color = MaterialTheme.colorScheme.error)
+        }
+        Text(
+            "注册和邮箱验证将在浏览器中完成，完成后请返回 App 登录。",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
+
+private const val REGISTRATION_LAUNCH_ERROR = "无法打开注册页面，请确认设备已安装浏览器后重试。"
 
 fun formatChapter(number: Double): String = if (number % 1.0 == 0.0) number.toLong().toString() else number.toString().trimEnd('0').trimEnd('.')

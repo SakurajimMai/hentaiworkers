@@ -56,6 +56,7 @@ import de.ixacg.animestream.ui.detail.MangaDetailScreen
 import de.ixacg.animestream.ui.library.AccountScreen
 import de.ixacg.animestream.ui.library.LibraryScreen
 import de.ixacg.animestream.ui.library.LoginScreen
+import de.ixacg.animestream.ui.library.RegistrationLaunchPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -83,6 +84,9 @@ fun AnimeStreamApp(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val onRegister: () -> Boolean = {
+        RegistrationLaunchPolicy.launch { url -> openExternalUrl(context, url) }
+    }
     val route = backStackEntry?.destination?.route
     val showNavigation = mainDestinations.any { destination -> route == destination.route }
     val immersive = route?.startsWith("player/") == true || route?.startsWith("reader/") == true
@@ -97,6 +101,7 @@ fun AnimeStreamApp(
                 AppNavHost(
                     navController,
                     viewModel,
+                    onRegister,
                     Modifier.weight(1f).windowInsetsPadding(
                         WindowInsets.safeDrawing.only(
                             WindowInsetsSides.Top + WindowInsetsSides.End + WindowInsetsSides.Bottom,
@@ -109,6 +114,7 @@ fun AnimeStreamApp(
                 AppNavHost(
                     navController,
                     viewModel,
+                    onRegister,
                     Modifier.weight(1f).windowInsetsPadding(
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
                     ),
@@ -122,7 +128,7 @@ fun AnimeStreamApp(
                 } else {
                     Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
                 }
-            AppNavHost(navController, viewModel, contentModifier)
+            AppNavHost(navController, viewModel, onRegister, contentModifier)
         }
     }
 
@@ -207,6 +213,7 @@ private fun MainNavigationRail(navController: NavHostController) {
 private fun AppNavHost(
     navController: NavHostController,
     viewModel: AnimeStreamViewModel,
+    onRegister: () -> Boolean,
     modifier: Modifier,
 ) {
     fun animeDetail(id: Long) = navController.navigate("anime/$id")
@@ -217,7 +224,11 @@ private fun AppNavHost(
         mangaId: Long,
         chapter: Double,
         page: Int = 0,
-    ) = navController.navigate("reader/$mangaId/${chapter.toRouteNumber()}?page=${page.coerceAtLeast(0)}")
+    ) {
+        val boundedPage = page.coerceAtLeast(0)
+        viewModel.prepareReader(mangaId, chapter, boundedPage)
+        navController.navigate("reader/$mangaId/${chapter.toRouteNumber()}?page=$boundedPage")
+    }
 
     NavHost(navController = navController, startDestination = "home", modifier = modifier) {
         composable("home") {
@@ -243,13 +254,18 @@ private fun AppNavHost(
             )
         }
         composable("account") {
-            AccountScreen(viewModel = viewModel, onLogin = { navController.navigate("login") })
+            AccountScreen(
+                viewModel = viewModel,
+                onLogin = { navController.navigate("login") },
+                onRegister = onRegister,
+            )
         }
         composable("login") {
             LoginScreen(
                 viewModel = viewModel,
                 onBack = navController::navigateUp,
                 onSuccess = { navController.popBackStack() },
+                onRegister = onRegister,
             )
         }
         composable(
@@ -334,6 +350,7 @@ private fun AppNavHost(
                 viewModel = viewModel,
                 onBack = navController::navigateUp,
                 onChapter = { next ->
+                    viewModel.prepareReader(id, next, 0)
                     navController.navigate("reader/$id/${next.toRouteNumber()}?page=0") {
                         popUpTo(entry.destination.id) { inclusive = true }
                     }

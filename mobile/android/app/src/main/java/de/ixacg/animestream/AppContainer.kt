@@ -19,16 +19,31 @@ import de.ixacg.animestream.data.repository.UpdateRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 
 class AppContainer(context: Context) {
-    private val applicationContext = context.applicationContext
+    internal val applicationContext = context.applicationContext
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val apiOrigin = "${MediaUrlNormalizer.origin}/".toHttpUrl()
+    private val networkConnectionPool = ConnectionPool()
+    private val networkDispatcher = Dispatcher()
+    private val networkClient =
+        OkHttpClient.Builder()
+            .connectionPool(networkConnectionPool)
+            .dispatcher(networkDispatcher)
+            .build()
 
     val cookieStore = SessionCookieStore(applicationContext, apiOrigin, applicationScope)
-    val api = ApiClient.create(cookieStore)
+    val api =
+        ApiClient.create(
+            cookieStore = cookieStore,
+            connectionPool = networkConnectionPool,
+            dispatcher = networkDispatcher,
+            baseClient = networkClient,
+        )
     val database = LibraryDatabase.create(applicationContext)
     val sessionRepository = SessionRepository(api, cookieStore)
     val catalogRepository = CatalogRepository(api)
@@ -41,7 +56,7 @@ class AppContainer(context: Context) {
     val imageLoader: ImageLoader =
         ImageLoader.Builder(applicationContext)
             .okHttpClient {
-                OkHttpClient.Builder()
+                networkClient.newBuilder()
                     .addInterceptor { chain ->
                         val builder = chain.request().newBuilder()
                         MediaUrlNormalizer.imageHeaders().forEach { (name, value) ->

@@ -55,6 +55,7 @@ import de.ixacg.animestream.ui.components.RemoteImage
 import de.ixacg.animestream.ui.components.ScreenHeader
 import de.ixacg.animestream.ui.components.statePane
 import de.ixacg.animestream.ui.library.formatChapter
+import kotlinx.coroutines.delay
 
 @Composable
 fun AnimeDetailScreen(
@@ -239,6 +240,13 @@ fun MangaDetailScreen(
     }
     val detail = content ?: return
     val manga = detail.manga
+    val defaultChapter = manga.chapters.firstOrNull()?.number
+    LaunchedEffect(manga.id, defaultChapter) {
+        if (defaultChapter != null) {
+            delay(350L)
+            viewModel.prepareReader(manga.id, defaultChapter)
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 40.dp),
