@@ -43,10 +43,16 @@ scope, Docker image, production Compose services, and server-private imports.
 - Catalog controls remain visible for initial loading, errors, and successful empty responses.
   Empty filtered results provide a clear-filter action. Refresh and pagination use separate jobs,
   propagate cancellation, and reject responses from an older filter generation.
-- Do not restore an unconditional startup burst for tags, ads, or `/api/me`. Tags load on discovery,
-  `/api/me` requires a persisted session cookie, and ads load after useful home content or on demand
-  from any directly entered player, reader, or catalog screen that consumes ads.
+- Do not restore an unconditional startup burst for the home catalog, tags, ads, or `/api/me`. The
+  home catalog starts when `HomeScreen` enters composition, tags load on discovery, and `/api/me`
+  requires a persisted session cookie. Ads load after useful home content, on demand from player or
+  catalog screens that consume ads, and only after the reader's first original image is displayed.
 - Invalid API origins and media URLs fail closed or use the documented production fallback.
+- API JSON and image traffic may share an OkHttp connection pool and dispatcher to reuse transport
+  resources, but derive both clients from the same neutral base client so their TLS configuration is
+  connection-compatible. Merely injecting one pool into independently built TLS clients does not
+  guarantee reuse. The image client must not inherit the API cookie jar or send the authenticated
+  website session to media hosts.
 - Logged-out library data uses Room; the target-site session and migration version use
   DataStore; login performs best-effort local-to-cloud merging.
 - OkHttp cookie callbacks update memory immediately and serialize DataStore writes. A
@@ -55,17 +61,30 @@ scope, Docker image, production Compose services, and server-private imports.
 - Media3 owns MP4/HLS playback. Main playback waits until the pre-roll decision is ready, and
   lifecycle pauses must neither display pause ads nor resume a user-paused video.
 - The reader remains a continuous vertical reader. Use lazy page composition and a proven
-  subsampling/zoom library; prefetch only a bounded preview into the disk cache so long images
-  are not decoded eagerly into memory.
+  subsampling/zoom library; do not eagerly fetch or decode the entire chapter.
+- After manga details settle for 350 ms, prepare the default chapter in the background. Every
+  explicit reader navigation, including chapter changes and restored-page entries, calls
+  `prepareReader` before navigation. Preparation must not publish reader UI state or record history.
+- Chapter preparation is single-flight per normalized manga/chapter key. Cache successful chapter
+  responses for 30 seconds with capacity two; do not cache failures, and allow a later attempt to
+  retry them.
 - Treat the successful chapter response as the reader's only critical bootstrap result. Publish
   its pages immediately; full manga details, favorite state, history, ads, and other optional work
   may merge later but must neither block nor erase already published pages. Guard late results by
   the active reader generation and chapter key.
+- Preparation warms only the bounded target page as a `480x1280` memory preview. Use a deterministic
+  preview memory key and the original image URL as its disk-cache key; the reader still requests the
+  original image and uses the preview only as its placeholder, so preparation cannot reduce final
+  image quality. If that target preview is still loading when the page composes, defer only that
+  page's original request until the preview succeeds or fails; Coil resolves a placeholder memory
+  key when its display request starts, so concurrent requests would both duplicate the download and
+  miss a late preview. Never apply this gate when the original image already has a memory-cache hit.
 - Initialize reader list state at the bounded restored page instead of composing page zero and
-  seeking afterward. Consider the current page readable only when Telephoto reports
-  `isImageDisplayed`; only then prefetch the next two pages. Explicit prefetch is unique per chapter
-  URL and all outstanding Coil disposables are released when the reader entry changes or leaves
-  composition.
+  seeking afterward. A displayed preview unlocks only the next page; once Telephoto reports
+  `isImageDisplayed` for the original image, the forward window becomes two pages in total. Only the
+  original-image signal marks the page readable, records full readiness, or unlocks reader ads.
+  Explicit prefetch is unique per chapter URL, failed reservations are released for retry, and all
+  outstanding Coil disposables are released when the reader entry changes or leaves composition.
 - An image whose scaled height can exceed practical Compose item constraints must use a finite
   subsampling viewport with base-scale vertical pan and nested-scroll handoff. Do not squash the
   image, clip away unreachable content, or request an intrinsic million-pixel layout height.
@@ -75,6 +94,11 @@ scope, Docker image, production Compose services, and server-private imports.
   `safeDrawing` top/bottom plus horizontal insets while the manga canvas remains edge-to-edge.
   Slider changes map to a bounded discrete page and cancel the previous seek immediately during
   dragging; releasing the thumb commits the final page again.
+- Native registration remains a validated external-browser handoff to the site's `/register` page.
+  Registration availability, email allowlists, rate limits, Turnstile, and optional email
+  verification remain server/Web-owned; do not add a client shortcut that bypasses them or import
+  the browser session into the APK. Browser-launch failure must remain an inline recoverable error,
+  and the user returns to the APK login screen after registration.
 - Update checks run independently after home catalog loading finishes and never mutate home state.
   Successful automatic checks are limited to once per 24 hours, failures back off for 6 hours,
   manual checks bypass both windows, and dismissing one version snoozes it for 24 hours. The client
