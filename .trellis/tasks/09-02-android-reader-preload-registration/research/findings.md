@@ -74,3 +74,14 @@ server environment. Those values show that the sampled server path was not consi
 they are not an Android before/after measurement and are not presented as target-image-readable
 time. The remaining radio, TLS, transfer, decode, and Telephoto display contributions require a
 physical-device trace after the remote build passes.
+
+## Remote CI follow-up
+
+Android run `33617519073` (`Build Android APK #80`) stopped in
+`:app:ktlintMainSourceSetCheck` before Android lint, JVM tests, or APK assembly completed. The
+uploaded `ci-gradle.log` and `ktlint-format.patch` identify five auto-fixable formatting violations
+in `ReaderPreviewPreloader.kt`, `ReaderScreen.kt`, `AnimeStreamViewModel.kt`, and
+`RegistrationLaunchPolicy.kt`. The local follow-up applies that generated patch exactly. The run's
+Node.js 20 and `setup-java@v4` annotations are deprecation warnings, not this failure's cause; a new
+remote run is still required to expose any downstream Android failure hidden by the early ktlint
+exit.

@@ -115,6 +115,10 @@ Developers edit Android code locally but do not run `gradlew`, Android Studio bu
 emulators, device tests, or any local Android compilation. GitHub Actions is the authoritative
 Android build environment and must:
 
+- When the combined quality step stops at `ktlintCheck`, treat downstream Android lint, JVM tests,
+  and APK assembly as unverified. Use the uploaded `ci-gradle.log` and `ktlint-format.patch` as the
+  source of truth, apply the formatting patch, and require a new remote run before distribution.
+
 1. Validate the committed Gradle wrapper and install Java 17 plus the Android SDK.
 2. Run Kotlin formatting, Android Lint, JVM/Robolectric tests, and `assembleRelease`.
 3. Verify APK package, versionCode, launcher activity, archive integrity, and signature.
