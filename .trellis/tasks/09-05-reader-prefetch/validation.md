@@ -82,11 +82,35 @@ performance, memory use, and device behavior have not been measured in this task
 
 Added 15 real Coil/MockWebServer JVM integration tests and five Telephoto device canvas tests,
 including precise startup-grace expiry, cache bypass, early completion/failure, and jump release.
-None of the Android Gradle, JVM, instrumentation, emulator, device, or APK build checks
-were executed: this environment has no Java/SDK/device tools, and the mobile repository
-contract uses GitHub Actions for Android builds. Static source/API review and whitespace
-validation are not substitutes for those checks. See [Android validation and APK rebuild
-steps](research/android-validation.md) for exact commands and remaining device checks.
+The JVM tests were subsequently executed in GitHub Actions, after the user requested a
+direct push to `main` and a completed APK build. See [Android validation and APK rebuild
+steps](research/android-validation.md) for commands and remaining device checks.
+
+## Main APK Build
+
+- Implementation commit: `0098adb`; CI formatting correction: `7d48198`.
+- [Build #84](https://github.com/SakurajimMai/hentaiworkers/actions/runs/33954709717)
+  succeeded on `main` at `7d4819825ddce7cd14ba11864ac6ee6d0a06dda2`.
+- Executed `ktlintCheck lintRelease testDebugUnitTest assembleDebugAndroidTest
+  assembleRelease`; Gradle reported success in 5 minutes 5 seconds.
+- Parsed uploaded test XML: 17 suites, 78 tests, zero failures/errors/skips.
+  This includes all 15 `ReaderImagePipelineTest` tests, 13 `ReaderLogicTest` tests,
+  and four `ReaderPreparationStoreTest` tests. Network, decode, disk-cache, and
+  memory-cache observations are present in the pipeline suite's `system-out`.
+- Android Lint completed with zero errors and 35 warnings; the build is not warning-free.
+- The workflow now compiles the five device tests through `assembleDebugAndroidTest`.
+  No instrumentation, emulator, or physical-device test was executed.
+- APK package, launcher, versionCode, resources, signature, archive integrity, and
+  split/universal ABI validation passed. All five downloaded SHA-256 checks passed.
+- Artifact `AnimeStream-apk-84` contains release-signed versionCode 84 APKs for
+  `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`, and `universal`, plus build metadata
+  and `SHA256SUMS`. No GitHub Release was published.
+- Downloaded artifacts: `/tmp/reader-ci-TunqtJ/apk-84/` and
+  `/tmp/reader-ci-TunqtJ/reports-84/`.
+
+Run #83 stopped at Ktlint before downstream validation. Its uploaded formatting
+patch corrected three expression-body line breaks, then run #84 passed. The
+subsequent validation-record commit changes no Android application or workflow files.
 
 ## Executed Root Checks
 
@@ -119,6 +143,7 @@ Browser implementation and tests:
 
 Android implementation, tests, and test dependencies:
 
+- `.github/workflows/build-android.yml`
 - `mobile/android/app/src/main/java/de/ixacg/animestream/reader/ReaderLogic.kt`
 - `mobile/android/app/src/main/java/de/ixacg/animestream/reader/ReaderScreen.kt`
 - `mobile/android/app/src/main/java/de/ixacg/animestream/reader/ReaderPreviewPreloader.kt`

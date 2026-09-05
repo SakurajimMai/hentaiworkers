@@ -2,15 +2,30 @@
 
 ## Execution Status
 
-No Android Gradle compilation, JVM/Robolectric suite, emulator, or device test was
-executed in this workspace. The repository's mobile contract requires Android
-builds in GitHub Actions. Read-only environment inspection also found no Java,
-Gradle, Kotlin compiler, Android SDK, adb, emulator, or gh executable.
+Android validation runs remotely in GitHub Actions, in accordance with the mobile
+build contract. No local Gradle build, emulator, or device test was run.
 
 The existing `.github/workflows/build-android.yml` runs `ktlintCheck`,
-`lintRelease`, `testDebugUnitTest`, and `assembleRelease`, plus APK identity,
-signing, resources, and ABI validation. It does not currently execute device tests.
-No workflow was dispatched or changed by this task.
+`lintRelease`, `testDebugUnitTest`, `assembleDebugAndroidTest`, and `assembleRelease`,
+plus APK identity, signing, resources, and ABI validation. This task added the
+device-test APK compilation step; it does not execute device tests.
+
+The reader changes were pushed directly to `main` as `0098adb`. Run #83 stopped
+at Ktlint; its uploaded formatting patch was applied and pushed as `7d48198`.
+[Run #84](https://github.com/SakurajimMai/hentaiworkers/actions/runs/33954709717)
+succeeded at `7d4819825ddce7cd14ba11864ac6ee6d0a06dda2`: all five Gradle targets
+passed, including compilation of the device tests. The uploaded XML reports
+contain 78 tests across 17 suites with zero failures, errors, or skips. All 15
+Coil/MockWebServer pipeline tests, 13 reader logic tests, and four preparation-store
+tests passed. Android Lint reported zero errors and 35 warnings.
+
+The `AnimeStream-apk-84` artifact contains five release-signed APKs with versionCode
+84, build metadata, and SHA-256 checksums. Package, resources, launcher, signature,
+archive integrity, and ABI validation passed in CI. All five downloaded APK
+checksums also passed locally. The extracted APKs and reports are available under
+`/tmp/reader-ci-TunqtJ/apk-84/` and `/tmp/reader-ci-TunqtJ/reports-84/`.
+No GitHub Release was published. The follow-up verification-record commit does
+not change Android application or workflow files.
 
 Local verification performed for the added Android files:
 
@@ -21,7 +36,8 @@ Local verification performed for the added Android files:
   mobile/android/gradle/libs.versions.toml mobile/android/app/src/test
   mobile/android/app/src/androidTest` successfully.
 
-These checks do not establish Kotlin compilation or Android runtime success.
+These local checks alone do not establish Kotlin compilation or Android runtime
+success; the remote build and JVM reports above provide the executed CI evidence.
 
 ## Implemented Tests
 
@@ -84,14 +100,14 @@ it is not a before/after performance benchmark.
 
 ## Rebuild APK In CI
 
-1. Put the changes on a repository branch. A push that includes `mobile/**`
-   automatically runs **Build Android APK**.
-2. Alternatively dispatch the existing workflow for that branch with
+1. Merge changes into `main`. A push that includes `mobile/**` or the Android
+   workflow automatically runs **Build Android APK**.
+2. Alternatively dispatch the existing workflow for `main` with
    `publish_release=false`:
 
    ```sh
-   gh workflow run build-android.yml --ref READER_FIX_BRANCH -f publish_release=false
-   gh run list --workflow build-android.yml --branch READER_FIX_BRANCH --limit 1
+   gh workflow run build-android.yml --ref main -f publish_release=false
+   gh run list --workflow build-android.yml --branch main --limit 1
    gh run watch RUN_ID --exit-status
    gh run download RUN_ID
    ```
@@ -121,11 +137,10 @@ adb logcat -d -s ReaderPipelineTiming:I
 Collect `app/build/reports/androidTests/connected/`,
 `app/build/outputs/androidTest-results/connected/`, and timing logcat output.
 The existing workflow would need an additional remote device job to automate this
-command; this task did not silently claim that its existing JVM job runs it.
+command. The existing JVM and device-test compilation steps do not run it.
 
 ## Still Required Before Distribution
 
-- A successful remote Gradle build and all JVM/Robolectric tests.
 - A successful emulator/device instrumentation run, including canvas checks.
 - Full APK smoke testing for persisted reading progress, favorite toggling,
   ads only after a visible original is ready, retry, chapter changes, theme, zoom,
@@ -133,4 +148,4 @@ command; this task did not silently claim that its existing JVM job runs it.
 - Cold/hot cache measurements on a representative physical Android device and
   a before/after first-original-display comparison. No physical-device latency,
   memory pressure, decode, or first-display improvement is claimed from static
-  inspection or from an unexecuted suite.
+  inspection or from the JVM transport tests.

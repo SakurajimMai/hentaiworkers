@@ -140,7 +140,8 @@ Android build environment and must:
   source of truth, apply the formatting patch, and require a new remote run before distribution.
 
 1. Validate the committed Gradle wrapper and install Java 17 plus the Android SDK.
-2. Run Kotlin formatting, Android Lint, JVM/Robolectric tests, and `assembleRelease`.
+2. Run Kotlin formatting, Android Lint, JVM/Robolectric tests, `assembleDebugAndroidTest`,
+   and `assembleRelease`. Device-test APK compilation does not count as device-test execution.
 3. Verify APK package, versionCode, launcher activity, archive integrity, and signature.
 4. Reject React Native, Hermes, Metro, Expo, or JavaScript bundle remnants.
 5. Build and validate real `arm64-v8a`, `armeabi-v7a`, `x86_64`, and `x86` splits plus a

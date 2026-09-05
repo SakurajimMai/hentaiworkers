@@ -12,15 +12,15 @@
   "assignee": "root",
   "createdAt": "2026-09-05",
   "completedAt": null,
-  "branch": null,
+  "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "7d4819825ddce7cd14ba11864ac6ee6d0a06dda2",
   "pr_url": null,
   "subtasks": [],
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "Reader implementation is on main; GitHub Actions APK build #84 passed with 78 JVM tests and device-test compilation. Physical-device/emulator execution and full APK smoke/performance checks remain unverified.",
   "meta": {}
 }
