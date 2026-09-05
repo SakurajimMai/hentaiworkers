@@ -185,8 +185,7 @@ internal class ReaderPreviewPreloader(
         }
     }
 
-    private fun originalCached(imageUrl: String): Boolean =
-        imageLoader.memoryCache?.get(MemoryCache.Key(ReaderLogic.originalMemoryCacheKey(imageUrl, retry = 0))) != null
+    private fun originalCached(imageUrl: String): Boolean = imageLoader.memoryCache?.get(MemoryCache.Key(ReaderLogic.originalMemoryCacheKey(imageUrl, retry = 0))) != null
 
     private fun delayStartupLocked(imageUrl: String) {
         startupTargetUrl = imageUrl

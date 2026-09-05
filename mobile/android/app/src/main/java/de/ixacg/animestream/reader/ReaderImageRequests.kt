@@ -16,8 +16,7 @@ import kotlinx.coroutines.sync.withLock
 
 private const val READER_IMAGE_REQUEST = "reader-image-request"
 
-internal fun ImageRequest.Builder.readerImageRequest(): ImageRequest.Builder =
-    setParameter(READER_IMAGE_REQUEST, true, memoryCacheKey = null)
+internal fun ImageRequest.Builder.readerImageRequest(): ImageRequest.Builder = setParameter(READER_IMAGE_REQUEST, true, memoryCacheKey = null)
 
 internal class ReaderImageSingleFlight {
     class Factory : Fetcher.Factory<Uri> {

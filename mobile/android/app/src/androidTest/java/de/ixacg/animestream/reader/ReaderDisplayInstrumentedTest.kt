@@ -339,8 +339,7 @@ class ReaderDisplayInstrumentedTest {
         assertTrue("The canvas must contain the controlled green image, not an empty surface", center.green > center.red + 0.1f)
     }
 
-    private fun pages(count: Int): List<MangaPage> =
-        (0 until count).map { index -> MangaPage(index, server.url("/page-$index.png").toString()) }
+    private fun pages(count: Int): List<MangaPage> = (0 until count).map { index -> MangaPage(index, server.url("/page-$index.png").toString()) }
 
     private fun requested(index: Int): Boolean = networkRequests(index) > 0
 
