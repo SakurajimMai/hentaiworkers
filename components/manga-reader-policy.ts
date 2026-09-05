@@ -15,7 +15,10 @@ export type ReaderAdRenderPolicy = Readonly<{
   mountContent: boolean;
 }>;
 
-export const READER_PREFETCH_ROOT_MARGIN = '0px 0px 600px 0px';
+export const READER_PREFETCH_CONCURRENCY = 2;
+export const READER_INITIAL_PREFETCH_DELAY_MS = 300;
+export const READER_PREFETCH_FORWARD_PAGES = 4;
+export const READER_PREFETCH_REVERSE_PAGES = 1;
 
 export const READER_RESTORE_SCROLL_OPTIONS = {
   behavior: 'instant',
@@ -35,7 +38,26 @@ export function getStoredReaderPage(raw: string | null, pageCount: number): numb
 }
 
 export function getInitialReaderPages(initialPage: number, pageCount: number): number[] {
-  return pageCount > 0 ? [clampReaderPage(initialPage, pageCount)] : [];
+  if (pageCount <= 0) return [];
+  const current = clampReaderPage(initialPage, pageCount);
+  return [current, current + 1, current - 1, current + 2]
+    .filter((index) => index >= 0 && index < pageCount);
+}
+
+export function getReaderPrefetchPages(
+  currentPage: number,
+  pageCount: number,
+  direction: 1 | -1,
+): number[] {
+  const current = clampReaderPage(currentPage, pageCount);
+  const candidates = Array.from(
+    { length: READER_PREFETCH_FORWARD_PAGES },
+    (_, offset) => current + (offset + 1) * direction,
+  );
+  for (let offset = 1; offset <= READER_PREFETCH_REVERSE_PAGES; offset += 1) {
+    candidates.push(current - offset * direction);
+  }
+  return candidates.filter((index) => index >= 0 && index < pageCount);
 }
 
 export function getReaderImageRequestPolicy(isPriority: boolean): ReaderImageRequestPolicy {

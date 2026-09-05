@@ -17,6 +17,9 @@ type MediaImageProps = {
   variant?: PlaceholderVariant;
   fallbackLabel?: string;
   referrerPolicy?: ImgHTMLAttributes<HTMLImageElement>['referrerPolicy'];
+  onLoad?: ImgHTMLAttributes<HTMLImageElement>['onLoad'];
+  onError?: ImgHTMLAttributes<HTMLImageElement>['onError'];
+  onRetry?: () => void;
 };
 
 export function MediaImage({
@@ -32,6 +35,9 @@ export function MediaImage({
   variant = 'poster',
   fallbackLabel,
   referrerPolicy = 'no-referrer',
+  onLoad,
+  onError,
+  onRetry,
 }: MediaImageProps) {
   const [failed, setFailed] = useState(!src);
   const [retry, setRetry] = useState(0);
@@ -52,6 +58,7 @@ export function MediaImage({
               type="button"
               className="mt-1 rounded-full border border-border bg-card px-3 py-1 font-ui text-[11px] text-ink transition hover:bg-secondary"
               onClick={() => {
+                onRetry?.();
                 setFailed(false);
                 setRetry((value) => value + 1);
               }}
@@ -79,7 +86,11 @@ export function MediaImage({
         decoding={decoding}
         referrerPolicy={referrerPolicy}
         className={cn('bg-surface-2', className)}
-        onError={() => setFailed(true)}
+        onLoad={onLoad}
+        onError={(event) => {
+          setFailed(true);
+          onError?.(event);
+        }}
       />
     </div>
   );

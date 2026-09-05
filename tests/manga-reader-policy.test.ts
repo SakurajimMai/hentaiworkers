@@ -8,7 +8,7 @@ import {
   getReaderImageRequestPolicy,
   getStoredReaderPage,
   isReaderViewportTransition,
-  READER_PREFETCH_ROOT_MARGIN,
+  getReaderPrefetchPages,
   READER_RESTORE_SCROLL_OPTIONS,
   selectActiveReaderPage,
   shouldSyncReaderProgress,
@@ -27,9 +27,9 @@ test('reader restore values are bounded without silently accepting invalid stora
   assert.equal(clampReaderPage(-4, 280), 0);
 });
 
-test('only the intended current page is mounted as the initial critical image', () => {
-  assert.deepEqual(getInitialReaderPages(0, 292), [0]);
-  assert.deepEqual(getInitialReaderPages(200, 280), [200]);
+test('initial candidates include a small neighborhood with one critical image', () => {
+  assert.deepEqual(getInitialReaderPages(0, 292), [0, 1, 2]);
+  assert.deepEqual(getInitialReaderPages(200, 280), [200, 201, 199, 202]);
   assert.deepEqual(getInitialReaderPages(0, 0), []);
 
   const policies = [0, 1, 2].map((index) => getReaderImageRequestPolicy(index === 0));
@@ -51,8 +51,11 @@ test('offscreen prefetch intersections cannot advance the actual reader page', (
   assert.equal(active, 0);
 });
 
-test('reader prefetches forward without mounting pages above the viewport', () => {
-  assert.equal(READER_PREFETCH_ROOT_MARGIN, '0px 0px 600px 0px');
+test('reader window follows direction and stays bounded at chapter edges', () => {
+  assert.deepEqual(getReaderPrefetchPages(20, 292, 1), [21, 22, 23, 24, 19]);
+  assert.deepEqual(getReaderPrefetchPages(20, 292, -1), [19, 18, 17, 16, 21]);
+  assert.deepEqual(getReaderPrefetchPages(0, 292, -1), [1]);
+  assert.deepEqual(getReaderPrefetchPages(291, 292, 1), [290]);
 });
 
 test('reader restore bypasses global smooth scrolling and lands immediately', () => {

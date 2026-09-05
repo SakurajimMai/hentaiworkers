@@ -16,6 +16,7 @@ import de.ixacg.animestream.data.repository.LibraryRepository
 import de.ixacg.animestream.data.repository.SessionRepository
 import de.ixacg.animestream.data.repository.UpdateCheckStore
 import de.ixacg.animestream.data.repository.UpdateRepository
+import de.ixacg.animestream.reader.ReaderImageSingleFlight
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,6 +68,7 @@ class AppContainer(context: Context) {
                     .build()
             }
             .components {
+                add(ReaderImageSingleFlight.Factory())
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     add(ImageDecoderDecoder.Factory())
                 } else {

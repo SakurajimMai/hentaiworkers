@@ -74,17 +74,37 @@ scope, Docker image, production Compose services, and server-private imports.
   the active reader generation and chapter key.
 - Preparation warms only the bounded target page as a `480x1280` memory preview. Use a deterministic
   preview memory key and the original image URL as its disk-cache key; the reader still requests the
-  original image and uses the preview only as its placeholder, so preparation cannot reduce final
-  image quality. If that target preview is still loading when the page composes, defer only that
-  page's original request until the preview succeeds or fails; Coil resolves a placeholder memory
-  key when its display request starts, so concurrent requests would both duplicate the download and
-  miss a late preview. Never apply this gate when the original image already has a memory-cache hit.
+  original image and uses an available preview only as its placeholder, so preparation cannot reduce
+  final image quality. Preview requests use `Scale.FIT` and exact precision to constrain both image
+  dimensions, including unusually tall images. A visible original request must start immediately;
+  never set it to null while a prepared preview is loading or decoding.
 - Initialize reader list state at the bounded restored page instead of composing page zero and
-  seeking afterward. A displayed preview unlocks only the next page; once Telephoto reports
-  `isImageDisplayed` for the original image, the forward window becomes two pages in total. Only the
-  original-image signal marks the page readable, records full readiness, or unlocks reader ads.
-  Explicit prefetch is unique per chapter URL, failed reservations are released for retry, and all
-  outstanding Coil disposables are released when the reader entry changes or leaves composition.
+  seeking afterward. Start the moving prefetch window when pages are published, independently of
+  current-page readiness. In the reading direction, prepare two adjacent memory previews and four
+  further disk-only pages; retain one trailing disk candidate for reversal. Exclude all visible
+  URLs, deduplicate candidates by URL, update direction from actual page movement, and keep at most
+  two speculative jobs. Window size and active concurrency are separate limits. Promoted visible
+  transfers bypass speculative capacity, while cancelled speculative jobs retain their slots until
+  completion. Discard stale candidates and preview bitmaps when the window or chapter changes.
+- Give the first target a bounded 300 ms head start before speculative work. Skip this one-time
+  delay when the target original or preview is already in memory, release it early on target
+  preparation success/failure, and release it immediately when the active page changes. The timer
+  must never delay visible originals, re-arm on ordinary window updates, depend indefinitely on
+  image readiness, consume a speculative slot, or survive reader disposal/chapter replacement.
+- All reader preview, disk-only, and original requests use the shared Coil loader, the original URL
+  disk key, and the reader request marker. The shared reader fetcher locks each URL through Coil's
+  HTTP fetch/disk commit, then releases it before decode so visible requests can reuse the committed
+  file without waiting for preview decoding. Preserve this factory when cloning the loader for
+  Telephoto. Coil 2.7 disk-only requests use a request-specific decoder that returns a non-bitmap
+  result without image decoding; memory caching is disabled, and a missing committed disk snapshot
+  is an error. Never register that decoder globally or decode a tiny bitmap just to warm disk.
+- Success, failure, cancellation, and disposal must release prefetch work. Failures do not retry in
+  a tight loop; re-entering the window or explicit page retry can retry them. Leaving the reader
+  invalidates its generation and cancels outstanding reader/preparation jobs so late bootstrap
+  completion cannot restart prefetch. Preparation completion must not replace an active window.
+- Only Telephoto's original `isImageDisplayed` signal for an actually visible page can latch reader
+  readiness and unlock ads, including already-cached ad HTML. A prepared preview or a precomposed
+  offscreen page must never unlock reader ads. Preserve the original-image frame wait and retry UI.
 - An image whose scaled height can exceed practical Compose item constraints must use a finite
   subsampling viewport with base-scale vertical pan and nested-scroll handoff. Do not squash the
   image, clip away unreachable content, or request an intrinsic million-pixel layout height.
@@ -145,6 +165,12 @@ official Room Gradle plugin and are checked in. Do not point concurrent kapt var
   production persistence boundary instead of scheduler-idle heuristics.
 - Reader/player/ads changes: extract deterministic policy into pure unit tests; validate real
   media and gestures with the remote APK on a device.
+- Reader scheduling changes additionally need real Coil + MockWebServer delayed-response tests for
+  bounded concurrency, readiness-independent prefetch, visible promotion without duplicate network
+  transfers, cold/warm caches, disk-only decode avoidance, tall previews, reversal, jumps, failures,
+  cancellation, and chapter disposal. Record network, disk/memory source, actual bitmap decode, and
+  display timing separately. Compose/Telephoto instrumented coverage must use original display
+  callbacks; JVM decoder completion is not proof that pixels were displayed on a device.
 - Catalog state changes must cover successful empty results and stale-generation suppression.
   Update policy tests must cover timing windows, snoozing, ABI fallback, strict manifest rejection,
   and the exact Retrofit endpoint; automatic failure must remain outside home state.

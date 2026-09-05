@@ -19,13 +19,14 @@ import { MediaImage } from '@/components/media-image';
 import { ThemeMenu } from '@/components/theme-menu';
 import { HtmlAd } from '@/components/html-ad';
 import { createReaderProgressWriteQueue } from '@/components/manga-reader-progress';
+import { ReaderImageScheduler } from '@/components/manga-reader-scheduler';
 import {
+  clampReaderPage,
   getReaderAdRenderPolicy,
-  getInitialReaderPages,
   getReaderImageRequestPolicy,
   getStoredReaderPage,
   isReaderViewportTransition,
-  READER_PREFETCH_ROOT_MARGIN,
+  READER_INITIAL_PREFETCH_DELAY_MS,
   READER_RESTORE_SCROLL_OPTIONS,
   selectActiveReaderPage,
   shouldSyncReaderProgress,
@@ -64,7 +65,11 @@ type MangaReaderProps = {
   initialPage?: number;
 };
 
-export function MangaReader({
+export function MangaReader(props: MangaReaderProps) {
+  return <MangaReaderEntry key={`${props.mangaId}:${props.chapterNumber}`} {...props} />;
+}
+
+function MangaReaderEntry({
   title,
   mangaId,
   chapterNumber,
@@ -75,23 +80,27 @@ export function MangaReader({
   readerAds,
   initialPage = 0,
 }: MangaReaderProps) {
-  const boundedInitialPage = pages.length
-    ? Math.min(Math.max(0, Math.floor(initialPage)), pages.length - 1)
-    : 0;
+  const boundedInitialPage = pages.find((page) => page.index === initialPage)?.index
+    ?? pages[clampReaderPage(initialPage, pages.length)]?.index
+    ?? 0;
   const [activePage, setActivePage] = useState(boundedInitialPage);
-  const [priorityPage, setPriorityPage] = useState(boundedInitialPage);
-  const [prefetchReady, setPrefetchReady] = useState(false);
+  const [initialPriorityPage, setInitialPriorityPage] = useState(boundedInitialPage);
+  const [adsReady, setAdsReady] = useState(false);
   const [hasViewportTransition, setHasViewportTransition] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const [chromeHidden, setChromeHidden] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [loadedPages, setLoadedPages] = useState<Set<number>>(
-    () => new Set(getInitialReaderPages(boundedInitialPage, pages.length)),
+  const [scheduler, setScheduler] = useState(
+    () => new ReaderImageScheduler(pages.map((page) => page.index), boundedInitialPage),
+  );
+  // Resolve browser-only restoration before admitting speculative neighbors.
+  const [admittedPages, setAdmittedPages] = useState<ReadonlySet<number>>(
+    () => new Set(pages.length > 0 ? [boundedInitialPage] : []),
   );
   const pageRefs = useRef(new Map<number, HTMLElement>());
   const visiblePages = useRef(new Map<number, ReaderPageIntersection>());
   const activePageRef = useRef(boundedInitialPage);
-  const priorityPageRef = useRef(boundedInitialPage);
+  const initialPriorityPageRef = useRef(boundedInitialPage);
   const lastScrollY = useRef(0);
   const scrollFrame = useRef<number | null>(null);
   const readerKey = useMemo(
@@ -99,17 +108,12 @@ export function MangaReader({
     [chapterNumber, mangaId],
   );
   const totalPages = pageCount || pages.length;
-  const pageIndexes = useMemo(() => new Set(pages.map((page) => page.index)), [pages]);
 
-  const loadPages = useCallback((indexes: number[]) => {
-    setLoadedPages((current) => {
-      const next = new Set(current);
-      indexes.forEach((index) => {
-        if (pageIndexes.has(index)) next.add(index);
-      });
-      return next.size === current.size ? current : next;
-    });
-  }, [pageIndexes]);
+  const settlePage = useCallback((index: number, result: 'success' | 'error') => {
+    if (scheduler.settle(index, result)) setAdmittedPages(scheduler.admittedPages);
+  }, [scheduler]);
+
+  const retryPage = useCallback((index: number) => scheduler.retry(index), [scheduler]);
 
   const registerPage = useCallback((index: number, element: HTMLElement | null) => {
     if (element) pageRefs.current.set(index, element);
@@ -129,25 +133,57 @@ export function MangaReader({
   }, [readerKey]);
 
   useLayoutEffect(() => {
+    const indexes = [...pageRefs.current.keys()];
+    const pageBound = indexes.reduce((maximum, index) => Math.max(maximum, index + 1), 0);
     let saved: number | null = null;
     try {
-      saved = getStoredReaderPage(window.localStorage.getItem(readerKey), pages.length);
+      saved = getStoredReaderPage(window.localStorage.getItem(readerKey), pageBound);
+      if (saved != null && !indexes.includes(saved)) saved = null;
     } catch {
       saved = null;
     }
     const restoredPage = saved ?? boundedInitialPage;
     if (restoredPage !== boundedInitialPage) {
-      priorityPageRef.current = restoredPage;
+      initialPriorityPageRef.current = restoredPage;
       activePageRef.current = restoredPage;
-      setPriorityPage(restoredPage);
+      setInitialPriorityPage(restoredPage);
       setActivePage(restoredPage);
-      setPrefetchReady(false);
-      setLoadedPages(new Set([restoredPage]));
+      setAdsReady(false);
     }
+    const restoredScheduler = new ReaderImageScheduler(indexes, restoredPage, false);
+    setScheduler(restoredScheduler);
+    setAdmittedPages(restoredScheduler.admittedPages);
     if (restoredPage > 0) {
       pageRefs.current.get(restoredPage)?.scrollIntoView(READER_RESTORE_SCROLL_OPTIONS);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
+    // Give the critical transfer a short head start. A slow or failed first image
+    // cannot hold speculative work indefinitely, and viewport admission bypasses this.
+    const prefetchTimer = window.setTimeout(() => {
+      if (restoredScheduler.enablePrefetch()) setAdmittedPages(restoredScheduler.admittedPages);
+    }, READER_INITIAL_PREFETCH_DELAY_MS);
+    return () => window.clearTimeout(prefetchTimer);
   }, [boundedInitialPage, pages.length, readerKey]);
+
+  const refreshViewport = useCallback(() => {
+    // IntersectionObserver entries are only deltas. Refresh geometry so long pages
+    // and rapid scrolls cannot leave an old reading-line candidate behind.
+    const intersections = [...visiblePages.current.keys()].flatMap((index) => {
+      const node = pageRefs.current.get(index);
+      if (!node) return [];
+      const bounds = node.getBoundingClientRect();
+      return [{ index, isIntersecting: true, top: bounds.top, bottom: bounds.bottom }];
+    });
+    const visible = intersections.filter((entry) => entry.bottom > 0 && entry.top < window.innerHeight);
+    const next = selectActiveReaderPage(visible, window.innerHeight, activePageRef.current);
+    if (next != null) {
+      if (scheduler.updateViewport(next, visible.map((entry) => entry.index))) {
+        setAdmittedPages(scheduler.admittedPages);
+      }
+      commitActivePage(next);
+    }
+  }, [commitActivePage, scheduler]);
 
   useEffect(() => {
     const nodes = [...pageRefs.current.values()];
@@ -170,12 +206,7 @@ export function MangaReader({
             bottom: entry.boundingClientRect.bottom,
           });
         });
-        const next = selectActiveReaderPage(
-          [...visible.values()],
-          window.innerHeight,
-          activePageRef.current,
-        );
-        if (next != null) commitActivePage(next);
+        refreshViewport();
       },
       {
         rootMargin: '0px',
@@ -188,30 +219,10 @@ export function MangaReader({
       observer.disconnect();
       visible.clear();
     };
-  }, [commitActivePage, pages.length]);
-
-  useEffect(() => {
-    if (!prefetchReady) return;
-    const nodes = [...pageRefs.current.values()];
-    if (!nodes.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const nearby = entries
-          .filter((entry) => entry.isIntersecting)
-          .map((entry) => Number((entry.target as HTMLElement).dataset.pageIndex))
-          .filter(Number.isInteger);
-        if (nearby.length) loadPages(nearby);
-      },
-      { rootMargin: READER_PREFETCH_ROOT_MARGIN, threshold: 0.01 },
-    );
-
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, [loadPages, pages.length, prefetchReady]);
+  }, [pages.length, refreshViewport]);
 
   const markPrioritySettled = useCallback((index: number) => {
-    if (priorityPageRef.current === index) setPrefetchReady(true);
+    if (initialPriorityPageRef.current === index) setAdsReady(true);
   }, []);
 
   useEffect(() => {
@@ -220,6 +231,7 @@ export function MangaReader({
       if (scrollFrame.current != null) return;
       scrollFrame.current = window.requestAnimationFrame(() => {
         scrollFrame.current = null;
+        refreshViewport();
         const y = window.scrollY;
         setShowTop(y > 480);
         if (!reduceMotion.matches) {
@@ -233,7 +245,7 @@ export function MangaReader({
       window.removeEventListener('scroll', onScroll);
       if (scrollFrame.current != null) window.cancelAnimationFrame(scrollFrame.current);
     };
-  }, []);
+  }, [refreshViewport]);
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -306,12 +318,15 @@ export function MangaReader({
           <ReaderPageList
             title={title}
             pages={pages}
-            loadedPages={loadedPages}
-            priorityPage={priorityPage}
-            nonCriticalReady={prefetchReady}
+            admittedPages={admittedPages}
+            priorityPage={activePage}
+            initialPriorityPage={initialPriorityPage}
+            nonCriticalReady={adsReady}
             readerAds={readerAds}
             registerPage={registerPage}
             onPrioritySettled={markPrioritySettled}
+            onSettled={settlePage}
+            onRetry={retryPage}
           />
         )}
       </main>
@@ -457,21 +472,27 @@ function ReaderCloudProgress({
 const ReaderPageList = memo(function ReaderPageList({
   title,
   pages,
-  loadedPages,
+  admittedPages,
   priorityPage,
+  initialPriorityPage,
   nonCriticalReady,
   readerAds,
   registerPage,
   onPrioritySettled,
+  onSettled,
+  onRetry,
 }: {
   title: string;
   pages: ReaderPage[];
-  loadedPages: ReadonlySet<number>;
+  admittedPages: ReadonlySet<number>;
   priorityPage: number;
+  initialPriorityPage: number;
   nonCriticalReady: boolean;
   readerAds: Promise<MangaReaderAds>;
   registerPage: (index: number, element: HTMLElement | null) => void;
   onPrioritySettled: (index: number) => void;
+  onSettled: (index: number, result: 'success' | 'error') => void;
+  onRetry: (index: number) => void;
 }) {
   return (
     <div className="reader-stage">
@@ -487,10 +508,13 @@ const ReaderPageList = memo(function ReaderPageList({
           key={page.index}
           title={title}
           page={page}
-          loaded={loadedPages.has(page.index)}
+          admitted={admittedPages.has(page.index)}
           priority={page.index === priorityPage}
+          initialPriority={page.index === initialPriorityPage}
           registerPage={registerPage}
           onPrioritySettled={onPrioritySettled}
+          onSettled={onSettled}
+          onRetry={onRetry}
         />
       ))}
       {nonCriticalReady ? (
@@ -505,20 +529,27 @@ const ReaderPageList = memo(function ReaderPageList({
 const ReaderPageItem = memo(function ReaderPageItem({
   title,
   page,
-  loaded,
+  admitted,
   priority,
+  initialPriority,
   registerPage,
   onPrioritySettled,
+  onSettled,
+  onRetry,
 }: {
   title: string;
   page: ReaderPage;
-  loaded: boolean;
+  admitted: boolean;
   priority: boolean;
+  initialPriority: boolean;
   registerPage: (index: number, element: HTMLElement | null) => void;
   onPrioritySettled: (index: number) => void;
+  onSettled: (index: number, result: 'success' | 'error') => void;
+  onRetry: (index: number) => void;
 }) {
   const elementRef = useRef<HTMLElement | null>(null);
-  const settling = useRef(false);
+  const readableImage = useRef<HTMLImageElement | null>(null);
+  const readableFrame = useRef<number | null>(null);
   const requestPolicy = getReaderImageRequestPolicy(priority);
 
   const setElement = useCallback((element: HTMLElement | null) => {
@@ -527,56 +558,67 @@ const ReaderPageItem = memo(function ReaderPageItem({
   }, [page.index, registerPage]);
 
   const markReadable = useCallback((image: HTMLImageElement) => {
-    if (!priority || settling.current) return;
-    settling.current = true;
+    if (readableImage.current === image) return;
+    readableImage.current = image;
     void Promise.resolve(image.decode?.())
       .catch(() => undefined)
       .then(() => {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
+        if (readableImage.current !== image || !image.isConnected) return;
+        readableFrame.current = window.requestAnimationFrame(() => {
+          readableFrame.current = window.requestAnimationFrame(() => {
+            readableFrame.current = null;
+            if (readableImage.current !== image || !image.isConnected) return;
             if (image.naturalWidth > 0) {
               performance.mark(`manga-reader-page-${page.index}-readable`);
             }
-            onPrioritySettled(page.index);
+            if (initialPriority) onPrioritySettled(page.index);
           });
         });
       });
-  }, [onPrioritySettled, page.index, priority]);
+  }, [initialPriority, onPrioritySettled, page.index]);
 
   useEffect(() => {
-    settling.current = false;
-    if (!priority || !loaded) return;
+    if (!admitted) return;
+    if (!page.imageUrl) {
+      onSettled(page.index, 'error');
+      if (initialPriority) onPrioritySettled(page.index);
+      return;
+    }
     const image = elementRef.current?.querySelector<HTMLImageElement>('img.reader-image');
     if (!image?.complete) return;
-    if (image.naturalWidth > 0) markReadable(image);
-    else onPrioritySettled(page.index);
-  }, [loaded, markReadable, onPrioritySettled, page.imageUrl, page.index, priority]);
-
-  const onLoadCapture = useCallback((event: SyntheticEvent<HTMLElement>) => {
-    if (event.target instanceof HTMLImageElement && event.target.classList.contains('reader-image')) {
-      markReadable(event.target);
+    if (image.naturalWidth > 0) {
+      onSettled(page.index, 'success');
+      markReadable(image);
+    } else {
+      onSettled(page.index, 'error');
+      if (initialPriority) onPrioritySettled(page.index);
     }
-  }, [markReadable]);
+  }, [admitted, initialPriority, markReadable, onPrioritySettled, onSettled, page.imageUrl, page.index]);
 
-  const onErrorCapture = useCallback((event: SyntheticEvent<HTMLElement>) => {
-    if (
-      priority
-      && event.target instanceof HTMLImageElement
-      && event.target.classList.contains('reader-image')
-    ) {
-      onPrioritySettled(page.index);
-    }
-  }, [onPrioritySettled, page.index, priority]);
+  useEffect(() => () => {
+    readableImage.current = null;
+    if (readableFrame.current != null) window.cancelAnimationFrame(readableFrame.current);
+  }, [page.imageUrl]);
+
+  const onLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
+    onSettled(page.index, 'success');
+    markReadable(event.currentTarget);
+  }, [markReadable, onSettled, page.index]);
+
+  const onError = useCallback(() => {
+    onSettled(page.index, 'error');
+    if (initialPriority) onPrioritySettled(page.index);
+  }, [initialPriority, onPrioritySettled, onSettled, page.index]);
+
+  const retry = useCallback(() => onRetry(page.index), [onRetry, page.index]);
 
   return (
     <figure
       ref={setElement}
       data-page-index={page.index}
       className="reader-page"
-      onLoadCapture={onLoadCapture}
-      onErrorCapture={onErrorCapture}
     >
-      {loaded ? (
+      {admitted ? (
         <MediaImage
           src={page.imageUrl}
           alt={`${title} P${page.index + 1}`}
@@ -588,6 +630,9 @@ const ReaderPageItem = memo(function ReaderPageItem({
           decoding="async"
           variant="page"
           fallbackLabel="本页加载失败"
+          onLoad={onLoad}
+          onError={onError}
+          onRetry={retry}
         />
       ) : (
         <div

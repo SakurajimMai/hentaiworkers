@@ -1,0 +1,2 @@
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Reader visibility, progress, readability contracts"}
+{"file":".trellis/spec/mobile/native-android.md","reason":"Native reader, cache, subsampling, build boundary"}

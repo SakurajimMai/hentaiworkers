@@ -9,11 +9,12 @@ data class VisibleReaderPage(
     val totalPixels: Int,
 )
 
-internal enum class ReaderPageReadiness {
-    Loading,
+internal enum class ReaderPrefetchKind {
     Preview,
-    Full,
+    Disk,
 }
+
+internal data class ReaderPrefetchPage(val page: MangaPage, val kind: ReaderPrefetchKind)
 
 object ReaderLogic {
     fun activePage(
@@ -37,24 +38,25 @@ object ReaderLogic {
         hasTopAd: Boolean,
     ): Int = boundedPage(restoredPage, pageCount) + if (hasTopAd) 1 else 0
 
-    internal fun prefetchPages(
+    internal fun prefetchWindow(
         pages: List<MangaPage>,
         currentPage: Int,
-        readiness: ReaderPageReadiness,
-        scheduledUrls: Set<String>,
-    ): List<MangaPage> {
-        val window =
-            when (readiness) {
-                ReaderPageReadiness.Loading -> 0
-                ReaderPageReadiness.Preview -> 1
-                ReaderPageReadiness.Full -> 2
+        direction: Int = 1,
+        visiblePages: Set<Int> = setOf(currentPage),
+    ): List<ReaderPrefetchPage> {
+        if (pages.isEmpty()) return emptyList()
+        val current = boundedPage(currentPage, pages.size)
+        val step = if (direction < 0) -1 else 1
+        val visibleUrls = visiblePages.mapNotNull { pages.getOrNull(it)?.imageUrl }.toSet()
+        return buildList {
+            for (distance in 1..FORWARD_PREFETCH_PAGES) {
+                val page = pages.getOrNull(current + distance * step) ?: continue
+                val kind = if (distance <= PREVIEW_PREFETCH_PAGES) ReaderPrefetchKind.Preview else ReaderPrefetchKind.Disk
+                add(ReaderPrefetchPage(page, kind))
             }
-        if (pages.isEmpty() || window == 0) return emptyList()
-        val start = boundedPage(currentPage, pages.size) + 1
-        return pages.drop(start)
-            .take(window)
-            .filterNot { it.imageUrl in scheduledUrls }
-            .distinctBy(MangaPage::imageUrl)
+            pages.getOrNull(current - step)?.let { add(ReaderPrefetchPage(it, ReaderPrefetchKind.Disk)) }
+        }.filterNot { it.page.imageUrl in visibleUrls }
+            .distinctBy { it.page.imageUrl }
     }
 
     fun targetPage(
@@ -82,11 +84,6 @@ object ReaderLogic {
         imageUrl: String,
         retry: Int,
     ): String = "$imageUrl-${retry.coerceAtLeast(0)}"
-
-    internal fun shouldWaitForPreparedPreview(
-        previewState: ReaderPreviewState,
-        originalCached: Boolean,
-    ): Boolean = previewState == ReaderPreviewState.Loading && !originalCached
 
     fun pageFromSlider(
         previewValue: Float,
@@ -120,44 +117,6 @@ object ReaderLogic {
     private const val MIN_PAGE_ASPECT_RATIO = 0.001f
     private const val MAX_PAGE_ASPECT_RATIO = 4f
     private const val MAX_UNBOUNDED_VIEWPORT_HEIGHTS = 8
-}
-
-internal class ReaderPrefetchRegistry {
-    private val scheduled = linkedSetOf<String>()
-    private val completed = mutableSetOf<String>()
-    private val cancellations = linkedMapOf<String, () -> Unit>()
-
-    val scheduledUrls: Set<String>
-        get() = scheduled.toSet()
-
-    fun reserve(url: String): Boolean = scheduled.add(url)
-
-    fun register(
-        url: String,
-        cancel: () -> Unit,
-    ) {
-        if (url in scheduled && url !in completed) {
-            cancellations[url] = cancel
-        } else {
-            cancel()
-        }
-    }
-
-    fun succeed(url: String) {
-        if (url in scheduled) completed += url
-        cancellations.remove(url)
-    }
-
-    fun fail(url: String) {
-        scheduled.remove(url)
-        completed.remove(url)
-        cancellations.remove(url)
-    }
-
-    fun cancelAll() {
-        cancellations.values.forEach { cancel -> runCatching(cancel) }
-        cancellations.clear()
-        scheduled.clear()
-        completed.clear()
-    }
+    internal const val PREVIEW_PREFETCH_PAGES = 2
+    internal const val FORWARD_PREFETCH_PAGES = 6
 }

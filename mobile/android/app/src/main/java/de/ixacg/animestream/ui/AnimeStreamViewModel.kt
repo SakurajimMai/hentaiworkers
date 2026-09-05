@@ -24,13 +24,11 @@ import de.ixacg.animestream.reader.ReaderLogic
 import de.ixacg.animestream.reader.ReaderPreparationKey
 import de.ixacg.animestream.reader.ReaderPreparationStore
 import de.ixacg.animestream.reader.ReaderPreviewPreloader
-import de.ixacg.animestream.reader.ReaderPreviewState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -233,11 +231,15 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private var readerPreparationJob: Job? = null
     private var readerPreparationKey: ReaderPreparationKey? = null
     private var readerPreparationPage: Int? = null
+    private var readerPreparationRevision = 0L
+    private var activeReaderPreparationRevision = 0L
+    private var readerPreviewOwnerRevision = 0L
     private var progressJob: Job? = null
     private var updateJob: Job? = null
     private var discoverRequestGeneration = 0L
     private var mangaRequestGeneration = 0L
     private var readerRequestGeneration = 0L
+    private var readerPrefetchActive = false
     private var activeReaderRequestId: String? = null
 
     init {
@@ -841,11 +843,14 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         readerPreparationJob?.cancel()
         readerPreparationKey = key
         readerPreparationPage = targetPage
+        val preparationRevision = ++readerPreparationRevision
         readerPreparationJob =
             viewModelScope.launch {
                 captureResult { preparedReaderChapter(key, mangaId, chapterNumber) }
                     .onSuccess { response ->
-                        warmReaderTarget(response, mangaId, chapterNumber, targetPage)
+                        if (preparationRevision == readerPreparationRevision) {
+                            warmReaderTarget(response, mangaId, chapterNumber, targetPage, preparationRevision)
+                        }
                     }
             }
     }
@@ -860,6 +865,8 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
             mutableReader.value = Loadable(error = "章节编号无效")
             return
         }
+        readerPrefetchActive = true
+        activeReaderPreparationRevision = readerPreparationRevision
         if (
             requestId != null &&
             requestId == activeReaderRequestId &&
@@ -906,6 +913,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
             }
             warmReaderTarget(previous.chapter.pages, mangaId, chapterNumber, restoredPage)
             activeReaderRequestId = requestId
+            updateReaderPrefetchWindow()
             return
         }
         val detail = mutableMangaDetail.value.value?.takeIf { it.manga.id == mangaId }
@@ -943,6 +951,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         if (identity.generation != readerRequestGeneration) return@coroutineScope
 
                         mutableReader.value = Loadable(value = content)
+                        updateReaderPrefetchWindow()
                         progressJob?.cancel()
                         progressJob =
                             launch {
@@ -1008,24 +1017,24 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         mangaId: Long,
         chapterNumber: Double,
         requestedPage: Int,
-    ) = warmReaderTarget(response.chapter.pages, mangaId, chapterNumber, requestedPage)
+        preparationRevision: Long = activeReaderPreparationRevision,
+    ) = warmReaderTarget(response.chapter.pages, mangaId, chapterNumber, requestedPage, preparationRevision)
 
     private fun warmReaderTarget(
         pages: List<MangaPage>,
         mangaId: Long,
         chapterNumber: Double,
         requestedPage: Int,
+        preparationRevision: Long = activeReaderPreparationRevision,
     ) {
+        if (preparationRevision != readerPreparationRevision) return
         val target = ReaderLogic.targetPage(pages, requestedPage) ?: return
+        readerPreviewOwnerRevision = preparationRevision
         readerPreviewPreloader.warm(
             imageUrl = target.imageUrl,
             memoryCacheKey = ReaderLogic.previewMemoryCacheKey(mangaId, chapterNumber, target),
         )
     }
-
-    internal fun readerPreviewState(memoryCacheKey: String): Flow<ReaderPreviewState> = readerPreviewPreloader.state(memoryCacheKey)
-
-    internal fun currentReaderPreviewState(memoryCacheKey: String): ReaderPreviewState = readerPreviewPreloader.currentState(memoryCacheKey)
 
     private fun updateReader(
         identity: ReaderLoadIdentity,
@@ -1048,13 +1057,20 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun setReaderPage(index: Int) {
+    fun setReaderPage(
+        index: Int,
+        visiblePages: Set<Int> = setOf(index),
+    ) {
         val content = mutableReader.value.value ?: return
         val safeIndex = index.coerceIn(0, (content.chapter.pages.size - 1).coerceAtLeast(0))
-        if (content.currentPage == safeIndex) return
+        if (content.currentPage == safeIndex) {
+            updateReaderPrefetchWindow(visiblePages)
+            return
+        }
         mutableReader.update { state ->
             state.copy(value = state.value?.copy(currentPage = safeIndex))
         }
+        updateReaderPrefetchWindow(visiblePages)
         progressJob?.cancel()
         progressJob =
             viewModelScope.launch {
@@ -1067,6 +1083,28 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                     )
                 }
             }
+    }
+
+    private fun updateReaderPrefetchWindow(visiblePages: Set<Int>? = null) {
+        if (!readerPrefetchActive || activeReaderPreparationRevision != readerPreparationRevision) return
+        val content = mutableReader.value.value ?: return
+        readerPreviewOwnerRevision = activeReaderPreparationRevision
+        readerPreviewPreloader.updateWindow(
+            mangaId = content.manga.id,
+            chapterNumber = content.chapter.number,
+            pages = content.chapter.pages,
+            currentPage = content.currentPage,
+            visiblePages = visiblePages ?: setOf(content.currentPage),
+        )
+    }
+
+    fun stopReaderPrefetch(requestId: String) {
+        if (activeReaderRequestId != requestId) return
+        readerPrefetchActive = false
+        readerRequestGeneration++
+        readerJob?.cancel()
+        if (readerPreparationRevision == activeReaderPreparationRevision) readerPreparationJob?.cancel()
+        if (readerPreviewOwnerRevision == activeReaderPreparationRevision) readerPreviewPreloader.cancelAll()
     }
 
     fun toggleReaderFavorite() {

@@ -105,7 +105,7 @@ jobs:
         run: |
           mkdir -p app/build/reports
           set -o pipefail
-          ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleRelease --no-daemon --stacktrace 2>&1 | tee app/build/reports/ci-gradle.log
+          ./gradlew ktlintCheck lintRelease testDebugUnitTest assembleDebugAndroidTest assembleRelease --no-daemon --stacktrace 2>&1 | tee app/build/reports/ci-gradle.log
 
       - name: Generate Ktlint formatting patch
         if: failure() && steps.quality.outcome == 'failure'

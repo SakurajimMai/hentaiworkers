@@ -65,95 +65,47 @@ class ReaderLogicTest {
     }
 
     @Test
-    fun `prefetch uses one page for preview and two for full readiness`() {
-        val pages = (0 until 6).map { MangaPage(index = it, imageUrl = "https://example.test/$it.jpg") }
+    fun `window prepares two bounded previews and farther files without a readiness gate`() {
+        val pages = (0 until 240).map { MangaPage(index = it, imageUrl = "page-$it") }
+        val window = ReaderLogic.prefetchWindow(pages, currentPage = 120)
 
-        assertTrue(
-            ReaderLogic.prefetchPages(
-                pages = pages,
-                currentPage = 2,
-                readiness = ReaderPageReadiness.Loading,
-                scheduledUrls = emptySet(),
-            ).isEmpty(),
-        )
-        assertEquals(
-            listOf("https://example.test/3.jpg"),
-            ReaderLogic.prefetchPages(
-                pages = pages,
-                currentPage = 2,
-                readiness = ReaderPageReadiness.Preview,
-                scheduledUrls = emptySet(),
-            ).map(MangaPage::imageUrl),
-        )
-        assertEquals(
-            listOf("https://example.test/4.jpg"),
-            ReaderLogic.prefetchPages(
-                pages = pages,
-                currentPage = 2,
-                readiness = ReaderPageReadiness.Full,
-                scheduledUrls = setOf("https://example.test/3.jpg"),
-            ).map(MangaPage::imageUrl),
-        )
+        assertEquals(listOf(121, 122, 123, 124, 125, 126, 119), window.map { it.page.index })
+        assertEquals(listOf(121, 122), window.filter { it.kind == ReaderPrefetchKind.Preview }.map { it.page.index })
+        assertEquals(5, window.count { it.kind == ReaderPrefetchKind.Disk })
+        assertTrue(window.none { it.page.index == 0 || it.page.index == 120 })
     }
 
     @Test
-    fun `prefetch registry keeps successes deduplicated and releases failures`() {
-        val registry = ReaderPrefetchRegistry()
-        var cancellations = 0
-
-        assertTrue(registry.reserve("page-1"))
-        assertFalse(registry.reserve("page-1"))
-        assertTrue(registry.reserve("page-2"))
-        registry.register("page-1") { cancellations++ }
-        registry.register("page-2") { cancellations++ }
-
-        assertEquals(setOf("page-1", "page-2"), registry.scheduledUrls)
-        registry.succeed("page-1")
-        assertFalse(registry.reserve("page-1"))
-        registry.fail("page-2")
-        assertTrue(registry.reserve("page-2"))
-        registry.register("page-2") { cancellations++ }
-        registry.cancelAll()
-        assertEquals(1, cancellations)
-        assertTrue(registry.scheduledUrls.isEmpty())
-    }
-
-    @Test
-    fun `prefetch registry disposes a request registered after completion`() {
-        val registry = ReaderPrefetchRegistry()
-        var cancellations = 0
-
-        assertTrue(registry.reserve("page-1"))
-        registry.succeed("page-1")
-        registry.register("page-1") { cancellations++ }
-
-        assertEquals(1, cancellations)
-        assertFalse(registry.reserve("page-1"))
-    }
-
-    @Test
-    fun `forty sequential pages enqueue each future url at most once`() {
+    fun `reverse reading mirrors the bounded lookahead window`() {
         val pages = (0 until 40).map { MangaPage(index = it, imageUrl = "page-$it") }
-        val registry = ReaderPrefetchRegistry()
-        var enqueueCount = 0
+        val window = ReaderLogic.prefetchWindow(pages, currentPage = 20, direction = -1)
 
-        pages.indices.forEach { currentPage ->
-            ReaderLogic.prefetchPages(
-                pages = pages,
-                currentPage = currentPage,
-                readiness = ReaderPageReadiness.Full,
-                scheduledUrls = registry.scheduledUrls,
-            ).forEach { page ->
-                if (registry.reserve(page.imageUrl)) {
-                    enqueueCount++
-                    registry.register(page.imageUrl) { }
-                }
+        assertEquals(listOf(19, 18, 17, 16, 15, 14, 21), window.map { it.page.index })
+        assertEquals(listOf(19, 18), window.filter { it.kind == ReaderPrefetchKind.Preview }.map { it.page.index })
+    }
+
+    @Test
+    fun `visible urls are excluded from speculative work and repeated urls are unique`() {
+        val pages =
+            (0 until 40).map { index ->
+                MangaPage(index = index, imageUrl = if (index == 4) "page-3" else "page-$index")
             }
-        }
+        val window = ReaderLogic.prefetchWindow(pages, currentPage = 0, visiblePages = setOf(0, 1))
 
-        assertEquals(39, enqueueCount)
-        assertEquals(39, registry.scheduledUrls.size)
-        assertFalse("page-0" in registry.scheduledUrls)
+        assertEquals(listOf(2, 3, 5, 6), window.map { it.page.index })
+        assertEquals(window.size, window.map { it.page.imageUrl }.distinct().size)
+    }
+
+    @Test
+    fun `window clips at chapter edges and never opens an entire long chapter`() {
+        val pages = (0 until 240).map { MangaPage(index = it, imageUrl = "page-$it") }
+
+        assertTrue(ReaderLogic.prefetchWindow(emptyList(), currentPage = 0).isEmpty())
+        assertEquals(listOf(238), ReaderLogic.prefetchWindow(pages, currentPage = 239).map { it.page.index })
+        assertEquals(listOf(1), ReaderLogic.prefetchWindow(pages, currentPage = 0, direction = -1).map { it.page.index })
+        pages.indices.forEach { current ->
+            assertTrue(ReaderLogic.prefetchWindow(pages, current).size <= ReaderLogic.FORWARD_PREFETCH_PAGES + 1)
+        }
     }
 
     @Test
@@ -180,34 +132,6 @@ class ReaderLogicTest {
         assertNotEquals(
             ReaderLogic.previewMemoryCacheKey(8, 1.0, page),
             ReaderLogic.previewMemoryCacheKey(8, 1.0, page.copy(index = 4)),
-        )
-    }
-
-    @Test
-    fun `preview gate never delays an already cached original`() {
-        assertTrue(
-            ReaderLogic.shouldWaitForPreparedPreview(
-                previewState = ReaderPreviewState.Loading,
-                originalCached = false,
-            ),
-        )
-        assertFalse(
-            ReaderLogic.shouldWaitForPreparedPreview(
-                previewState = ReaderPreviewState.Loading,
-                originalCached = true,
-            ),
-        )
-        assertFalse(
-            ReaderLogic.shouldWaitForPreparedPreview(
-                previewState = ReaderPreviewState.Ready,
-                originalCached = false,
-            ),
-        )
-        assertFalse(
-            ReaderLogic.shouldWaitForPreparedPreview(
-                previewState = ReaderPreviewState.Idle,
-                originalCached = false,
-            ),
         )
     }
 
