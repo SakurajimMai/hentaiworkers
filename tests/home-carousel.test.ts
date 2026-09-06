@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import React from 'react';
+import { jsx } from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { HorizontalCarousel } from '../components/horizontal-carousel';
 import {
@@ -105,7 +106,7 @@ test('carousel page buttons move a complete viewport plus the inter-page gap', (
 
 test('carousel exposes labelled keyboard controls and touch-scroll semantics', () => {
   const markup = renderToStaticMarkup(
-    React.createElement(HorizontalCarousel, {
+    jsx(HorizontalCarousel, {
       title: '热门',
       children: Array.from({ length: 6 }, (_, index) =>
         React.createElement('article', { key: index }, `Card ${index + 1}`),

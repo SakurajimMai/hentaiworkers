@@ -1,0 +1,4 @@
+{"file":".trellis/spec/mobile/native-android.md","reason":"Native reader and Android CI contracts"}
+{"file":".trellis/spec/backend/app-only-boundary.md","reason":"System settings and public API ownership"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Reader and frontend verification"}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Existing UI component conventions"}

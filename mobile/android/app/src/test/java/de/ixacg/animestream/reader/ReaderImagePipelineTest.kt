@@ -3,6 +3,8 @@ package de.ixacg.animestream.reader
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import androidx.test.core.app.ApplicationProvider
 import coil.EventListener
 import coil.ImageLoader
@@ -35,10 +37,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import okhttp3.Call
 import okhttp3.OkHttpClient
@@ -438,6 +440,28 @@ class ReaderImagePipelineTest {
         }
 
     @Test
+    fun `display handoff bounds long bitmap decode while retaining full resolution for subsampling`() =
+        runBlocking {
+            val page = pages(1).single()
+            bodies["/page-0.png"] = png(width = 768, height = 8_192)
+
+            val result = imageLoader.execute(displayRequest(page)) as SuccessResult
+            val bitmap = (result.drawable as BitmapDrawable).bitmap
+
+            assertTrue(bitmap.width <= READER_DISPLAY_WIDTH)
+            assertTrue(bitmap.height <= READER_DISPLAY_HEIGHT)
+            assertTrue(bitmap.allocationByteCount <= READER_DISPLAY_WIDTH * READER_DISPLAY_HEIGHT * 4)
+            imageLoader.diskCache?.openSnapshot(page.imageUrl).use { snapshot ->
+                assertNotNull(snapshot)
+                val dimensions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(requireNotNull(snapshot).data.toString(), dimensions)
+                assertEquals(768, dimensions.outWidth)
+                assertEquals(8_192, dimensions.outHeight)
+            }
+            assertEquals(1, requestCount(0))
+        }
+
+    @Test
     fun `restoration reverse movement and quick distant jump replace the window`() =
         runBlocking {
             val pages = pages(160)
@@ -528,11 +552,10 @@ class ReaderImagePipelineTest {
     private fun displayRequest(page: MangaPage): ImageRequest =
         ImageRequest.Builder(context)
             .data(page.imageUrl)
-            .readerImageRequest()
+            .readerDisplayRequest()
             .diskCacheKey(page.imageUrl)
             .memoryCacheKey(ReaderLogic.originalMemoryCacheKey(page.imageUrl, retry = 0))
             .placeholderMemoryCacheKey(previewKey(page))
-            .size(900, 1_600)
             .crossfade(false)
             .build()
 

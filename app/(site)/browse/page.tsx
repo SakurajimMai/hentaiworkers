@@ -165,7 +165,7 @@ export default async function BrowsePage({
             <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-5 md:gap-y-8">
               {slots.map((slot) =>
                 slot.type === 'ad' ? (
-                  <FeedAdCard key={slot.key} html={slot.ad.html} href={slot.ad.href} />
+                  <FeedAdCard key={slot.key} html={slot.ad.html} href={slot.ad.href} width={slot.ad.width} height={slot.ad.height} />
                 ) : (
                   <AnimeCard key={slot.key} anime={slot.item} />
                 ),

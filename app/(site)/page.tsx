@@ -43,7 +43,7 @@ export default async function HomePage() {
   let mangas: Awaited<ReturnType<typeof listMangas>>['data'] = [];
   let loggedIn = false;
   let error: string | null = null;
-  let homeAdHtml = '';
+  let homeAd: { html: string; width?: number; height?: number } | undefined;
 
   try {
     const user = await getIdentityService().getCurrentUser();
@@ -64,8 +64,7 @@ export default async function HomePage() {
     latest = lat.data;
     mangas = mangaData;
     heroIntervalSeconds = system.hero.intervalSeconds;
-    homeAdHtml =
-      system.ads.feedSlots.find((slot) => slot.enabled && slot.html.trim())?.html.trim() || '';
+    homeAd = system.ads.feedSlots.find((slot) => slot.enabled && slot.html.trim());
     continueWatching = progress.filter((p) => !p.completed && p.positionSeconds > 5);
     const completedIds = progress.filter((p) => p.completed).map((p) => p.animeId);
     const favorites = favoritesPage?.items ?? [];
@@ -176,9 +175,9 @@ export default async function HomePage() {
           <HeroCarousel intervalSeconds={heroIntervalSeconds} items={hero} />
         )}
 
-        {homeAdHtml ? (
+        {homeAd ? (
           <aside className="reader-ad reader-ad-banner overflow-hidden rounded-2xl border border-border bg-card" aria-label="首页广告">
-            <HtmlAd html={homeAdHtml} />
+            <HtmlAd html={homeAd.html} width={homeAd.width} height={homeAd.height} />
           </aside>
         ) : null}
 

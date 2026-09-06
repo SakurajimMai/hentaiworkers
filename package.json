@@ -13,6 +13,8 @@
     "test": "npm run test:ts",
     "test:ts": "node scripts/run-tests.mjs",
     "test:reader:browser": "node tests/browser/manga-reader.mjs",
+    "test:ads:browser": "node tests/browser/html-ad.mjs",
+    "test:meta:browser": "node tests/browser/site-meta.mjs",
     "check:legacy": "node scripts/check-no-legacy.mjs",
     "check:boundaries": "node scripts/check-app-boundaries.mjs",
     "db:baseline": "node scripts/export-schema-baseline.mjs",

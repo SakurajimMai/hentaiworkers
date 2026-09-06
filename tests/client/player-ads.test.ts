@@ -29,7 +29,10 @@ test('clampAdDurations floors floats, caps play at 120, and fills total when pla
 });
 
 test('buildPreRollHtml prefers custom html then image', () => {
-  assert.equal(buildPreRollHtml({ html: '<b>ad</b>', imageUrl: 'https://x/a.jpg' }), '<b>ad</b>');
+  const custom = buildPreRollHtml({ html: '<b>ad</b>', imageUrl: 'https://x/a.jpg' });
+  assert.match(custom, /^<iframe/);
+  assert.match(custom, /<b>ad<\/b>/);
+  assert.doesNotMatch(custom, /https:\/\/x\/a\.jpg/);
   const img = buildPreRollHtml({ html: '', imageUrl: 'https://x/a.jpg?q="1"' });
   assert.match(img, /art-preroll-image/);
   assert.match(img, /https:\/\/x\/a\.jpg\?q=&quot;1&quot;/);
@@ -109,7 +112,9 @@ test('buildPauseAdBody prefers video then html then image', () => {
     clickUrl: '',
     muted: true,
   });
-  assert.equal(html, '<div>pause</div>');
+  assert.match(html, /<iframe/);
+  assert.match(html, /<div>pause<\/div>/);
+  assert.doesNotMatch(html, /https:\/\/cdn\.example\/p\.jpg/);
 
   const image = buildPauseAdBody({
     enabled: true,
@@ -237,7 +242,8 @@ test('buildPreRollPluginOption image/html-only leaves video undefined and empty 
     muted: true,
   });
   assert.equal(htmlOpt.video, undefined);
-  assert.equal(htmlOpt.html, '<div>ad</div>');
+  assert.match(htmlOpt.html, /^<iframe/);
+  assert.match(htmlOpt.html, /<div>ad<\/div>/);
   assert.equal(htmlOpt.url, undefined);
 
   const imageOpt = buildPreRollPluginOption({

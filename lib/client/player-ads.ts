@@ -1,4 +1,5 @@
 /** Pure helpers for ArtPlayer pre-roll / pause ads (unit-testable). */
+import { buildPlayerHtmlAd } from './html-ad';
 
 export type PreRollAdInput = {
   enabled: boolean;
@@ -44,8 +45,8 @@ export function clampAdDurations(
   return { playDuration: play, totalDuration: total };
 }
 
-export function buildPreRollHtml(config: Pick<PreRollAdInput, 'html' | 'imageUrl'>): string {
-  if (config.html.trim()) return config.html;
+export function buildPreRollHtml(config: Pick<PreRollAdInput, 'html' | 'imageUrl'> & { clickUrl?: string }): string {
+  if (config.html.trim()) return buildPlayerHtmlAd(config.html, config.clickUrl);
   if (config.imageUrl.trim()) {
     const img = escapeHtmlAttr(config.imageUrl.trim());
     return `<div class="art-preroll-image" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#000"><img src="${img}" alt="广告" style="max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain" /></div>`;
@@ -69,7 +70,7 @@ export function buildPauseAdBody(pauseAd: PauseAdInput): string {
     const mutedAttr = pauseAd.muted ? ' muted' : '';
     return `<video class="art-pause-ad-video" src="${src}" playsinline loop autoplay${mutedAttr} style="max-width:min(92%,720px);max-height:72%;width:auto;height:auto;border-radius:12px;background:#000"></video>`;
   }
-  if (pauseAd.html.trim()) return pauseAd.html;
+  if (pauseAd.html.trim()) return `<div style="width:min(720px,80vw);height:min(360px,60vh);max-width:100%;max-height:100%">${buildPlayerHtmlAd(pauseAd.html, pauseAd.clickUrl)}</div>`;
   if (pauseAd.imageUrl.trim()) {
     const img = escapeHtmlAttr(pauseAd.imageUrl.trim());
     return `<img class="art-pause-ad-image" src="${img}" alt="暂停广告" style="max-width:min(92%,720px);max-height:72%;object-fit:contain;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45)" />`;

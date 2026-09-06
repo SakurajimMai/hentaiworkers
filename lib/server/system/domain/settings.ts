@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { MAX_AD_HEIGHT, MAX_AD_WIDTH } from '@/lib/ad-dimensions';
+import { siteMetaTagsSchema } from '@/lib/site-meta';
 
 /** Encrypted blob stored in JSON (AES-GCM via app keyring). */
 export const encryptedFieldSchema = z.object({
@@ -115,8 +117,15 @@ export const mangaSettingsSchema = z.object({
 
 export const MAX_FEED_ADS = 12;
 
+const adDimensionFields = {
+  /** Creative pixels; absent or zero selects bounded automatic sizing. */
+  width: z.number().int().min(0).max(MAX_AD_WIDTH).optional(),
+  height: z.number().int().min(0).max(MAX_AD_HEIGHT).optional(),
+};
+
 /** One native card in /browse and /manga grids. */
 export const feedAdSlotSchema = z.object({
+  ...adDimensionFields,
   enabled: z.boolean().default(true),
   name: z.string().max(40).default(''),
   /** Insert after every N content items. */
@@ -128,6 +137,7 @@ export const feedAdSlotSchema = z.object({
 
 /** One HTML slot on the manga reader. */
 export const readerAdSlotSchema = z.object({
+  ...adDimensionFields,
   enabled: z.boolean().default(false),
   html: z.string().max(20000).default(''),
   /** Only used by the mid-chapter slot. */
@@ -188,6 +198,7 @@ export const heroSlideSchema = z.object({
 export const MAX_HERO_SLIDES = 20;
 
 export const siteSettingsSchema = z.object({
+  metaTags: siteMetaTagsSchema.default([]),
   /** Public Android APK / download page. Empty hides the footer link. */
   androidDownloadUrl: z.string().max(1000).default(''),
   androidDownloadLabel: z.string().min(1).max(40).default('下载 App'),
@@ -256,7 +267,7 @@ export type PublicAdsConfig = Readonly<{
 
 function publicReaderSlot(slot: ReaderAdSlot): ReaderAdSlot {
   if (!slot.enabled) {
-    return { enabled: false, html: '', interval: slot.interval };
+    return { ...slot, enabled: false, html: '' };
   }
   return slot;
 }

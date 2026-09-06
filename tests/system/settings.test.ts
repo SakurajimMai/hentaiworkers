@@ -374,6 +374,19 @@ test('registration closed and whitelist enforced', async () => {
   assert.equal(ok.user.username, 'x@allowed.com');
 });
 
+test('global meta settings round-trip, survive unrelated updates and can be removed', async () => {
+  const { service } = buildService();
+  const metaTags = [{ attribute: 'name' as const, key: 'ad-network-verification', content: 'public-token' }];
+  await service.update({ site: { metaTags, telegramUrl: '@channel' } });
+  assert.deepEqual((await service.getAdminView()).site.metaTags, metaTags);
+  assert.deepEqual(await service.getPublicMetaTags(), metaTags);
+  await service.update({ site: { androidDownloadLabel: 'Android' } });
+  assert.deepEqual(await service.getPublicMetaTags(), metaTags);
+  assert.equal((await service.getAdminView()).site.telegramUrl, '@channel');
+  await service.update({ site: { metaTags: [] } });
+  assert.deepEqual(await service.getPublicMetaTags(), []);
+});
+
 test('smtp password and turnstile secret persist encrypted and stay masked in admin view', async () => {
   const { service } = buildService();
   await service.update({

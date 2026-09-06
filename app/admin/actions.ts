@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { AppError, isAuthRequiredError } from '@/lib/server/shared/errors';
 import { getIdentityService } from '@/lib/server/identity';
@@ -8,6 +8,8 @@ import { getAdminCatalogService } from '@/lib/server/catalog/admin';
 import { parseAdsSettingsFromForm } from '@/lib/server/system/domain/ads-settings-form';
 import { parsePlayerSettingsFromForm } from '@/lib/server/system/domain/player-settings-form';
 import { parseHeroSettingsFromForm } from '@/lib/server/system/domain/hero-settings-form';
+import { parseSiteMetaTagsFromForm } from '@/lib/server/system/domain/site-settings-form';
+import { SITE_META_CACHE_TAG } from '@/lib/site-meta';
 import {
   deleteAdminManga,
   deleteAdminMangaChapter,
@@ -526,6 +528,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
       .split(/[\n,;]+/)
       .map((s) => s.trim())
       .filter(Boolean);
+    const metaTags = parseSiteMetaTagsFromForm(formData);
 
     await getSystemSettingsService().update({
       registration: {
@@ -562,12 +565,15 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
       },
       hero: parseHeroSettingsFromForm(formData),
       site: {
+        ...(metaTags === undefined ? {} : { metaTags }),
         androidDownloadUrl: String(formData.get('androidDownloadUrl') || '').trim(),
         androidDownloadLabel: String(formData.get('androidDownloadLabel') || '').trim() || '下载 App',
         telegramUrl: String(formData.get('telegramUrl') || '').trim(),
         telegramLabel: String(formData.get('telegramLabel') || '').trim() || 'Telegram',
       },
     });
+    revalidateTag(SITE_META_CACHE_TAG);
+    revalidatePath('/', 'layout');
     revalidatePath('/admin/settings');
     revalidatePath('/');
     revalidatePath('/login');
@@ -580,6 +586,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
     if (error instanceof AppError) {
       if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
       if (error.message.includes('SMTP')) redirect('/admin/settings?error=verify_smtp');
+      if (error.details?.field === 'siteMetaTags') redirect('/admin/settings?error=meta');
     }
     // Next.js redirect throws; rethrow
     if (error && typeof error === 'object' && 'digest' in error) throw error;

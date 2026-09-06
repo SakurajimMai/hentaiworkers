@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,23 +61,25 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.imageLoader
+import coil.memory.MemoryCache
 import coil.request.ImageRequest
 import de.ixacg.animestream.core.model.MangaChapterSummary
 import de.ixacg.animestream.core.model.MangaPage
@@ -88,6 +91,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import me.saket.telephoto.zoomable.DoubleClickToZoomListener
+import me.saket.telephoto.zoomable.OverzoomEffect
 import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.coil.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
@@ -129,12 +134,12 @@ fun ReaderScreen(
             rememberLazyListState(initialFirstVisibleItemIndex = initialListIndex)
         }
     val scope = rememberCoroutineScope()
+    val canvasState = key(readerRequestId, chapterKey) { rememberReaderCanvasState() }
     var chromeVisible by remember { mutableStateOf(true) }
     var chapterSheetVisible by remember { mutableStateOf(false) }
     var sliderValue by remember { mutableFloatStateOf(initialPage.toFloat()) }
     var sliderDragging by remember { mutableStateOf(false) }
     var seekJob by remember { mutableStateOf<Job?>(null) }
-    var appliedTopAd by remember(readerRequestId, chapterKey) { mutableStateOf(topAdEnabled) }
 
     fun seekToPage(
         page: Int,
@@ -160,12 +165,6 @@ fun ReaderScreen(
         if (!readerReady && displayedPages.any { it in visibleReaderPages }) {
             readerReady = true
             viewModel.ensureAdsLoaded()
-        }
-    }
-    LaunchedEffect(readerRequestId, chapterKey, topAdEnabled) {
-        if (content != null && pages.isNotEmpty() && appliedTopAd != topAdEnabled) {
-            listState.scrollToItem(pageStartIndex + content.currentPage.coerceIn(pages.indices))
-            appliedTopAd = topAdEnabled
         }
     }
     LaunchedEffect(content?.currentPage, sliderDragging) {
@@ -217,52 +216,74 @@ fun ReaderScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
             else -> {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                    if (topAdEnabled) {
-                        item(key = "reader-top-ad") {
-                            HtmlAd(ads.reader.top.html, modifier = Modifier.padding(vertical = 12.dp))
+                ReaderCanvas(
+                    state = canvasState,
+                    listState = listState,
+                    onTransform = { chromeVisible = false },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        userScrollEnabled = !canvasState.hasMultiplePointers,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        if (topAdEnabled) {
+                            item(key = "reader-top-ad") {
+                                HtmlAd(
+                                    ads.reader.top.html,
+                                    modifier = Modifier.padding(vertical = 12.dp),
+                                    width = ads.reader.top.width,
+                                    height = ads.reader.top.height,
+                                )
+                            }
                         }
-                    }
-                    itemsIndexed(pages, key = { index, _ -> "page-$index" }) { index, page ->
-                        key(page.imageUrl) {
-                            val previewMemoryCacheKey =
-                                ReaderLogic.previewMemoryCacheKey(mangaId, chapterNumber, page)
-                            ZoomableReaderPage(
-                                pagePosition = index,
-                                page = page,
-                                previewMemoryCacheKey = previewMemoryCacheKey,
-                                onDisplayed = { displayedPage ->
-                                    if (displayedPage !in displayedPages) {
-                                        displayedPages = displayedPages + displayedPage
+                        itemsIndexed(pages, key = { index, _ -> "page-$index" }) { index, page ->
+                            key(page.imageUrl) {
+                                val previewMemoryCacheKey =
+                                    ReaderLogic.previewMemoryCacheKey(mangaId, chapterNumber, page)
+                                ZoomableReaderPage(
+                                    pagePosition = index,
+                                    page = page,
+                                    previewMemoryCacheKey = previewMemoryCacheKey,
+                                    onDisplayed = { displayedPage ->
+                                        if (displayedPage !in displayedPages) {
+                                            displayedPages = displayedPages + displayedPage
+                                        }
+                                    },
+                                    onTap = { chromeVisible = !chromeVisible },
+                                    readingScale = canvasState.scale,
+                                    pagePanEnabled = !canvasState.hasMultiplePointers,
+                                )
+                            }
+                        }
+                        item(key = "chapter-end") {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 40.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text("本话完", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                                Text(
+                                    if (nextChapter == null) "已经是最后一话" else "继续下一话",
+                                    color = Color(0xFFAAA69F),
+                                )
+                                nextChapter?.let { next ->
+                                    Button(onClick = { onChapter(next.number) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                        Text("第 ${formatChapter(next.number)} 话")
+                                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                                     }
-                                },
-                                onTap = { chromeVisible = !chromeVisible },
-                                onZoomChanged = { zoomed -> if (zoomed) chromeVisible = false },
-                            )
-                        }
-                    }
-                    item(key = "chapter-end") {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 40.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text("本话完", color = Color.White, style = MaterialTheme.typography.titleLarge)
-                            Text(
-                                if (nextChapter == null) "已经是最后一话" else "继续下一话",
-                                color = Color(0xFFAAA69F),
-                            )
-                            nextChapter?.let { next ->
-                                Button(onClick = { onChapter(next.number) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                                    Text("第 ${formatChapter(next.number)} 话")
-                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                                 }
                             }
                         }
-                    }
-                    if (readerReady && ads.reader.bottom.enabled && ads.reader.bottom.html.isNotBlank()) {
-                        item(key = "reader-bottom-ad") {
-                            HtmlAd(ads.reader.bottom.html, modifier = Modifier.padding(vertical = 12.dp))
+                        if (readerReady && ads.reader.bottom.enabled && ads.reader.bottom.html.isNotBlank()) {
+                            item(key = "reader-bottom-ad") {
+                                HtmlAd(
+                                    ads.reader.bottom.html,
+                                    modifier = Modifier.padding(vertical = 12.dp),
+                                    width = ads.reader.bottom.width,
+                                    height = ads.reader.bottom.height,
+                                )
+                            }
                         }
                     }
                 }
@@ -428,14 +449,24 @@ internal fun ZoomableReaderPage(
     previewMemoryCacheKey: String,
     onDisplayed: (Int) -> Unit,
     onTap: () -> Unit,
-    onZoomChanged: (Boolean) -> Unit,
+    readingScale: Float = 1f,
+    pagePanEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
-    var ratio by remember(page.imageUrl) { mutableFloatStateOf(0.72f) }
-    var imageSize by remember(page.imageUrl) { mutableStateOf(IntSize.Zero) }
     var retry by remember(page.imageUrl) { mutableIntStateOf(0) }
-    var loadState by remember(page.imageUrl) { mutableStateOf(PageLoadState.Loading) }
-    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 4f))
+    val cachedBitmap =
+        remember(page.imageUrl, previewMemoryCacheKey, retry) {
+            val memoryCache = context.imageLoader.memoryCache
+            memoryCache?.get(MemoryCache.Key(ReaderLogic.originalMemoryCacheKey(page.imageUrl, retry)))?.bitmap
+                ?: memoryCache?.get(MemoryCache.Key(previewMemoryCacheKey))?.bitmap
+        }
+    var imageWidth by rememberSaveable(page.imageUrl) { mutableIntStateOf(cachedBitmap?.width ?: 0) }
+    var imageHeight by rememberSaveable(page.imageUrl) { mutableIntStateOf(cachedBitmap?.height ?: 0) }
+    val ratio = ReaderLogic.pageAspectRatio(imageWidth, imageHeight)
+    var loadState by remember(page.imageUrl) {
+        mutableStateOf(if (cachedBitmap == null) PageLoadState.Loading else PageLoadState.Preview)
+    }
+    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 1f, overzoomEffect = OverzoomEffect.Disabled))
     val imageState = rememberZoomableImageState(zoomableState)
     val request =
         remember(page.imageUrl, previewMemoryCacheKey, retry) {
@@ -443,27 +474,20 @@ internal fun ZoomableReaderPage(
             ImageRequest.Builder(context)
                 .data(page.imageUrl)
                 .memoryCacheKey(originalMemoryCacheKey)
-                .placeholderMemoryCacheKey(previewMemoryCacheKey)
                 .diskCacheKey(page.imageUrl)
-                .readerImageRequest()
+                .readerDisplayRequest()
                 .crossfade(false)
                 .listener(
-                    onStart = { loadState = PageLoadState.Loading },
+                    onStart = { loadState = if (cachedBitmap == null) PageLoadState.Loading else PageLoadState.Preview },
                     onSuccess = { _, result ->
                         val width = result.drawable.intrinsicWidth
                         val height = result.drawable.intrinsicHeight
-                        imageSize = IntSize(width.coerceAtLeast(0), height.coerceAtLeast(0))
-                        ratio = ReaderLogic.pageAspectRatio(width, height)
+                        imageWidth = width.coerceAtLeast(0)
+                        imageHeight = height.coerceAtLeast(0)
                     },
                     onError = { _, _ -> loadState = PageLoadState.Error },
                 ).build()
         }
-    LaunchedEffect(imageState, page.imageUrl, retry) {
-        snapshotFlow { imageState.isPlaceholderDisplayed }
-            .distinctUntilChanged()
-            .first { displayed -> displayed }
-        if (loadState == PageLoadState.Loading) loadState = PageLoadState.Preview
-    }
     LaunchedEffect(imageState, page.imageUrl, retry) {
         snapshotFlow { imageState.isImageDisplayed }
             .distinctUntilChanged()
@@ -473,24 +497,20 @@ internal fun ZoomableReaderPage(
         withFrameNanos { }
         if (imageState.isImageDisplayed) onDisplayed(pagePosition)
     }
-    LaunchedEffect(zoomableState) {
-        snapshotFlow { zoomableState.zoomFraction }
-            .distinctUntilChanged()
-            .collect { fraction -> onZoomChanged((fraction ?: 0f) > 0.01f) }
-    }
     val viewportHeight = LocalConfiguration.current.screenHeightDp.coerceAtLeast(1).dp
     val density = LocalDensity.current
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val boundedViewport =
             ReaderLogic.requiresBoundedViewport(
-                imageWidth = imageSize.width,
-                imageHeight = imageSize.height,
-                viewportWidth = with(density) { maxWidth.roundToPx() },
+                imageWidth = imageWidth,
+                imageHeight = imageHeight,
+                viewportWidth = with(density) { (maxWidth / readingScale).roundToPx() },
                 viewportHeight = with(density) { viewportHeight.roundToPx() },
+                maximumReadingScale = ReaderLogic.MAX_READING_SCALE,
             )
         val pageModifier =
             if (boundedViewport) {
-                Modifier.fillMaxWidth().height(viewportHeight)
+                Modifier.fillMaxWidth().height(viewportHeight * readingScale)
             } else {
                 Modifier.fillMaxWidth().aspectRatio(ratio)
             }
@@ -506,9 +526,9 @@ internal fun ZoomableReaderPage(
                 modifier = Modifier.fillMaxSize(),
                 alignment = Alignment.TopCenter,
                 contentScale = ContentScale.FillWidth,
-                onClick = {
-                    if ((zoomableState.zoomFraction ?: 0f) <= 0.01f) onTap()
-                },
+                gesturesEnabled = boundedViewport && pagePanEnabled,
+                onClick = { onTap() },
+                onDoubleClick = DoubleClickToZoomListener { _, _ -> },
             )
             when (loadState) {
                 PageLoadState.Loading -> {
@@ -530,9 +550,18 @@ internal fun ZoomableReaderPage(
                         }
                     }
                 }
-                PageLoadState.Preview,
-                PageLoadState.Ready,
-                -> Unit
+                PageLoadState.Preview -> {
+                    cachedBitmap?.let { bitmap ->
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            alignment = Alignment.TopCenter,
+                            contentScale = ContentScale.FillWidth,
+                        )
+                    }
+                }
+                PageLoadState.Ready -> Unit
             }
         }
     }

@@ -598,17 +598,8 @@
     background: hsl(var(--accent-soft));
   }
   .feed-ad-html {
-    height: 100%;
     width: 100%;
     overflow: hidden;
-  }
-  .feed-ad-html iframe,
-  .feed-ad-html img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    object-fit: cover;
   }
   .feed-ad-default {
     display: flex;
@@ -632,7 +623,7 @@
     color: hsl(var(--ink-soft));
   }
   .reader-ad {
-    width: min(40rem, 100%);
+    width: min(970px, 100%);
     margin: 0 auto;
     padding: 0.85rem 0.75rem 1.1rem;
     font-size: 14px;
@@ -640,6 +631,7 @@
   }
   .reader-ad-banner {
     padding: 0.75rem 0.75rem 1rem;
+    overflow: hidden;
   }
   .reader-ad iframe,
   .reader-ad img {

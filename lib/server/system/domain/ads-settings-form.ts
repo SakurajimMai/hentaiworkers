@@ -1,4 +1,5 @@
 import { MAX_FEED_ADS, type FeedAdSlot } from './settings';
+import { normalizeAdDimensions } from '@/lib/ad-dimensions';
 
 /**
  * Pure admin form parser for native feed + manga-reader ads.
@@ -8,6 +9,7 @@ export function parseAdsSettingsFromForm(formData: FormData) {
     feedSlots: parseFeedSlotsFromForm(formData),
     reader: {
       top: {
+        ...parseDimensions(formData, 'adsReaderTop'),
         enabled: formData.get('adsReaderTopEnabled') === '1',
         html: String(formData.get('adsReaderTopHtml') || '').slice(0, 20000),
         interval: 5,
@@ -18,12 +20,20 @@ export function parseAdsSettingsFromForm(formData: FormData) {
         interval: 5,
       },
       bottom: {
+        ...parseDimensions(formData, 'adsReaderBottom'),
         enabled: formData.get('adsReaderBottomEnabled') === '1',
         html: String(formData.get('adsReaderBottomHtml') || '').slice(0, 20000),
         interval: 5,
       },
     },
   };
+}
+
+function parseDimensions(formData: FormData, prefix: string) {
+  return normalizeAdDimensions({
+    width: Number(formData.get(`${prefix}Width`)),
+    height: Number(formData.get(`${prefix}Height`)),
+  });
 }
 
 function clampInterval(raw: FormDataEntryValue | string | number | null, fallback: number, max: number): number {
@@ -51,6 +61,7 @@ function parseFeedSlotsFromForm(formData: FormData): FeedAdSlot[] {
 
   return [
     {
+      ...parseDimensions(formData, 'adsFeed'),
       enabled: formData.get('adsFeedEnabled') === '1',
       name: '信息流广告 1',
       interval: clampInterval(formData.get('adsFeedInterval'), 5, 40),
@@ -66,6 +77,7 @@ function sanitizeFeedSlot(value: unknown): FeedAdSlot | null {
   const text = (key: string, max: number) =>
     typeof raw[key] === 'string' ? (raw[key] as string).slice(0, max) : '';
   return {
+    ...normalizeAdDimensions({ width: Number(raw.width), height: Number(raw.height) }),
     enabled: raw.enabled !== false && raw.enabled !== '0',
     name: text('name', 40),
     interval: clampInterval(

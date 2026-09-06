@@ -472,6 +472,18 @@ components:
       type: object
       required: [enabled, name, interval, href, html]
       properties:
+        width:
+          type: integer
+          minimum: 0
+          maximum: 1920
+          default: 0
+          description: Creative width in CSS pixels. Missing or zero uses automatic layout; a fixed size needs both dimensions.
+        height:
+          type: integer
+          minimum: 0
+          maximum: 600
+          default: 0
+          description: Creative height in CSS pixels. Fixed creatives scale down proportionally to fit the available width.
         enabled:
           type: boolean
         name:
@@ -489,6 +501,18 @@ components:
       type: object
       required: [enabled, html, interval]
       properties:
+        width:
+          type: integer
+          minimum: 0
+          maximum: 1920
+          default: 0
+          description: Creative width in CSS pixels. Missing or zero uses automatic layout; a fixed size needs both dimensions.
+        height:
+          type: integer
+          minimum: 0
+          maximum: 600
+          default: 0
+          description: Creative height in CSS pixels. Automatic rendered height is also capped at 600 pixels.
         enabled:
           type: boolean
         html:

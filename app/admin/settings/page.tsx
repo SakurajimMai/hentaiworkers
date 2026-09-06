@@ -2,7 +2,9 @@ import { getSystemSettingsService } from '@/lib/server/system';
 import { requireAdmin } from '@/lib/auth';
 import { AdminMangaPublishSecret } from '@/components/admin-manga-publish-secret';
 import { AdsFeedSlotsEditor } from '@/components/admin/ads-feed-slots-editor';
+import { AdSizeFields } from '@/components/admin/ad-size-fields';
 import { HeroSlidesEditor } from '@/components/admin/hero-slides-editor';
+import { SiteMetaEditor } from '@/components/admin/site-meta-editor';
 import { effectiveHeroSlides } from '@/lib/server/system/domain/settings';
 import {
   actionSaveSystemSettings,
@@ -37,6 +39,7 @@ export default async function AdminSystemSettingsPage({
         <a href="#registration">注册</a>
         <a href="#hero">幻灯片</a>
         <a href="#app">页脚</a>
+        <a href="#meta">全局 Meta</a>
         <a href="#smtp">SMTP</a>
         <a href="#trust">安全验证</a>
         <a href="#player">播放器</a>
@@ -56,6 +59,9 @@ export default async function AdminSystemSettingsPage({
       )}
       {sp.error === '1' && (
         <p className="font-meta text-[13px] text-danger">保存失败，请检查必填项</p>
+      )}
+      {sp.error === 'meta' && (
+        <p role="alert" className="font-meta text-[13px] text-danger">全局 Meta 标签无效，请检查名称、内容和标签数量</p>
       )}
       {sp.error === 'verify_smtp' && (
         <p className="font-meta text-[13px] text-danger">
@@ -173,6 +179,11 @@ export default async function AdminSystemSettingsPage({
               maxLength={40}
             />
           </label>
+        </section>
+
+        <section id="meta" className="scroll-mt-24 border-y border-border py-5 space-y-4">
+          <h2 className="font-ui text-sm font-semibold">全局 Meta</h2>
+          <SiteMetaEditor initialTags={view.site.metaTags} />
         </section>
 
         {/* SMTP */}
@@ -516,6 +527,7 @@ export default async function AdminSystemSettingsPage({
                   placeholder={'<script>/* 联盟广告代码 */</script>'}
                 />
               </label>
+              <AdSizeFields name="adsReaderTop" initial={view.ads.reader.top} />
             </div>
 
             <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
@@ -538,6 +550,7 @@ export default async function AdminSystemSettingsPage({
                   placeholder={'<script>/* 联盟广告代码 */</script>'}
                 />
               </label>
+              <AdSizeFields name="adsReaderBottom" initial={view.ads.reader.bottom} />
             </div>
           </div>
         </section>

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { getGlobalMetaTags } from '@/lib/server/site-metadata';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -40,10 +41,19 @@ export const viewport: Viewport = {
 
 const THEME_BOOT_SCRIPT = `(function(){try{var k='animestream.theme.v1';var s=localStorage.getItem(k);var m=(s==='light'||s==='dark')?s:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');var r=document.documentElement;r.setAttribute('data-theme',m);r.style.colorScheme=m;var c=m==='dark'?'#121318':'#f6f4ef';var meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute('content',c);}catch(e){}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const metaTags = await getGlobalMetaTags();
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
+        {metaTags.map((tag, index) => (
+          <meta
+            key={`site-meta-${index}`}
+            name={tag.attribute === 'name' ? tag.key : undefined}
+            property={tag.attribute === 'property' ? tag.key : undefined}
+            content={tag.content}
+          />
+        ))}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

@@ -188,6 +188,10 @@ export class SystemSettingsService {
     return toPublicSiteConfig(await this.getSettings());
   }
 
+  async getPublicMetaTags() {
+    return (await this.getSettings()).site.metaTags;
+  }
+
   async getPublicAdsConfig() {
     const { toPublicAdsConfig } = await import('../domain/settings');
     return toPublicAdsConfig(await this.getSettings());
@@ -290,6 +294,7 @@ export class SystemSettingsService {
       site: {
         ...current.site,
         ...omitUndefined({
+          metaTags: input.site?.metaTags,
           androidDownloadUrl: input.site?.androidDownloadUrl,
           androidDownloadLabel: input.site?.androidDownloadLabel,
           telegramUrl: input.site?.telegramUrl,

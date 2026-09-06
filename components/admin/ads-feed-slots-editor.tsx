@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { IconX } from '@/components/icons';
 import { MAX_FEED_ADS, type FeedAdSlot } from '@/lib/server/system/domain/settings';
+import { AdSizeFields } from '@/components/admin/ad-size-fields';
 
 function emptySlot(index: number): FeedAdSlot {
   return {
@@ -96,6 +97,7 @@ export function AdsFeedSlotsEditor({ initialSlots }: { initialSlots: FeedAdSlot[
                 />
               </label>
             </div>
+            <AdSizeFields value={slot} onChange={(dimensions) => update(index, dimensions)} />
           </li>
         ))}
       </ul>

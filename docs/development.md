@@ -148,6 +148,8 @@ unset ADMIN_BOOTSTRAP_USER ADMIN_BOOTSTRAP_PASSWORD
 | `npm run lint` | ESLint，禁止 warning |
 | `npm run typecheck` | TypeScript 静态类型检查 |
 | `npm run test` | 运行全部 TypeScript 测试 |
+| `npm run test:ads:browser` | 验证 HTML 广告脚本执行、横幅尺寸与隔离 |
+| `npm run test:meta:browser` | 验证全局 Meta 服务端输出、导入与手机/桌面布局 |
 | `npm run check:legacy` | 阻止旧 Web/SQLite 栈回流 |
 | `npm run check:boundaries` | 验证仓库和部署保持 App-only |
 | `npm run build` | Next.js 生产构建与类型检查 |

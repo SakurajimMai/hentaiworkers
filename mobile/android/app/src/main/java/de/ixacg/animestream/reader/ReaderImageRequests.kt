@@ -11,12 +11,25 @@ import coil.fetch.Fetcher
 import coil.fetch.SourceResult
 import coil.request.ImageRequest
 import coil.request.Options
+import coil.size.Precision
+import coil.size.Scale
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 private const val READER_IMAGE_REQUEST = "reader-image-request"
 
 internal fun ImageRequest.Builder.readerImageRequest(): ImageRequest.Builder = setParameter(READER_IMAGE_REQUEST, true, memoryCacheKey = null)
+
+internal fun ImageRequest.Builder.readerDisplayRequest(): ImageRequest.Builder =
+    readerImageRequest()
+        // Telephoto displays the original disk file through subsampling. Coil's bitmap is only
+        // its initial render, so keep that decode independent of long pages and reading zoom.
+        .size(READER_DISPLAY_WIDTH, READER_DISPLAY_HEIGHT)
+        .scale(Scale.FIT)
+        .precision(Precision.EXACT)
+
+internal const val READER_DISPLAY_WIDTH = 960
+internal const val READER_DISPLAY_HEIGHT = 2_560
 
 internal class ReaderImageSingleFlight {
     class Factory : Fetcher.Factory<Uri> {

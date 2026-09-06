@@ -249,3 +249,33 @@ Raised bounded Android API timeouts, localized transport errors, made home loads
 ### Next Steps
 
 - Monitor pushed GitHub Actions; Android Gradle and real-device TTIR remain remote verification items.
+
+
+## Session 9: Native reader performance, chapter zoom, global meta and HTML banners
+
+**Date**: 2026-09-06
+**Task**: Native reader performance, chapter zoom, global meta and HTML banners
+**Branch**: `codex/reader-meta-ads-check-20260906030631488`
+
+### Summary
+
+Implemented native reader and web admin changes; all root and browser checks passed; Android CI Build 87 passed with 84 JVM tests and five test APKs.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e38f98ebc21b1be723db094aaee2bdf34c79c843` | (see git log) |
+
+### Testing
+
+- [OK] Root lint/typecheck/test/build and boundaries passed; meta/ads browser checks and 15 reader cases passed.
+- [OK] Android CI 34008360595 passed; 15 native source hashes match local workspace.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Run real-device reader and ad smoke tests before production release; local preview needs valid DATABASE_URL.

@@ -53,6 +53,8 @@ async function readReaderAds(): Promise<MangaReaderAds> {
     return {
       topHtml: ads.reader.top.enabled ? ads.reader.top.html : '',
       bottomHtml: ads.reader.bottom.enabled ? ads.reader.bottom.html : '',
+      topSize: { width: ads.reader.top.width, height: ads.reader.top.height },
+      bottomSize: { width: ads.reader.bottom.width, height: ads.reader.bottom.height },
     };
   } catch (error) {
     console.error('readReaderAds failed', error);

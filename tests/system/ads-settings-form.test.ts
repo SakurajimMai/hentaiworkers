@@ -4,7 +4,7 @@ import {
   interleaveFeedAds,
   parseAdsSettingsFromForm,
 } from '../../lib/server/system/domain/ads-settings-form';
-import { parseSystemSettings } from '../../lib/server/system/domain/settings';
+import { parseSystemSettings, toPublicAdsConfig } from '../../lib/server/system/domain/settings';
 
 function form(entries: Record<string, string>): FormData {
   const fd = new FormData();
@@ -73,4 +73,39 @@ test('interleaveFeedAds respects each slot interval independently', () => {
     slots.map((slot) => (slot.type === 'ad' ? slot.ad.html : slot.item)),
     [1, 2, 'a', 3, 'b', 4, 'a', 5, 6, 'a', 'b'],
   );
+});
+
+test('banner dimensions round-trip from the admin form into public ads', () => {
+  const parsed = parseAdsSettingsFromForm(form({
+    adsFeedSlotsJson: JSON.stringify([{ enabled: true, width: 300, height: 250, html: '<div>feed</div>' }]),
+    adsReaderTopEnabled: '1',
+    adsReaderTopHtml: '<div>banner</div>',
+    adsReaderTopWidth: '728',
+    adsReaderTopHeight: '90',
+    adsReaderBottomWidth: '9999',
+    adsReaderBottomHeight: '9999',
+  }));
+  const settings = parseSystemSettings({ ads: parsed });
+  const publicAds = toPublicAdsConfig(settings);
+  assert.equal(publicAds.feedSlots[0].width, 300);
+  assert.equal(publicAds.feedSlots[0].height, 250);
+  assert.equal(publicAds.reader.top.width, 728);
+  assert.equal(publicAds.reader.top.height, 90);
+  assert.equal(publicAds.reader.top.html, '<div>banner</div>');
+  assert.equal(publicAds.reader.bottom.width, 1920);
+  assert.equal(publicAds.reader.bottom.height, 600);
+  assert.equal(publicAds.reader.bottom.html, '');
+});
+
+test('partial, absent, or invalid banner dimensions select automatic layout', () => {
+  const parsed = parseAdsSettingsFromForm(form({
+    adsReaderTopWidth: '728',
+    adsReaderBottomWidth: 'invalid',
+    adsReaderBottomHeight: '90',
+  }));
+  assert.equal(parsed.reader.top.width, 0);
+  assert.equal(parsed.reader.top.height, 0);
+  assert.equal(parsed.reader.bottom.width, 0);
+  assert.equal(parsed.reader.bottom.height, 0);
+  assert.equal(parsed.feedSlots[0].width, 0);
 });

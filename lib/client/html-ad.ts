@@ -1,53 +1,25 @@
-/** Helpers for admin-authored HTML ads (including document.write networks). */
+import { MAX_AD_HEIGHT, normalizeAdDimensions, type AdDimensions } from '@/lib/ad-dimensions';
+import { HTML_AD_RUNTIME } from './html-ad-runtime';
 
 export const HTML_AD_MESSAGE_TYPE = 'hw-ad-size';
+export const HTML_AD_SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
 
-export function buildHtmlAdSrcDoc(html: string, messageId: string): string {
-  const id = JSON.stringify(messageId);
-  const type = JSON.stringify(HTML_AD_MESSAGE_TYPE);
+export function buildHtmlAdSrcDoc(html: string, messageId: string, dimensions: AdDimensions = {}, clickUrl = ''): string {
+  const { width, height } = normalizeAdDimensions(dimensions);
+  const config = JSON.stringify({ id: messageId, width, height, clickUrl: clickUrl.trim() }).replace(/</g, '\\u003c');
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
-html,body{margin:0;padding:0;background:transparent}
-img,video,iframe,ins{max-width:100%}
+html,body{margin:0;padding:0;background:transparent;overflow:hidden}
+#hw-ad-content{display:flow-root;position:relative;transform-origin:top left;${width ? `width:${width}px;height:${height}px;overflow:hidden` : 'width:100%;min-height:0'}}
+img,video{max-width:100%;height:auto}iframe{border:0}
 </style>
-<script>
-(function(){
-  function write(args){
-    var html = Array.prototype.slice.call(args).join('');
-    if (!document.body) {
-      document.documentElement.insertAdjacentHTML('beforeend', html);
-      return;
-    }
-    document.body.insertAdjacentHTML('beforeend', html);
-  }
-  document.write = function(){ write(arguments); };
-  document.writeln = function(){ write(arguments); write(['\\n']); };
-})();
-</script>
+<script>window.__htmlAd=${config};${HTML_AD_RUNTIME}</script>
 </head>
-<body>
-${html}
-<script>
-(function(){
-  var id = ${id};
-  function report(){
-    var h = Math.max(document.body ? document.body.scrollHeight : 0, document.documentElement.scrollHeight, 0);
-    if (parent !== window) parent.postMessage({type:${type}, id:id, h:h}, '*');
-  }
-  try {
-    new MutationObserver(report).observe(document.documentElement, {childList:true,subtree:true,attributes:true});
-  } catch (e) {}
-  window.addEventListener('load', report);
-  setTimeout(report, 200);
-  setTimeout(report, 1200);
-  setTimeout(report, 3500);
-})();
-</script>
-</body>
+<body><div id="hw-ad-content">${html}</div></body>
 </html>`;
 }
 
@@ -55,7 +27,20 @@ export function parseHtmlAdSizeMessage(data: unknown, expectedId: string): numbe
   if (!data || typeof data !== 'object') return null;
   const rec = data as Record<string, unknown>;
   if (rec.type !== HTML_AD_MESSAGE_TYPE || rec.id !== expectedId) return null;
-  const height = Number(rec.h);
-  if (!Number.isFinite(height) || height <= 0) return null;
-  return Math.ceil(height);
+  if (typeof rec.h !== 'number' || !Number.isFinite(rec.h) || rec.h <= 0) return null;
+  return Math.min(MAX_AD_HEIGHT, Math.ceil(rec.h));
+}
+
+/** ArtPlayer inserts HTML strings; an iframe gives embedded scripts a real document. */
+export function buildPlayerHtmlAd(html: string, clickUrl = ''): string {
+  const srcdoc = buildHtmlAdSrcDoc(html, 'player-ad', {}, clickUrl).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return `<iframe title="广告" sandbox="${HTML_AD_SANDBOX}" referrerpolicy="no-referrer-when-downgrade" scrolling="no" src="about:blank" data-html-ad-srcdoc="${srcdoc}" style="display:block;width:100%;height:100%;border:0;background:transparent"></iframe>`;
+}
+
+export function setPlayerHtmlAdsActive(root: ParentNode | null | undefined, active: boolean): void {
+  root?.querySelectorAll<HTMLIFrameElement>('iframe[data-html-ad-srcdoc]').forEach((frame) => {
+    const source = frame.getAttribute('data-html-ad-srcdoc');
+    if (active && source && !frame.hasAttribute('srcdoc')) frame.srcdoc = source;
+    if (!active && frame.hasAttribute('srcdoc')) frame.removeAttribute('srcdoc');
+  });
 }

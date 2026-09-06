@@ -5,7 +5,10 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -17,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
@@ -26,6 +30,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pinch
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import coil.Coil
@@ -53,6 +61,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -79,6 +88,7 @@ class ReaderDisplayInstrumentedTest {
     private val observations = CopyOnWriteArrayList<Observation>()
     private val heldResponses = ConcurrentHashMap<String, CountDownLatch>()
     private val heldPreviewDecodes = ConcurrentHashMap<String, CountDownLatch>()
+    private val heldDisplayDecodes = ConcurrentHashMap<String, CountDownLatch>()
     private val failingResponses = ConcurrentHashMap.newKeySet<String>()
     private val responseBodies = ConcurrentHashMap<String, ByteArray>()
     private lateinit var context: Context
@@ -87,7 +97,9 @@ class ReaderDisplayInstrumentedTest {
     private lateinit var loader: ImageLoader
     private lateinit var preloader: ReaderPreviewPreloader
     private lateinit var listState: LazyListState
+    private lateinit var canvasState: ReaderCanvasState
     private var mounted by mutableStateOf(true)
+    private var showTopAd by mutableStateOf(false)
 
     @Before
     fun setUp() {
@@ -147,6 +159,8 @@ class ReaderDisplayInstrumentedTest {
                             record(path(request), "decode-start:${decoder.javaClass.simpleName}")
                             if (request.memoryCacheKey?.key?.startsWith("reader-preview:") == true) {
                                 heldPreviewDecodes[path(request)]?.await(15, TimeUnit.SECONDS)
+                            } else {
+                                heldDisplayDecodes[path(request)]?.await(15, TimeUnit.SECONDS)
                             }
                         }
 
@@ -182,6 +196,7 @@ class ReaderDisplayInstrumentedTest {
     fun tearDown() {
         heldResponses.values.forEach(CountDownLatch::countDown)
         heldPreviewDecodes.values.forEach(CountDownLatch::countDown)
+        heldDisplayDecodes.values.forEach(CountDownLatch::countDown)
         compose.runOnIdle { mounted = false }
         compose.waitForIdle()
         preloader.cancelAll()
@@ -290,6 +305,138 @@ class ReaderDisplayInstrumentedTest {
         assertImagePixels()
     }
 
+    @Test
+    fun pinchOnPreparedPreviewChangesChapterScaleAndKeepsLaterPagesAtThatScale() {
+        val pages = pages(80)
+        val previewKey = ReaderLogic.previewMemoryCacheKey(8, 1.0, pages[0])
+        preloader.warm(pages[0].imageUrl, previewKey)
+        compose.waitUntil(10_000) { preloader.currentState(previewKey) == ReaderPreviewState.Ready }
+        val displayGate = CountDownLatch(1)
+        heldDisplayDecodes["/page-0.png"] = displayGate
+        mount(pages)
+        compose.waitUntil(10_000) {
+            observations.count { it.path == "/page-0.png" && it.event.startsWith("decode-start:") } >= 2
+        }
+        val originalHeight = compose.runOnIdle { listState.layoutInfo.visibleItemsInfo.first { it.index == 0 }.size }
+        assertFalse(displayed(0))
+        assertImagePixels()
+
+        compose.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            pinch(
+                start0 = Offset(width * 0.4f, height * 0.5f),
+                start1 = Offset(width * 0.6f, height * 0.5f),
+                end0 = Offset(width * 0.2f, height * 0.5f),
+                end1 = Offset(width * 0.8f, height * 0.5f),
+                durationMillis = 600,
+            )
+        }
+        compose.waitUntil(10_000) { canvasState.scale > 1.5f }
+        assertFalse(displayed(0))
+        displayGate.countDown()
+        compose.waitUntil(10_000) { displayed(0) }
+        assertEquals(1, networkRequests(0))
+
+        compose.onNodeWithTag(LIST_TAG).performScrollToIndex(2)
+        compose.waitUntil(10_000) { displayed(2) && visible(2) }
+        compose.runOnIdle {
+            val item = listState.layoutInfo.visibleItemsInfo.first { it.index == 2 }
+            assertTrue(item.size > originalHeight * 1.5f)
+            assertFalse(canvasState.hasMultiplePointers)
+        }
+        val oldOffset = compose.runOnIdle { listState.firstVisibleItemScrollOffset }
+        compose.onNodeWithTag(CANVAS_TAG).performTouchInput { swipeUp() }
+        compose.runOnIdle {
+            assertTrue(listState.firstVisibleItemIndex > 2 || listState.firstVisibleItemScrollOffset > oldOffset)
+        }
+        assertTrue(requestedPages().size < 20)
+        assertImagePixels()
+    }
+
+    @Test
+    fun insertingReadyTopAdPreservesVisiblePageAndItsScrollOffset() {
+        mount(pages(80))
+        compose.waitUntil(10_000) { displayed(0) }
+        compose.runOnIdle { scope.launch { listState.scrollToItem(0, 180) } }
+        compose.waitUntil(10_000) { listState.firstVisibleItemScrollOffset == 180 }
+
+        compose.runOnIdle { showTopAd = true }
+        compose.waitUntil(10_000) { listState.firstVisibleItemIndex == 1 }
+
+        compose.runOnIdle {
+            assertEquals(180, listState.firstVisibleItemScrollOffset)
+            assertEquals("page-0", listState.layoutInfo.visibleItemsInfo.first { it.index == 1 }.key)
+        }
+        assertImagePixels()
+    }
+
+    @Test
+    fun topAdInsertedDuringPinchKeepsTheSamePageUnderTheGestureCenter() {
+        mount(pages(80))
+        compose.waitUntil(10_000) { displayed(0) }
+        compose.runOnIdle { scope.launch { listState.scrollToItem(0, 180) } }
+        compose.waitUntil(10_000) { listState.firstVisibleItemScrollOffset == 180 }
+        val focalY = 220f
+        val pageFraction =
+            compose.runOnIdle {
+                val item = listState.layoutInfo.visibleItemsInfo.first { it.key == "page-0" }
+                (focalY - item.offset) / item.size
+            }
+        compose.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            down(0, Offset(width * 0.4f, focalY))
+            down(1, Offset(width * 0.6f, focalY))
+            updatePointerTo(0, Offset(width * 0.3f, focalY))
+            updatePointerTo(1, Offset(width * 0.7f, focalY))
+            move()
+        }
+        compose.waitUntil(10_000) { canvasState.scale > 1.5f }
+
+        compose.runOnIdle { showTopAd = true }
+        compose.waitUntil(10_000) { listState.firstVisibleItemIndex == 1 }
+        compose.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            updatePointerTo(0, Offset(width * 0.15f, focalY))
+            updatePointerTo(1, Offset(width * 0.85f, focalY))
+            move()
+            up(0)
+            up(1)
+        }
+
+        compose.runOnIdle {
+            val item = listState.layoutInfo.visibleItemsInfo.first { it.key == "page-0" }
+            assertEquals(focalY, item.offset + item.size * pageFraction, 12f)
+            assertTrue(canvasState.scale > 2.5f)
+            assertFalse(canvasState.hasMultiplePointers)
+        }
+        assertImagePixels()
+    }
+
+    @Test
+    fun fingersOnAdjacentPagesZoomTheChapterAndKeepTheBoundaryUnderTheirCenter() {
+        responseBodies["/page-0.png"] = png(900, 500)
+        responseBodies["/page-1.png"] = png(900, 500)
+        mount(pages(80))
+        compose.waitUntil(10_000) { displayed(0) && displayed(1) }
+        val boundary = compose.runOnIdle { listState.layoutInfo.visibleItemsInfo.first { it.index == 1 }.offset.toFloat() }
+
+        compose.onNodeWithTag(CANVAS_TAG).performTouchInput {
+            pinch(
+                start0 = Offset(width * 0.4f, boundary - 35f),
+                start1 = Offset(width * 0.6f, boundary + 35f),
+                end0 = Offset(width * 0.15f, boundary - 35f),
+                end1 = Offset(width * 0.85f, boundary + 35f),
+                durationMillis = 600,
+            )
+        }
+        compose.waitUntil(10_000) { canvasState.scale > 1.5f }
+
+        compose.runOnIdle {
+            val second = listState.layoutInfo.visibleItemsInfo.first { it.index == 1 }
+            assertEquals(boundary, second.offset.toFloat(), 12f)
+            assertFalse(canvasState.hasMultiplePointers)
+        }
+        assertTrue(requestedPages().size < 20)
+        assertImagePixels()
+    }
+
     private fun mount(
         pages: List<MangaPage>,
         initialPage: Int = 0,
@@ -298,12 +445,15 @@ class ReaderDisplayInstrumentedTest {
             MaterialTheme {
                 if (mounted) {
                     listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
+                    canvasState = rememberReaderCanvasState()
                     LaunchedEffect(pages, listState) {
                         snapshotFlow { listState.layoutInfo.visibleItemsInfo }
                             .map { items ->
                                 items.filter { item ->
                                     item.offset < listState.layoutInfo.viewportEndOffset && item.offset + item.size > 0
-                                }.map { it.index }.toSet()
+                                }.mapNotNull { item ->
+                                    (item.key as? String)?.removePrefix("page-")?.toIntOrNull()
+                                }.toSet()
                             }
                             .distinctUntilChanged()
                             .collect { visible ->
@@ -313,19 +463,31 @@ class ReaderDisplayInstrumentedTest {
                                 }
                             }
                     }
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize().background(Color.Black).testTag(LIST_TAG),
+                    ReaderCanvas(
+                        state = canvasState,
+                        listState = listState,
+                        onTransform = {},
+                        modifier = Modifier.fillMaxSize().background(Color.Black).testTag(CANVAS_TAG),
                     ) {
-                        itemsIndexed(pages, key = { _, page -> page.imageUrl }) { index, page ->
-                            ZoomableReaderPage(
-                                pagePosition = index,
-                                page = page,
-                                previewMemoryCacheKey = ReaderLogic.previewMemoryCacheKey(8, 1.0, page),
-                                onDisplayed = { record("/page-$it.png", "displayed") },
-                                onTap = {},
-                                onZoomChanged = {},
-                            )
+                        LazyColumn(
+                            state = listState,
+                            userScrollEnabled = !canvasState.hasMultiplePointers,
+                            modifier = Modifier.fillMaxSize().background(Color.Black).testTag(LIST_TAG),
+                        ) {
+                            if (showTopAd) {
+                                item(key = "reader-top-ad") { Box(Modifier.fillMaxWidth().height(90.dp)) }
+                            }
+                            itemsIndexed(pages, key = { index, _ -> "page-$index" }) { index, page ->
+                                ZoomableReaderPage(
+                                    pagePosition = index,
+                                    page = page,
+                                    previewMemoryCacheKey = ReaderLogic.previewMemoryCacheKey(8, 1.0, page),
+                                    onDisplayed = { record("/page-$it.png", "displayed") },
+                                    onTap = {},
+                                    readingScale = canvasState.scale,
+                                    pagePanEnabled = !canvasState.hasMultiplePointers,
+                                )
+                            }
                         }
                     }
                 }
@@ -334,7 +496,7 @@ class ReaderDisplayInstrumentedTest {
     }
 
     private fun assertImagePixels() {
-        val pixels = compose.onNodeWithTag(LIST_TAG).captureToImage().toPixelMap()
+        val pixels = compose.onNodeWithTag(CANVAS_TAG).captureToImage().toPixelMap()
         val center = pixels[pixels.width / 2, pixels.height / 2]
         assertTrue("The canvas must contain the controlled green image, not an empty surface", center.green > center.red + 0.1f)
     }
@@ -383,5 +545,6 @@ class ReaderDisplayInstrumentedTest {
 
     private companion object {
         const val LIST_TAG = "reader-test-list"
+        const val CANVAS_TAG = "reader-test-canvas"
     }
 }

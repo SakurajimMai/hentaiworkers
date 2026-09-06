@@ -115,6 +115,8 @@ export type ErrorResponse = {
 };
 
 export type PublicFeedAdSlot = {
+  width?: number;
+  height?: number;
   enabled: boolean;
   name: string;
   interval: number;
@@ -123,6 +125,8 @@ export type PublicFeedAdSlot = {
 };
 
 export type PublicReaderAdSlot = {
+  width?: number;
+  height?: number;
   enabled: boolean;
   html: string;
   interval: number;

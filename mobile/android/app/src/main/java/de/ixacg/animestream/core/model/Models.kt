@@ -153,6 +153,8 @@ data class FeedAdSlot(
     val interval: Int = 5,
     val href: String = "",
     val html: String = "",
+    val width: Int = 0,
+    val height: Int = 0,
 )
 
 @Serializable
@@ -160,6 +162,8 @@ data class ReaderAdSlot(
     val enabled: Boolean = false,
     val html: String = "",
     val interval: Int = 5,
+    val width: Int = 0,
+    val height: Int = 0,
 )
 
 @Serializable

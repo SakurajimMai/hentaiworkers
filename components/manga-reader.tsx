@@ -18,6 +18,7 @@ import { MangaFavoriteButton } from '@/components/manga-favorite-button';
 import { MediaImage } from '@/components/media-image';
 import { ThemeMenu } from '@/components/theme-menu';
 import { HtmlAd } from '@/components/html-ad';
+import { normalizeAdDimensions, type AdDimensions } from '@/lib/ad-dimensions';
 import { createReaderProgressWriteQueue } from '@/components/manga-reader-progress';
 import { ReaderImageScheduler } from '@/components/manga-reader-scheduler';
 import {
@@ -51,6 +52,8 @@ export type MangaReaderFavoriteState = Readonly<{
 export type MangaReaderAds = Readonly<{
   topHtml: string;
   bottomHtml: string;
+  topSize?: AdDimensions;
+  bottomSize?: AdDimensions;
 }>;
 
 type MangaReaderProps = {
@@ -656,6 +659,8 @@ function ReaderAdSlot({
 }) {
   const ads = use(state);
   const html = (position === 'top' ? ads.topHtml : ads.bottomHtml).trim();
+  const size = position === 'top' ? ads.topSize : ads.bottomSize;
+  const dimensions = normalizeAdDimensions(size);
   const policy = getReaderAdRenderPolicy(html, contentReady);
   if (!policy.reserveSlot) return null;
   return (
@@ -665,9 +670,16 @@ function ReaderAdSlot({
       aria-busy={!policy.mountContent}
     >
       {policy.mountContent ? (
-        <HtmlAd html={html} />
+        <HtmlAd html={html} width={size?.width} height={size?.height} />
       ) : (
-        <div className="reader-ad-reserved" aria-hidden="true" />
+        <div
+          className="reader-ad-reserved"
+          aria-hidden="true"
+          style={dimensions.width ? {
+            width: '100%', maxWidth: dimensions.width, height: 'auto',
+            aspectRatio: `${dimensions.width} / ${dimensions.height}`, marginInline: 'auto',
+          } : undefined}
+        />
       )}
     </aside>
   );

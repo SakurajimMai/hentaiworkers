@@ -62,6 +62,16 @@ scope, Docker image, production Compose services, and server-private imports.
   lifecycle pauses must neither display pause ads nor resume a user-paused video.
 - The reader remains a continuous vertical reader. Use lazy page composition and a proven
   subsampling/zoom library; do not eagerly fetch or decode the entire chapter.
+- Pinch changes the chapter canvas reading scale (1x-4x) while reader chrome remains fixed.
+  Use Compose gesture calculations and claim multi-pointer transforms in the Initial pointer pass;
+  single-finger vertical input must retain lazy-list/long-page fling and nested-scroll behavior.
+  Anchor zoom by stable item key and within-page fraction, including when a top ad is inserted.
+- Bound the original request's Coil transition bitmap to 960x2560 with FIT/exact precision; Telephoto
+  still reads the full-resolution disk file for subsampling. Preserve cached/saved image dimensions
+  when lazily re-entering a page. A prepared preview overlay must not own independent zoom gestures.
+- Classify finite long-page viewports from base reader width and maximum reading scale so a pinch
+  cannot switch layout modes midway. Top-ad insertion relies on stable lazy-list keys; never force
+  a scroll to the page start and discard the user's within-page offset.
 - After manga details settle for 350 ms, prepare the default chapter in the background. Every
   explicit reader navigation, including chapter changes and restored-page entries, calls
   `prepareReader` before navigation. Preparation must not publish reader UI state or record history.

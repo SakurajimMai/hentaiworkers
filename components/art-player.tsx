@@ -3,6 +3,7 @@
 import type Artplayer from 'artplayer';
 import type HlsType from 'hls.js';
 import { useEffect, useRef, useState } from 'react';
+import { setPlayerHtmlAdsActive } from '@/lib/client/html-ad';
 import {
   DEFAULT_CLIENT_PLAYER_CONFIG,
   type ClientPlayerConfig,
@@ -315,6 +316,7 @@ function mountPauseAd(
 
       const show = () => {
         root.style.display = 'flex';
+        setPlayerHtmlAdsActive(root, true);
         if (video) {
           try {
             video.currentTime = 0;
@@ -328,6 +330,7 @@ function mountPauseAd(
       };
       const hide = () => {
         root.style.display = 'none';
+        setPlayerHtmlAdsActive(root, false);
         if (video) {
           try {
             video.pause();
@@ -567,7 +570,9 @@ export function ArtPlayer({
       const player = art;
       const clearPreRollIfIdle = () => {
         if (cancelled || player.isDestroy) return;
-        if (!isPreRollAdsDomVisible(player)) {
+        const visible = isPreRollAdsDomVisible(player);
+        setPlayerHtmlAdsActive((player.template as { $ads?: HTMLElement }).$ads, visible);
+        if (!visible) {
           preRollActive = false;
         }
       };
@@ -581,6 +586,7 @@ export function ArtPlayer({
 
       player.on('artplayerPluginAds:skip' as never, () => {
         preRollActive = false;
+        setPlayerHtmlAdsActive((player.template as { $ads?: HTMLElement }).$ads, false);
       });
       // When content is actually playing and ads DOM is gone, drop the flag.
       // Plugin may issue transient pause/play cycles; a short delay avoids races.

@@ -3,22 +3,25 @@
 import { IconMegaphone } from '@/components/icons';
 import { HtmlAd } from '@/components/html-ad';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import type { AdDimensions } from '@/lib/ad-dimensions';
 
 export function FeedAdCard({
   html,
   href,
+  width,
+  height,
 }: {
   html?: string;
   href?: string;
-}) {
+} & AdDimensions) {
   const custom = (html || '').trim();
   const target = (href || '').trim();
   const frame = (
     <div className="feed-ad-card">
-      <AspectRatio ratio={2 / 3}>
-        {custom ? (
-          <HtmlAd html={custom} className="feed-ad-html" fill />
-        ) : (
+      {custom ? (
+        <HtmlAd html={custom} width={width} height={height} className="feed-ad-html" />
+      ) : (
+        <AspectRatio ratio={2 / 3}>
           <div className="feed-ad-default">
             <span className="feed-ad-badge">广告</span>
             <IconMegaphone size={22} className="text-accent" />
@@ -30,8 +33,8 @@ export function FeedAdCard({
               <span className="mt-3 font-ui text-[12px] font-medium text-accent">查看广告位 →</span>
             ) : null}
           </div>
-        )}
-      </AspectRatio>
+        </AspectRatio>
+      )}
     </div>
   );
 

@@ -89,7 +89,7 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(parsedWorkflow.jobs.build.environment.name, /CI/);
   assert.doesNotMatch(parsedWorkflow.jobs.build.environment.name, /workflow_dispatch/);
   assert.match(workflow, /working-directory: mobile\/android/);
-  assert.match(workflow, /ktlintCheck lintRelease testDebugUnitTest assembleRelease/);
+  assert.match(workflow, /ktlintCheck lintRelease testDebugUnitTest assembleDebugAndroidTest assembleRelease/);
   assert.match(workflow, /versionCode='\$\{GITHUB_RUN_NUMBER\}'/);
   assert.match(workflow, /de\.ixacg\.animestream\.MainActivity/);
   assert.match(workflow, /output-metadata\.json/);
