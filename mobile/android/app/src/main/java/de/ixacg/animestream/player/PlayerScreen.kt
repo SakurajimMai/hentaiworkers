@@ -471,7 +471,7 @@ private fun AdMedia(
                     update = { it.player = player },
                 )
             }
-            html.isNotBlank() -> HtmlAd(html, modifier = Modifier.fillMaxSize())
+            html.isNotBlank() -> HtmlAd(html, modifier = Modifier.fillMaxSize(), clickUrl = safeClick.orEmpty())
             safeImage != null ->
                 RemoteImage(
                     url = safeImage,

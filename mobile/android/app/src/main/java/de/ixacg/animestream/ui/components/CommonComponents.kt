@@ -2,9 +2,6 @@ package de.ixacg.animestream.ui.components
 
 import android.content.Intent
 import android.net.Uri
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,11 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,7 +51,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
@@ -326,76 +318,6 @@ fun statePane(
 }
 
 @Composable
-fun HtmlAd(
-    html: String,
-    modifier: Modifier = Modifier,
-    dark: Boolean = true,
-) {
-    if (html.isBlank()) return
-    val context = LocalContext.current
-    var webView by remember { mutableStateOf<WebView?>(null) }
-    val foreground = if (dark) "#F1ECE3" else "#1B1B1A"
-    val background = if (dark) "#0B0D10" else "transparent"
-    val document =
-        remember(html, dark) {
-            """
-            <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-            <style>html,body{margin:0;padding:0;background:$background;color:$foreground;overflow:hidden}img,video,iframe{max-width:100%;height:auto}a{color:#ffb59f}</style>
-            </head><body>$html</body></html>
-            """.trimIndent()
-        }
-    AndroidView(
-        modifier = modifier.fillMaxWidth().heightIn(min = 96.dp, max = 220.dp),
-        factory = { ctx ->
-            WebView(ctx).apply {
-                webView = this
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = false
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
-                settings.javaScriptCanOpenWindowsAutomatically = false
-                settings.setSupportMultipleWindows(false)
-                webViewClient =
-                    object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView,
-                            request: WebResourceRequest,
-                        ): Boolean = openExternal(request.url)
-
-                        @Suppress("DEPRECATION")
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView,
-                            url: String,
-                        ): Boolean = openExternal(Uri.parse(url))
-
-                        private fun openExternal(uri: Uri): Boolean {
-                            if (uri.scheme !in setOf("http", "https")) return uri.scheme != "about"
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
-                            return true
-                        }
-                    }
-                loadDataWithBaseURL(MediaUrlNormalizer.origin, document, "text/html", "utf-8", null)
-                tag = document
-            }
-        },
-        update = { view ->
-            if (view.tag != document) {
-                view.loadDataWithBaseURL(MediaUrlNormalizer.origin, document, "text/html", "utf-8", null)
-                view.tag = document
-            }
-        },
-    )
-    DisposableEffect(Unit) {
-        onDispose {
-            webView?.stopLoading()
-            webView?.destroy()
-            webView = null
-        }
-    }
-}
-
-@Composable
 fun FeedAdCard(
     ad: FeedAdSlot,
     modifier: Modifier = Modifier,
@@ -423,7 +345,7 @@ fun FeedAdCard(
                     }
                 }
             }
-            if (ad.html.isNotBlank()) HtmlAd(ad.html)
+            if (ad.html.isNotBlank()) HtmlAd(ad.html, width = ad.width, height = ad.height)
         }
     }
 }

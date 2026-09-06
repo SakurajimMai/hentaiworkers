@@ -17,6 +17,38 @@ internal enum class ReaderPrefetchKind {
 internal data class ReaderPrefetchPage(val page: MangaPage, val kind: ReaderPrefetchKind)
 
 object ReaderLogic {
+    fun readingScale(scale: Float): Float = if (scale.isFinite()) scale.coerceIn(1f, MAX_READING_SCALE) else 1f
+
+    fun boundedReadingOffsetX(
+        offset: Float,
+        scale: Float,
+        viewportWidth: Int,
+    ): Float {
+        val minimum = -viewportWidth.coerceAtLeast(0) * (readingScale(scale) - 1f)
+        return if (offset.isFinite()) offset.coerceIn(minimum, 0f) else 0f
+    }
+
+    fun readingOffsetX(
+        offsetX: Float,
+        centroidX: Float,
+        panX: Float,
+        previousScale: Float,
+        nextScale: Float,
+        viewportWidth: Int,
+    ): Float =
+        boundedReadingOffsetX(
+            offset = centroidX - (centroidX - panX - offsetX) * readingScale(nextScale) / readingScale(previousScale),
+            scale = nextScale,
+            viewportWidth = viewportWidth,
+        )
+
+    fun zoomAnchorScrollOffset(
+        itemSize: Int,
+        itemFraction: Float,
+        scaleChange: Float,
+        centroidY: Float,
+    ): Int = (itemSize * itemFraction * scaleChange - centroidY).roundToInt()
+
     fun activePage(
         pages: List<VisibleReaderPage>,
         minimumVisibleFraction: Float = 0.4f,
@@ -108,15 +140,23 @@ object ReaderLogic {
         imageHeight: Int,
         viewportWidth: Int,
         viewportHeight: Int,
+        maximumReadingScale: Float = 1f,
     ): Boolean {
         if (imageWidth <= 0 || imageHeight <= 0 || viewportWidth <= 0 || viewportHeight <= 0) return false
         val scaledImageHeight = imageHeight.toDouble() * viewportWidth / imageWidth
-        return scaledImageHeight > viewportHeight.toDouble() * MAX_UNBOUNDED_VIEWPORT_HEIGHTS
+        val maximumHeight =
+            minOf(
+                viewportHeight.toDouble() * MAX_UNBOUNDED_VIEWPORT_HEIGHTS,
+                MAX_PAGE_LAYOUT_HEIGHT.toDouble() / readingScale(maximumReadingScale),
+            )
+        return scaledImageHeight > maximumHeight
     }
 
     private const val MIN_PAGE_ASPECT_RATIO = 0.001f
     private const val MAX_PAGE_ASPECT_RATIO = 4f
     private const val MAX_UNBOUNDED_VIEWPORT_HEIGHTS = 8
+    private const val MAX_PAGE_LAYOUT_HEIGHT = 24_000
     internal const val PREVIEW_PREFETCH_PAGES = 2
     internal const val FORWARD_PREFETCH_PAGES = 6
+    internal const val MAX_READING_SCALE = 4f
 }

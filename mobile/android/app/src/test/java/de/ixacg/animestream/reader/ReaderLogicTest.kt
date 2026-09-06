@@ -10,6 +10,39 @@ import org.junit.Test
 
 class ReaderLogicTest {
     @Test
+    fun `chapter zoom keeps the content under the moving pinch center`() {
+        val oldLeft = -100f
+        val oldCenter = 250f
+        val newCenter = 280f
+        val oldScale = 1.5f
+        val newScale = 3f
+        val nextLeft =
+            ReaderLogic.readingOffsetX(
+                offsetX = oldLeft,
+                centroidX = newCenter,
+                panX = newCenter - oldCenter,
+                previousScale = oldScale,
+                nextScale = newScale,
+                viewportWidth = 400,
+            )
+
+        assertEquals((oldCenter - oldLeft) / oldScale, (newCenter - nextLeft) / newScale, 0.001f)
+        val scrollOffset = ReaderLogic.zoomAnchorScrollOffset(1_000, 0.6f, newScale / oldScale, 480f)
+        assertEquals(480f, 2_000f * 0.6f - scrollOffset, 0.001f)
+    }
+
+    @Test
+    fun `reading zoom limits never reveal a horizontal gap and reset its offset at fit width`() {
+        assertEquals(1f, ReaderLogic.readingScale(0.5f), 0f)
+        assertEquals(4f, ReaderLogic.readingScale(100f), 0f)
+        assertEquals(1f, ReaderLogic.readingScale(Float.NaN), 0f)
+        assertEquals(-1_200f, ReaderLogic.boundedReadingOffsetX(-10_000f, 4f, 400), 0f)
+        assertEquals(0f, ReaderLogic.boundedReadingOffsetX(100f, 4f, 400), 0f)
+        assertEquals(0f, ReaderLogic.boundedReadingOffsetX(-100f, 1f, 400), 0f)
+        assertEquals(0f, ReaderLogic.boundedReadingOffsetX(Float.NaN, 3f, 400), 0f)
+    }
+
+    @Test
     fun `selects first page at least forty percent visible`() {
         assertEquals(
             3,
@@ -181,5 +214,32 @@ class ReaderLogicTest {
             ),
         )
         assertFalse(ReaderLogic.requiresBoundedViewport(0, 0, 1_080, 2_400))
+        assertTrue(ReaderLogic.requiresBoundedViewport(1_000, 10_000, 4_320, 2_400))
+        assertTrue(ReaderLogic.requiresBoundedViewport(1_000, 30_000, 1_080, 5_000))
+    }
+
+    @Test
+    fun `reader viewport mode stays fixed throughout the supported zoom range`() {
+        for (scale in listOf(1f, 2f, 3f, ReaderLogic.MAX_READING_SCALE)) {
+            val scaledWidth = 400f * scale
+            assertFalse(
+                ReaderLogic.requiresBoundedViewport(
+                    imageWidth = 1_000,
+                    imageHeight = 6_000,
+                    viewportWidth = (scaledWidth / scale).toInt(),
+                    viewportHeight = 800,
+                    maximumReadingScale = ReaderLogic.MAX_READING_SCALE,
+                ),
+            )
+            assertTrue(
+                ReaderLogic.requiresBoundedViewport(
+                    imageWidth = 1_000,
+                    imageHeight = 20_000,
+                    viewportWidth = (scaledWidth / scale).toInt(),
+                    viewportHeight = 1_200,
+                    maximumReadingScale = ReaderLogic.MAX_READING_SCALE,
+                ),
+            )
+        }
     }
 }
