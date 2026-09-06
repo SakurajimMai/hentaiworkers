@@ -16,6 +16,7 @@ import coil.decode.Decoder
 import coil.disk.DiskCache
 import coil.fetch.SourceResult
 import coil.memory.MemoryCache
+import coil.request.ErrorResult
 import coil.request.ImageRequest
 import coil.request.Options
 import coil.request.SuccessResult
@@ -80,6 +81,7 @@ class ReaderImagePipelineTest {
     private val bodies = ConcurrentHashMap<String, ByteArray>()
     private val requests = CopyOnWriteArrayList<Observation>()
     private val events = CopyOnWriteArrayList<Observation>()
+    private val imageFailures = ConcurrentHashMap<String, Throwable>()
     private val activeCalls = ConcurrentHashMap.newKeySet<Call>()
     private val maximumCalls = AtomicInteger()
     private lateinit var context: Context
@@ -112,7 +114,6 @@ class ReaderImagePipelineTest {
         server.start()
         client =
             OkHttpClient.Builder()
-                .retryOnConnectionFailure(false)
                 .eventListenerFactory {
                     object : okhttp3.EventListener() {
                         override fun callStart(call: Call) {
@@ -133,6 +134,11 @@ class ReaderImagePipelineTest {
                         ) {
                             activeCalls -= call
                             events += Observation(call.request().url.encodedPath, "network-failed")
+                            events +=
+                                Observation(
+                                    call.request().url.encodedPath,
+                                    "network-failure:${ioe.javaClass.name}:${ioe.message}:canceled=${call.isCanceled()}",
+                                )
                         }
                     }
                 }.build()
@@ -180,7 +186,20 @@ class ReaderImagePipelineTest {
                             request: ImageRequest,
                             result: SuccessResult,
                         ) {
+                            imageFailures.remove(path(request))
                             events += Observation(path(request), "success:${result.dataSource}")
+                        }
+
+                        override fun onError(
+                            request: ImageRequest,
+                            result: ErrorResult,
+                        ) {
+                            imageFailures[path(request)] = result.throwable
+                            events += Observation(path(request), "error:${result.throwable.javaClass.name}:${result.throwable.message}")
+                        }
+
+                        override fun onCancel(request: ImageRequest) {
+                            events += Observation(path(request), "request-cancelled")
                         }
 
                         override fun decodeEnd(
@@ -465,6 +484,12 @@ class ReaderImagePipelineTest {
     fun `restoration reverse movement and quick distant jump replace the window`() =
         runBlocking {
             val pages = pages(160)
+            // Hold the old windows in HTTP fetch, so both replacements exercise cancellation
+            // without racing a response that has already moved into bitmap decoding.
+            hold("/page-71.png")
+            hold("/page-72.png")
+            hold("/page-68.png")
+            hold("/page-67.png")
             preloader.updateWindow(8, 1.0, pages, currentPage = 70)
             await { requested(71) && requested(72) }
             assertFalse(requested(0))
@@ -474,7 +499,14 @@ class ReaderImagePipelineTest {
             hold("/page-120.png")
             val jumpedPage = async { imageLoader.execute(displayRequest(pages[120])) }
             preloader.updateWindow(8, 1.0, pages, currentPage = 120)
-            await { requested(120) && requested(121) }
+            await {
+                for (path in listOf("/page-120.png", "/page-121.png")) {
+                    imageFailures[path]?.let { cause ->
+                        throw AssertionError("Jump-window image failed while waiting for requests: $path", cause)
+                    }
+                }
+                requested(120) && requested(121)
+            }
             assertFalse(jumpedPage.isCompleted)
             assertFalse(requested(99))
             assertTrue("Two speculative requests plus the visible original stay bounded after replacement", maximumCalls.get() <= 3)
