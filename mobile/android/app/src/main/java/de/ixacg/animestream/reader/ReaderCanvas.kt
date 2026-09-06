@@ -69,6 +69,7 @@ internal fun ReaderCanvas(
     content: @Composable () -> Unit,
 ) {
     val currentOnTransform by rememberUpdatedState(onTransform)
+
     fun applyTransform(
         zoom: Float,
         pan: Offset,

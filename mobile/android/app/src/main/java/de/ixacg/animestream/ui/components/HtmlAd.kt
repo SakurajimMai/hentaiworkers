@@ -29,7 +29,10 @@ import org.json.JSONObject
 
 private class HtmlAdSizeBridge(private val onResize: (String, Float) -> Unit) {
     @JavascriptInterface
-    fun resize(id: String, height: Double) {
+    fun resize(
+        id: String,
+        height: Double,
+    ) {
         HtmlAdPolicy.measuredHeight(height)?.let { onResize(id, it) }
     }
 }
