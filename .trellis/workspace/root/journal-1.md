@@ -279,3 +279,25 @@ Implemented native reader and web admin changes; all root and browser checks pas
 ### Next Steps
 
 - Run real-device reader and ad smoke tests before production release; local preview needs valid DATABASE_URL.
+
+
+## Session 10: 发布漫画阅读优化、Meta 与 HTML 广告正式版 Build 91
+
+**Date**: 2026-09-06
+**Task**: 发布漫画阅读优化、Meta 与 HTML 广告正式版 Build 91
+**Branch**: `main`
+
+### Summary
+
+隔离保留原 SMTP 改动，推送功能提交和 Android 测试稳定性修正。Web 257 项测试与完整检查通过；Android Build 91 的 84 项单测、生产签名及五种 APK 校验通过，已提升为正式 latest Release。网站固定部署 9dc3d8f 镜像，公网 25 项检查与新版更新清单通过；数据库 22 表备份已隔离恢复验证，回滚配置保留。未进行真机测试。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1e98a74` | (see git log) |
+| `9dc3d8f` | (see git log) |
+
+### Status
+
+[OK] **Completed**

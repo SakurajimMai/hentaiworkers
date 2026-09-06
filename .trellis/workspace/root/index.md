@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-09-06
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~281 | Active |
+| `journal-1.md` | ~303 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-09-06 | 发布漫画阅读优化、Meta 与 HTML 广告正式版 Build 91 | `1e98a74`, `9dc3d8f` | `main` |
 | 9 | 2026-09-06 | Native reader performance, chapter zoom, global meta and HTML banners | `e38f98ebc21b1be723db094aaee2bdf34c79c843` | `codex/reader-meta-ads-check-20260906030631488` |
 | 8 | 2026-09-01 | 优化漫画阅读首图与连续滚动性能 | `7a36f06`, `4b1b93a`, `b60d6ec`, `1ce3174` | `main` |
 | 7 | 2026-09-01 | 修复站点分页与首页轮播 | `d4fe12d`, `2880536` | `main` |
