@@ -6,6 +6,7 @@ const tailwindConfig = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  safelist: ['col-span-2'],
   theme: {
     extend: {
       fontFamily: {

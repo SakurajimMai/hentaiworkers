@@ -19,7 +19,8 @@
 - Homepage rails interleave `card` slots next to catalog posters. The dedicated home strip is
   banners only — never drop cards from home because they are not banners. `/browse` and `/manga`
   keep both placements in the poster grid. `interleaveFeedAds` include filters must preserve the
-  public `feedSlots` index used by `/ads/html/feed/{id}`.
+  public `feedSlots` index used by `/ads/html/feed/{id}`. Banner `col-span-2` must appear as a
+  complete class in `components/` or `app/` (Tailwind does not scan `lib/`).
 - Size feed cards like catalog posters (`poster-frame` + `aspect-[2/3]` + Radix `AspectRatio`).
   Give fill iframes explicit pixel width/height from ResizeObserver; mobile WebKit treats
   `iframe { height:100% }` as 0 inside an absolute box. Fluid/fill documents must not apply

@@ -64,12 +64,16 @@ export function FeedAdCard({
         href={target}
         target="_blank"
         rel="noopener noreferrer sponsored"
-        className={`group block min-w-0${className ? ` ${className}` : ''}`}
+        className={`group block min-w-0${banner ? ' col-span-2' : ''}${className ? ` ${className}` : ''}`}
         aria-label="广告"
       >
         {frame}
       </a>
     );
   }
-  return <div className={`block min-w-0${className ? ` ${className}` : ''}`}>{frame}</div>;
+  return (
+    <div className={`block min-w-0${banner ? ' col-span-2' : ''}${className ? ` ${className}` : ''}`}>
+      {frame}
+    </div>
+  );
 }

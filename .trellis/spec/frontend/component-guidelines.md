@@ -39,7 +39,9 @@ Questions to answer:
 ## Styling Patterns
 
 - Shared components use Tailwind utility classes and expose domain props rather than accepting
-  arbitrary layout fragments from each caller.
+  arbitrary layout fragments from each caller. Dynamic layout classes such as `col-span-2` must
+  be written as complete literals under `app/` or `components/`; Tailwind content does not scan
+  `lib/`.
 - Horizontal card rails derive item basis from the track width so each supported breakpoint shows
   only complete cards. The homepage convention is 2 columns by default, 3 at `sm`, 4 at `md`, and
   5 at `lg`; the item width must account for every inter-card gap.
