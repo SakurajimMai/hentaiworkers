@@ -226,6 +226,21 @@ try {
 
   frame = await render({
     kind: 'feed',
+    banner: true,
+    hostWidth: 432,
+    width: 300,
+    height: 250,
+    html: '<div id="creative" style="width:300px;height:250px;background:#147d72">catalog-banner</div>',
+  });
+  assert.equal(await frame.evaluate(() => window.innerWidth), 300, 'catalog banner keeps a 300px alliance viewport');
+  const catalogBanner = await page.locator('#ad-host iframe').boundingBox();
+  assert.ok(Math.abs(catalogBanner.width - 432) < 4, `banner fills the two-column slot, got ${catalogBanner.width}`);
+  assert.ok(Math.abs(catalogBanner.height - 432 * 250 / 300) < 4, `banner keeps 300x250 ratio in the slot, got ${catalogBanner.height}`);
+  const catalogSlot = await page.locator('#ad-host .feed-ad-banner-card').boundingBox();
+  assert.ok(Math.abs(catalogSlot.height - catalogBanner.height) < 4, 'banner chrome must not add empty poster padding');
+
+  frame = await render({
+    kind: 'feed',
     html: '<div id="creative" style="width:100%;height:100%;background:#147d72">native</div>',
   });
   const nativeInner = await frame.evaluate(() => window.innerWidth);

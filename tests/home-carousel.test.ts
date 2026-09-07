@@ -55,6 +55,8 @@ test('homepage carousel uses exact complete-card columns at responsive breakpoin
 test('feed banner grid span is a complete Tailwind class in a scanned file', () => {
   const feedCard = readFileSync(new URL('../components/feed-ad-card.tsx', import.meta.url), 'utf8');
   assert.match(feedCard, /col-span-2/);
+  assert.match(feedCard, /self-start/);
+  assert.match(feedCard, /fitParent/);
 });
 
 test('all homepage carousel sections share the track-owned item sizing', () => {

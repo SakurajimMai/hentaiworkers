@@ -14,8 +14,9 @@
   aborted by later reparenting; still measure height from `#hw-ad-content`, not the iframe viewport.
 - Feed slots have `placement: card | banner`. Cards fill one poster cell at 2:3 and load a fluid
   ad document (`fluid=1`) so native/responsive snippets match the catalog grid. Banners occupy two
-  poster columns (`col-span-2`) and keep a fixed creative viewport. Empty native cards stay
-  poster-sized. Stored HTML slots without placement migrate to banner.
+  poster columns (`col-span-2 self-start`) at the creative's own ratio (300×250 → 6:5), scale the
+  iframe to fill that box, and must not stretch to the neighboring poster 2:3 height. Empty native
+  cards stay poster-sized. Stored HTML slots without placement migrate to banner.
 - Homepage rails interleave `card` slots next to catalog posters. The dedicated home strip is
   banners only — never drop cards from home because they are not banners. `/browse` and `/manga`
   keep both placements in the poster grid. `interleaveFeedAds` include filters must preserve the

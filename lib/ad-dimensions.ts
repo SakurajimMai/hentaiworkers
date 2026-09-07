@@ -78,6 +78,12 @@ export function htmlAdFrameScale(creativeWidth: number): string {
   return `scale(calc(100cqw / ${creativeWidth}px))`;
 }
 
+/** Fit a creative CSS-pixel viewport into a slot. Catalog banners may scale above 1 to fill two columns. */
+export function htmlAdFitScale(slotWidth: number, creativeWidth: number): number {
+  if (!(slotWidth > 0) || !(creativeWidth > 0)) return 1;
+  return slotWidth / creativeWidth;
+}
+
 /** Catalog poster ratio (width / height). */
 export const FEED_CARD_RATIO = 2 / 3;
 

@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   MAX_AD_HEIGHT,
+  htmlAdFitScale,
   htmlAdSlotPaddingBottom,
   resolveAdDimensions,
   type AdDimensions,
@@ -20,6 +21,7 @@ export function HtmlAd({
   documentSrc,
   className = '',
   fill = false,
+  fitParent = false,
   minHeight = 72,
   width = 0,
   height: creativeHeight = 0,
@@ -29,6 +31,8 @@ export function HtmlAd({
   documentSrc?: string;
   className?: string;
   fill?: boolean;
+  /** Scale the creative to the parent box instead of capping at native CSS pixels. */
+  fitParent?: boolean;
   minHeight?: number;
 } & AdDimensions) {
   const reactId = useId();
@@ -74,7 +78,10 @@ export function HtmlAd({
     if (fixed) {
       const update = () => {
         const next = node.clientWidth;
-        if (next > 0) setScale(Math.min(1, next / dimensions.width));
+        if (next > 0) {
+          const fitted = htmlAdFitScale(next, dimensions.width);
+          setScale(fitParent ? fitted : Math.min(1, fitted));
+        }
       };
       update();
       const observer = new ResizeObserver(update);
@@ -97,7 +104,7 @@ export function HtmlAd({
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [fixed, useFill, dimensions.width, html, srcDoc, src]);
+  }, [fixed, fitParent, useFill, dimensions.width, html, srcDoc, src]);
 
   const iframe = (
     <iframe
@@ -168,23 +175,31 @@ export function HtmlAd({
       <div
         ref={slot}
         className={className}
-        style={{
-          width: '100%',
-          maxWidth: dimensions.width,
-          marginInline: 'auto',
-        }}
+        style={
+          fitParent
+            ? { position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }
+            : {
+                width: '100%',
+                maxWidth: dimensions.width,
+                marginInline: 'auto',
+              }
+        }
       >
-        <div
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: 0,
-            paddingBottom: htmlAdSlotPaddingBottom(dimensions.width, dimensions.height),
-            overflow: 'hidden',
-          }}
-        >
-          {iframe}
-        </div>
+        {fitParent ? (
+          iframe
+        ) : (
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              height: 0,
+              paddingBottom: htmlAdSlotPaddingBottom(dimensions.width, dimensions.height),
+              overflow: 'hidden',
+            }}
+          >
+            {iframe}
+          </div>
+        )}
       </div>
     );
   }
