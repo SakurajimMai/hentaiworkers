@@ -55,16 +55,56 @@
     } catch (_) {}
   });
 
+  var nativeAppend = Node.prototype.appendChild;
+  Node.prototype.appendChild = function (node) {
+    var content = document.getElementById('hw-ad-content');
+    if (content && this === document.body && node !== content) return nativeAppend.call(content, node);
+    return nativeAppend.call(this, node);
+  };
+  var nativeInsertBefore = Node.prototype.insertBefore;
+  Node.prototype.insertBefore = function (node, ref) {
+    var content = document.getElementById('hw-ad-content');
+    if (content && this === document.body && node !== content) return nativeInsertBefore.call(content, node, null);
+    return nativeInsertBefore.call(this, node, ref);
+  };
+
   var frame = 0;
   var previousHeight = -1;
   var previousScale = -1;
+  function adoptOrphans() {
+    var content = document.getElementById('hw-ad-content');
+    if (!content || !document.body) return;
+    var nodes = Array.prototype.slice.call(document.body.childNodes);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (node === content) continue;
+      if (node.nodeType === 1 && (node.tagName === 'SCRIPT' || node.tagName === 'STYLE')) continue;
+      nativeAppend.call(content, node);
+    }
+  }
   function report() {
     frame = 0;
+    adoptOrphans();
     var content = document.getElementById('hw-ad-content');
     if (!content) return;
+    if (config.fill) {
+      if (previousScale !== 1) {
+        content.style.transform = 'none';
+        previousScale = 1;
+      }
+      var fillHeight = Math.min(600, Math.max(1, Math.ceil(Math.max(content.offsetHeight, window.innerHeight, 1))));
+      if (fillHeight === previousHeight) return;
+      previousHeight = fillHeight;
+      if (parent !== window) parent.postMessage({ type: 'hw-ad-size', id: config.id, h: fillHeight }, '*');
+      if (window.HtmlAdBridge) window.HtmlAdBridge.resize(config.id, fillHeight);
+      return;
+    }
+    var viewport = window.innerWidth;
+    if (!(viewport > 0)) return;
     var width = config.width || Math.max(content.offsetWidth, content.scrollWidth, 1);
     var height = config.height || Math.max(content.offsetHeight, content.scrollHeight, 1);
-    var scale = Math.min(1, window.innerWidth / width);
+    var scale = Math.min(1, viewport / width);
+    if (!(scale > 0)) scale = 1;
     if (scale !== previousScale) {
       content.style.transform = 'scale(' + scale + ')';
       previousScale = scale;
@@ -79,9 +119,11 @@
   function observe() {
     var content = document.getElementById('hw-ad-content');
     if (!content) return;
-    new MutationObserver(schedule).observe(content, { childList: true, subtree: true, attributes: true, characterData: true });
+    new MutationObserver(function () { adoptOrphans(); schedule(); }).observe(content, { childList: true, subtree: true, attributes: true, characterData: true });
+    if (document.body) new MutationObserver(function () { adoptOrphans(); schedule(); }).observe(document.body, { childList: true });
     if (window.ResizeObserver) new ResizeObserver(schedule).observe(content);
     content.addEventListener('load', schedule, true);
+    adoptOrphans();
     schedule();
   }
   window.addEventListener('resize', schedule);

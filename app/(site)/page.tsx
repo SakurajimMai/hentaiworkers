@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
+import { FeedAdCard } from '@/components/feed-ad-card';
 import { GuestContinueWatching } from '@/components/continue-watching-client';
 import { HeroCarousel, type HeroItem } from '@/components/hero-carousel';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
@@ -15,7 +17,10 @@ import {
   getWatchProgressService,
 } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
-import { effectiveHeroSlides } from '@/lib/server/system/domain/settings';
+import { interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
+import { resolveAdDimensions } from '@/lib/ad-dimensions';
+import { effectiveHeroSlides, type FeedAdSlot } from '@/lib/server/system/domain/settings';
+import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { StructuredData } from '@/components/structured-data';
 import { resolveSiteUrl } from '@/lib/site-url';
 import type { Metadata } from 'next';
@@ -43,7 +48,8 @@ export default async function HomePage() {
   let mangas: Awaited<ReturnType<typeof listMangas>>['data'] = [];
   let loggedIn = false;
   let error: string | null = null;
-  let homeAd: { html: string; width?: number; height?: number } | undefined;
+  let feedSlots: FeedAdSlot[] = [];
+  let homeAd: { html: string; width?: number; height?: number; index: number } | undefined;
 
   try {
     const user = await getIdentityService().getCurrentUser();
@@ -64,7 +70,12 @@ export default async function HomePage() {
     latest = lat.data;
     mangas = mangaData;
     heroIntervalSeconds = system.hero.intervalSeconds;
-    homeAd = system.ads.feedSlots.find((slot) => slot.enabled && slot.html.trim());
+    feedSlots = system.ads.feedSlots.filter((slot) => slot.enabled);
+    const homeAdIndex = feedSlots.findIndex((slot) => slot.html.trim() && isFeedBannerAd(slot));
+    const homeSlot = homeAdIndex >= 0 ? feedSlots[homeAdIndex] : undefined;
+    homeAd = homeSlot
+      ? { html: homeSlot.html, ...resolveAdDimensions(homeSlot), index: homeAdIndex }
+      : undefined;
     continueWatching = progress.filter((p) => !p.completed && p.positionSeconds > 5);
     const completedIds = progress.filter((p) => p.completed).map((p) => p.animeId);
     const favorites = favoritesPage?.items ?? [];
@@ -177,7 +188,12 @@ export default async function HomePage() {
 
         {homeAd ? (
           <aside className="reader-ad reader-ad-banner overflow-hidden rounded-2xl border border-border bg-card" aria-label="首页广告">
-            <HtmlAd html={homeAd.html} width={homeAd.width} height={homeAd.height} />
+            <HtmlAd
+              html={homeAd.html}
+              documentSrc={htmlAdDocumentPath({ kind: 'feed', id: homeAd.index })}
+              width={homeAd.width}
+              height={homeAd.height}
+            />
           </aside>
         ) : null}
 
@@ -223,53 +239,98 @@ export default async function HomePage() {
         {!loggedIn && <GuestContinueWatching />}
 
         {loggedIn && forYou.length > 0 && (
-          <HorizontalCarousel title="根据收藏推荐" viewAllHref="/browse?sort=popular">
-            {forYou.map((a) => (
-              <div key={a.id} className={horizontalCarouselItemClass}>
-                <AnimeCard anime={a} />
-              </div>
-            ))}
-          </HorizontalCarousel>
+          <HomeFeedRail
+            title="根据收藏推荐"
+            viewAllHref="/browse?sort=popular"
+            items={forYou}
+            ads={feedSlots}
+            itemKey={(anime) => String(anime.id)}
+            renderItem={(anime) => <AnimeCard anime={anime} />}
+          />
         )}
 
         {popular.length > 0 && (
-          <HorizontalCarousel title="热门" viewAllHref="/browse?sort=popular">
-            {popular.map((a) => (
-              <div key={a.id} className={horizontalCarouselItemClass}>
-                <AnimeCard anime={a} />
-              </div>
-            ))}
-          </HorizontalCarousel>
+          <HomeFeedRail
+            title="热门"
+            viewAllHref="/browse?sort=popular"
+            items={popular}
+            ads={feedSlots}
+            itemKey={(anime) => String(anime.id)}
+            renderItem={(anime) => <AnimeCard anime={anime} />}
+          />
         )}
 
         {latest.length > 0 && (
-          <HorizontalCarousel title="最近更新" viewAllHref="/browse">
-            {latest.map((a) => (
-              <div key={a.id} className={horizontalCarouselItemClass}>
-                <AnimeCard anime={a} />
-              </div>
-            ))}
-          </HorizontalCarousel>
+          <HomeFeedRail
+            title="最近更新"
+            viewAllHref="/browse"
+            items={latest}
+            ads={feedSlots}
+            itemKey={(anime) => String(anime.id)}
+            renderItem={(anime) => <AnimeCard anime={anime} />}
+          />
         )}
 
         {mangas.length > 0 && (
-          <HorizontalCarousel title="漫画更新" viewAllHref="/manga">
-            {mangas.map((manga) => (
-              <div key={manga.id} className={horizontalCarouselItemClass}>
-                <MangaCard
-                  manga={{
-                    id: manga.id,
-                    title: manga.title,
-                    coverUrl: manga.coverUrl,
-                    pageCount: manga.pageCount,
-                  }}
-                />
-              </div>
-            ))}
-          </HorizontalCarousel>
+          <HomeFeedRail
+            title="漫画更新"
+            viewAllHref="/manga"
+            items={mangas}
+            ads={feedSlots}
+            itemKey={(manga) => String(manga.id)}
+            renderItem={(manga) => (
+              <MangaCard
+                manga={{
+                  id: manga.id,
+                  title: manga.title,
+                  coverUrl: manga.coverUrl,
+                  pageCount: manga.pageCount,
+                }}
+              />
+            )}
+          />
         )}
         </div>
       </div>
     </div>
+  );
+}
+
+function HomeFeedRail<T>({
+  title,
+  viewAllHref,
+  items,
+  ads,
+  itemKey,
+  renderItem,
+}: {
+  title: string;
+  viewAllHref: string;
+  items: readonly T[];
+  ads: readonly FeedAdSlot[];
+  itemKey: (item: T, index: number) => string;
+  renderItem: (item: T) => ReactNode;
+}) {
+  const slots = interleaveFeedAds(items, ads, itemKey, (ad) => !isFeedBannerAd(ad));
+  return (
+    <HorizontalCarousel title={title} viewAllHref={viewAllHref}>
+      {slots.map((slot) =>
+        slot.type === 'ad' ? (
+          <div key={slot.key} className={horizontalCarouselItemClass}>
+            <FeedAdCard
+              html={slot.ad.html}
+              href={slot.ad.href}
+              width={slot.ad.width}
+              height={slot.ad.height}
+              documentSrc={htmlAdDocumentPath({ kind: 'feed', id: slot.adIndex })}
+            />
+          </div>
+        ) : (
+          <div key={slot.key} className={horizontalCarouselItemClass}>
+            {renderItem(slot.item)}
+          </div>
+        ),
+      )}
+    </HorizontalCarousel>
   );
 }

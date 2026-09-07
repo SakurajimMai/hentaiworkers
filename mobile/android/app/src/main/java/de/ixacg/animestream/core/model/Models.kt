@@ -155,7 +155,19 @@ data class FeedAdSlot(
     val html: String = "",
     val width: Int = 0,
     val height: Int = 0,
-)
+    val placement: String = "card",
+) {
+    val spansCatalogRow: Boolean get() = placement == "banner"
+
+    fun catalogSpan(maxLineSpan: Int): Int =
+        if (!spansCatalogRow) {
+            1
+        } else if (maxLineSpan <= 3) {
+            maxLineSpan
+        } else {
+            minOf(2, maxLineSpan)
+        }
+}
 
 @Serializable
 data class ReaderAdSlot(

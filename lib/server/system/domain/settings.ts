@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_AD_HEIGHT, MAX_AD_WIDTH } from '@/lib/ad-dimensions';
+import { MAX_AD_HEIGHT, MAX_AD_WIDTH, resolveAdDimensions } from '@/lib/ad-dimensions';
 import { siteMetaTagsSchema } from '@/lib/site-meta';
 
 /** Encrypted blob stored in JSON (AES-GCM via app keyring). */
@@ -36,6 +36,21 @@ export const smtpSettingsSchema = z.object({
   fromEmail: z.string().max(255).default(''),
   fromName: z.string().max(128).default('AnimeStream'),
 });
+
+/**
+ * Many control panels show a local-part mailbox name (`admin`) while SMTP AUTH
+ * requires the full address (`admin@domain`). Qualify using the From domain.
+ * Empty username stays empty so unauthenticated send remains possible.
+ */
+export function qualifySmtpUsername(username: string, fromEmail: string): string {
+  const user = username.trim();
+  if (!user || user.includes('@')) return user;
+  const at = fromEmail.trim().lastIndexOf('@');
+  if (at <= 0 || at === fromEmail.trim().length - 1) return user;
+  const domain = fromEmail.trim().slice(at + 1).trim();
+  if (!domain || domain.includes('@')) return user;
+  return `${user}@${domain}`;
+}
 
 /** Admin-only: whether outbound mail can actually be sent. Never expose to the public site. */
 export function isOutboundMailReady(smtp: {
@@ -133,6 +148,8 @@ export const feedAdSlotSchema = z.object({
   href: z.string().max(1000).default(''),
   /** Empty = default “广告位招租” card. Supports iframe / HTML / script. */
   html: z.string().max(20000).default(''),
+  /** `banner` spans the catalog row; `card` stays poster-sized. */
+  placement: z.enum(['card', 'banner']).default('card'),
 });
 
 /** One HTML slot on the manga reader. */
@@ -177,6 +194,16 @@ export function migrateAdsSettings(raw: unknown): unknown {
 
   if (!ads.reader && ads.mangaReader && typeof ads.mangaReader === 'object') {
     next.reader = { top: {}, middle: ads.mangaReader, bottom: {} };
+  }
+
+  if (Array.isArray(next.feedSlots)) {
+    next.feedSlots = next.feedSlots.map((slot) => {
+      if (!slot || typeof slot !== 'object') return slot;
+      const rec = slot as Record<string, unknown>;
+      if (rec.placement === 'card' || rec.placement === 'banner') return rec;
+      const html = typeof rec.html === 'string' ? rec.html.trim() : '';
+      return { ...rec, placement: html ? 'banner' : 'card' };
+    });
   }
 
   return next;
@@ -265,16 +292,20 @@ export type PublicAdsConfig = Readonly<{
   }>;
 }>;
 
+function publicFeedSlot(slot: FeedAdSlot): FeedAdSlot {
+  return { ...slot, ...resolveAdDimensions(slot) };
+}
+
 function publicReaderSlot(slot: ReaderAdSlot): ReaderAdSlot {
   if (!slot.enabled) {
     return { ...slot, enabled: false, html: '' };
   }
-  return slot;
+  return { ...slot, ...resolveAdDimensions(slot) };
 }
 
 export function toPublicAdsConfig(settings: SystemSettings): PublicAdsConfig {
   return {
-    feedSlots: settings.ads.feedSlots.filter((slot) => slot.enabled),
+    feedSlots: settings.ads.feedSlots.filter((slot) => slot.enabled).map(publicFeedSlot),
     reader: {
       top: publicReaderSlot(settings.ads.reader.top),
       // Mid-chapter interval ads were removed from the reader UX.

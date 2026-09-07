@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminSystemSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; reason?: string }>;
 }) {
   await requireAdmin();
   const sp = await searchParams;
@@ -55,7 +55,9 @@ export default async function AdminSystemSettingsPage({
         <p className="font-meta text-[13px] text-[hsl(var(--success))]">测试邮件已发送</p>
       )}
       {sp.error === 'smtp' && (
-        <p className="font-meta text-[13px] text-danger">SMTP 测试失败，请检查配置</p>
+        <p className="font-meta text-[13px] text-danger">
+          SMTP 测试失败{sp.reason ? `：${sp.reason}` : '，请检查配置'}
+        </p>
       )}
       {sp.error === '1' && (
         <p className="font-meta text-[13px] text-danger">保存失败，请检查必填项</p>
@@ -235,6 +237,7 @@ export default async function AdminSystemSettingsPage({
                 className="admin-input mt-1"
                 defaultValue={view.smtp.username}
                 autoComplete="off"
+                placeholder="完整邮箱，例如 no-reply@example.com"
               />
             </label>
             <label className="block font-meta text-[12px]">
@@ -266,6 +269,9 @@ export default async function AdminSystemSettingsPage({
               />
             </label>
           </div>
+          <p className="font-ui text-[12px] text-soft">
+            用户名一般为完整邮箱。只填本地部分（如 admin）时，发送与保存会自动补上发件人域名。
+          </p>
         </section>
 
         {/* Trust */}
@@ -493,14 +499,15 @@ export default async function AdminSystemSettingsPage({
             <h2 className="font-ui text-sm font-semibold">广告位</h2>
             <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
               信息流可配置多条广告，每条单独开关、单独设置「每隔 x 张卡片」。
+              目录里推荐「信息流卡片」+ 尺寸「自动」，粘贴联盟 Native / 自适应代码，广告会跟海报卡同宽同比例。
+              只有固定像素横幅（300×250 等）才选「横幅」并填写对应宽高。
               阅读页只在章节顶部和底部放广告，不会插入到漫画页中间。
               这里保存后，网站（含手机浏览器）和 Android App 会使用同一套广告。
-              阅读页 HTML 可以直接粘贴联盟脚本（含 document.write、async src）。
             </p>
           </div>
 
           <div className="space-y-3 border-t border-border pt-4">
-            <h3 className="font-ui text-[13px] font-semibold">信息流原生卡</h3>
+            <h3 className="font-ui text-[13px] font-semibold">信息流与横幅</h3>
             <AdsFeedSlotsEditor initialSlots={[...view.ads.feedSlots]} />
           </div>
 

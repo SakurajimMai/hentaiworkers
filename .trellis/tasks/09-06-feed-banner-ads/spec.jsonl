@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/site-metadata-and-ads.md", "reason": "HTML ad isolation, sizing, and browser test contract"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend pre-dev checklist"}
+{"file": ".trellis/spec/backend/app-only-boundary.md", "reason": "New HTML ad document route stays App-owned"}
+{"file": ".trellis/spec/mobile/native-android.md", "reason": "Public ads DTO compatibility for Android"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Ads settings → public API → web/Android render"}

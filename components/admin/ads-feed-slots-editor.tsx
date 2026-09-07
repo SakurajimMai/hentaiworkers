@@ -12,12 +12,15 @@ function emptySlot(index: number): FeedAdSlot {
     interval: 5,
     href: '',
     html: '',
+    placement: 'card',
   };
 }
 
 export function AdsFeedSlotsEditor({ initialSlots }: { initialSlots: FeedAdSlot[] }) {
   const [slots, setSlots] = useState<FeedAdSlot[]>(
-    initialSlots.length ? initialSlots : [emptySlot(0)],
+    initialSlots.length
+      ? initialSlots.map((slot, index) => ({ ...emptySlot(index), ...slot }))
+      : [emptySlot(0)],
   );
 
   const update = (index: number, patch: Partial<FeedAdSlot>) => {
@@ -86,15 +89,31 @@ export function AdsFeedSlotsEditor({ initialSlots }: { initialSlots: FeedAdSlot[
                   placeholder="https://example.com/ad"
                 />
               </label>
+              <label className="block font-meta text-[12px]">
+                展示方式
+                <select
+                  className="admin-input mt-1"
+                  value={slot.placement === 'banner' ? 'banner' : 'card'}
+                  onChange={(event) =>
+                    update(index, { placement: event.target.value === 'banner' ? 'banner' : 'card' })
+                  }
+                >
+                  <option value="card">信息流卡片</option>
+                  <option value="banner">横幅</option>
+                </select>
+              </label>
               <label className="block font-meta text-[12px] sm:col-span-2">
                 自定义 HTML（留空则用默认招租卡）
                 <textarea
-                  rows={3}
+                  rows={8}
                   value={slot.html}
                   onChange={(event) => update(index, { html: event.target.value.slice(0, 20000) })}
                   className="admin-input mt-1 font-mono text-[12px]"
-                  placeholder={'<iframe src="https://example.com/ad" style="width:100%;height:100%;border:0"></iframe>'}
+                  placeholder={'<script src="https://example.com/native.js"></script>'}
                 />
+                <span className="mt-1 block font-ui text-[11px] font-normal normal-case tracking-normal text-soft">
+                  信息流卡片会跟海报同一格、同一比例，尺寸请选「自动」，粘贴联盟 Native / 自适应代码。固定 300×250 请改选「横幅」。
+                </span>
               </label>
             </div>
             <AdSizeFields value={slot} onChange={(dimensions) => update(index, dimensions)} />

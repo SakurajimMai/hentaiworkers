@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  FEED_BANNER_GRID_CLASS,
   interleaveFeedAds,
+  isFeedBannerAd,
   parseAdsSettingsFromForm,
 } from '../../lib/server/system/domain/ads-settings-form';
 import { parseSystemSettings, toPublicAdsConfig } from '../../lib/server/system/domain/settings';
@@ -19,6 +21,7 @@ test('ads settings default to one enabled feed slot and reader off', () => {
   assert.equal(settings.ads.feedSlots.length, 1);
   assert.equal(settings.ads.feedSlots[0].enabled, true);
   assert.equal(settings.ads.feedSlots[0].interval, 5);
+  assert.equal(settings.ads.feedSlots[0].placement, 'card');
   assert.equal(settings.ads.reader.top.enabled, false);
   assert.equal(settings.ads.reader.middle.enabled, false);
   assert.equal(settings.ads.reader.bottom.enabled, false);
@@ -34,6 +37,7 @@ test('legacy single feed/mangaReader settings migrate', () => {
   assert.equal(settings.ads.feedSlots.length, 1);
   assert.equal(settings.ads.feedSlots[0].interval, 8);
   assert.equal(settings.ads.feedSlots[0].html, '<b>a</b>');
+  assert.equal(settings.ads.feedSlots[0].placement, 'banner');
   assert.equal(settings.ads.reader.middle.enabled, true);
   assert.equal(settings.ads.reader.middle.interval, 3);
   assert.equal(settings.ads.reader.top.enabled, false);
@@ -54,6 +58,7 @@ test('parseAdsSettingsFromForm reads multiple feed slots and reader positions', 
   );
   assert.equal(parsed.feedSlots.length, 2);
   assert.equal(parsed.feedSlots[0].interval, 4);
+  assert.equal(parsed.feedSlots[0].placement, 'banner');
   assert.equal(parsed.feedSlots[1].enabled, false);
   assert.equal(parsed.reader.top.html, '<p>top</p>');
   assert.equal(parsed.reader.middle.enabled, false);
@@ -64,8 +69,8 @@ test('interleaveFeedAds respects each slot interval independently', () => {
   const slots = interleaveFeedAds(
     [1, 2, 3, 4, 5, 6],
     [
-      { enabled: true, name: 'A', interval: 2, href: '', html: 'a' },
-      { enabled: true, name: 'B', interval: 3, href: '', html: 'b' },
+      { enabled: true, name: 'A', interval: 2, href: '', html: 'a', placement: 'banner' },
+      { enabled: true, name: 'B', interval: 3, href: '', html: 'b', placement: 'card' },
     ],
     (item) => String(item),
   );
@@ -73,6 +78,50 @@ test('interleaveFeedAds respects each slot interval independently', () => {
     slots.map((slot) => (slot.type === 'ad' ? slot.ad.html : slot.item)),
     [1, 2, 'a', 3, 'b', 4, 'a', 5, 6, 'a', 'b'],
   );
+  assert.deepEqual(
+    slots.filter((slot) => slot.type === 'ad').map((slot) => slot.adIndex),
+    [0, 1, 0, 0, 1],
+  );
+
+  const cardsOnly = interleaveFeedAds(
+    [1, 2, 3, 4, 5],
+    [
+      { enabled: true, name: 'A', interval: 5, href: '', html: 'banner', placement: 'banner' },
+      { enabled: true, name: 'B', interval: 5, href: '', html: 'card', placement: 'card' },
+    ],
+    (item) => String(item),
+    (ad) => !isFeedBannerAd(ad),
+  );
+  assert.deepEqual(
+    cardsOnly.map((slot) => (slot.type === 'ad' ? slot.ad.html : slot.item)),
+    [1, 2, 3, 4, 5, 'card'],
+  );
+  assert.equal(cardsOnly.find((slot) => slot.type === 'ad')?.adIndex, 1);
+});
+
+test('saved HTML feed slots migrate to banners and form placement round-trips', () => {
+  const migrated = parseSystemSettings({
+    ads: { feedSlots: [{ enabled: true, html: '<script src="https://ads.example/invoke.js"></script>' }] },
+  });
+  assert.equal(migrated.ads.feedSlots[0].placement, 'banner');
+  assert.equal(isFeedBannerAd(migrated.ads.feedSlots[0]), true);
+  assert.equal(FEED_BANNER_GRID_CLASS, 'col-span-2');
+
+  const empty = parseSystemSettings({
+    ads: { feedSlots: [{ enabled: true, html: '' }] },
+  });
+  assert.equal(empty.ads.feedSlots[0].placement, 'card');
+
+  const parsed = parseAdsSettingsFromForm(
+    form({
+      adsFeedSlotsJson: JSON.stringify([
+        { enabled: true, html: '<script></script>', placement: 'banner', width: 300, height: 250 },
+        { enabled: true, html: '', placement: 'card' },
+      ]),
+    }),
+  );
+  assert.equal(parsed.feedSlots[0].placement, 'banner');
+  assert.equal(parsed.feedSlots[1].placement, 'card');
 });
 
 test('banner dimensions round-trip from the admin form into public ads', () => {

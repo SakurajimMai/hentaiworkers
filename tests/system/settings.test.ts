@@ -19,6 +19,7 @@ import {
   isEmailAllowedByWhitelist,
   isOutboundMailReady,
   parseSystemSettings,
+  qualifySmtpUsername,
   toPublicAdsConfig,
   toPublicAuthConfig,
   toPublicSiteConfig,
@@ -188,6 +189,22 @@ test('toPublicAdsConfig keeps enabled feed/reader slots and player ads', () => {
   );
   assert.equal(pub.feedSlots.length, 1);
   assert.equal(pub.feedSlots[0].html, '<b>a</b>');
+  assert.equal(pub.feedSlots[0].placement, 'banner');
+  const inferred = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: {
+        feedSlots: [
+          {
+            enabled: true,
+            html: `<script>atOptions = { 'key': 'x', 'format': 'iframe', 'height': 250, 'width': 300, 'params': {} };</script>`,
+          },
+        ],
+      },
+    }),
+  );
+  assert.equal(inferred.feedSlots[0].width, 300);
+  assert.equal(inferred.feedSlots[0].height, 250);
+  assert.equal(inferred.feedSlots[0].placement, 'banner');
   assert.equal(pub.reader.top.html, '<p>top</p>');
   assert.equal(pub.reader.bottom.enabled, false);
   assert.equal(pub.reader.bottom.html, '');
@@ -385,6 +402,25 @@ test('global meta settings round-trip, survive unrelated updates and can be remo
   assert.equal((await service.getAdminView()).site.telegramUrl, '@channel');
   await service.update({ site: { metaTags: [] } });
   assert.deepEqual(await service.getPublicMetaTags(), []);
+});
+
+test('saving smtp qualifies a local-part username with the from-email domain', async () => {
+  const { service } = buildService();
+  await service.update({
+    smtp: {
+      enabled: true,
+      host: 'eu1.workspace.org',
+      port: 465,
+      secure: true,
+      username: 'admin',
+      fromEmail: 'no-reply@ixacg.de',
+      fromName: 'no-reply',
+      password: 'secret-pass',
+    },
+  });
+  const view = await service.getAdminView();
+  assert.equal(view.smtp.username, 'admin@ixacg.de');
+  assert.equal(qualifySmtpUsername('admin', 'no-reply@ixacg.de'), view.smtp.username);
 });
 
 test('smtp password and turnstile secret persist encrypted and stay masked in admin view', async () => {

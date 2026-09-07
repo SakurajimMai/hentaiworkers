@@ -18,6 +18,7 @@ const bundle = await build({
       import { flushSync } from 'react-dom';
       import { HtmlAd } from './components/html-ad';
       import { FeedAdCard } from './components/feed-ad-card';
+      import { horizontalCarouselItemClass } from './components/horizontal-carousel-model';
       import { buildPreRollHtml, buildPauseAdBody } from './lib/client/player-ads';
       import { setPlayerHtmlAdsActive } from './lib/client/html-ad';
       const root = createRoot(document.getElementById('root'));
@@ -25,15 +26,23 @@ const bundle = await build({
       window.embeddedAds = 0;
       window.addEventListener('message', (event) => { if (event.data?.type === 'embedded-ready') window.embeddedAds += 1; });
       window.renderAd = (options) => {
-        const { kind = 'reader', ...props } = options;
+        const { kind = 'reader', layout, ...props } = options;
         const player = kind === 'preRoll' || kind === 'pause';
         const body = player ? (kind === 'pause'
           ? buildPauseAdBody({ html: props.html, clickUrl: props.clickUrl, videoUrl: '', imageUrl: '', muted: true })
           : buildPreRollHtml({ html: props.html, clickUrl: props.clickUrl, imageUrl: '' })) : '';
+        const ad = kind === 'feed' ? <FeedAdCard {...props} /> : <HtmlAd {...props} />;
+        const poster = <div className="poster-frame aspect-[2/3]" style={{ background: '#d9d2c8' }} />;
+        const inner = player
+          ? <div style={{ width: '100%', height: 300 }} dangerouslySetInnerHTML={{ __html: body }} />
+          : layout === 'grid'
+            ? <div className="grid grid-cols-2 gap-x-3 gap-y-7">{poster}{ad}</div>
+            : layout === 'rail'
+              ? <div className="flex w-full gap-3"><div className={horizontalCarouselItemClass}>{poster}</div><div className={horizontalCarouselItemClass}>{ad}</div></div>
+              : ad;
         flushSync(() => root.render(<main key={++serial} className={kind === 'reader' ? 'reader-ad reader-ad-banner' : ''}>
-          <div id="ad-host" style={{ width: kind === 'feed' ? 230 : '100%', minWidth: 0 }}>
-            {player ? <div style={{ width: '100%', height: 300 }} dangerouslySetInnerHTML={{ __html: body }} />
-              : kind === 'feed' ? <FeedAdCard {...props} /> : <HtmlAd {...props} />}
+          <div id="ad-host" style={{ width: options.hostWidth || (kind === 'feed' ? 230 : '100%'), minWidth: 0 }}>
+            {inner}
           </div></main>));
         if (player && options.active !== false) setPlayerHtmlAdsActive(document.getElementById('ad-host'), true);
       };
@@ -53,17 +62,40 @@ const css = await postcss([tailwindcss(join(repository, 'tailwind.config.js'))])
 let origin;
 const requests = [];
 const beacon = await sharp({ create: { width: 1, height: 1, channels: 3, background: '#fff' } }).png().toBuffer();
+const runtime = await readFile(join(repository, 'mobile/android/app/src/main/assets/html-ad-runtime.js'), 'utf8');
 const server = createServer((request, response) => {
   requests.push(request.url);
-  if (request.url === '/fixture.js') {
+  const path = request.url.split('?')[0];
+  if (path === '/fixture.js') {
     response.writeHead(200, { 'Content-Type': 'text/javascript' }).end(bundle.outputFiles[0].text);
-  } else if (request.url === '/dependency.js') {
+  } else if (path === '/dependency.js') {
     setTimeout(() => response.writeHead(200, { 'Content-Type': 'text/javascript' }).end('window.adDependency = 42;'), 80);
-  } else if (request.url === '/async-ad.js') {
+  } else if (path === '/async-ad.js') {
     const nested = `<script src="${origin}/dependency.js"></script><script>document.write('<div id="nested">'+window.adDependency+'</div>')</script>`;
     setTimeout(() => response.writeHead(200, { 'Content-Type': 'text/javascript' }).end(`document.write(${JSON.stringify(nested)});`), 150);
-  } else if (request.url === '/embedded') {
+  } else if (path === '/embedded') {
     response.writeHead(200, { 'Content-Type': 'text/html' }).end('<p id="embedded">Embedded creative</p><script>top.postMessage({type:"embedded-ready"},"*")</script>');
+  } else if (path === '/at-invoke.js') {
+    response.writeHead(200, { 'Content-Type': 'text/javascript' }).end(`(function(){
+      if (!window.atOptions) { window.atAdError = 'missing-options'; return; }
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+        window.atAdError = 'bad-protocol:' + location.protocol;
+        return;
+      }
+      var iframe = document.createElement('iframe');
+      iframe.id = 'at-creative';
+      iframe.width = String(window.atOptions.width);
+      iframe.height = String(window.atOptions.height);
+      iframe.src = location.protocol + '//' + location.host + '/embedded';
+      document.body.appendChild(iframe);
+    })();`);
+  } else if (path === '/alliance-ad') {
+    const mid = new URL(request.url, origin).searchParams.get('mid') || 'ad';
+    const config = JSON.stringify({ id: mid, width: 300, height: 250, clickUrl: '' });
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Frame-Options': 'SAMEORIGIN' }).end(`<!DOCTYPE html><html><head>
+<meta charset="utf-8"/><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden}#hw-ad-content{display:flow-root;position:relative;transform-origin:top left;width:300px;height:250px;overflow:hidden}iframe{border:0}</style>
+<script>window.__htmlAd=${config};${runtime}</script></head>
+<body><div id="hw-ad-content"><script>atOptions={key:'test',format:'iframe',height:250,width:300,params:{}};</script><script src="${origin}/at-invoke.js"></script></div></body></html>`);
   } else if (request.url.startsWith('/tick?')) {
     response.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }).end(beacon);
   } else {
@@ -100,11 +132,27 @@ try {
       const bounds = await page.locator('#ad-host iframe').boundingBox();
       assert.ok(Math.abs(bounds.height - bounds.width * height / width) < 2, `${viewport.width}: ${width}x${height} keeps aspect ratio`);
       assert.ok(bounds.width <= width && bounds.height <= 600);
-      const creative = await frame.locator('#creative').boundingBox();
-      assert.ok(Math.abs(creative.width - bounds.width) < 2, 'whole creative scales to frame width');
+      const inner = await frame.evaluate(() => ({
+        viewport: window.innerWidth,
+        creative: document.getElementById('creative').getBoundingClientRect().width,
+      }));
+      assert.ok(Math.abs(inner.viewport - width) < 2, `${viewport.width}: iframe viewport stays ${width} so alliance units can fill`);
+      assert.ok(Math.abs(inner.creative - width) < 2, 'creative keeps native pixels inside the frame');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       if (width === 970) await page.screenshot({ path: join(artifacts, `banner-${viewport.width}.png`) });
     }
+  }
+
+  {
+    const narrowFrame = await render({
+      hostWidth: 160,
+      width: 300,
+      height: 250,
+      html: '<div id="creative" style="width:300px;height:250px;background:#147d72"></div>',
+    });
+    assert.equal(await narrowFrame.evaluate(() => window.innerWidth), 300, 'narrow slot still exposes a 300px alliance viewport');
+    const narrow = await page.locator('#ad-host iframe').boundingBox();
+    assert.ok(Math.abs(narrow.width - 160) < 3, 'outer iframe visually fits the 160px card column');
   }
 
   const nestedInline = `<div id="initial">inline</div><script src="${origin}/dependency.js"></script><script>document.write('<div id="parser-nested">'+window.adDependency+'</div>')</script>`;
@@ -150,6 +198,76 @@ try {
     await frame.waitForFunction(() => document.getElementById('nested')?.textContent === '42');
     assert.ok((await page.locator('#ad-host iframe').boundingBox()).height > 0);
   }
+
+  const embeddedBefore = await page.evaluate(() => window.embeddedAds);
+  frame = await render({ width: 300, height: 250, html: '', documentSrc: '/alliance-ad' });
+  await frame.waitForFunction(() => location.protocol === 'http:' && document.getElementById('at-creative'));
+  assert.equal(await frame.evaluate(() => window.atAdError), undefined);
+  assert.equal(await frame.evaluate(() => document.getElementById('at-creative')?.parentElement?.id), 'hw-ad-content');
+  await page.waitForFunction((before) => window.embeddedAds > before, embeddedBefore);
+
+  frame = await render({
+    kind: 'feed',
+    banner: true,
+    html: `<script>atOptions = { 'key': 'x', 'format': 'iframe', 'height': 250, 'width': 300, 'params': {} };</script><div id="creative" style="width:300px;height:250px;background:#147d72">inferred</div>`,
+  });
+  assert.equal(await frame.evaluate(() => window.innerWidth), 300, 'atOptions width is used when admin size is 自动');
+  assert.ok((await page.locator('#ad-host iframe').boundingBox()).height > 80);
+
+  frame = await render({
+    kind: 'feed',
+    banner: true,
+    width: 300,
+    height: 250,
+    html: '<div id="creative" style="width:300px;height:250px;background:#147d72">banner</div>',
+  });
+  assert.equal(await page.evaluate(() => document.querySelector('.feed-ad-banner-card') != null), true);
+  assert.ok((await page.locator('#ad-host iframe').boundingBox()).height > 80);
+
+  frame = await render({
+    kind: 'feed',
+    html: '<div id="creative" style="width:100%;height:100%;background:#147d72">native</div>',
+  });
+  const nativeInner = await frame.evaluate(() => window.innerWidth);
+  assert.ok(nativeInner >= 220 && nativeInner <= 240, `native card iframe follows the poster column, got ${nativeInner}`);
+  const nativeBox = await page.locator('#ad-host iframe').boundingBox();
+  assert.ok(Math.abs(nativeBox.height - nativeBox.width * 3 / 2) < 4, 'native card keeps the 2:3 poster ratio');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  frame = await render({
+    kind: 'feed',
+    hostWidth: 160,
+    html: '<div id="creative" style="width:100%;height:100%;background:#147d72">mobile-card</div>',
+  });
+  const mobileSlot = await page.locator('#ad-host .poster-frame, #ad-host .feed-ad-card').first().boundingBox();
+  assert.ok(mobileSlot && mobileSlot.height > 220, `mobile feed card must keep poster height, got ${mobileSlot && mobileSlot.height}`);
+  const mobileFrame = await page.locator('#ad-host iframe').boundingBox();
+  assert.ok(mobileFrame && mobileFrame.height > 220, `mobile feed iframe must fill the card, got ${mobileFrame && mobileFrame.height}`);
+  assert.equal(
+    await frame.evaluate(() => document.getElementById('hw-ad-content').style.transform !== 'scale(0)'),
+    true,
+    'fluid feed cards must not collapse with scale(0)',
+  );
+
+  frame = await render({
+    kind: 'feed',
+    layout: 'grid',
+    hostWidth: 358,
+    html: '<div id="creative" style="width:100%;height:100%;background:#147d72">grid-card</div>',
+  });
+  const gridFrame = await page.locator('#ad-host iframe').boundingBox();
+  assert.ok(gridFrame && gridFrame.height > 220, `catalog grid feed card must keep poster height, got ${gridFrame && gridFrame.height}`);
+  assert.ok(gridFrame.width > 140 && gridFrame.width < 200, `catalog grid feed card must occupy one column, got ${gridFrame.width}`);
+
+  frame = await render({
+    kind: 'feed',
+    layout: 'rail',
+    hostWidth: 358,
+    html: '<div id="creative" style="width:100%;height:100%;background:#147d72">rail-card</div>',
+  });
+  const railFrame = await page.locator('#ad-host iframe').boundingBox();
+  assert.ok(railFrame && railFrame.height > 220, `homepage rail feed card must keep poster height, got ${railFrame && railFrame.height}`);
+  assert.ok(railFrame.width > 140 && railFrame.width < 200, `homepage rail feed card must match a poster column, got ${railFrame.width}`);
 
   const heartbeat = `<div id="heartbeat">Ad creative</div><script>setInterval(function(){new Image().src='${origin}/tick?'+Date.now()},40)</script>`;
   for (const kind of ['preRoll', 'pause']) {

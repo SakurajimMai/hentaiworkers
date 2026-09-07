@@ -6,7 +6,8 @@ import { FeedAdCard } from '@/components/feed-ad-card';
 import { Pagination } from '@/components/pagination';
 import { listAnimes, type SortType } from '@/lib/anime-service';
 import { StructuredData } from '@/components/structured-data';
-import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
+import { FEED_BANNER_GRID_CLASS, interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
+import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
 
 export const revalidate = 60;
@@ -165,7 +166,16 @@ export default async function BrowsePage({
             <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-5 md:gap-y-8">
               {slots.map((slot) =>
                 slot.type === 'ad' ? (
-                  <FeedAdCard key={slot.key} html={slot.ad.html} href={slot.ad.href} width={slot.ad.width} height={slot.ad.height} />
+                  <FeedAdCard
+                    key={slot.key}
+                    html={slot.ad.html}
+                    href={slot.ad.href}
+                    width={slot.ad.width}
+                    height={slot.ad.height}
+                    banner={isFeedBannerAd(slot.ad)}
+                    documentSrc={htmlAdDocumentPath({ kind: 'feed', id: slot.adIndex })}
+                    className={isFeedBannerAd(slot.ad) ? FEED_BANNER_GRID_CLASS : undefined}
+                  />
                 ) : (
                   <AnimeCard key={slot.key} anime={slot.item} />
                 ),

@@ -57,7 +57,10 @@ test('all homepage carousel sections share the track-owned item sizing', () => {
   assert.doesNotMatch(guestHistory, /cardWidth|w-\[140px\]|snap-start/);
   assert.match(homePage, /<GuestContinueWatching \/>/);
   assert.match(guestHistory, /export function GuestContinueWatching\(\)/);
-  assert.equal(homePage.match(/className=\{horizontalCarouselItemClass\}/g)?.length, 5);
+  assert.match(homePage, /function HomeFeedRail/);
+  assert.equal(homePage.match(/<HomeFeedRail/g)?.length, 4);
+  assert.match(homePage, /FeedAdCard/);
+  assert.match(homePage, /className=\{horizontalCarouselItemClass\}/);
   assert.equal(guestHistory.match(/className=\{horizontalCarouselItemClass\}/g)?.length, 1);
 });
 

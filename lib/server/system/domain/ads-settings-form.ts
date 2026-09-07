@@ -67,6 +67,7 @@ function parseFeedSlotsFromForm(formData: FormData): FeedAdSlot[] {
       interval: clampInterval(formData.get('adsFeedInterval'), 5, 40),
       href: String(formData.get('adsFeedHref') || '').slice(0, 1000),
       html: String(formData.get('adsFeedHtml') || '').slice(0, 20000),
+      placement: String(formData.get('adsFeedHtml') || '').trim() ? 'banner' : 'card',
     },
   ];
 }
@@ -87,27 +88,41 @@ function sanitizeFeedSlot(value: unknown): FeedAdSlot | null {
     ),
     href: text('href', 1000),
     html: text('html', 20000),
+    placement:
+      raw.placement === 'banner' || raw.placement === 'card'
+        ? raw.placement
+        : text('html', 20000).trim()
+          ? 'banner'
+          : 'card',
   };
 }
 
 export type FeedSlot<T> =
   | { type: 'item'; item: T; key: string }
-  | { type: 'ad'; key: string; ad: FeedAdSlot };
+  | { type: 'ad'; key: string; ad: FeedAdSlot; adIndex: number };
+
+export function isFeedBannerAd(ad: Pick<FeedAdSlot, 'placement'>): boolean {
+  return ad.placement === 'banner';
+}
+
+/** Two poster columns so a 300×250 unit aligns with the catalog grid on mobile and desktop. */
+export const FEED_BANNER_GRID_CLASS = 'col-span-2';
 
 export function interleaveFeedAds<T>(
   items: readonly T[],
   ads: readonly FeedAdSlot[],
   itemKey: (item: T, index: number) => string,
+  include: (ad: FeedAdSlot, index: number) => boolean = () => true,
 ): FeedSlot<T>[] {
-  const active = ads.filter((ad) => ad.enabled);
   const slots: FeedSlot<T>[] = [];
   items.forEach((item, index) => {
     slots.push({ type: 'item', item, key: itemKey(item, index) });
     const seen = index + 1;
-    active.forEach((ad, adIndex) => {
+    ads.forEach((ad, adIndex) => {
+      if (!ad.enabled || !include(ad, adIndex)) return;
       const step = Math.max(1, Math.min(40, Math.floor(ad.interval) || 5));
       if (seen % step === 0) {
-        slots.push({ type: 'ad', key: `ad-${adIndex}-${seen}`, ad });
+        slots.push({ type: 'ad', key: `ad-${adIndex}-${seen}`, ad, adIndex });
       }
     });
   });

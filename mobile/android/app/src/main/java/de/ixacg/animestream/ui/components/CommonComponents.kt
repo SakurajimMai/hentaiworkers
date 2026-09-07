@@ -345,7 +345,15 @@ fun FeedAdCard(
                     }
                 }
             }
-            if (ad.html.isNotBlank()) HtmlAd(ad.html, width = ad.width, height = ad.height)
+            if (ad.html.isNotBlank()) {
+                if (ad.spansCatalogRow) {
+                    HtmlAd(ad.html, width = ad.width, height = ad.height)
+                } else {
+                    Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
+                        HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), fill = true)
+                    }
+                }
+            }
         }
     }
 }

@@ -133,7 +133,8 @@ GET /api/ads
 单位为创意的 CSS 像素。两者均大于 `0` 时按原始比例展示，并缩小到当前可用宽度；
 例如 `"width": 728, "height": 90`。宽度上限 `1920`、高度上限 `600`。
 缺省或任一值为 `0` 时采用自动尺寸，自动高度同样不超过 `600`。旧客户端可忽略新增字段。
-HTML 可包含 iframe、内联脚本和外部脚本；Web 使用隔离 iframe，Android 使用独立 WebView。
+`feedSlots[].placement` 为 `card`（目录海报格）或 `banner`（整行横幅）。缺省时，有 HTML 的旧槽位按横幅迁移。
+HTML 可包含 iframe、内联脚本和外部脚本；Web 把创意放在同域 `/ads/html/...` 隔离 iframe 中，Android 使用独立 WebView。
 
 ## 3. 里番目录
 

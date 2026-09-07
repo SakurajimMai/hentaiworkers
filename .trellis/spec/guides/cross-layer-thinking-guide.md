@@ -100,6 +100,16 @@ create one owner for:
 
 Rendering code may format fields, but it must not redefine the payload contract.
 
+### Mistake 5: Filtering a list and reusing its index as an ID
+
+Public HTML ad documents are `/ads/html/feed/{id}` where `{id}` is the index in
+`getPublicAdsConfig().feedSlots`. A homepage rail that interleaves only `card`
+slots must keep that public index. `ads.filter(isCard).forEach((ad, index) => …)`
+compacts the index so a card after a banner loads the banner document.
+
+**Good**: iterate the original public array and skip unwanted rows, or pass an
+include predicate that still reports the original index.
+
 ---
 
 ## Checklist for Cross-Layer Features

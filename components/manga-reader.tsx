@@ -19,6 +19,7 @@ import { MediaImage } from '@/components/media-image';
 import { ThemeMenu } from '@/components/theme-menu';
 import { HtmlAd } from '@/components/html-ad';
 import { normalizeAdDimensions, type AdDimensions } from '@/lib/ad-dimensions';
+import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { createReaderProgressWriteQueue } from '@/components/manga-reader-progress';
 import { ReaderImageScheduler } from '@/components/manga-reader-scheduler';
 import {
@@ -670,7 +671,12 @@ function ReaderAdSlot({
       aria-busy={!policy.mountContent}
     >
       {policy.mountContent ? (
-        <HtmlAd html={html} width={size?.width} height={size?.height} />
+        <HtmlAd
+          html={html}
+          documentSrc={htmlAdDocumentPath({ kind: 'reader', id: position })}
+          width={size?.width}
+          height={size?.height}
+        />
       ) : (
         <div
           className="reader-ad-reserved"

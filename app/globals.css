@@ -598,7 +598,13 @@
     background: hsl(var(--accent-soft));
   }
   .feed-ad-html {
+    position: absolute;
+    inset: 0;
     width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  .feed-ad-banner-card {
     overflow: hidden;
   }
   .feed-ad-default {

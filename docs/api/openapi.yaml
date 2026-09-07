@@ -496,6 +496,11 @@ components:
           type: string
         html:
           type: string
+        placement:
+          type: string
+          enum: [card, banner]
+          default: card
+          description: card stays in the poster grid; banner spans the catalog row.
 
     PublicReaderAdSlot:
       type: object

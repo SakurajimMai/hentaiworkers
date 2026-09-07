@@ -4,6 +4,7 @@ import type Artplayer from 'artplayer';
 import type HlsType from 'hls.js';
 import { useEffect, useRef, useState } from 'react';
 import { setPlayerHtmlAdsActive } from '@/lib/client/html-ad';
+import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import {
   DEFAULT_CLIENT_PLAYER_CONFIG,
   type ClientPlayerConfig,
@@ -290,7 +291,7 @@ function mountPauseAd(
   isPreRollActive: () => boolean,
 ) {
   if (!pauseAd.enabled) return;
-  const content = buildPauseAdBody(pauseAd);
+  const content = buildPauseAdBody(pauseAd, htmlAdDocumentPath({ kind: 'player', id: 'pause' }));
   if (!content) return;
 
   const clickUrl = pauseAd.clickUrl.trim();
@@ -476,7 +477,10 @@ export function ArtPlayer({
             .default
           ?? (adsMod as unknown as (opt: Record<string, unknown>) => (art: Artplayer) => unknown);
         if (typeof adsFactory === 'function') {
-          plugins.push(adsFactory(buildPreRollPluginOption(preRoll)));
+          plugins.push(adsFactory(buildPreRollPluginOption({
+            ...preRoll,
+            documentSrc: htmlAdDocumentPath({ kind: 'player', id: 'preroll' }),
+          })));
         } else {
           preRollActive = false;
         }
