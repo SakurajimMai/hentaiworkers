@@ -7,6 +7,7 @@ import {
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
   parseSystemSettings,
+  qualifySmtpUsername,
   toPublicAuthConfig,
   type PublicAuthConfig,
   type SystemSettings,
@@ -213,7 +214,13 @@ export class SystemSettingsService {
           host: input.smtp?.host,
           port: input.smtp?.port,
           secure: input.smtp?.secure,
-          username: input.smtp?.username,
+          username:
+            input.smtp?.username === undefined
+              ? undefined
+              : qualifySmtpUsername(
+                  input.smtp.username,
+                  input.smtp.fromEmail ?? current.smtp.fromEmail,
+                ),
           fromEmail: input.smtp?.fromEmail,
           fromName: input.smtp?.fromName,
         }),

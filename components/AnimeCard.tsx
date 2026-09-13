@@ -38,22 +38,22 @@ export function AnimeCard({
             fetchPriority={priority ? 'high' : 'auto'}
           />
         </AspectRatio>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/40 via-transparent to-transparent opacity-80" />
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-background/95 text-ink shadow-ink backdrop-blur-sm">
-            <IconPlay size={14} className="ml-0.5" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-90" />
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-all duration-300 ease-out group-hover:opacity-100">
+          <span className="flex h-11 w-11 scale-90 items-center justify-center rounded-full bg-background/95 text-ink shadow-ink backdrop-blur-md transition-transform duration-300 ease-out group-hover:scale-100 group-hover:bg-accent group-hover:text-white">
+            <IconPlay size={15} className="ml-0.5" />
           </span>
         </div>
         {showStats && anime.viewCount != null && (
-          <span className="absolute left-2.5 bottom-2.5 flex items-center gap-1 rounded-full bg-ink/55 px-2 py-0.5 font-meta text-[10px] normal-case tracking-normal text-background backdrop-blur-sm">
-            <IconEye size={11} />
-            <span className="tabular">{formatCount(anime.viewCount)}</span>
+          <span className="absolute left-2.5 bottom-2.5 inline-flex items-center gap-1 rounded-full bg-ink/75 px-2 py-0.5 font-meta text-[10px] normal-case tracking-normal text-white shadow-sm backdrop-blur-md">
+            <IconEye size={11} className="text-white/80" />
+            <span className="tabular font-medium">{formatCount(anime.viewCount)}</span>
           </span>
         )}
       </div>
       <div className="pt-2.5 px-0.5">
         <h3
-          className="manga-card-title font-ui text-[13px] font-medium tracking-tight text-ink"
+          className="manga-card-title font-ui text-[13px] font-medium tracking-tight text-ink transition-colors duration-200 group-hover:text-accent"
           title={anime.title}
         >
           {anime.title}

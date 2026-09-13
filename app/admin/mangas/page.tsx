@@ -6,6 +6,7 @@ import {
   actionToggleManga,
 } from '../actions';
 import { listAdminMangas } from '@/lib/server/manga-admin';
+import { IconSearch } from '@/components/icons';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,19 +64,22 @@ export default async function AdminMangasPage({
 
       <form className="surface-card flex flex-col gap-2 p-3 sm:flex-row sm:p-4" method="get">
         <label htmlFor="manga-search" className="sr-only">搜索漫画</label>
-        <input
-          id="manga-search"
-          name="q"
-          defaultValue={q}
-          placeholder="搜索标题、URL 别名或来源群组"
-          className="admin-input sm:max-w-md"
-        />
+        <div className="relative flex-1 sm:max-w-md">
+          <input
+            id="manga-search"
+            name="q"
+            defaultValue={q}
+            placeholder="搜索标题、URL 别名或来源群组"
+            className="admin-input pl-8"
+          />
+          <IconSearch size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
         <button type="submit" className="btn-ink !text-[13px]">搜索</button>
         {q && <Link href="/admin/mangas" className="btn-ghost !text-[13px]">清除</Link>}
       </form>
 
       <div className="surface-card overflow-hidden">
-        <div className="space-y-2 p-3 md:hidden">
+        <div className="space-y-2.5 p-3 md:hidden">
           {result.data.map((manga) => (
             <article key={manga.id} className="admin-mobile-card">
               <div className="flex gap-3">
@@ -84,17 +88,17 @@ export default async function AdminMangasPage({
                   <img
                     src={manga.coverUrl}
                     alt=""
-                    width={40}
-                    height={56}
-                    className="h-14 w-10 shrink-0 rounded-md border border-border bg-secondary object-cover"
+                    width={44}
+                    height={62}
+                    className="h-16 w-11 shrink-0 rounded-lg border border-border bg-secondary object-cover"
                     loading="lazy"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="h-14 w-10 shrink-0 rounded-md border border-border bg-secondary" />
+                  <div className="h-16 w-11 shrink-0 rounded-lg border border-border bg-secondary" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
                     <Link href={`/admin/mangas/${manga.id}`} className="min-w-0 font-ui text-[14px] font-medium leading-snug text-ink hover:underline">
                       {manga.title}
                     </Link>
@@ -108,12 +112,12 @@ export default async function AdminMangasPage({
                     <span>{manga.sourceChatTitle || '来源未记录'}</span>
                     <span>{formatDate(manga.updatedAt)}</span>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-3">
-                    <Link href={`/admin/mangas/${manga.id}`} className="font-ui text-[12px] text-foreground underline-offset-2 hover:underline">管理</Link>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
+                    <Link href={`/admin/mangas/${manga.id}`} className="admin-btn-action">管理</Link>
                     <form action={actionToggleManga}>
                       <input type="hidden" name="id" value={manga.id} />
                       <input type="hidden" name="isPublished" value={manga.isPublished ? '1' : '0'} />
-                      <button type="submit" className="font-ui text-[12px] text-foreground underline-offset-2 hover:underline">
+                      <button type="submit" className="admin-btn-action">
                         {manga.isPublished ? '下架' : '上架'}
                       </button>
                     </form>
@@ -122,7 +126,7 @@ export default async function AdminMangasPage({
                       <ConfirmSubmitButton
                         title="删除漫画确认"
                         message={`确定删除「${manga.title}」及其全部页面？此操作不可恢复。`}
-                        className="font-ui text-[12px] text-danger underline-offset-2 hover:underline"
+                        className="admin-btn-action-danger"
                         confirmLabel="删除"
                       >
                         删除
@@ -187,17 +191,17 @@ export default async function AdminMangasPage({
                   </td>
                   <td className="whitespace-nowrap text-[12px] text-muted-foreground">{formatDate(manga.updatedAt)}</td>
                   <td>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Link
                         href={`/admin/mangas/${manga.id}`}
-                        className="text-[12px] text-foreground underline-offset-2 hover:underline"
+                        className="admin-btn-action"
                       >
                         管理
                       </Link>
                       <form action={actionToggleManga}>
                         <input type="hidden" name="id" value={manga.id} />
                         <input type="hidden" name="isPublished" value={manga.isPublished ? '1' : '0'} />
-                        <button type="submit" className="text-[12px] text-foreground underline-offset-2 hover:underline">
+                        <button type="submit" className="admin-btn-action">
                           {manga.isPublished ? '下架' : '上架'}
                         </button>
                       </form>
@@ -206,7 +210,7 @@ export default async function AdminMangasPage({
                         <ConfirmSubmitButton
                           title="删除漫画确认"
                           message={`确定删除「${manga.title}」及其全部页面？此操作不可恢复。`}
-                          className="text-[12px] text-danger underline-offset-2 hover:underline"
+                          className="admin-btn-action-danger"
                           confirmLabel="删除"
                         >
                           删除

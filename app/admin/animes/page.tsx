@@ -10,6 +10,8 @@ import {
 import { AdminPagination } from '@/components/admin/admin-pagination';
 import { AnimesBatchList } from '@/components/admin/animes-batch-list';
 
+import { IconPlus, IconSearch } from '@/components/icons';
+
 export const dynamic = 'force-dynamic';
 
 export default async function AdminAnimesPage({
@@ -54,13 +56,14 @@ export default async function AdminAnimesPage({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="font-meta mb-2">里番</p>
-          <h1 className="section-title text-3xl text-ink">里番管理</h1>
+          <p className="font-meta mb-2">里番管理</p>
+          <h1 className="section-title text-3xl text-ink">里番片库</h1>
           <p className="mt-2 font-ui text-sm text-soft leading-relaxed">
-            里番片库与标签（tags）。支持批量上架/下架/删除。
+            管理全站里番视频、封面与状态。支持勾选多部作品批量上架、下架或删除。
           </p>
         </div>
         <Link href="/admin/animes/new" className="btn-ink !text-[13px]">
+          <IconPlus size={14} />
           新建里番
         </Link>
       </div>
@@ -77,15 +80,23 @@ export default async function AdminAnimesPage({
       )}
 
       <form className="surface-card p-3 sm:p-4 flex flex-col sm:flex-row gap-2">
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="搜索标题"
-          className="admin-input sm:max-w-sm"
-        />
+        <div className="relative flex-1 sm:max-w-sm">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="搜索里番标题或日文原名"
+            className="admin-input pl-8"
+          />
+          <IconSearch size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        </div>
         <button type="submit" className="btn-ink !text-[13px]">
           搜索
         </button>
+        {q && (
+          <Link href="/admin/animes" className="btn-ghost !text-[13px]">
+            清除
+          </Link>
+        )}
       </form>
 
       <AnimesBatchList
@@ -94,6 +105,7 @@ export default async function AdminAnimesPage({
           title: row.title,
           isActive: !!row.isActive,
           viewCount: Number(row.viewCount ?? 0),
+          cover: row.cover,
         }))}
         batchAction={actionBatchAnimes}
         toggleAction={actionToggleAnime}

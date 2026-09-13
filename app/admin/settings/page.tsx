@@ -26,16 +26,24 @@ export default async function AdminSystemSettingsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="font-meta mb-2">系统</p>
-        <h1 className="section-title text-3xl text-ink sm:text-4xl">系统设置</h1>
-        <p className="mt-2 font-ui text-sm text-soft max-w-2xl leading-relaxed">
-          配置前台注册策略、首页幻灯片、页脚（App 下载 / Telegram 频道）、播放器（里番 ArtPlayer 广告/右键）、信息流/漫画阅读广告、SMTP、Trust、Cloudflare Turnstile，以及漫画发布密钥。
-          SMTP / Turnstile / 漫画发布密钥加密存库，表单留空表示不修改。
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="font-meta mb-2">系统配置</p>
+          <h1 className="section-title text-3xl text-ink sm:text-4xl">系统设置</h1>
+          <p className="mt-2 font-ui text-sm text-soft max-w-2xl leading-relaxed">
+            配置前台注册策略、首页幻灯片、页脚（App 下载 / TG 频道）、播放器参数、广告位、SMTP、安全验证与发布密钥。
+          </p>
+        </div>
+        <button
+          type="submit"
+          form="system-settings-form"
+          className="btn-ink shrink-0 !text-[13px]"
+        >
+          保存全部设置
+        </button>
       </div>
 
-      <nav className="admin-section-nav sticky top-[4.5rem] z-20 -mx-1 bg-background/95 px-1 py-2 backdrop-blur" aria-label="系统设置分区">
+      <nav className="admin-section-nav sticky top-[3.5rem] z-20 -mx-1 bg-background/90 px-1 py-2 backdrop-blur-md border-b border-border/80" aria-label="系统设置分区">
         <a href="#registration">注册</a>
         <a href="#hero">幻灯片</a>
         <a href="#app">页脚</a>
@@ -49,29 +57,29 @@ export default async function AdminSystemSettingsPage({
       </nav>
 
       {sp.ok === '1' && (
-        <p className="font-meta text-[13px] text-[hsl(var(--success))]">设置已保存</p>
+        <div className="notice-success">设置已保存</div>
       )}
       {sp.ok === 'smtp' && (
-        <p className="font-meta text-[13px] text-[hsl(var(--success))]">测试邮件已发送</p>
+        <div className="notice-success">测试邮件已成功发送</div>
       )}
       {sp.error === 'smtp' && (
-        <p className="font-meta text-[13px] text-danger">
+        <div className="notice-error">
           SMTP 测试失败{sp.reason ? `：${sp.reason}` : '，请检查配置'}
-        </p>
+        </div>
       )}
       {sp.error === '1' && (
-        <p className="font-meta text-[13px] text-danger">保存失败，请检查必填项</p>
+        <div className="notice-error">保存失败，请检查必填项</div>
       )}
       {sp.error === 'meta' && (
-        <p role="alert" className="font-meta text-[13px] text-danger">全局 Meta 标签无效，请检查名称、内容和标签数量</p>
+        <div role="alert" className="notice-error">全局 Meta 标签无效，请检查名称、内容和标签数量</div>
       )}
       {sp.error === 'verify_smtp' && (
-        <p className="font-meta text-[13px] text-danger">
+        <div className="notice-error">
           开启邮箱验证前须先启用并配置 SMTP
-        </p>
+        </div>
       )}
 
-      <form action={actionSaveSystemSettings} className="space-y-6">
+      <form id="system-settings-form" action={actionSaveSystemSettings} className="space-y-6">
         {/* Registration + whitelist */}
         <section id="registration" className="surface-card scroll-mt-24 p-5 space-y-4">
           <h2 className="font-ui text-sm font-semibold">注册与邮箱白名单</h2>

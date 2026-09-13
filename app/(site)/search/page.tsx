@@ -38,10 +38,22 @@ export default async function SearchPage({
     return (
       <div className="page-shell py-12 sm:py-16 pb-20">
         <header className="max-w-2xl">
+          <p className="font-meta mb-2 text-soft">Search</p>
           <h1 className="section-title text-4xl text-ink sm:text-5xl">搜索</h1>
           <p className="mt-4 max-w-md font-ui text-[15px] leading-relaxed text-soft">
             在顶栏输入关键词，会同时查找里番和漫画。两边的标签是分开的。
           </p>
+          <div className="mt-8 flex flex-wrap gap-2.5">
+            <Link href="/browse" className="btn-ink !rounded-xl !text-[13px]">
+              浏览里番馆
+            </Link>
+            <Link href="/browse?sort=popular" className="btn-ghost !rounded-xl !text-[13px]">
+              热门里番
+            </Link>
+            <Link href="/manga" className="btn-ghost !rounded-xl !text-[13px]">
+              漫画目录
+            </Link>
+          </div>
         </header>
       </div>
     );
@@ -62,14 +74,25 @@ export default async function SearchPage({
     ? (mangasResult.reason instanceof Error ? mangasResult.reason.message : '漫画搜索失败')
     : null;
 
-  const animeCount = animes?.data.length ?? 0;
-  const mangaCount = mangas?.data.length ?? 0;
-  const empty = !animeError && !mangaError && animeCount === 0 && mangaCount === 0;
+  const animeHits = animes?.data.length ?? 0;
+  const mangaHits = mangas?.data.length ?? 0;
+  const animeTotal = animes?.pagination.total ?? null;
+  const mangaTotal = mangas?.total ?? null;
+  const foundTotal = (animeTotal ?? 0) + (mangaTotal ?? 0);
+  const empty = !animeError && !mangaError && foundTotal === 0;
 
   return (
     <div className="page-shell py-8 sm:py-12 pb-20">
-      <header className="mb-10 border-b border-border pb-7 sm:mb-12 sm:pb-9">
-        <h1 className="section-title text-4xl text-ink sm:text-5xl">「{q}」</h1>
+      <header className="mb-10 border-b border-border pb-7 sm:mb-12 sm:pb-9 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <p className="font-meta mb-2 text-soft">搜索结果</p>
+          <h1 className="section-title text-4xl text-ink sm:text-5xl">「{q}」</h1>
+        </div>
+        {foundTotal > 0 && (
+          <p className="font-ui text-sm text-soft tabular">
+            找到 {foundTotal} 部相关作品
+          </p>
+        )}
       </header>
 
       {empty && (
@@ -95,13 +118,20 @@ export default async function SearchPage({
       <div className="space-y-14 sm:space-y-16">
         <section>
           <div className="mb-6 flex items-end justify-between gap-4">
-            <h2 className="section-title text-2xl text-ink sm:text-3xl">里番</h2>
-            {animes && animes.pagination.total > animeCount && (
+            <div className="flex items-center gap-2.5">
+              <h2 className="section-title text-2xl text-ink sm:text-3xl">里番</h2>
+              {animeTotal != null && animeTotal > 0 && (
+                <span className="rounded-full bg-secondary px-2.5 py-0.5 font-ui text-[12px] font-medium text-soft tabular">
+                  {animeTotal}
+                </span>
+              )}
+            </div>
+            {animes && animeTotal != null && animeTotal > animeHits && (
               <Link
                 href={`/browse?search=${encodeURIComponent(q)}`}
                 className="font-ui text-[12px] text-soft transition hover:text-ink"
               >
-                全部里番结果
+                全部里番结果 →
               </Link>
             )}
           </div>
@@ -110,10 +140,10 @@ export default async function SearchPage({
               {animeError}
             </div>
           )}
-          {animes && animeCount === 0 && !animeError && (
+          {animes && animeHits === 0 && !animeError && (
             <p className="font-ui text-[13px] text-soft">没有匹配的里番。</p>
           )}
-          {animes && animeCount > 0 && (
+          {animes && animeHits > 0 && (
             <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-6">
               {animes.data.map((anime) => (
                 <AnimeCard key={anime.id} anime={anime} />
@@ -125,13 +155,20 @@ export default async function SearchPage({
         {mangaOn && (
           <section>
             <div className="mb-6 flex items-end justify-between gap-4">
-              <h2 className="section-title text-2xl text-ink sm:text-3xl">漫画</h2>
-              {mangas && mangas.total > mangaCount && (
+              <div className="flex items-center gap-2.5">
+                <h2 className="section-title text-2xl text-ink sm:text-3xl">漫画</h2>
+                {mangaTotal != null && mangaTotal > 0 && (
+                  <span className="rounded-full bg-secondary px-2.5 py-0.5 font-ui text-[12px] font-medium text-soft tabular">
+                    {mangaTotal}
+                  </span>
+                )}
+              </div>
+              {mangas && mangaTotal != null && mangaTotal > mangaHits && (
                 <Link
                   href={`/manga?q=${encodeURIComponent(q)}`}
                   className="font-ui text-[12px] text-soft transition hover:text-ink"
                 >
-                  全部漫画结果
+                  全部漫画结果 →
                 </Link>
               )}
             </div>
@@ -140,10 +177,10 @@ export default async function SearchPage({
                 {mangaError}
               </div>
             )}
-            {mangas && mangaCount === 0 && !mangaError && (
+            {mangas && mangaHits === 0 && !mangaError && (
               <p className="font-ui text-[13px] text-soft">没有匹配的漫画。</p>
             )}
-            {mangas && mangaCount > 0 && (
+            {mangas && mangaHits > 0 && (
               <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-10 md:grid-cols-4 lg:grid-cols-6">
                 {mangas.data.map((manga) => (
                   <MangaCard

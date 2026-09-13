@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { IconMenu, IconX } from '@/components/icons';
-import type { AdminNavItem } from '@/components/admin/admin-nav';
+import { AdminNavGlyph, type AdminNavItem } from '@/components/admin/admin-nav';
 
 export function AdminMobileNav({ items }: { items: AdminNavItem[] }) {
   const pathname = usePathname() || '';
@@ -49,20 +49,28 @@ export function AdminMobileNav({ items }: { items: AdminNavItem[] }) {
           className="mx-auto grid max-w-6xl grid-cols-2 gap-1.5 pt-2 font-ui text-[13px]"
           aria-label="移动端后台导航"
         >
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active(item) ? 'page' : undefined}
-              className={`rounded-xl px-3 py-2.5 transition-colors ${
-                active(item)
-                  ? 'bg-card font-medium text-ink shadow-[0_1px_0_hsla(30,12%,18%,0.04)]'
-                  : 'text-soft hover:bg-card hover:text-ink'
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {items.map((item) => {
+            const isCurrent = active(item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isCurrent ? 'page' : undefined}
+                className={`flex items-center gap-2 rounded-xl px-3 py-2.5 transition-colors ${
+                  isCurrent
+                    ? 'bg-card font-medium text-ink shadow-sm border border-border/80'
+                    : 'text-soft hover:bg-card hover:text-ink'
+                }`}
+              >
+                <AdminNavGlyph
+                  name={item.icon}
+                  size={15}
+                  className={isCurrent ? 'text-accent' : 'text-muted-foreground'}
+                />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       )}
     </div>

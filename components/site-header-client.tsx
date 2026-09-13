@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { BrandMark } from '@/components/brand-mark';
-import { IconMenu, IconSearch, IconX } from '@/components/icons';
+import { IconClock, IconMenu, IconSearch, IconX } from '@/components/icons';
 import { ThemeMenu } from '@/components/theme-menu';
 import {
   clearSearchHistory,
@@ -108,11 +108,11 @@ export function SiteHeaderClient({
           </Link>
         </nav>
 
-        <form onSubmit={onSubmit} className="relative ml-auto w-[min(38vw,11rem)] flex-1 sm:max-w-sm">
+        <form onSubmit={onSubmit} className="relative ml-auto w-[min(38vw,11rem)] flex-1 sm:max-w-sm focus-within:sm:max-w-md transition-all">
           <div className="relative flex items-center">
             <IconSearch
               size={15}
-              className={`absolute left-3 transition-colors ${focused ? 'text-ink' : 'text-muted-foreground'}`}
+              className={`absolute left-3 transition-colors ${focused ? 'text-primary' : 'text-muted-foreground'}`}
             />
             <input
               type="search"
@@ -126,20 +126,30 @@ export function SiteHeaderClient({
               onBlur={() => {
                 window.setTimeout(() => setFocused(false), 150);
               }}
-              className={`h-9 w-full rounded-full border bg-card pl-9 pr-3 font-ui text-[13px] text-foreground outline-none transition-all ${
+              className={`h-9 w-full rounded-full border bg-card pl-9 pr-8 font-ui text-[13px] text-foreground outline-none transition-all ${
                 focused
-                  ? 'border-primary/25 shadow-[0_0_0_3px_hsla(30,12%,18%,0.08)]'
+                  ? 'border-primary/40 shadow-[0_0_0_3px_hsla(var(--primary)/0.12)]'
                   : 'border-border hover:border-muted-foreground'
               }`}
             />
+            {q && (
+              <button
+                type="button"
+                className="absolute right-2.5 grid h-5 w-5 place-items-center rounded-full text-soft hover:bg-secondary hover:text-ink transition-colors"
+                aria-label="清空输入"
+                onClick={() => setQ('')}
+              >
+                <IconX size={12} />
+              </button>
+            )}
           </div>
           {focused && history.length > 0 && (
-            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-border bg-card shadow-ink">
-              <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border">
-                <span className="font-meta text-[11px]">最近搜索</span>
+            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-border bg-card shadow-ink animate-in fade-in duration-150">
+              <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border bg-surface-2/40">
+                <span className="font-meta text-[11px] text-soft">最近搜索</span>
                 <button
                   type="button"
-                  className="font-ui text-[11px] text-muted-foreground hover:text-foreground"
+                  className="font-ui text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     clearSearchHistory();
@@ -154,7 +164,7 @@ export function SiteHeaderClient({
                   <li key={item}>
                     <button
                       type="button"
-                      className="w-full text-left px-3.5 py-2.5 font-ui text-[13px] text-foreground hover:bg-secondary"
+                      className="flex w-full items-center gap-2 px-3.5 py-2 font-ui text-[13px] text-foreground hover:bg-secondary transition-colors"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setQ(item);
@@ -163,7 +173,8 @@ export function SiteHeaderClient({
                         setFocused(false);
                       }}
                     >
-                      {item}
+                      <IconClock size={13} className="text-soft shrink-0" />
+                      <span className="truncate">{item}</span>
                     </button>
                   </li>
                 ))}
@@ -193,12 +204,12 @@ export function SiteHeaderClient({
             <div className="md:hidden">
               <button
                 type="button"
-                className="fixed inset-0 z-[80] bg-ink/40"
+                className="fixed inset-0 z-[80] bg-ink/40 backdrop-blur-sm transition-opacity"
                 aria-label="关闭菜单"
                 onClick={() => setMenuOpen(false)}
               />
               <aside
-                className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[90] flex max-h-[min(28rem,calc(100dvh-1.5rem))] w-[min(16rem,84vw)] flex-col overflow-y-auto rounded-2xl border border-border bg-background px-3 py-3 shadow-ink"
+                className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[90] flex max-h-[min(28rem,calc(100dvh-1.5rem))] w-[min(16rem,84vw)] flex-col overflow-y-auto rounded-2xl border border-border bg-card/95 px-3.5 py-3.5 shadow-2xl backdrop-blur-md"
                 aria-label="移动端菜单"
               >
                 <div className="mb-2 flex items-center justify-between px-1">

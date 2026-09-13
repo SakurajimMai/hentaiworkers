@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
+import { IconClock, IconTrendingUp } from '@/components/icons';
 import { FeedAdCard } from '@/components/feed-ad-card';
 import { Pagination } from '@/components/pagination';
 import { listAnimes, type SortType } from '@/lib/anime-service';
@@ -124,21 +125,23 @@ export default async function BrowsePage({
           <div className="flex-1 min-w-0">
             <h1 className="section-title text-3xl sm:text-4xl text-ink">{heading}</h1>
           </div>
-          <div className="inline-flex items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-ink">
+          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
             <Link
               href={qs({ sort: undefined })}
-              className={`rounded-full px-3.5 py-1.5 font-ui text-[12px] font-medium transition-colors ${
-                sort === 'latest' ? 'bg-ink text-background' : 'text-soft hover:text-ink'
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-ui text-[12px] font-medium transition-all ${
+                sort === 'latest' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-soft hover:text-ink hover:bg-secondary'
               }`}
             >
+              <IconClock size={13} />
               最近更新
             </Link>
             <Link
               href={qs({ sort: 'popular' })}
-              className={`rounded-full px-3.5 py-1.5 font-ui text-[12px] font-medium transition-colors ${
-                sort === 'popular' ? 'bg-ink text-background' : 'text-soft hover:text-ink'
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-ui text-[12px] font-medium transition-all ${
+                sort === 'popular' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-soft hover:text-ink hover:bg-secondary'
               }`}
             >
+              <IconTrendingUp size={13} />
               热门
             </Link>
           </div>
@@ -151,13 +154,15 @@ export default async function BrowsePage({
         )}
 
         {data && data.data.length === 0 && (
-          <div className="empty-state">
-            <p className="font-meta mb-2">Empty</p>
+          <div className="surface-panel max-w-xl mx-auto px-6 py-12 text-center sm:px-10">
+            <p className="font-meta mb-2 text-soft">Catalog</p>
             <p className="section-title text-2xl text-ink">没有找到相关里番</p>
-            <p className="mt-2 font-ui text-sm text-soft">试试换个关键词，或浏览全部上架内容。</p>
-            <Link href="/browse" className="btn-ink inline-flex mt-5">
-              返回里番馆
-            </Link>
+            <p className="mt-2 font-ui text-sm text-soft leading-relaxed">试试换个关键词，或浏览全部上架内容。</p>
+            <div className="mt-6 flex justify-center">
+              <Link href="/browse" className="btn-ink inline-flex">
+                返回里番馆
+              </Link>
+            </div>
           </div>
         )}
 

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { IconArrowLeft, IconBook, IconExternalLink, IconTrash } from '@/components/icons';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import { AdminPagination } from '@/components/admin/admin-pagination';
 import {
@@ -99,28 +100,32 @@ export default async function AdminMangaDetailPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Link href="/admin/mangas" className="font-ui text-[12px] text-soft hover:text-ink">
-            ← 返回漫画管理
+          <Link href="/admin/mangas" className="inline-flex items-center gap-1.5 font-ui text-[12px] text-soft hover:text-ink transition-colors">
+            <IconArrowLeft size={13} /> 返回漫画管理
           </Link>
-          <p className="font-meta mb-2 mt-4">manga #{manga.id}</p>
+          <p className="font-meta mb-2 mt-4 text-soft">manga #{manga.id}</p>
           <h1 className="section-title text-3xl text-ink">{manga.title}</h1>
           <p className="mt-2 font-ui text-[13px] text-soft">
             {manga.author ? `作者 ${manga.author} · ` : ''}
             {chapters.length} 个章节 · P{manga.pageCount ?? 0}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={publicHref} target="_blank" className="btn-ghost !text-[13px]">查看前台</Link>
-          <Link href={readerHref} target="_blank" className="btn-ghost !text-[13px]">阅读</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={publicHref} target="_blank" className="btn-ghost !text-[13px] inline-flex items-center gap-1.5">
+            <IconExternalLink size={13} /> 查看前台
+          </Link>
+          <Link href={readerHref} target="_blank" className="btn-ghost !text-[13px] inline-flex items-center gap-1.5">
+            <IconBook size={13} /> 阅读
+          </Link>
           <form action={actionDeleteManga}>
             <input type="hidden" name="id" value={manga.id} />
             <ConfirmSubmitButton
               title="删除漫画确认"
               message={`确定删除「${manga.title}」及其全部页面？此操作不可恢复。`}
-              className="btn-ghost !border-[hsl(var(--danger-border))] !text-danger !text-[13px]"
+              className="btn-ghost !border-[hsl(var(--danger-border))] !text-danger !text-[13px] inline-flex items-center gap-1.5"
               confirmLabel="删除"
             >
-              删除漫画
+              <IconTrash size={13} /> 删除漫画
             </ConfirmSubmitButton>
           </form>
         </div>
@@ -210,10 +215,23 @@ export default async function AdminMangaDetailPage({
                 暂无封面
               </div>
             )}
-            <div className="space-y-2 px-4 py-3 font-ui text-[13px] text-soft">
-              <p>状态：{manga.isPublished ? '上架' : '下架'}</p>
-              <p>来源：{manga.sourceChatTitle || '-'}</p>
-              <p>内容：P{manga.pageCount ?? 0}</p>
+            <div className="space-y-2.5 px-4 py-3.5 font-ui text-[13px] border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-soft">发布状态</span>
+                <span className={`status-pill ${manga.isPublished ? 'status-pill-on' : 'status-pill-off'}`}>
+                  {manga.isPublished ? '上架' : '下架'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-soft">页面总数</span>
+                <span className="font-semibold text-ink tabular">P{manga.pageCount ?? 0}</span>
+              </div>
+              {manga.sourceChatTitle && (
+                <div className="flex items-center justify-between">
+                  <span className="text-soft">来源</span>
+                  <span className="text-ink truncate max-w-[140px]">{manga.sourceChatTitle}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -291,38 +309,38 @@ export default async function AdminMangaDetailPage({
                       </span>
                     </td>
                     <td>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <Link
                           href={mangaContentHref(manga.id, { chapter: chapter.id, view })}
-                          className="text-[12px] text-foreground underline-offset-2 hover:underline"
+                          className="admin-btn-action"
                         >
                           查看页面
                         </Link>
                         <Link
                           href={`/manga/${manga.id}/read/${chapter.number}`}
                           target="_blank"
-                          className="text-[12px] text-foreground underline-offset-2 hover:underline"
+                          className="admin-btn-action inline-flex items-center gap-1"
                         >
-                          阅读
+                          <IconExternalLink size={11} /> 阅读
                         </Link>
-                        <form action={actionToggleMangaChapter}>
+                        <form action={actionToggleMangaChapter} className="inline-block">
                           <input type="hidden" name="mangaId" value={manga.id} />
                           <input type="hidden" name="chapterId" value={chapter.id} />
                           <input type="hidden" name="isPublished" value={chapter.isPublished ? '1' : '0'} />
                           {selectedChapterId ? <input type="hidden" name="chapter" value={selectedChapterId} /> : null}
                           {view === 'links' ? <input type="hidden" name="view" value="links" /> : null}
-                          <button type="submit" className="text-[12px] text-foreground underline-offset-2 hover:underline">
+                          <button type="submit" className="admin-btn-action">
                             {chapter.isPublished ? '下架' : '上架'}
                           </button>
                         </form>
-                        <form action={actionDeleteMangaChapter}>
+                        <form action={actionDeleteMangaChapter} className="inline-block">
                           <input type="hidden" name="mangaId" value={manga.id} />
                           <input type="hidden" name="chapterId" value={chapter.id} />
                           {view === 'links' ? <input type="hidden" name="view" value="links" /> : null}
                           <ConfirmSubmitButton
                             title="删除章节确认"
                             message={`确定删除第 ${chapter.number} 话及其 ${chapter.pageCount} 页？`}
-                            className="text-[12px] text-danger underline-offset-2 hover:underline"
+                            className="admin-btn-action-danger"
                             confirmLabel="删除"
                           >
                             删除
@@ -430,22 +448,22 @@ export default async function AdminMangaDetailPage({
                             defaultValue={page.imageUrl}
                             className="admin-input font-mono text-[12px]"
                           />
-                          <button type="submit" className="text-[12px] text-foreground underline-offset-2 hover:underline">
+                          <button type="submit" className="admin-btn-action shrink-0">
                             保存
                           </button>
                         </form>
                       </td>
                       <td className="whitespace-nowrap">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
                           <a
                             href={page.imageUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-[12px] text-foreground underline-offset-2 hover:underline"
+                            className="admin-btn-action inline-flex items-center gap-1"
                           >
-                            打开
+                            <IconExternalLink size={11} /> 打开
                           </a>
-                          <form action={actionDeleteMangaPage}>
+                          <form action={actionDeleteMangaPage} className="inline-block">
                             <input type="hidden" name="mangaId" value={manga.id} />
                             <input type="hidden" name="pageId" value={page.id} />
                             {selectedChapterId ? <input type="hidden" name="chapter" value={selectedChapterId} /> : null}
@@ -453,7 +471,7 @@ export default async function AdminMangaDetailPage({
                             <ConfirmSubmitButton
                               title="删除页面确认"
                               message={`确定删除第 ${page.chapterNumber} 话的第 ${page.index + 1} 页？`}
-                              className="text-[12px] text-danger underline-offset-2 hover:underline"
+                              className="admin-btn-action-danger"
                               confirmLabel="删除"
                             >
                               删除
@@ -482,7 +500,7 @@ export default async function AdminMangaDetailPage({
                   />
                 </a>
                 <div className="flex items-center justify-between gap-2 px-2.5 py-2">
-                  <p className="truncate font-ui text-[11px] text-soft">
+                  <p className="truncate font-ui text-[11px] font-medium text-ink">
                     {page.chapterNumber}-{page.index + 1}
                   </p>
                   <form action={actionDeleteMangaPage}>
@@ -493,7 +511,7 @@ export default async function AdminMangaDetailPage({
                     <ConfirmSubmitButton
                       title="删除页面确认"
                       message={`确定删除第 ${page.chapterNumber} 话的第 ${page.index + 1} 页？`}
-                      className="font-ui text-[11px] text-danger underline-offset-2 hover:underline"
+                      className="admin-btn-action-danger !py-0.5 !px-2 !text-[10px]"
                       confirmLabel="删除"
                     >
                       删除

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
+import { BrandMark } from '@/components/brand-mark';
 import { actionLogin } from '../actions';
 
 export default async function AdminLoginPage({
@@ -17,10 +18,18 @@ export default async function AdminLoginPage({
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-md space-y-6">
-        <header>
-          <p className="font-meta mb-2">管理中心</p>
+        <header className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[#121318] text-[#f4efe6] shadow-sm">
+              <BrandMark className="h-10 w-10" />
+            </span>
+            <div>
+              <p className="font-ui text-sm font-semibold text-ink leading-tight">AnimeStream</p>
+              <p className="font-meta text-[11px] text-soft">管理控制台</p>
+            </div>
+          </div>
           <h1 className="section-title text-3xl text-ink sm:text-4xl">登录后台</h1>
-          <p className="mt-2 font-ui text-sm leading-relaxed text-soft">
+          <p className="font-ui text-sm leading-relaxed text-soft">
             仅管理员可进入。改密后也会回到这一页。
           </p>
         </header>

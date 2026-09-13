@@ -105,23 +105,33 @@ export function UserMenu({ name, isAdmin, variant = 'dropdown' }: UserMenuProps)
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-[70] min-w-44 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-ink"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-[70] min-w-44 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-ink animate-in fade-in zoom-in-95 duration-150"
         >
-          <p className="truncate border-b border-border px-3 py-2 font-meta text-[11px] normal-case tracking-normal">
-            {name}
-          </p>
-          {links.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              role="menuitem"
-              className="flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 font-ui text-[13px] text-foreground transition hover:bg-secondary"
-            >
-              <item.icon size={14} className="text-muted-foreground" />
-              {item.label}
-            </Link>
-          ))}
-          <form action={actionPublicLogout} className="border-t border-border mt-1 pt-1">
+          <div className="border-b border-border px-3 py-2">
+            <p className="font-meta text-[10px] text-soft">当前登录</p>
+            <p className="truncate font-ui text-[13px] font-medium text-ink">{name}</p>
+          </div>
+          <div className="py-1">
+            {links.map((item) => {
+              const isAdm = item.href === '/admin';
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  role="menuitem"
+                  className={`flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 font-ui text-[13px] transition ${
+                    isAdm
+                      ? 'text-accent font-medium hover:bg-accent-soft'
+                      : 'text-foreground hover:bg-secondary'
+                  }`}
+                >
+                  <item.icon size={14} className={isAdm ? 'text-accent' : 'text-muted-foreground'} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+          <form action={actionPublicLogout} className="border-t border-border pt-1">
             <button
               type="submit"
               role="menuitem"

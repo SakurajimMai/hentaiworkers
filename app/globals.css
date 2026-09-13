@@ -327,7 +327,17 @@
     background: hsl(var(--surface));
     border: 1px solid hsl(var(--line));
     border-radius: 14px;
-    box-shadow: 0 1px 0 hsla(var(--shadow-color), 0.03);
+    box-shadow: 0 1px 3px hsla(var(--shadow-color), 0.04);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .surface-card-hover {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+  }
+  .surface-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px hsla(var(--shadow-color), 0.09);
+    border-color: hsl(var(--accent) / 0.35);
   }
 
   .surface-panel {
@@ -336,7 +346,63 @@
     border-radius: 18px;
     box-shadow:
       0 1px 0 hsla(var(--shadow-color), 0.04),
-      0 14px 36px hsla(var(--shadow-color), 0.12);
+      0 14px 36px hsla(var(--shadow-color), 0.1);
+  }
+
+  .admin-kpi-card {
+    @apply surface-card relative overflow-hidden p-5 transition-all duration-200;
+  }
+  .admin-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px hsla(var(--shadow-color), 0.08);
+    border-color: hsl(var(--accent) / 0.35);
+  }
+
+  .admin-btn-action {
+    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12px] font-medium text-foreground transition-all duration-150;
+    border: 1px solid hsl(var(--line));
+    background: hsl(var(--surface));
+  }
+  .admin-btn-action:hover {
+    background: hsl(var(--secondary));
+    border-color: hsl(var(--muted-foreground) / 0.4);
+    color: hsl(var(--ink));
+  }
+  .admin-btn-action-danger {
+    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12px] font-medium text-danger transition-all duration-150;
+    border: 1px solid hsl(var(--danger-border));
+    background: hsl(var(--danger-soft));
+  }
+  .admin-btn-action-danger:hover {
+    filter: brightness(0.96);
+  }
+
+  .status-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-normal;
+  }
+  .status-pill::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .status-pill-on {
+    background: hsl(var(--success-soft));
+    color: hsl(var(--success));
+    border: 1px solid hsl(var(--success-border) / 0.8);
+  }
+  .status-pill-off {
+    background: hsl(var(--danger-soft));
+    color: hsl(var(--danger));
+    border: 1px solid hsl(var(--danger-border) / 0.8);
+  }
+  .status-pill-neutral {
+    background: hsl(var(--secondary));
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--line) / 0.8);
   }
 
   .btn-ink {
@@ -486,18 +552,6 @@
     @apply inline-flex items-center gap-2 font-ui text-[13px] text-foreground cursor-pointer select-none;
   }
 
-  .status-pill {
-    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium;
-  }
-  .status-pill-on {
-    background: hsl(var(--success-soft));
-    color: hsl(var(--success));
-  }
-  .status-pill-off {
-    background: hsl(var(--danger-soft));
-    color: hsl(var(--danger));
-  }
-
   .notice-success {
     @apply rounded-xl px-4 py-3 font-ui text-[13px];
     background: hsl(var(--success-soft));
@@ -583,10 +637,11 @@
     border-radius: 1rem;
     border: 1px solid hsl(var(--line));
     background: hsl(var(--surface-2));
-    box-shadow: 0 1px 0 hsla(var(--shadow-color), 0.03);
+    box-shadow: 0 1px 3px hsla(var(--shadow-color), 0.04);
     transition:
-      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-      box-shadow 0.3s ease;
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.35s ease,
+      border-color 0.25s ease;
   }
 
   /* 覆盖全局 h3 的 text-wrap:balance，否则 -webkit-line-clamp 失效、标题会撑开卡片。 */
@@ -666,8 +721,9 @@
   }
   .group:hover .poster-frame,
   a:hover .poster-frame {
-    transform: translateY(-2px);
-    box-shadow: 0 14px 32px hsla(var(--shadow-color), 0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 16px 36px hsla(var(--shadow-color), 0.13);
+    border-color: hsl(var(--accent) / 0.35);
   }
 
   .hero-carousel {

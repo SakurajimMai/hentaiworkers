@@ -138,9 +138,9 @@ export default async function AdminMangaTagsPage({
                       name="to"
                       defaultValue={row.tag}
                       maxLength={40}
-                      className="admin-input max-w-[180px]"
+                      className="admin-input max-w-[180px] !py-1 text-[12px]"
                     />
-                    <button type="submit" className="text-[12px] text-foreground underline underline-offset-2">
+                    <button type="submit" className="admin-btn-action !py-1">
                       保存
                     </button>
                   </form>
@@ -151,7 +151,7 @@ export default async function AdminMangaTagsPage({
                     <ConfirmSubmitButton
                       title="删除漫画标签"
                       message={`确定删除标签「${row.tag}」？${row.count > 0 ? `${row.count} 部漫画会同步移除该标签。` : ''}`}
-                      className="text-[12px] text-danger underline underline-offset-2"
+                      className="admin-btn-action-danger !py-1"
                       confirmLabel="删除"
                     >
                       删除

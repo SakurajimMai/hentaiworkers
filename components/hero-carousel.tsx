@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { IconChevronLeft, IconChevronRight, IconPlay } from '@/components/icons';
+import { IconChevronLeft, IconChevronRight, IconPlay, IconSparkles } from '@/components/icons';
 import { MediaImage } from '@/components/media-image';
 
 export type HeroItem = {
@@ -123,29 +123,33 @@ export function HeroCarousel({
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/25 to-ink/20 sm:bg-gradient-to-r sm:from-ink/85 sm:via-ink/48 sm:to-transparent" />
             <div className="relative z-10 flex h-full min-h-0 items-end">
-              <div className="w-full max-w-lg min-w-0 overflow-hidden px-3.5 pb-9 sm:px-9 sm:pb-14">
-                <h2 className="font-serif text-[1.15rem] leading-tight tracking-tight text-white line-clamp-2 text-balance sm:text-4xl">
+              <div className="w-full max-w-lg min-w-0 overflow-hidden px-4 pb-9 sm:px-10 sm:pb-14">
+                <div className="mb-2.5 hidden sm:inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-meta text-[11px] normal-case tracking-normal text-white/90 backdrop-blur-md border border-white/10">
+                  <IconSparkles size={12} className="text-accent" />
+                  <span>精选推荐</span>
+                </div>
+                <h2 className="font-serif text-[1.25rem] leading-tight tracking-tight text-white line-clamp-2 text-balance sm:text-4xl drop-shadow-sm">
                   {anime.title}
                 </h2>
                 {anime.titleJapanese && (
-                  <p className="mt-2 hidden font-ui text-[12px] text-white/55 line-clamp-1 sm:block">
+                  <p className="mt-2 hidden font-ui text-[12px] text-white/65 line-clamp-1 sm:block">
                     {anime.titleJapanese}
                   </p>
                 )}
                 {summary && (
-                  <p className="mt-2 hidden max-w-[42ch] font-ui text-[13px] leading-relaxed text-white/70 line-clamp-2 sm:block">
+                  <p className="mt-2.5 hidden max-w-[44ch] font-ui text-[13px] leading-relaxed text-white/80 line-clamp-2 sm:block">
                     {summary}
                   </p>
                 )}
-                <div className="flex flex-wrap gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-2 sm:pt-3">
                   {(() => {
                     const href = anime.href || `/watch/${anime.id}`;
-                    const label = anime.ctaLabel || '播放';
+                    const label = anime.ctaLabel || '立即播放';
                     const cls =
-                      'btn-ink !bg-white !text-[#1a1917] hover:!bg-white/90 !px-3 !py-1.5 !text-[12px] sm:!px-3.5 sm:!py-2 sm:!text-[13px]';
+                      'btn-ink !bg-white !text-[#1a1917] hover:!bg-white/95 !px-3.5 !py-2 !text-[12px] sm:!px-4 sm:!py-2.5 sm:!text-[13px] shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold';
                     const inner = (
                       <>
-                        <IconPlay size={13} />
+                        <IconPlay size={14} className="fill-current text-[#1a1917]" />
                         {label}
                       </>
                     );
@@ -171,7 +175,7 @@ export function HeroCarousel({
             type="button"
             aria-label="上一张"
             onClick={() => go(active - 1)}
-            className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-ink/40 text-white backdrop-blur-sm transition hover:bg-ink/60 sm:grid"
+            className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid"
           >
             <IconChevronLeft size={18} />
           </button>
@@ -179,7 +183,7 @@ export function HeroCarousel({
             type="button"
             aria-label="下一张"
             onClick={() => go(active + 1)}
-            className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-ink/40 text-white backdrop-blur-sm transition hover:bg-ink/60 sm:grid"
+            className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid"
           >
             <IconChevronRight size={18} />
           </button>

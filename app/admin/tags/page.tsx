@@ -95,43 +95,49 @@ export default async function AdminTagsPage({
       </form>
 
       <div className="surface-card overflow-x-auto">
-        <table className="w-full text-left font-ui text-sm">
-          <thead className="border-b border-border text-soft">
+        <table className="admin-table">
+          <thead>
             <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">名称</th>
-              <th className="p-3">关联里番</th>
-              <th className="p-3">操作</th>
+              <th>ID</th>
+              <th>标签名称与描述</th>
+              <th>关联里番</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((tag) => (
-              <tr key={tag.id} className="border-b border-border last:border-0">
-                <td className="p-3 tabular text-soft">{tag.id}</td>
-                <td className="p-3">
+              <tr key={tag.id}>
+                <td className="tabular text-soft font-mono text-[12px]">{tag.id}</td>
+                <td>
                   <form action={actionSaveTag} className="flex flex-wrap gap-2 items-center">
                     <input type="hidden" name="id" value={tag.id} />
                     <input
                       name="name"
                       defaultValue={tag.name}
-                      className="admin-input max-w-[160px]"
+                      className="admin-input max-w-[160px] !py-1 text-[12px]"
+                      placeholder="名称"
+                      required
                     />
                     <input
                       name="description"
                       defaultValue={tag.description || ''}
-                      className="admin-input max-w-[200px]"
-                      placeholder="描述"
+                      className="admin-input max-w-[200px] !py-1 text-[12px]"
+                      placeholder="可选描述"
                     />
-                    <button type="submit" className="text-[12px] underline">
+                    <button type="submit" className="admin-btn-action !py-1">
                       保存
                     </button>
                   </form>
                 </td>
-                <td className="p-3 tabular">{countMap.get(tag.id) || 0}</td>
-                <td className="p-3">
+                <td>
+                  <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-foreground tabular">
+                    {countMap.get(tag.id) || 0} 部
+                  </span>
+                </td>
+                <td>
                   <form action={actionDeleteTag}>
                     <input type="hidden" name="id" value={tag.id} />
-                    <button type="submit" className="text-[12px] text-danger underline">
+                    <button type="submit" className="admin-btn-action-danger !py-1">
                       删除
                     </button>
                   </form>

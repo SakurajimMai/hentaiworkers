@@ -132,69 +132,79 @@ export default async function AdminUsersPage({
           <thead>
             <tr>
               <th>ID</th>
-              <th>用户</th>
+              <th>用户信息</th>
               <th>角色 / 状态</th>
-              <th>更新</th>
+              <th>修改权限与密码</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((u) => (
-              <tr key={u.id}>
-                <td className="tabular text-soft">{u.id}</td>
-                <td>
-                  <div className="font-medium text-ink">{u.username}</div>
-                  <div className="text-[12px] text-soft">{u.displayName || '—'}</div>
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className={u.role === 'admin' ? 'status-pill status-pill-on' : 'admin-chip'}>
-                      {u.role === 'admin' ? '管理员' : '用户'}
-                    </span>
-                    <span className={`status-pill ${u.isActive ? 'status-pill-on' : 'status-pill-off'}`}>
-                      {u.isActive ? '启用' : '停用'}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <form action={actionSaveUser} className="flex flex-wrap items-center gap-2">
-                    <input type="hidden" name="id" value={u.id} />
-                    <input type="hidden" name="username" value={u.username} />
-                    <select
-                      name="role"
-                      defaultValue={u.role}
-                      className="admin-input max-w-[7.5rem]"
-                      aria-label={`角色 ${u.username}`}
-                    >
-                      <option value="user">用户</option>
-                      <option value="admin">管理员</option>
-                    </select>
-                    <label className="field-check text-[12px]">
+            {rows.map((u) => {
+              const initial = (u.displayName || u.username).slice(0, 1).toUpperCase();
+              return (
+                <tr key={u.id}>
+                  <td className="tabular text-soft font-mono text-[12px]">{u.id}</td>
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary font-ui text-[13px] font-semibold text-ink">
+                        {initial}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-medium text-ink">{u.username}</div>
+                        <div className="text-[12px] text-soft">{u.displayName || '—'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={u.role === 'admin' ? 'inline-flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-0.5 font-ui text-[11px] font-medium text-accent border border-accent/25' : 'admin-chip'}>
+                        {u.role === 'admin' ? '管理员' : '普通用户'}
+                      </span>
+                      <span className={`status-pill ${u.isActive ? 'status-pill-on' : 'status-pill-off'}`}>
+                        {u.isActive ? '正常' : '停用'}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <form action={actionSaveUser} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={u.id} />
+                      <input type="hidden" name="username" value={u.username} />
+                      <select
+                        name="role"
+                        defaultValue={u.role}
+                        className="admin-input max-w-[7rem] !py-1 text-[12px]"
+                        aria-label={`角色 ${u.username}`}
+                      >
+                        <option value="user">普通用户</option>
+                        <option value="admin">管理员</option>
+                      </select>
+                      <label className="field-check text-[12px]">
+                        <input
+                          type="checkbox"
+                          name="isActive"
+                          value="1"
+                          defaultChecked={!!u.isActive}
+                        />
+                        启用
+                      </label>
                       <input
-                        type="checkbox"
-                        name="isActive"
-                        value="1"
-                        defaultChecked={!!u.isActive}
+                        name="password"
+                        type="password"
+                        placeholder="重置密码（可选）"
+                        className="admin-input max-w-[9.5rem] !py-1 text-[12px]"
+                        minLength={8}
+                        autoComplete="new-password"
                       />
-                      启用
-                    </label>
-                    <input
-                      name="password"
-                      type="password"
-                      placeholder="新密码（可选）"
-                      className="admin-input max-w-[10rem]"
-                      minLength={8}
-                      autoComplete="new-password"
-                    />
-                    <button type="submit" className="btn-ghost !px-3 !py-1.5 !text-[12px]">
-                      保存
-                    </button>
-                  </form>
-                </td>
-              </tr>
-            ))}
+                      <button type="submit" className="admin-btn-action !py-1">
+                        保存
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              );
+            })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-8 text-center text-soft">
+                <td colSpan={4} className="p-12 text-center text-soft">
                   {q ? '没有匹配的用户' : '暂无用户'}
                 </td>
               </tr>
