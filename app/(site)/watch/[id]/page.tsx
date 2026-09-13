@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { AnimeCard } from '@/components/AnimeCard';
 import { FavoriteButton } from '@/components/favorite-button';
+import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconCalendar, IconEye } from '@/components/icons';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { WatchPlayer } from '@/components/watch-player';
@@ -85,13 +86,13 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
         }}
       />
       <div className="page-shell py-5 sm:py-8">
-        <Link
+        <HistoryBackLink
           href="/browse"
           className="inline-flex items-center gap-2 rounded-full px-2.5 py-1.5 font-ui text-sm text-soft hover:bg-card hover:text-ink mb-5 transition"
         >
           <IconArrowLeft size={16} />
           返回里番馆
-        </Link>
+        </HistoryBackLink>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-ink shadow-ink">
           <AspectRatio ratio={16 / 9}>

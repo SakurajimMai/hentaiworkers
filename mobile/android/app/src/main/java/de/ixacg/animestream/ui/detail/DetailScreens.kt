@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -68,6 +69,7 @@ fun AnimeDetailScreen(
 ) {
     val state by viewModel.animeDetail.collectAsStateWithLifecycle()
     var lightboxUrl by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
     LaunchedEffect(animeId) { viewModel.loadAnimeDetail(animeId) }
     val content = state.value?.takeIf { it.anime.id == animeId }
     if (
@@ -89,6 +91,7 @@ fun AnimeDetailScreen(
         }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(bottom = 40.dp),
     ) {
         item {
@@ -225,6 +228,7 @@ fun MangaDetailScreen(
     onTag: (String) -> Unit,
 ) {
     val state by viewModel.mangaDetail.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
     LaunchedEffect(mangaId) { viewModel.loadMangaDetail(mangaId) }
     val content = state.value?.takeIf { it.manga.id == mangaId }
     if (
@@ -249,6 +253,7 @@ fun MangaDetailScreen(
     }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(bottom = 40.dp),
     ) {
         item {

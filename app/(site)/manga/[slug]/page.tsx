@@ -5,6 +5,7 @@ import { MangaCard } from '@/components/MangaCard';
 import { getManga, isMangaEnabled, listMangas } from '@/lib/manga-client';
 import { MediaImage } from '@/components/media-image';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconPlay } from '@/components/icons';
 import { StructuredData } from '@/components/structured-data';
 import { resolveSiteUrl } from '@/lib/site-url';
@@ -109,9 +110,9 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
           isPartOf: { '@type': 'CollectionPage', name: 'AnimeStream 漫画目录' },
         }}
       />
-      <Link href="/manga" className="mb-7 inline-flex items-center gap-1.5 font-ui text-[12px] text-soft transition hover:text-ink">
+      <HistoryBackLink href="/manga" className="mb-7 inline-flex items-center gap-1.5 font-ui text-[12px] text-soft transition hover:text-ink">
         <IconArrowLeft size={15} /> 漫画目录
-      </Link>
+      </HistoryBackLink>
 
       <div className="grid gap-7 sm:grid-cols-[190px_minmax(0,1fr)] sm:gap-10 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-14">
         <div className="mx-auto w-[min(48vw,190px)] shrink-0 sm:mx-0 sm:w-full lg:w-[230px]">

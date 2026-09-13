@@ -33,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -88,47 +87,29 @@ fun AnimeStreamApp(
         RegistrationLaunchPolicy.launch { url -> openExternalUrl(context, url) }
     }
     val route = backStackEntry?.destination?.route
-    val showNavigation = mainDestinations.any { destination -> route == destination.route }
-    val immersive = route?.startsWith("player/") == true || route?.startsWith("reader/") == true
+    val showNavigation = isMainDestination(route)
     LaunchedEffect(navController, incomingDeepLinks) {
         incomingDeepLinks.collect { intent -> navController.handleDeepLink(intent) }
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val useRail = maxWidth >= 700.dp && showNavigation
-        if (useRail) {
-            Row(Modifier.fillMaxSize()) {
+        val chrome = navigationChrome(route, maxWidth.value)
+        // Keep NavHost in this single Row/Column slot. Exclusive if/else branches would dispose
+        // it when chrome hides and drop catalog scroll on back.
+        Row(Modifier.fillMaxSize()) {
+            if (chrome.showRail) {
                 MainNavigationRail(navController)
+            }
+            Column(Modifier.weight(1f).fillMaxSize()) {
                 AppNavHost(
                     navController,
                     viewModel,
                     onRegister,
-                    Modifier.weight(1f).windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Top + WindowInsetsSides.End + WindowInsetsSides.Bottom,
-                        ),
-                    ),
+                    Modifier.weight(1f).fillMaxSize().then(navigationHostInsets(chrome)),
                 )
-            }
-        } else if (showNavigation) {
-            Column(Modifier.fillMaxSize()) {
-                AppNavHost(
-                    navController,
-                    viewModel,
-                    onRegister,
-                    Modifier.weight(1f).windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                    ),
-                )
-                MainNavigationBar(navController)
-            }
-        } else {
-            val contentModifier =
-                if (immersive) {
-                    Modifier.fillMaxSize()
-                } else {
-                    Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                if (chrome.showBottomBar) {
+                    MainNavigationBar(navController)
                 }
-            AppNavHost(navController, viewModel, onRegister, contentModifier)
+            }
         }
     }
 
@@ -164,6 +145,23 @@ fun AnimeStreamApp(
         }
     }
 }
+
+@Composable
+private fun navigationHostInsets(chrome: NavigationChrome): Modifier =
+    when {
+        chrome.immersive -> Modifier
+        chrome.showRail ->
+            Modifier.windowInsetsPadding(
+                WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Top + WindowInsetsSides.End + WindowInsetsSides.Bottom,
+                ),
+            )
+        chrome.showBottomBar ->
+            Modifier.windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+            )
+        else -> Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+    }
 
 private fun openExternalUrl(
     context: Context,

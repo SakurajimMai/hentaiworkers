@@ -19,6 +19,8 @@ paginate it.
 - Server state: catalog, identity, favorites, and cloud progress loaded through server services.
 - URL state: pagination and filters that must survive refresh, back/forward navigation, and deep
   links. Page one omits its page parameter.
+- Browser-only catalog scroll: sessionStorage keyed by pathname+search. Restore it only for
+  back/forward traversals so a header click still opens the catalog at the top.
 - Derived state: totals and page boundaries come from the server query result, not the current
   rendered array length.
 

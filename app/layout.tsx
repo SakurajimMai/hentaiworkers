@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
+import { CatalogScrollRestoration } from '@/components/catalog-scroll-restoration';
 import { getGlobalMetaTags } from '@/lib/server/site-metadata';
 import './globals.css';
 
@@ -62,7 +64,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <CatalogScrollRestoration />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

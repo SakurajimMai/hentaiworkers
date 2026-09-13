@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -64,6 +65,8 @@ fun HomeScreen(
 ) {
     val state by viewModel.home.collectAsStateWithLifecycle()
     val ads by viewModel.adsState.collectAsStateWithLifecycle()
+    val gridState = rememberLazyGridState()
+    val mangaStripState = rememberLazyListState()
     LaunchedEffect(Unit) { viewModel.ensureHomeLoaded() }
     PullToRefreshBox(
         isRefreshing = state.loading && state.value != null,
@@ -93,6 +96,7 @@ fun HomeScreen(
             }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(112.dp),
+            state = gridState,
             contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 32.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -123,6 +127,7 @@ fun HomeScreen(
                 }
                 item(span = { GridItemSpan(maxLineSpan) }, key = "manga-strip") {
                     LazyRow(
+                        state = mangaStripState,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(horizontal = 4.dp),
                     ) {

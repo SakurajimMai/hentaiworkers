@@ -32,6 +32,10 @@ Questions to answer:
   readability.
 - Do not use smooth scrolling for automatic reading-position restoration. Intermediate pages can
   become visible and overwrite the intended saved position.
+- Do not wrap every public route in a home-shaped `loading.tsx`. That remounts catalog pages as a
+  short skeleton on back navigation and discards the previous scroll position.
+- Do not `Link` push to `/manga` or `/browse` from a detail/reader back control when the user just
+  came from that catalog; use history back so pagination and scroll can restore.
 
 ---
 
@@ -56,6 +60,9 @@ Questions to answer:
   priority follows the actual active page; it must not change which initial page gates ads.
 - Automatic restoration initializes the target page before progress persistence is eligible and
   uses an instant scroll even when the site enables global smooth scrolling.
+- Catalog, home, browse, and library window scroll is saved per pathname+search and restored only
+  on history traverse, with `behavior: 'instant'`, including while images are still expanding the
+  document height. Push navigations and reader routes keep their own scroll behavior.
 - Reader image failures remain isolated per page; one failed image must not block the chapter.
 - Measure reader time-to-readable at the target image's completed decode followed by two animation
   frames. LCP is supplementary and must include the observed element identity.
@@ -84,6 +91,8 @@ Questions to answer:
 - Confirm optional server work is outside the critical reader response.
 - Confirm prefetch cannot mutate active-page or progress state.
 - Confirm automatic restoration cannot observe and persist intermediate pages.
+- Confirm returning from a manga/anime title restores the previous catalog scroll instead of
+  jumping to the top.
 - Confirm future requests start while the current image is pending, within the bounded window
   and speculative capacity, and only ads wait for the initial image's settlement.
 - Confirm request cleanup, per-page retry, page order, and progress finalization remain intact.

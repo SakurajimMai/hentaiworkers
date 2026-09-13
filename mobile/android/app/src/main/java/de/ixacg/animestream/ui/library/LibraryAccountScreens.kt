@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -83,6 +84,7 @@ fun LibraryScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var editing by rememberSaveable { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     LaunchedEffect(session.ready, session.user?.id) {
         if (session.ready) viewModel.refreshLibrary()
     }
@@ -121,6 +123,7 @@ fun LibraryScreen(
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
+            state = listState,
             contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 32.dp),
         ) {
             items(rows(snapshot ?: LibrarySnapshot(), tab), key = LibraryRowModel::key) { item ->

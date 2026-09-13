@@ -43,6 +43,11 @@ scope, Docker image, production Compose services, and server-private imports.
 - Catalog controls remain visible for initial loading, errors, and successful empty responses.
   Empty filtered results provide a clear-filter action. Refresh and pagination use separate jobs,
   propagate cancellation, and reject responses from an older filter generation.
+- Keep a single `NavHost` in a stable composition slot. Show or hide the bottom bar and
+  navigation rail without wrapping the host in exclusive layout branches; otherwise catalog
+  scroll state is discarded when opening a title and pressing back. Home, catalog, and library
+  lazy lists must use saveable list/grid state so returning from a detail, player, or reader
+  destination restores the previous scroll position.
 - Do not restore an unconditional startup burst for the home catalog, tags, ads, or `/api/me`. The
   home catalog starts when `HomeScreen` enters composition, tags load on discovery, and `/api/me`
   requires a persisted session cookie. Ads load after useful home content, on demand from player or
@@ -185,6 +190,8 @@ official Room Gradle plugin and are checked in. Do not point concurrent kapt var
 - Catalog state changes must cover successful empty results and stale-generation suppression.
   Update policy tests must cover timing windows, snoozing, ABI fallback, strict manifest rejection,
   and the exact Retrofit endpoint; automatic failure must remain outside home state.
+- Navigation chrome policy tests must cover phone/tablet catalog chrome, manga-detail not matching
+  the manga tab, and detail/reader/player hiding chrome without requiring a different NavHost slot.
 - Workflow changes: parse YAML in root tests and assert checks, identity validation, signing
   mode, release gate, and absence of the JavaScript runtime.
 - Final task validation: root quality commands, `git diff --check`, remote Android workflow,

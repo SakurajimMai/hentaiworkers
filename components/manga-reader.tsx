@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   memo,
   Suspense,
@@ -13,6 +12,7 @@ import {
   useState,
   type SyntheticEvent,
 } from 'react';
+import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconArrowUp, IconMaximize } from '@/components/icons';
 import { MangaFavoriteButton } from '@/components/manga-favorite-button';
 import { MediaImage } from '@/components/media-image';
@@ -271,14 +271,14 @@ function MangaReaderEntry({
     <div data-reader-shell className="reader-shell min-h-dvh">
       <header className={`reader-header ${chromeHidden ? 'is-hidden' : ''}`}>
         <div className="mx-auto flex min-h-14 max-w-5xl items-center gap-2 px-3 sm:px-5">
-          <Link
+          <HistoryBackLink
             href={`/manga/${mangaId}`}
             className="reader-icon-button"
             aria-label="返回作品"
             title="返回作品"
           >
             <IconArrowLeft size={17} />
-          </Link>
+          </HistoryBackLink>
           <div className="min-w-0 flex-1 px-1">
             <p className="truncate font-ui text-[13px] font-medium text-ink">{title}</p>
             <p className="font-meta text-[10px] tabular" aria-live="polite">
@@ -314,9 +314,9 @@ function MangaReaderEntry({
         {pages.length === 0 ? (
           <div className="px-5 py-24 text-center">
             <p className="font-ui text-sm text-soft">这部作品还没有可阅读内容。</p>
-            <Link href={`/manga/${mangaId}`} className="mt-5 inline-flex btn-ghost">
+            <HistoryBackLink href={`/manga/${mangaId}`} className="mt-5 inline-flex btn-ghost">
               返回作品
-            </Link>
+            </HistoryBackLink>
           </div>
         ) : (
           <ReaderPageList
