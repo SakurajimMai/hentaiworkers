@@ -16,8 +16,7 @@ internal data class NavigationChrome(
 
 internal fun isMainDestination(route: String?): Boolean = route != null && route in MAIN_DESTINATION_ROUTES
 
-internal fun isImmersiveDestination(route: String?): Boolean =
-    route?.startsWith("player/") == true || route?.startsWith("reader/") == true
+internal fun isImmersiveDestination(route: String?): Boolean = route?.startsWith("player/") == true || route?.startsWith("reader/") == true
 
 /**
  * Chrome flags for a destination. Bottom bar and rail may hide, but the NavHost always stays in
