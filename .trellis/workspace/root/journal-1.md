@@ -343,3 +343,24 @@ Build 97 推送验证通过（ktlint 补丁后 89 项 JVM 测试全绿，正式�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: 移除源码中的部署专属域名、仓库与镜像名
+
+**Date**: 2026-09-14
+**Task**: 移除源码中的部署专属域名、仓库与镜像名
+**Branch**: `main`
+
+### Summary
+
+cdn-img 上游、Android 更新仓库、Compose 镜像名、Actions 站点/图片主机/镜像变量与 Android BuildConfig 全部改为配置注入，缺失即关闭对应功能；设置仓库变量 ANIMESTREAM_API_BASE_URL / ANIMESTREAM_IMAGE_PROXY_HOST / APP_IMAGE。Docker 与 Android CI 均通过（91 项 JVM 测试），Build 102 自动发布为 Latest，build-79 被保留策略删除。生产 deploy/.env 需补 APP_IMAGE、IMAGE_PROXY_UPSTREAM、ANDROID_UPDATE_REPOSITORY。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `416fa97` | (see git log) |
+
+### Status
+
+[OK] **Completed**
