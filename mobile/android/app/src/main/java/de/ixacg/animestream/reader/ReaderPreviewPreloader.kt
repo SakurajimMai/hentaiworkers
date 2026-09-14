@@ -2,6 +2,7 @@ package de.ixacg.animestream.reader
 
 import android.content.Context
 import coil.ImageLoader
+import coil.annotation.ExperimentalCoilApi
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -52,6 +53,7 @@ internal class ReaderPreviewPreloader(
     private var direction = 1
     private var startupTargetUrl: String? = null
     private var startupDelayJob: Job? = null
+    private var upcoming: Active? = null
 
     fun state(memoryCacheKey: String): Flow<ReaderPreviewState> =
         states.map { values -> values[memoryCacheKey] ?: ReaderPreviewState.Idle }
@@ -69,7 +71,9 @@ internal class ReaderPreviewPreloader(
         if (imageUrl in visibleUrls || pending.any { it.memoryCacheKey == memoryCacheKey && it !in failed }) return
         val cacheKey = MemoryCache.Key(memoryCacheKey)
         val cachedPreview = imageLoader.memoryCache?.get(cacheKey)
-        cancelAll()
+        // An upcoming-chapter transfer for this very page keeps running; the preview request
+        // below joins it through the shared single-flight fetcher instead of restarting it.
+        cancelAllLocked(keepUpcomingUrl = imageUrl)
         if (originalCached(imageUrl)) return
         if (cachedPreview != null) imageLoader.memoryCache?.set(cacheKey, cachedPreview)
         val work = Work(imageUrl, memoryCacheKey, ReaderPrefetchKind.Preview)
@@ -133,8 +137,39 @@ internal class ReaderPreviewPreloader(
         pumpLocked()
     }
 
+    /**
+     * Warm the first page of the chapter the reader is about to enter. The transfer is disk-only,
+     * runs outside the speculative window and its concurrency budget, and never touches the
+     * memory cache, so it cannot evict or delay the chapter currently being read.
+     */
+    @Synchronized
+    fun warmUpcoming(imageUrl: String) {
+        if (!scope.isActive) return
+        if (upcoming?.work?.imageUrl == imageUrl && upcoming?.job?.isActive == true) return
+        if (originalCached(imageUrl) || cachedOnDisk(imageUrl)) return
+        upcoming?.job?.cancel()
+        val work = Work(imageUrl, memoryCacheKey = "", kind = ReaderPrefetchKind.Disk)
+        lateinit var job: Job
+        job =
+            scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    imageLoader.execute(request(work))
+                } finally {
+                    synchronized(this@ReaderPreviewPreloader) {
+                        if (upcoming?.job === job) upcoming = null
+                    }
+                }
+            }
+        upcoming = Active(work, job)
+        job.start()
+    }
+
     @Synchronized
     fun cancelAll() {
+        cancelAllLocked(keepUpcomingUrl = null)
+    }
+
+    private fun cancelAllLocked(keepUpcomingUrl: String?) {
         releaseStartupLocked()
         val jobs = active.values.map { it.job }
         states.value.keys.forEach { imageLoader.memoryCache?.remove(MemoryCache.Key(it)) }
@@ -148,6 +183,12 @@ internal class ReaderPreviewPreloader(
         direction = 1
         states.value = emptyMap()
         jobs.forEach(::cancelLocked)
+        upcoming?.let { running ->
+            if (running.work.imageUrl != keepUpcomingUrl) {
+                upcoming = null
+                running.job.cancel()
+            }
+        }
     }
 
     private fun pumpLocked() {
@@ -186,6 +227,10 @@ internal class ReaderPreviewPreloader(
     }
 
     private fun originalCached(imageUrl: String): Boolean = imageLoader.memoryCache?.get(MemoryCache.Key(ReaderLogic.originalMemoryCacheKey(imageUrl, retry = 0))) != null
+
+    @OptIn(ExperimentalCoilApi::class)
+    private fun cachedOnDisk(imageUrl: String): Boolean =
+        runCatching { imageLoader.diskCache?.openSnapshot(imageUrl)?.use { true } == true }.getOrDefault(false)
 
     private fun delayStartupLocked(imageUrl: String) {
         startupTargetUrl = imageUrl
@@ -279,7 +324,13 @@ internal class ReaderPreviewPreloader(
     companion object {
         const val PREVIEW_WIDTH = 480
         const val PREVIEW_HEIGHT = 1_280
-        const val MAX_CONCURRENT_PREFETCH = 2
+
+        /**
+         * Speculative transfers in flight. Cold page fetches are dominated by round-trip latency
+         * rather than bandwidth, so four parallel transfers roughly double the pages prepared per
+         * second compared with two while a visible original still bypasses this budget.
+         */
+        const val MAX_CONCURRENT_PREFETCH = 4
         const val STARTUP_PREFETCH_GRACE_MS = 300L
     }
 }

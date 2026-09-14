@@ -30,7 +30,13 @@ class AppContainer(context: Context) {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val apiOrigin = "${MediaUrlNormalizer.origin}/".toHttpUrl()
     private val networkConnectionPool = ConnectionPool()
-    private val networkDispatcher = Dispatcher()
+    private val networkDispatcher =
+        Dispatcher().apply {
+            // Reader prefetch keeps up to four speculative page transfers in flight next to the
+            // visible originals and catalog JSON on the same host; OkHttp's default of five
+            // per-host calls would queue visible images behind speculative ones.
+            maxRequestsPerHost = MAX_REQUESTS_PER_HOST
+        }
     private val networkClient =
         OkHttpClient.Builder()
             .connectionPool(networkConnectionPool)
@@ -78,4 +84,8 @@ class AppContainer(context: Context) {
             .crossfade(true)
             .respectCacheHeaders(false)
             .build()
+
+    companion object {
+        internal const val MAX_REQUESTS_PER_HOST = 8
+    }
 }

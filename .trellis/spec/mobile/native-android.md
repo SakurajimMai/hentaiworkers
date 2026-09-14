@@ -81,8 +81,13 @@ scope, Docker image, production Compose services, and server-private imports.
   explicit reader navigation, including chapter changes and restored-page entries, calls
   `prepareReader` before navigation. Preparation must not publish reader UI state or record history.
 - Chapter preparation is single-flight per normalized manga/chapter key. Cache successful chapter
-  responses for 30 seconds with capacity two; do not cache failures, and allow a later attempt to
-  retry them.
+  responses for five minutes with capacity three (current, next, previous); do not cache failures,
+  and allow a later attempt to retry them.
+- Near the end of a chapter (last three pages) with a next chapter available, warm that chapter's
+  JSON through the preparation store and its first page as a disk-only transfer outside the
+  speculative window. This must not go through `prepareReader` (it would bump the preparation
+  revision and stop the active window), must not publish reader state, and is cancelled with the
+  reader. A later `warm()` of the same URL joins the running transfer instead of restarting it.
 - Treat the successful chapter response as the reader's only critical bootstrap result. Publish
   its pages immediately; full manga details, favorite state, history, ads, and other optional work
   may merge later but must neither block nor erase already published pages. Guard late results by
@@ -95,12 +100,15 @@ scope, Docker image, production Compose services, and server-private imports.
   never set it to null while a prepared preview is loading or decoding.
 - Initialize reader list state at the bounded restored page instead of composing page zero and
   seeking afterward. Start the moving prefetch window when pages are published, independently of
-  current-page readiness. In the reading direction, prepare two adjacent memory previews and four
-  further disk-only pages; retain one trailing disk candidate for reversal. Exclude all visible
-  URLs, deduplicate candidates by URL, update direction from actual page movement, and keep at most
-  two speculative jobs. Window size and active concurrency are separate limits. Promoted visible
+  current-page readiness. Page fetches are latency-bound (cold edge fetches spend 1-2 s before the
+  first byte), so in the reading direction prepare three adjacent memory previews and seven further
+  disk-only pages; retain one trailing disk candidate for reversal. Exclude all visible URLs,
+  deduplicate candidates by URL, update direction from actual page movement, and keep at most four
+  speculative jobs. Window size and active concurrency are separate limits. Promoted visible
   transfers bypass speculative capacity, while cancelled speculative jobs retain their slots until
-  completion. Discard stale candidates and preview bitmaps when the window or chapter changes.
+  completion. Discard stale candidates and preview bitmaps when the window or chapter changes. The
+  shared OkHttp dispatcher allows eight calls per host so visible originals and catalog JSON never
+  queue behind the speculative budget.
 - Give the first target a bounded 300 ms head start before speculative work. Skip this one-time
   delay when the target original or preview is already in memory, release it early on target
   preparation success/failure, and release it immediately when the active page changes. The timer
@@ -143,6 +151,13 @@ scope, Docker image, production Compose services, and server-private imports.
   Finding an available update is not persisted as a successful check until the user dismisses or
   opens it, so process death before presentation cannot suppress the reminder. DataStore failures
   remain inside the update subsystem and must never escape into `viewModelScope`.
+
+- Feed ads consume the same resolved `width`/`height` as the web. A sized `card` is letterboxed
+  inside the 2:3 poster cell (contain, centred, never cropped); a sized `banner` scales to the
+  spanned column width; automatic sizing keeps the fluid/measured paths; an empty slot shows a
+  poster-sized placeholder. Fixed creatives measure the WebView at native CSS pixels through an
+  explicit layout modifier that reports the scaled footprint; `requiredSize` + `graphicsLayer`
+  centres the oversized view before scaling and shifts narrow banners out of their box.
 
 ## 4. Build And Verification Boundary
 

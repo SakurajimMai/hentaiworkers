@@ -20,6 +20,22 @@ class HtmlAdPolicyTest {
     }
 
     @Test
+    fun fitScaleLetterboxesCardsAndFillsBannersWithoutCropping() {
+        val banner = HtmlAdPolicy.Dimensions(300, 250)
+        // Poster cell 170x255: width-limited, may not exceed the cell height.
+        assertEquals(170f / 300f, HtmlAdPolicy.fitScale(170f, 255f, banner, allowUpscale = true), 0.0001f)
+        // Skyscraper 300x600 in the same cell is height-limited.
+        assertEquals(255f / 600f, HtmlAdPolicy.fitScale(170f, 255f, HtmlAdPolicy.Dimensions(300, 600), allowUpscale = true), 0.0001f)
+        // Two-column banner grows to fill the span; the default reader path never upscales.
+        assertEquals(340f / 300f, HtmlAdPolicy.fitScale(340f, null, banner, allowUpscale = true), 0.0001f)
+        assertEquals(1f, HtmlAdPolicy.fitScale(340f, null, banner, allowUpscale = false), 0f)
+        assertEquals(0.5f, HtmlAdPolicy.fitScale(150f, null, banner, allowUpscale = false), 0.0001f)
+        // Degenerate inputs fall back to the native size.
+        assertEquals(1f, HtmlAdPolicy.fitScale(0f, 100f, banner, allowUpscale = true), 0f)
+        assertEquals(1f, HtmlAdPolicy.fitScale(170f, 255f, HtmlAdPolicy.Dimensions(), allowUpscale = true), 0f)
+    }
+
+    @Test
     fun adJsonAcceptsBothOldAndSizedPublicContracts() {
         val json = Json { ignoreUnknownKeys = true }
         val old = json.decodeFromString<PublicAdsConfig>("""{"reader":{"top":{"enabled":true,"html":"<div>ad</div>"}}}""")

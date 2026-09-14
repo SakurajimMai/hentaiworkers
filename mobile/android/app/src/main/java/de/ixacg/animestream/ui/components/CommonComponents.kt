@@ -345,12 +345,29 @@ fun FeedAdCard(
                     }
                 }
             }
-            if (ad.html.isNotBlank()) {
-                if (ad.spansCatalogRow) {
-                    HtmlAd(ad.html, width = ad.width, height = ad.height)
-                } else {
+            val fixed = HtmlAdPolicy.dimensions(ad.width, ad.height).width > 0
+            when {
+                ad.html.isBlank() -> {
+                    // Match the web placeholder: an empty slot still reserves one poster cell.
+                    Box(
+                        Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)).background(InkRaised),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("广告位招租", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                ad.spansCatalogRow -> {
+                    // Banners keep the creative ratio and stretch across the spanned columns.
+                    HtmlAd(ad.html, width = ad.width, height = ad.height, fitParent = fixed)
+                }
+                else -> {
                     Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
-                        HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), fill = true)
+                        if (fixed) {
+                            // A sized creative is letterboxed inside the poster cell; never crop it.
+                            HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), width = ad.width, height = ad.height, contain = true)
+                        } else {
+                            HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), fill = true)
+                        }
                     }
                 }
             }

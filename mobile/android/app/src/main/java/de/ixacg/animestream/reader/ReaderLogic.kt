@@ -96,6 +96,20 @@ object ReaderLogic {
         requestedPage: Int,
     ): MangaPage? = pages.getOrNull(boundedPage(requestedPage, pages.size))
 
+    /**
+     * Sequential readers usually continue into the next chapter. Once the reader reaches the
+     * last pages of a chapter, its chapter JSON and first page file can be prepared quietly so
+     * tapping "下一话" opens on warm caches instead of two cold round trips.
+     */
+    fun shouldWarmNextChapter(
+        currentPage: Int,
+        pageCount: Int,
+        hasNextChapter: Boolean,
+    ): Boolean {
+        if (!hasNextChapter || pageCount <= 0) return false
+        return boundedPage(currentPage, pageCount) >= pageCount - NEXT_CHAPTER_WARMUP_PAGES
+    }
+
     fun previewMemoryCacheKey(
         mangaId: Long,
         chapterNumber: Double,
@@ -156,7 +170,11 @@ object ReaderLogic {
     private const val MAX_PAGE_ASPECT_RATIO = 4f
     private const val MAX_UNBOUNDED_VIEWPORT_HEIGHTS = 8
     private const val MAX_PAGE_LAYOUT_HEIGHT = 24_000
-    internal const val PREVIEW_PREFETCH_PAGES = 2
-    internal const val FORWARD_PREFETCH_PAGES = 6
+    // Page images are latency-bound (a cold edge fetch is often 1-2 s before the first byte),
+    // so a deeper disk window plus more parallel transfers keeps sequential readers ahead of
+    // the network without decoding more bitmaps than the three adjacent previews.
+    internal const val PREVIEW_PREFETCH_PAGES = 3
+    internal const val FORWARD_PREFETCH_PAGES = 10
+    internal const val NEXT_CHAPTER_WARMUP_PAGES = 3
     internal const val MAX_READING_SCALE = 4f
 }

@@ -234,6 +234,8 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private var readerPreparationRevision = 0L
     private var activeReaderPreparationRevision = 0L
     private var readerPreviewOwnerRevision = 0L
+    private var upcomingChapterJob: Job? = null
+    private var upcomingChapterKey: ReaderPreparationKey? = null
     private var progressJob: Job? = null
     private var updateJob: Job? = null
     private var discoverRequestGeneration = 0L
@@ -924,6 +926,8 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
         readerJob?.cancel()
         progressJob?.cancel()
+        upcomingChapterJob?.cancel()
+        upcomingChapterKey = null
         activeReaderRequestId = requestId
         val identity = ReaderLoadIdentity(++readerRequestGeneration, mangaId, chapterNumber)
         readerJob =
@@ -1065,12 +1069,14 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         val safeIndex = index.coerceIn(0, (content.chapter.pages.size - 1).coerceAtLeast(0))
         if (content.currentPage == safeIndex) {
             updateReaderPrefetchWindow(visiblePages)
+            warmUpcomingChapter(content)
             return
         }
         mutableReader.update { state ->
             state.copy(value = state.value?.copy(currentPage = safeIndex))
         }
         updateReaderPrefetchWindow(visiblePages)
+        mutableReader.value.value?.let(::warmUpcomingChapter)
         progressJob?.cancel()
         progressJob =
             viewModelScope.launch {
@@ -1098,11 +1104,58 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         )
     }
 
+    /**
+     * Sequential readers almost always continue into the next chapter. Near the end of the current
+     * chapter, fetch the next chapter's JSON into the preparation cache and its first page onto disk
+     * so "下一话" opens without two cold round trips. This never publishes reader state, never
+     * touches the active prefetch window, and is cancelled with the reader.
+     */
+    private fun warmUpcomingChapter(content: ReaderContent) {
+        if (!readerPrefetchActive) return
+        val next = content.nextChapter ?: return
+        if (
+            !ReaderLogic.shouldWarmNextChapter(
+                currentPage = content.currentPage,
+                pageCount = content.chapter.pages.size,
+                hasNextChapter = true,
+            )
+        ) {
+            return
+        }
+        val key = ReaderPreparationKey.of(content.manga.id, next.number)
+        if (upcomingChapterKey == key) return
+        upcomingChapterJob?.cancel()
+        upcomingChapterKey = key
+        val mangaId = content.manga.id
+        val chapterNumber = content.chapter.number
+        upcomingChapterJob =
+            viewModelScope.launch {
+                captureResult { preparedReaderChapter(key, mangaId, next.number) }
+                    .onSuccess { response ->
+                        val current = mutableReader.value.value
+                        val stillReading =
+                            readerPrefetchActive &&
+                                current?.manga?.id == mangaId &&
+                                current.chapter.number == chapterNumber
+                        if (!stillReading) return@onSuccess
+                        ReaderLogic.targetPage(response.chapter.pages, requestedPage = 0)?.let { page ->
+                            readerPreviewPreloader.warmUpcoming(page.imageUrl)
+                        }
+                    }
+                    .onFailure {
+                        // Leave the key cleared so a later page change can retry once more.
+                        if (upcomingChapterKey == key) upcomingChapterKey = null
+                    }
+            }
+    }
+
     fun stopReaderPrefetch(requestId: String) {
         if (activeReaderRequestId != requestId) return
         readerPrefetchActive = false
         readerRequestGeneration++
         readerJob?.cancel()
+        upcomingChapterJob?.cancel()
+        upcomingChapterKey = null
         if (readerPreparationRevision == activeReaderPreparationRevision) readerPreparationJob?.cancel()
         if (readerPreviewOwnerRevision == activeReaderPreparationRevision) readerPreviewPreloader.cancelAll()
     }

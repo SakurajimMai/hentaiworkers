@@ -120,7 +120,12 @@ internal class ReaderPreparationStore<T : Any>(
     }
 
     companion object {
-        const val DEFAULT_TTL_MILLIS = 30_000L
-        const val DEFAULT_CAPACITY = 2
+        /**
+         * Chapter JSON is tiny and rarely changes. Keeping it for five minutes covers a reader who
+         * lingers on the detail page or finishes the current chapter before opening the prepared
+         * one; capacity three holds the current, next, and previous chapters.
+         */
+        const val DEFAULT_TTL_MILLIS = 5 * 60_000L
+        const val DEFAULT_CAPACITY = 3
     }
 }

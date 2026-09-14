@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -24,13 +23,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
 import java.util.UUID
+import kotlin.math.roundToInt
 import org.json.JSONObject
 
 private class HtmlAdSizeBridge(private val onResize: (String, Float) -> Unit) {
@@ -52,6 +53,8 @@ fun HtmlAd(
     height: Int = 0,
     clickUrl: String = "",
     fill: Boolean = false,
+    fitParent: Boolean = false,
+    contain: Boolean = false,
 ) {
     if (html.isBlank()) return
     val context = LocalContext.current
@@ -82,9 +85,19 @@ fun HtmlAd(
         }
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val fixed = dimensions.width > 0
-        val displayWidth = if (fixed) minOf(maxWidth, dimensions.width.dp) else maxWidth
-        val scale = if (fixed) (displayWidth / dimensions.width.dp).coerceAtMost(1f) else 1f
         val boundedHeight = maxHeight != Dp.Unspecified && maxHeight != Dp.Infinity
+        val scale =
+            if (fixed) {
+                HtmlAdPolicy.fitScale(
+                    slotWidth = maxWidth.value,
+                    slotHeight = if (contain && boundedHeight) maxHeight.value else null,
+                    creative = dimensions,
+                    allowUpscale = fitParent || contain,
+                )
+            } else {
+                1f
+            }
+        val displayWidth = if (fixed) minOf(maxWidth, dimensions.width.dp * scale) else maxWidth
         val fillParent = fill || (!fixed && boundedHeight)
         val displayHeight =
             if (fixed) {
@@ -97,13 +110,7 @@ fun HtmlAd(
         val boxHeight = if (boundedHeight) minOf(displayHeight, maxHeight) else displayHeight
         val viewModifier =
             if (fixed) {
-                Modifier
-                    .requiredSize(dimensions.width.dp, dimensions.height.dp)
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        transformOrigin = TransformOrigin(0f, 0f)
-                    }
+                Modifier.scaledCreative(dimensions.width.dp, dimensions.height.dp, scale)
             } else {
                 Modifier.width(displayWidth).height(boxHeight)
             }
@@ -184,3 +191,25 @@ fun HtmlAd(
         }
     }
 }
+
+/**
+ * Measure the creative at its native CSS-pixel size so alliance scripts still see e.g. 300x250,
+ * then report only the scaled footprint to the parent and draw it scaled from the top-left.
+ * `requiredSize` + `graphicsLayer` would centre the oversized WebView inside the smaller slot
+ * before scaling, which pushed narrowed banners up and left out of their box.
+ */
+private fun Modifier.scaledCreative(
+    width: Dp,
+    height: Dp,
+    scale: Float,
+): Modifier =
+    layout { measurable, _ ->
+        val placeable = measurable.measure(Constraints.fixed(width.roundToPx(), height.roundToPx()))
+        layout((placeable.width * scale).roundToInt(), (placeable.height * scale).roundToInt()) {
+            placeable.placeWithLayer(0, 0) {
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
+        }
+    }

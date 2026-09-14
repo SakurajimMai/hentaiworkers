@@ -89,6 +89,12 @@ class ReaderPreparationStoreTest {
         }
 
     @Test
+    fun `defaults keep the current, next and previous chapters through a full read`() {
+        assertEquals(5 * 60_000L, ReaderPreparationStore.DEFAULT_TTL_MILLIS)
+        assertEquals(3, ReaderPreparationStore.DEFAULT_CAPACITY)
+    }
+
+    @Test
     fun `chapter key is normalized and isolated by manga`() {
         assertEquals(ReaderPreparationKey.of(5, 1.0), ReaderPreparationKey.of(5, 1.00))
         assertNotEquals(ReaderPreparationKey.of(5, 1.0), ReaderPreparationKey.of(6, 1.0))

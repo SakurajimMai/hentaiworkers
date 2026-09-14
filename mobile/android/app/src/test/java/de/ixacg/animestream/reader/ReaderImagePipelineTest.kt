@@ -244,17 +244,18 @@ class ReaderImagePipelineTest {
     fun `pending initial original leaves bounded capacity for pages ahead`() =
         runBlocking {
             val pages = pages(80)
-            hold("/page-0.png")
-            hold("/page-1.png")
-            hold("/page-2.png")
+            (0..4).forEach { hold("/page-$it.png") }
             val first = async { imageLoader.execute(displayRequest(pages[0])) }
             await { requested(0) }
             preloader.updateWindow(8, 1.0, pages, currentPage = 0)
 
-            await { requested(1) && requested(2) }
+            await { (1..4).all(::requested) }
             assertFalse(first.isCompleted)
-            assertEquals(setOf(0, 1, 2), requestedPages())
-            assertTrue("Only two speculative requests accompany the visible request", maximumCalls.get() <= 3)
+            assertEquals(setOf(0, 1, 2, 3, 4), requestedPages())
+            assertTrue(
+                "Only the speculative budget accompanies the visible request",
+                maximumCalls.get() <= ReaderPreviewPreloader.MAX_CONCURRENT_PREFETCH + 1,
+            )
 
             release("/page-0.png")
             assertTrue(first.await() is SuccessResult)
@@ -265,9 +266,7 @@ class ReaderImagePipelineTest {
         runBlocking {
             val clock = controlledPrefetchClock()
             val pages = pages(80)
-            hold("/page-0.png")
-            hold("/page-1.png")
-            hold("/page-2.png")
+            (0..4).forEach { hold("/page-$it.png") }
             preloader.warm(pages[0].imageUrl, previewKey(pages[0]))
             await(clock) { requested(0) }
             preloader.updateWindow(8, 1.0, pages, currentPage = 0)
@@ -278,11 +277,11 @@ class ReaderImagePipelineTest {
             assertEquals(setOf(0), requestedPages())
             preloader.updateWindow(8, 1.0, pages, currentPage = 0)
             clock.advanceTimeBy(1)
-            await(clock) { requested(1) && requested(2) }
+            await(clock) { (1..4).all(::requested) }
 
             assertEquals(ReaderPreviewPreloader.STARTUP_PREFETCH_GRACE_MS, clock.currentTime)
             assertEquals(ReaderPreviewState.Loading, preloader.currentState(previewKey(pages[0])))
-            assertEquals(setOf(0, 1, 2), requestedPages())
+            assertEquals(setOf(0, 1, 2, 3, 4), requestedPages())
             assertTrue(maximumCalls.get() <= ReaderPreviewPreloader.MAX_CONCURRENT_PREFETCH + 1)
         }
 
@@ -352,7 +351,10 @@ class ReaderImagePipelineTest {
             assertTrue(requests.single { it.path == "/page-1.png" }.atNanos < becameVisibleAt)
             assertEquals(DataSource.DISK, result.dataSource)
             assertEquals(1, requestCount(1))
-            assertTrue("Opening a chapter must not fetch its tail", requestedPages().none { it > 6 })
+            assertTrue(
+                "Opening a chapter must not fetch its tail",
+                requestedPages().none { it > ReaderLogic.FORWARD_PREFETCH_PAGES },
+            )
         }
 
     @Test
@@ -509,9 +511,60 @@ class ReaderImagePipelineTest {
             }
             assertFalse(jumpedPage.isCompleted)
             assertFalse(requested(99))
-            assertTrue("Two speculative requests plus the visible original stay bounded after replacement", maximumCalls.get() <= 3)
+            assertTrue(
+                "Speculative requests plus the visible original stay bounded after replacement",
+                maximumCalls.get() <= ReaderPreviewPreloader.MAX_CONCURRENT_PREFETCH + 1,
+            )
             release("/page-120.png")
             assertTrue(jumpedPage.await() is SuccessResult)
+        }
+
+    @Test
+    fun `upcoming chapter warm stores its first page on disk without decode or window slots`() =
+        runBlocking {
+            val pages = pages(30)
+            val nextChapter = pages.map { it.copy(imageUrl = it.imageUrl.replace("page-", "chapter-two-")) }
+            (1..4).forEach { hold("/page-$it.png") }
+            preloader.updateWindow(8, 1.0, pages, currentPage = 0)
+            await { (1..4).all(::requested) }
+
+            preloader.warmUpcoming(nextChapter[0].imageUrl)
+            await { cachedOnDisk(nextChapter[0]) }
+
+            assertEquals("Upcoming transfer bypasses the full speculative budget", 1, requests.count { it.path == "/chapter-two-0.png" })
+            assertTrue(events.none { it.path == "/chapter-two-0.png" && it.event == "bitmap-decode" })
+            assertFalse(hasPreview(nextChapter[0]))
+            assertEquals(setOf(1, 2, 3, 4), requestedPages())
+            assertTrue(maximumCalls.get() <= ReaderPreviewPreloader.MAX_CONCURRENT_PREFETCH + 1)
+
+            preloader.warmUpcoming(nextChapter[0].imageUrl)
+            delay(100)
+            assertEquals("A warm disk file is not downloaded again", 1, requests.count { it.path == "/chapter-two-0.png" })
+
+            // Entering the prepared chapter reads the file instead of the network.
+            preloader.warm(nextChapter[0].imageUrl, previewKey(nextChapter[0]))
+            await { preloader.currentState(previewKey(nextChapter[0])) == ReaderPreviewState.Ready }
+            val opened = imageLoader.execute(displayRequest(nextChapter[0])) as SuccessResult
+            assertEquals(DataSource.DISK, opened.dataSource)
+            assertEquals(1, requests.count { it.path == "/chapter-two-0.png" })
+        }
+
+    @Test
+    fun `warming the page a running upcoming transfer is fetching joins it instead of restarting`() =
+        runBlocking {
+            val page = pages(1).single().let { it.copy(imageUrl = it.imageUrl.replace("page-", "chapter-two-")) }
+            hold("/chapter-two-0.png")
+            preloader.warmUpcoming(page.imageUrl)
+            await { requests.any { it.path == "/chapter-two-0.png" } }
+
+            preloader.warm(page.imageUrl, previewKey(page))
+            delay(150)
+            assertEquals(1, requests.count { it.path == "/chapter-two-0.png" })
+            assertEquals(ReaderPreviewState.Loading, preloader.currentState(previewKey(page)))
+
+            release("/chapter-two-0.png")
+            await { preloader.currentState(previewKey(page)) == ReaderPreviewState.Ready }
+            assertEquals(1, requests.count { it.path == "/chapter-two-0.png" })
         }
 
     @Test

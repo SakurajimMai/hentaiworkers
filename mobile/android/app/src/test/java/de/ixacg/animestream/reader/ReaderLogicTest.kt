@@ -98,13 +98,13 @@ class ReaderLogicTest {
     }
 
     @Test
-    fun `window prepares two bounded previews and farther files without a readiness gate`() {
+    fun `window prepares three bounded previews and farther files without a readiness gate`() {
         val pages = (0 until 240).map { MangaPage(index = it, imageUrl = "page-$it") }
         val window = ReaderLogic.prefetchWindow(pages, currentPage = 120)
 
-        assertEquals(listOf(121, 122, 123, 124, 125, 126, 119), window.map { it.page.index })
-        assertEquals(listOf(121, 122), window.filter { it.kind == ReaderPrefetchKind.Preview }.map { it.page.index })
-        assertEquals(5, window.count { it.kind == ReaderPrefetchKind.Disk })
+        assertEquals(listOf(121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 119), window.map { it.page.index })
+        assertEquals(listOf(121, 122, 123), window.filter { it.kind == ReaderPrefetchKind.Preview }.map { it.page.index })
+        assertEquals(8, window.count { it.kind == ReaderPrefetchKind.Disk })
         assertTrue(window.none { it.page.index == 0 || it.page.index == 120 })
     }
 
@@ -113,8 +113,8 @@ class ReaderLogicTest {
         val pages = (0 until 40).map { MangaPage(index = it, imageUrl = "page-$it") }
         val window = ReaderLogic.prefetchWindow(pages, currentPage = 20, direction = -1)
 
-        assertEquals(listOf(19, 18, 17, 16, 15, 14, 21), window.map { it.page.index })
-        assertEquals(listOf(19, 18), window.filter { it.kind == ReaderPrefetchKind.Preview }.map { it.page.index })
+        assertEquals(listOf(19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 21), window.map { it.page.index })
+        assertEquals(listOf(19, 18, 17), window.filter { it.kind == ReaderPrefetchKind.Preview }.map { it.page.index })
     }
 
     @Test
@@ -125,8 +125,20 @@ class ReaderLogicTest {
             }
         val window = ReaderLogic.prefetchWindow(pages, currentPage = 0, visiblePages = setOf(0, 1))
 
-        assertEquals(listOf(2, 3, 5, 6), window.map { it.page.index })
+        assertEquals(listOf(2, 3, 5, 6, 7, 8, 9, 10), window.map { it.page.index })
         assertEquals(window.size, window.map { it.page.imageUrl }.distinct().size)
+    }
+
+    @Test
+    fun `next chapter warms only near the end of the current chapter`() {
+        assertFalse(ReaderLogic.shouldWarmNextChapter(currentPage = 0, pageCount = 40, hasNextChapter = true))
+        assertFalse(ReaderLogic.shouldWarmNextChapter(currentPage = 36, pageCount = 40, hasNextChapter = true))
+        assertTrue(ReaderLogic.shouldWarmNextChapter(currentPage = 37, pageCount = 40, hasNextChapter = true))
+        assertTrue(ReaderLogic.shouldWarmNextChapter(currentPage = 39, pageCount = 40, hasNextChapter = true))
+        assertTrue(ReaderLogic.shouldWarmNextChapter(currentPage = 99, pageCount = 40, hasNextChapter = true))
+        assertTrue(ReaderLogic.shouldWarmNextChapter(currentPage = 0, pageCount = 2, hasNextChapter = true))
+        assertFalse(ReaderLogic.shouldWarmNextChapter(currentPage = 39, pageCount = 40, hasNextChapter = false))
+        assertFalse(ReaderLogic.shouldWarmNextChapter(currentPage = 0, pageCount = 0, hasNextChapter = true))
     }
 
     @Test
