@@ -19,6 +19,7 @@ import { getSystemSettingsService } from '@/lib/server/system';
 import { StructuredData } from '@/components/structured-data';
 import { MediaImage } from '@/components/media-image';
 import { absoluteMediaUrl, breadcrumbJsonLd, isoDate, pageOpenGraph, siteOrigin } from '@/lib/seo';
+import { formatCompactCount } from '@/lib/format-count';
 
 export const dynamic = 'force-dynamic';
 
@@ -166,7 +167,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
                 {anime.viewCount != null && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--success-soft))] px-2.5 py-1 font-ui text-[11px] font-medium text-[hsl(var(--success))] tabular">
                     <IconEye size={12} />
-                    {anime.viewCount.toLocaleString()} 次播放
+                    {formatCompactCount(anime.viewCount)} 次播放
                   </span>
                 )}
                 {anime.createdAt && (

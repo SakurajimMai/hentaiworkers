@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { IconPlay, IconEye } from '@/components/icons';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { MediaImage } from '@/components/media-image';
+import { formatCompactCount } from '@/lib/format-count';
 
 export type AnimeCardData = {
   id: number;
@@ -47,7 +48,7 @@ export function AnimeCard({
         {showStats && anime.viewCount != null && (
           <span className="absolute left-2.5 bottom-2.5 inline-flex items-center gap-1 rounded-full bg-ink/75 px-2 py-0.5 font-meta text-[10px] normal-case tracking-normal text-white shadow-sm backdrop-blur-md">
             <IconEye size={11} className="text-white/80" />
-            <span className="tabular font-medium">{formatCount(anime.viewCount)}</span>
+            <span className="tabular font-medium">{formatCompactCount(anime.viewCount)}</span>
           </span>
         )}
       </div>
@@ -66,10 +67,4 @@ export function AnimeCard({
       </div>
     </Link>
   );
-}
-
-function formatCount(n: number): string {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return n.toString();
 }

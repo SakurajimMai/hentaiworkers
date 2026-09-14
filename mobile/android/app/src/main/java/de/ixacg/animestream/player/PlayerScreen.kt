@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.net.Uri
+import android.view.LayoutInflater
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -94,6 +95,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import de.ixacg.animestream.R
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
 import de.ixacg.animestream.core.model.PlayerPauseAd
 import de.ixacg.animestream.core.model.PlayerPreRollAd
@@ -255,6 +257,7 @@ private fun VideoStage(
     var scrubOriginMs by remember(url, instanceToken) { mutableLongStateOf(0L) }
     var isPlaying by remember(url, instanceToken) { mutableStateOf(false) }
     var isBuffering by remember(url, instanceToken) { mutableStateOf(true) }
+    var brightnessOverridden by remember(url, instanceToken) { mutableStateOf(false) }
 
     var attachedPlayerView by remember { mutableStateOf<PlayerView?>(null) }
     var lifecycleStarted by remember(url, instanceToken) {
@@ -308,6 +311,7 @@ private fun VideoStage(
                 val next = PlayerUiPolicy.adjustLevel(currentLevel, deltaPx, viewportPx)
                 params.screenBrightness = next
                 host.window.attributes = params
+                brightnessOverridden = true
                 hudLevel = next
                 hud = PlayerHud.Brightness
             }
@@ -452,10 +456,12 @@ private fun VideoStage(
             player.removeListener(listener)
             attachedPlayerView?.player = null
             player.release()
-            activity?.let { host ->
-                val params = host.window.attributes
-                params.screenBrightness = BRIGHTNESS_SYSTEM_DEFAULT
-                host.window.attributes = params
+            if (brightnessOverridden) {
+                activity?.let { host ->
+                    val params = host.window.attributes
+                    params.screenBrightness = BRIGHTNESS_SYSTEM_DEFAULT
+                    host.window.attributes = params
+                }
             }
         }
     }
@@ -475,18 +481,19 @@ private fun VideoStage(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                PlayerView(ctx).also { view ->
-                    attachedPlayerView = view
-                    view.player = playbackPlayer
-                    // Chrome below is Compose; Media3's own controller would duplicate every control.
-                    view.useController = false
-                    view.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                    view.resizeMode = resizeMode
-                }
+                // Inflated rather than constructed: surface_type is an XML-only attribute, and a
+                // TextureView is what keeps the last frame from surviving the rotation home.
+                val view = LayoutInflater.from(ctx).inflate(R.layout.player_surface, null) as PlayerView
+                attachedPlayerView = view
+                view.player = playbackPlayer
+                view.resizeMode = resizeMode
+                view
             },
-            update = {
-                it.player = playbackPlayer
-                it.resizeMode = resizeMode
+            update = { view ->
+                view.player = playbackPlayer
+                view.resizeMode = resizeMode
+                // Bound to the view, so the flag is dropped automatically when it detaches.
+                view.keepScreenOn = isPlaying
             },
         )
 

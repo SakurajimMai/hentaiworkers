@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A SurfaceView keeps its own buffer outside the view hierarchy, so its last decoded frame stays
+  on screen while the activity rotates back to portrait and the player is torn down. Rendering to
+  a TextureView keeps the video inside the normal drawing pass: it disappears with the view and
+  the detail screen no longer shows a frozen frame on the way back.
+
+  The controller is Compose (see PlayerScreen.kt), so the built-in one stays off here too.
+-->
+<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    app:show_buffering="never"
+    app:shutter_background_color="@android:color/black"
+    app:surface_type="texture_view"
+    app:use_controller="false" />

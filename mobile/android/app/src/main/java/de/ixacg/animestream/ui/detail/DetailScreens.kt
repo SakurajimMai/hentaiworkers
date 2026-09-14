@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.ixacg.animestream.core.format.CountFormat
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
 import de.ixacg.animestream.core.model.MangaSummary
 import de.ixacg.animestream.core.model.Tag
@@ -128,7 +129,7 @@ fun AnimeDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "${anime.viewCount ?: 0} 次观看 · ${anime.favoriteCount ?: 0} 收藏",
+                        "${CountFormat.compact(anime.viewCount)} 次观看 · ${CountFormat.compact(anime.favoriteCount)} 收藏",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
