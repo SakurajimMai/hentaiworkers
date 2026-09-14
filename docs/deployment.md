@@ -12,7 +12,7 @@ HTTPS 反向代理和主机升级均由操作者或外部平台负责。GitHub A
 | 组件 | 当前责任 |
 |------|----------|
 | Docker workflow | 构建并推送 App 镜像与标签 |
-| Android workflow | 检查并构建 APK；正式签名的 `main` 构建自动创建 GitHub prerelease，并只保留最新八个 |
+| Android workflow | 检查并构建 APK；正式签名的 `main` 构建自动创建 GitHub Release（最新一个为 Latest），并只保留最新八个 |
 | Compose | 启动一个 `app` 服务并检查进程存活 |
 | 操作者 | 选择镜像、准备环境、审核/执行迁移、seed、反代、烟测、升级与回滚 |
 | 外部数据库 | 创建数据库、备份、TLS、权限、容量和恢复 |
@@ -260,7 +260,8 @@ Android workflow 构建：
 - `universal`
 
 `main` push 在四个生产签名 Secrets 完整且证书摘要匹配时自动创建 `build-*` GitHub
-prerelease；分支、PR 或缺少签名配置时只产生待验收 Artifact。APK 不进入 App 镜像。
+Release，并把最新一个标为 Latest（不使用 prerelease）；分支、PR 或缺少签名配置时只产生待验收
+Artifact。APK 不进入 App 镜像。
 
 保留策略：
 

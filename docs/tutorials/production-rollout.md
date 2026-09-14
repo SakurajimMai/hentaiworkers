@@ -273,7 +273,7 @@ docker compose ps
 ## 11. 发布系统边界
 
 Docker workflow 只构建和推送镜像，不登录生产主机。Android `main` push 在正式签名门禁通过后
-自动创建 GitHub prerelease。
+自动创建 GitHub Release，最新一个带 Latest 标记。
 
 保留策略：Releases 保留最新八个 `build-*`，Docker Hub 保留最新八个提交 SHA 镜像标签，
 Actions runs 保留仓库级最新五次。因此：

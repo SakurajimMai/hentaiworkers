@@ -12,7 +12,7 @@
 - 公开安装包只从
   [SakurajimMai/hentaiworkers Releases](https://github.com/SakurajimMai/hentaiworkers/releases)
   下载，不使用来源不明的 APK，也不使用 GitHub Actions 内部 Artifact。
-- 工作流会把公开版本标为 prerelease；请以正式 Releases 页面和完整五种 APK 为准，不要因此
+- 公开版本都是正式 Release，最新一个带 **Latest** 标记；请以 Releases 页面和完整五种 APK 为准，不要因此
   改去下载内部 Artifact。
 - 首次安装需要允许侧载。Android 7.0/7.1 通常使用系统安全设置中的全局“未知来源”开关；
   Android 8.0 及以上通常对当前浏览器或文件管理器授予“安装未知应用”权限。厂商入口名称

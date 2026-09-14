@@ -370,7 +370,9 @@ jobs:
             mobile/artifacts/SHA256SUMS
           body_path: release-notes.md
           draft: false
-          prerelease: true
+          # Full releases only: the newest build always carries GitHub's "Latest" label.
+          prerelease: false
+          make_latest: true
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

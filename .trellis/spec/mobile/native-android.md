@@ -21,8 +21,9 @@ scope, Docker image, production Compose services, and server-private imports.
   the production key; users must uninstall those builds before installing the first securely
   signed native release.
 - Every `main` build that passes verification with all four release-signing secrets and the pinned
-  certificate publishes a `build-N` prerelease automatically (push or `workflow_dispatch`; a manual
-  run may untick `publish_release` for a verification-only build). Branch and PR builds never
+  certificate publishes a full `build-N` release automatically with `make_latest: true` and never
+  as a prerelease (push or `workflow_dispatch`; a manual run may untick `publish_release` for a
+  verification-only build). Branch and PR builds never
   publish. After publishing, the release job keeps only the newest eight `build-N` releases and
   deletes older releases together with their tags. Partial signing configuration must fail.
 - The first native launch must idempotently import the five known `RKStorage` values without

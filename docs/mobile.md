@@ -23,8 +23,8 @@
 | `x86.apk` | 32 位 Intel 模拟器和少量 Intel 设备 | 实机通常不用 |
 | `universal.apk` | 包含以上四种 ABI | 无法判断架构时使用，文件更大 |
 
-从最新且资源完整的 `build-<数字>` Release 的 **Assets** 下载对应 APK。工作流把公开版本标为
-prerelease；这不等于分支构建使用内部 debug 签名的 Actions Artifact。首次安装时，Android
+从标记为 **Latest** 的 `build-<数字>` Release 的 **Assets** 下载对应 APK。公开 Release 都是
+正式版本，不再标为 prerelease；这不等于分支构建使用内部 debug 签名的 Actions Artifact。首次安装时，Android
 可能要求允许侧载：Android 7.0/7.1 通常使用系统安全设置中的全局“未知来源”开关，Android
 8.0 及以上通常对当前浏览器或文件管理器授予“安装未知应用”权限。入口名称因系统厂商而异；
 安装结束后可撤销刚才启用的开关或来源权限。
@@ -250,8 +250,8 @@ typecheck、测试、边界检查与构建；Android 结果以 GitHub Actions �
 构建 Artifact 包含五个 `AnimeStream-<run>-<abi>.apk`、`SHA256SUMS` 和
 `build-info.txt`，保留 30 天；Android reports 包含 Lint、测试与诊断资料，保留 14 天。
 分支和 PR 使用内部 debug 签名，仅供内部测试。`main` push 进入 `Production` environment：
-四项签名 Secret 完整且证书摘要匹配时，工作流在验证通过后**自动**发布 `build-<run>` 预发布
-Release（含五个 APK 与 `SHA256SUMS`）；四项全空时只生成标记为 `internal-debug` 的内部
+四项签名 Secret 完整且证书摘要匹配时，工作流在验证通过后**自动**发布 `build-<run>` 正式
+Release（含五个 APK 与 `SHA256SUMS`，最新一个自动带 Latest 标记，不使用 prerelease）；四项全空时只生成标记为 `internal-debug` 的内部
 Artifact，不会发布。发布后同一任务只保留最新八个 `build-*` Release，更早的 Release 及其
 标签会被删除；App 内更新检查总是选择最新且资源完整的 Release。
 
