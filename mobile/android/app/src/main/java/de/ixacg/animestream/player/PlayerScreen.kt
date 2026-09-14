@@ -176,7 +176,7 @@ fun PlayerScreen(
             else ->
                 VideoStage(
                     url = videoUrl,
-                    title = anime.title,
+                    title = anime?.title.orEmpty(),
                     instanceToken = retryToken,
                     blocked = !preRollDecided || preRollVisible,
                     chromeEnabled = !preRollVisible && !pauseAdVisible && playbackError == null,
