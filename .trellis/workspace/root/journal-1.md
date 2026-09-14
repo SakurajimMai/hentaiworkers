@@ -301,3 +301,24 @@ Implemented native reader and web admin changes; all root and browser checks pas
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: APK 阅读预取、信息流广告尺寸与 SEO 收录优化
+
+**Date**: 2026-09-14
+**Task**: APK 阅读预取、信息流广告尺寸与 SEO 收录优化
+**Branch**: `main`
+
+### Summary
+
+阅读器预取并发 2→4、窗口 6→10（3 预览 + 7 磁盘）、章节准备缓存 5 分钟/容量 3、章末预热下一话、OkHttp 每主机 8；信息流广告推断 <img> 尺寸并在网页与 Android 中按 contain 展示固定尺寸卡片，修复 Android 固定创意偏移；站点地图改为索引 + 分片（含封面图片）、IndexNow、精选漫画标签可索引、browse 标签名解析、面包屑/OG/rating/preconnect、可抓取分页。根检查 lint/typecheck/280 测试/legacy/boundaries/build 与 test:ads:browser 通过；Android 需推送 Actions 验证。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `uncommitted` | (see git log) |
+
+### Status
+
+[OK] **Completed**
