@@ -364,3 +364,24 @@ cdn-img 上游、Android 更新仓库、Compose 镜像名、Actions 站点/图�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: 重做 APK 播放器并修复观看/收藏计数
+
+**Date**: 2026-09-14
+**Task**: 重做 APK 播放器并修复观看/收藏计数
+**Branch**: `main`
+
+### Summary
+
+播放器改为自绘 Compose 控制层（顶/中/底栏、缓冲进度条、锁定、倍速与画面比例），新增双击±10秒、拖动预览进度、左右半屏亮度与音量、长按2倍速手势，手势识别拆到 PlayerGestures.kt，确定性逻辑进 PlayerUiPolicy.kt 并补 14 项 JVM 测试；播放进度改为上报真实秒数并支持云端续播，取代固定 1 秒观看标记。计数方面查明 crawler 用 random.randint(1000,10000) 伪造 view_count、favorite_count 恒为 0，新增 lib/anime-views.ts 按人按天去重计数并新增 0020 迁移，收藏数改为实时统计系统收藏列表。Android CI Build 105 通过（105 项 JVM 测试）并已发布为 Latest；Web 侧 300 项测试与全部根检查通过但尚未推送。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `509ef99` | (see git log) |
+
+### Status
+
+[OK] **Completed**
