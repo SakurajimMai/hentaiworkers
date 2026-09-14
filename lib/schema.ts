@@ -24,7 +24,14 @@ export const animes = mysqlTable(
     videoUrl: varchar('video_url', { length: 1000 }).notNull(),
     releaseYear: int('release_year'),
     releaseDate: text('release_date'),
+    /** Real deduped play counter maintained by lib/anime-views.ts. */
     viewCount: int('view_count').default(0),
+    /**
+     * NOT MAINTAINED — do not read. Kept for schema history only: the column was
+     * inserted as 0 and never updated. The real favourite count is derived from
+     * the system favourites lists (`user_lists` + `user_list_items`) by
+     * CatalogReadRepository.countFavorites.
+     */
     favoriteCount: int('favorite_count').default(0),
     isActive: int('is_active').default(1),
     categoryId: int('category_id'),

@@ -93,6 +93,7 @@ export class MariaDbAdminCatalogRepository implements AdminCatalogRepository {
           animeId = await insertAnimeReturningId(tx, {
             ...payload,
             viewCount: 0,
+            // Column default only; favourite counts are never read from here.
             favoriteCount: 0,
             createdAt: nowIso(),
           });

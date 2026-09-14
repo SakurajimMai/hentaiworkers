@@ -17,9 +17,24 @@ import type {
 
 type TagRecord = TagSummary & { description: string | null };
 
+/** Mirrors the `user_lists` row shape that owns anime favourites. */
+export type UserListRecord = Readonly<{
+  id: number;
+  listType: string;
+  isSystem: number;
+}>;
+
+/** Mirrors a `user_list_items` row. */
+export type UserListItemRecord = Readonly<{
+  listId: number;
+  animeId: number;
+}>;
+
 export class InMemoryCatalogRepository implements CatalogReadRepository {
   private readonly animes = new Map<number, AnimeSeed>();
   private readonly tags = new Map<number, TagRecord>();
+  private readonly userLists = new Map<number, UserListRecord>();
+  private readonly userListItems: UserListItemRecord[] = [];
 
   seedAnime(seed: AnimeSeed) {
     this.animes.set(seed.id, {
@@ -30,6 +45,14 @@ export class InMemoryCatalogRepository implements CatalogReadRepository {
 
   seedTag(tag: TagRecord) {
     this.tags.set(tag.id, tag);
+  }
+
+  seedUserList(list: UserListRecord) {
+    this.userLists.set(list.id, list);
+  }
+
+  seedUserListItem(item: UserListItemRecord) {
+    this.userListItems.push(item);
   }
 
   async list(input: CatalogListQuery): Promise<CatalogPage> {
@@ -106,13 +129,26 @@ export class InMemoryCatalogRepository implements CatalogReadRepository {
       releaseYear: row.releaseYear ?? null,
       releaseDate: row.releaseDate ?? null,
       viewCount: row.viewCount ?? null,
-      favoriteCount: row.favoriteCount ?? null,
+      // The stored column is dead; CatalogQueryService composes the real count.
+      favoriteCount: null,
       isActive: row.isActive ?? null,
       categoryId: row.categoryId ?? null,
       createdAt: row.createdAt ?? null,
       updatedAt: row.updatedAt ?? null,
       tags,
     };
+  }
+
+  /** Only system favourites lists count; custom lists are ignored. */
+  async countFavorites(animeId: number): Promise<number> {
+    const systemFavoriteListIds = new Set(
+      [...this.userLists.values()]
+        .filter((list) => list.listType === 'favorites' && list.isSystem === 1)
+        .map((list) => list.id),
+    );
+    return this.userListItems.filter(
+      (item) => item.animeId === animeId && systemFavoriteListIds.has(item.listId),
+    ).length;
   }
 
   async listTags(): Promise<ReadonlyArray<TagSummary>> {
@@ -128,6 +164,7 @@ export class InMemoryCatalogRepository implements CatalogReadRepository {
         id: row.id,
         createdAt: row.createdAt ?? null,
         updatedAt: row.updatedAt ?? null,
+        cover: row.cover ?? null,
       }));
     const tags = await this.listTags();
     return { animes, tags };

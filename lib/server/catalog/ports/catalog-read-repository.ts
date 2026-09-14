@@ -28,7 +28,14 @@ export type PopularQuery = Readonly<{
 
 export interface CatalogReadRepository {
   list(input: CatalogListQuery): Promise<CatalogPage>;
+  /**
+   * Row-level detail. `favoriteCount` is always `null` here: the stored
+   * `animes.favorite_count` column is dead, so the real number is composed by
+   * the application layer through `countFavorites`.
+   */
   getById(id: number): Promise<AnimeDetail | null>;
+  /** Live favourite count from the system favourites lists. */
+  countFavorites(animeId: number): Promise<number>;
   listTags(): Promise<ReadonlyArray<TagSummary>>;
   getSitemapData(): Promise<SitemapData>;
   listByTitlePrefix(input: TitlePrefixQuery): Promise<ReadonlyArray<AnimeSimilarItem>>;

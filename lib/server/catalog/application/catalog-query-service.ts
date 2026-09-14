@@ -1,4 +1,3 @@
-import { assertSitemapEntryLimit } from '@/lib/sitemap';
 import {
   escapeLike,
   normalizeListQuery,
@@ -28,18 +27,35 @@ export class CatalogQueryService {
     });
   }
 
-  getById(id: number): Promise<AnimeDetail | null> {
-    return this.repository.getById(id);
+  /**
+   * Detail composes the live favourite count from the system favourites lists.
+   * `animes.favorite_count` is never read: it was inserted as 0 and never
+   * maintained. A count failure degrades to `null` ("unknown") instead of
+   * failing the whole detail read or inventing a number.
+   */
+  async getById(id: number): Promise<AnimeDetail | null> {
+    const anime = await this.repository.getById(id);
+    if (!anime) return null;
+    return { ...anime, favoriteCount: await this.countFavorites(id) };
+  }
+
+  private async countFavorites(id: number): Promise<number | null> {
+    try {
+      const total = await this.repository.countFavorites(id);
+      return Number.isFinite(total) && total >= 0 ? Math.trunc(total) : null;
+    } catch (error) {
+      console.error('countFavorites failed', error);
+      return null;
+    }
   }
 
   listTags(): Promise<ReadonlyArray<TagSummary>> {
     return this.repository.listTags();
   }
 
-  async getSitemapData(): Promise<SitemapData> {
-    const data = await this.repository.getSitemapData();
-    assertSitemapEntryLimit(data.animes.length, data.tags.length);
-    return data;
+  /** Sitemap files are chunked by lib/sitemap, so the full active catalog is returned here. */
+  getSitemapData(): Promise<SitemapData> {
+    return this.repository.getSitemapData();
   }
 
   /**

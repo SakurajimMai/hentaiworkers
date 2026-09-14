@@ -73,6 +73,8 @@ export type SitemapAnime = Readonly<{
   id: number;
   createdAt: string | null;
   updatedAt: string | null;
+  /** Poster URL for the image sitemap; null when the work has no cover. */
+  cover: string | null;
 }>;
 
 export type SitemapTag = Readonly<{
@@ -97,7 +99,6 @@ export type AnimeSeed = Readonly<{
   releaseYear?: number | null;
   releaseDate?: string | null;
   viewCount?: number | null;
-  favoriteCount?: number | null;
   isActive?: number | null;
   categoryId?: number | null;
   createdAt?: string | null;

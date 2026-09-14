@@ -330,9 +330,19 @@ test('动漫列表依赖异常保持 500 和 error 字符串', async () => {
 });
 
 test('动漫详情保持 200 黄金响应', async () => {
-  const handler = createAnimeDetailHandler(async (id) => {
-    assert.equal(id, detailFixture.id);
-    return detailFixture;
+  let recordedId: number | undefined;
+  let scheduled = 0;
+  const handler = createAnimeDetailHandler({
+    getAnimeById: async (id) => {
+      assert.equal(id, detailFixture.id);
+      return detailFixture;
+    },
+    recordView: async (animeId) => {
+      recordedId = animeId;
+    },
+    scheduleAfter: () => {
+      scheduled += 1;
+    },
   });
 
   const response = await handler(new Request('http://fixture.invalid'), {
@@ -341,13 +351,22 @@ test('动漫详情保持 200 黄金响应', async () => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(await responseJson(response), detailFixture);
+  assert.equal(recordedId, detailFixture.id);
+  assert.equal(scheduled, 1);
 });
 
 test('动漫详情非法 id 与不存在记录均保持 404', async () => {
   let calls = 0;
-  const handler = createAnimeDetailHandler(async () => {
-    calls += 1;
-    return null;
+  let schedules = 0;
+  const handler = createAnimeDetailHandler({
+    getAnimeById: async () => {
+      calls += 1;
+      return null;
+    },
+    recordView: async () => undefined,
+    scheduleAfter: () => {
+      schedules += 1;
+    },
   });
 
   const invalidResponse = await handler(new Request('http://fixture.invalid'), {
@@ -362,11 +381,19 @@ test('动漫详情非法 id 与不存在记录均保持 404', async () => {
   assert.equal(missingResponse.status, 404);
   assert.deepEqual(await responseJson(missingResponse), { error: 'Not found' });
   assert.equal(calls, 1);
+  assert.equal(schedules, 0);
 });
 
 test('动漫详情依赖异常保持 500 和 error 字符串', async () => {
-  const handler = createAnimeDetailHandler(async () => {
-    throw new Error('synthetic detail failure');
+  let schedules = 0;
+  const handler = createAnimeDetailHandler({
+    getAnimeById: async () => {
+      throw new Error('synthetic detail failure');
+    },
+    recordView: async () => undefined,
+    scheduleAfter: () => {
+      schedules += 1;
+    },
   });
 
   const response = await handler(new Request('http://fixture.invalid'), {
@@ -375,6 +402,7 @@ test('动漫详情依赖异常保持 500 和 error 字符串', async () => {
 
   assert.equal(response.status, 500);
   assert.deepEqual(await responseJson(response), { error: 'synthetic detail failure' });
+  assert.equal(schedules, 0);
 });
 
 test('相似动漫保持 200 黄金响应，非法 id 保持 200 空数组', async () => {
