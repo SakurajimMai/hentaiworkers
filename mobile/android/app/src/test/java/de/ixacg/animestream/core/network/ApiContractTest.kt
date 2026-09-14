@@ -65,7 +65,7 @@ class ApiContractTest {
         runTest {
             val versionCode = 67
             val releaseTag = "build-$versionCode"
-            val releaseOrigin = "https://github.com/SakurajimMai/hentaiworkers/releases"
+            val releaseOrigin = "https://github.com/example-owner/example-app/releases"
             val sha256 = "a".repeat(64)
             val apks =
                 listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86", "universal")

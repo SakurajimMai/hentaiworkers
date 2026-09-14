@@ -241,7 +241,7 @@ object ApiClient {
         baseClient: OkHttpClient? = null,
     ): AnimeStreamApi {
         return Retrofit.Builder()
-            .baseUrl("${MediaUrlNormalizer.validatedOrigin(baseUrl)}/")
+            .baseUrl("${MediaUrlNormalizer.validatedOrigin(baseUrl) ?: MediaUrlNormalizer.origin}/")
             .client(createHttpClient(cookieStore, connectionPool, dispatcher, baseClient))
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()

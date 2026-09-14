@@ -2,35 +2,52 @@ package de.ixacg.animestream.core.media
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MediaUrlNormalizerTest {
     @Test
     fun `validates and canonicalizes configured API origins`() {
         assertEquals("https://example.com", MediaUrlNormalizer.validatedOrigin(" https://example.com/api?q=1#fragment "))
-        assertEquals(MediaUrlNormalizer.DEFAULT_ORIGIN, MediaUrlNormalizer.validatedOrigin("ftp://example.com"))
-        assertEquals(MediaUrlNormalizer.DEFAULT_ORIGIN, MediaUrlNormalizer.validatedOrigin("not a URL"))
-        assertEquals(MediaUrlNormalizer.DEFAULT_ORIGIN, MediaUrlNormalizer.validatedOrigin(null))
+        assertNull(MediaUrlNormalizer.validatedOrigin("ftp://example.com"))
+        assertNull(MediaUrlNormalizer.validatedOrigin("not a URL"))
+        assertNull(MediaUrlNormalizer.validatedOrigin(null))
     }
 
     @Test
-    fun `proxies configured image host through site origin`() {
+    fun `build injected origin is already a canonical https origin`() {
+        assertEquals(MediaUrlNormalizer.origin, MediaUrlNormalizer.validatedOrigin(MediaUrlNormalizer.origin))
+        assertTrue(MediaUrlNormalizer.origin.startsWith("http"))
+    }
+
+    @Test
+    fun `proxies the configured image host through the site origin`() {
         assertEquals(
-            "https://www.ixacg.de/cdn-img/file/1787838438761_1111765.jpg?width=900",
+            "https://site.example/cdn-img/file/1787838438761_1111765.jpg?width=900",
             MediaUrlNormalizer.rewriteCdnUrl(
-                "https://image.ixacg.de/file/1787838438761_1111765.jpg?width=900",
-                "https://www.ixacg.de",
+                "https://IMAGES.example/file/1787838438761_1111765.jpg?width=900",
+                siteOrigin = "https://site.example",
+                proxiedHost = "images.example",
             ),
         )
     }
 
     @Test
-    fun `leaves other image hosts unchanged`() {
+    fun `leaves other image hosts unchanged and never rewrites without a configured host`() {
         assertEquals(
-            "https://static.hxsl.org/cover.jpg",
+            "https://static.other.example/cover.jpg",
             MediaUrlNormalizer.rewriteCdnUrl(
-                "https://static.hxsl.org/cover.jpg",
-                "https://www.ixacg.de",
+                "https://static.other.example/cover.jpg",
+                siteOrigin = "https://site.example",
+                proxiedHost = "images.example",
+            ),
+        )
+        assertEquals(
+            "https://images.example/cover.jpg",
+            MediaUrlNormalizer.rewriteCdnUrl(
+                "https://images.example/cover.jpg",
+                siteOrigin = "https://site.example",
+                proxiedHost = "",
             ),
         )
     }
@@ -38,9 +55,9 @@ class MediaUrlNormalizerTest {
     @Test
     fun `filters empty and invalid media entries`() {
         assertEquals(
-            listOf("https://static.hxsl.org/one.jpg", "https://static.hxsl.org/two.jpg"),
+            listOf("https://static.other.example/one.jpg", "https://static.other.example/two.jpg"),
             MediaUrlNormalizer.split(
-                "https://static.hxsl.org/one.jpg, invalid value, https://static.hxsl.org/two.jpg",
+                "https://static.other.example/one.jpg, invalid value, https://static.other.example/two.jpg",
             ),
         )
         assertNull(MediaUrlNormalizer.normalize("javascript:alert(1)"))

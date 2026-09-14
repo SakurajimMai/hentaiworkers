@@ -26,7 +26,10 @@ permissions:
   actions: read
 
 env:
-  ANIMESTREAM_API_BASE_URL: https://www.ixacg.de
+  # Deployment-specific values live in repository variables, never in source.
+  ANIMESTREAM_API_BASE_URL: ${{ vars.ANIMESTREAM_API_BASE_URL }}
+  ANIMESTREAM_IMAGE_PROXY_HOST: ${{ vars.ANIMESTREAM_IMAGE_PROXY_HOST }}
+  ANIMESTREAM_UPDATE_REPOSITORY: ${{ github.repository }}
   ANDROID_RELEASE_CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
 
 jobs:
@@ -44,6 +47,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate client configuration
+        run: |
+          if ! printf '%s' "$ANIMESTREAM_API_BASE_URL" | grep -Eq '^https?://[^/?#[:space:]]+$'; then
+            echo "Repository variable ANIMESTREAM_API_BASE_URL must be an absolute HTTP(S) origin without a path."
+            exit 1
+          fi
+          if [ -n "$ANIMESTREAM_IMAGE_PROXY_HOST" ] && ! printf '%s' "$ANIMESTREAM_IMAGE_PROXY_HOST" | grep -Eq '^[A-Za-z0-9.-]+$'; then
+            echo "Repository variable ANIMESTREAM_IMAGE_PROXY_HOST must be a bare host name."
+            exit 1
+          fi
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4

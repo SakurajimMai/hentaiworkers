@@ -87,8 +87,10 @@ APK 更新是应用启动后的非阻塞检查与弹窗，不是通知推送、�
 
 ## Docker
 
-根目录与 `deploy/` 的 Compose 清单都只启动 App。若使用已发布镜像，必须显式选择 tag 与
-拉取策略；清单自身的 fallback 是本地 `manga` tag 和 `pull_policy: never`。
+根目录与 `deploy/` 的 Compose 清单都只启动 App。镜像名来自 `.env` 中的 `APP_IMAGE`
+（`owner/name`），tag 与拉取策略必须显式选择；清单自身的 fallback 是本地 `manga` tag 和
+`pull_policy: never`。图片代理主机与 APK 发布仓库同样通过 `IMAGE_PROXY_UPSTREAM`、
+`ANDROID_UPDATE_REPOSITORY` 配置，源码中不含任何站点专属地址。
 
 ```bash
 cp deploy/.env.example deploy/.env

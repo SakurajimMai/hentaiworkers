@@ -1,5 +1,6 @@
 package de.ixacg.animestream.data.repository
 
+import de.ixacg.animestream.BuildConfig
 import de.ixacg.animestream.core.model.AndroidUpdateApk
 import de.ixacg.animestream.core.model.AndroidUpdateManifest
 import de.ixacg.animestream.core.network.AnimeStreamApi
@@ -43,6 +44,8 @@ class UpdateRepository(
     ): UpdateCheckResult =
         mutex.withLock {
             val checkedAt = now()
+            // Builds without a configured release repository never contact the update endpoint.
+            if (UpdatePolicy.releaseOrigin() == null) return@withLock UpdateCheckResult.Skipped
             val snapshot = readSnapshot() ?: return@withLock UpdateCheckResult.Failed
             if (!force && !UpdatePolicy.shouldAutomaticallyCheck(snapshot, checkedAt)) {
                 return@withLock UpdateCheckResult.Skipped
@@ -130,8 +133,15 @@ internal object UpdatePolicy {
     const val AUTO_SUCCESS_INTERVAL_MS = 24L * 60 * 60 * 1_000
     const val AUTO_FAILURE_INTERVAL_MS = 6L * 60 * 60 * 1_000
     private const val PACKAGE_NAME = "de.ixacg.animestream"
-    private const val RELEASE_ORIGIN = "https://github.com/SakurajimMai/hentaiworkers"
     private const val MAX_VERSION_CODE = 2_100_000_000
+    private val REPOSITORY = Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}$")
+
+    /** GitHub repository (`owner/name`) injected at build time; blank disables update checks. */
+    val configuredRepository: String = BuildConfig.UPDATE_REPOSITORY.trim()
+
+    /** Release origin for a repository, or null when none is configured or the value is malformed. */
+    fun releaseOrigin(repository: String = configuredRepository): String? =
+        repository.trim().takeIf { REPOSITORY.matches(it) }?.let { "https://github.com/$it" }
     private val SHA256 = Regex("^[0-9a-fA-F]{64}$")
     private val PUBLISHED_AT = Regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$")
     private val supportedApkAbis = setOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
@@ -153,7 +163,9 @@ internal object UpdatePolicy {
     fun selectUpdate(
         manifest: AndroidUpdateManifest,
         deviceAbis: List<String>,
+        repository: String = configuredRepository,
     ): AvailableUpdate? {
+        val releaseOrigin = releaseOrigin(repository) ?: return null
         if (
             manifest.schemaVersion != 1 ||
             manifest.packageName != PACKAGE_NAME ||
@@ -165,10 +177,10 @@ internal object UpdatePolicy {
         }
         val expectedTag = "build-${manifest.versionCode}"
         if (manifest.releaseTag != expectedTag) return null
-        if (manifest.releasePageUrl != "$RELEASE_ORIGIN/releases/tag/$expectedTag") return null
+        if (manifest.releasePageUrl != "$releaseOrigin/releases/tag/$expectedTag") return null
         if (manifest.apks.keys != requiredApkAbis) return null
-        if (requiredApkAbis.any { abi -> !isValidApk(manifest, abi, expectedTag) }) return null
-        if (!isValidChecksums(manifest.checksums, expectedTag)) return null
+        if (requiredApkAbis.any { abi -> !isValidApk(manifest, abi, expectedTag, releaseOrigin) }) return null
+        if (!isValidChecksums(manifest.checksums, expectedTag, releaseOrigin)) return null
 
         val abi = deviceAbis.firstOrNull { it in supportedApkAbis && manifest.apks.containsKey(it) } ?: "universal"
         val apk = manifest.apks[abi] ?: return null
@@ -186,10 +198,11 @@ internal object UpdatePolicy {
         manifest: AndroidUpdateManifest,
         abi: String,
         releaseTag: String,
+        releaseOrigin: String,
     ): Boolean {
         val apk = manifest.apks[abi] ?: return false
         val expectedName = "AnimeStream-${manifest.versionCode}-$abi.apk"
-        val expectedUrl = "$RELEASE_ORIGIN/releases/download/$releaseTag/$expectedName"
+        val expectedUrl = "$releaseOrigin/releases/download/$releaseTag/$expectedName"
         return apk.name == expectedName &&
             apk.url == expectedUrl &&
             apk.size > 0 &&
@@ -199,9 +212,10 @@ internal object UpdatePolicy {
     private fun isValidChecksums(
         checksums: AndroidUpdateApk,
         releaseTag: String,
+        releaseOrigin: String,
     ): Boolean {
         val expectedName = "SHA256SUMS"
-        val expectedUrl = "$RELEASE_ORIGIN/releases/download/$releaseTag/$expectedName"
+        val expectedUrl = "$releaseOrigin/releases/download/$releaseTag/$expectedName"
         return checksums.name == expectedName &&
             checksums.url == expectedUrl &&
             checksums.size > 0 &&

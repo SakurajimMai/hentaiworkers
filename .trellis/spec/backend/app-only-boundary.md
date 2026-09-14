@@ -41,6 +41,15 @@ Runtime environment keys are App-owned:
 | `DATABASE_URL` | Required MySQL URL |
 | `DATABASE_TLS_MODE` | `required`, except local loopback may use `disabled` |
 | `SITE_URL` | Canonical public origin |
+| `IMAGE_PROXY_UPSTREAM` | Optional image host origin proxied by `/cdn-img/**`; unset returns 503 |
+| `ANDROID_UPDATE_REPOSITORY` | Optional `owner/name` GitHub repository for `/api/android/update`; unset returns 404 |
+| `APP_IMAGE` | Compose image name (`owner/name`); the tag comes from `IMAGE_TAG` |
+| `INDEXNOW_ENDPOINT` | Optional override of the IndexNow submission endpoint |
+
+Deployment identity never lives in source: hosts, GitHub accounts/repositories and registry image
+names come from these keys, from GitHub repository variables in workflows, or from Gradle
+properties in the Android build. A missing value disables the feature (503/404/skipped) rather
+than falling back to a built-in default.
 | `SESSION_SECRET` | Required, at least 32 characters and not a placeholder |
 | `APP_ENCRYPTION_KEYRING` | JSON keyring of canonical 32-byte Base64 keys |
 | `APP_ENCRYPTION_CURRENT_KEY_ID` | Must identify a key in the keyring |
@@ -70,8 +79,8 @@ across page boundaries. Web Server Components consume these paged services direc
 state in the URL. A legacy mobile endpoint may retain its documented full-list default response for
 compatibility, but web rendering must not use that unbounded path.
 
-`GET /api/android/update` is a database-free public read from the fixed
-`SakurajimMai/hentaiworkers` GitHub Releases source. Include prereleases, but accept only
+`GET /api/android/update` is a database-free public read from the GitHub Releases of the
+repository named by `ANDROID_UPDATE_REPOSITORY`. Include prereleases, but accept only
 non-draft `build-N` releases targeting `main`; require exactly one uploaded, non-empty asset for
 each of `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`, and `universal`, plus `SHA256SUMS`.
 Every accepted asset must carry a valid SHA-256 digest and the exact HTTPS filename/path under

@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 env:
-  APP_IMAGE: sakurajiamai/hentaiworkers-app
+  # Registry image name (owner/name) comes from the APP_IMAGE repository variable.
+  APP_IMAGE: ${{ vars.APP_IMAGE }}
 
 jobs:
   publish:
@@ -22,6 +23,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate image configuration
+        run: |
+          if ! printf '%s' "$APP_IMAGE" | grep -Eq '^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$'; then
+            echo "Repository variable APP_IMAGE must be set to the registry image name (owner/name)."
+            exit 1
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

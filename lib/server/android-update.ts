@@ -4,8 +4,39 @@ import type {
   AndroidUpdateManifest,
 } from '@/lib/public-api-types';
 
-export const ANDROID_UPDATE_GITHUB_API_URL =
-  'https://api.github.com/repos/SakurajimMai/hentaiworkers/releases?per_page=100';
+/**
+ * GitHub repository (`owner/name`) whose Releases publish the APKs. It is injected per deployment
+ * through `ANDROID_UPDATE_REPOSITORY`; the code never assumes a specific account or repository.
+ */
+export const ANDROID_UPDATE_REPOSITORY_ENV = 'ANDROID_UPDATE_REPOSITORY';
+const GITHUB_REPOSITORY_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9_.-]{1,100}$/;
+
+export function resolveAndroidUpdateRepository(
+  value: string | undefined = process.env[ANDROID_UPDATE_REPOSITORY_ENV],
+): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  if (!GITHUB_REPOSITORY_PATTERN.test(candidate)) {
+    throw new Error(`${ANDROID_UPDATE_REPOSITORY_ENV} 必须是 owner/repository 形式`);
+  }
+  return candidate;
+}
+
+export function androidUpdateGithubApiUrl(repository: string): string {
+  return `https://api.github.com/repos/${repository}/releases?per_page=100`;
+}
+
+export function androidUpdateReleaseOrigin(repository: string): string {
+  return `https://github.com/${repository}`;
+}
+
+export class AndroidUpdateNotConfiguredError extends Error {
+  constructor() {
+    super(`Android updates are disabled: set ${ANDROID_UPDATE_REPOSITORY_ENV}`);
+    this.name = 'AndroidUpdateNotConfiguredError';
+  }
+}
+
 export const ANDROID_UPDATE_FETCH_TIMEOUT_MS = 5_000;
 export const ANDROID_UPDATE_FRESH_TTL_MS = 15 * 60_000;
 export const ANDROID_UPDATE_STALE_TTL_MS = 24 * 60 * 60_000;
@@ -90,7 +121,7 @@ function findUniqueAsset(
     : null;
 }
 
-function parseRelease(value: unknown): AndroidUpdateManifest | null {
+function parseRelease(value: unknown, repository: string): AndroidUpdateManifest | null {
   const release = asObject(value);
   if (
     !release
@@ -109,12 +140,11 @@ function parseRelease(value: unknown): AndroidUpdateManifest | null {
   if (versionCode === null || publishedAt === null) return null;
 
   const releaseTag = `build-${versionCode}`;
-  const releasePageUrl =
-    `https://github.com/SakurajimMai/hentaiworkers/releases/tag/${releaseTag}`;
+  const releaseOrigin = androidUpdateReleaseOrigin(repository);
+  const releasePageUrl = `${releaseOrigin}/releases/tag/${releaseTag}`;
   if (release.html_url !== releasePageUrl) return null;
 
-  const downloadPrefix =
-    `https://github.com/SakurajimMai/hentaiworkers/releases/download/${releaseTag}/`;
+  const downloadPrefix = `${releaseOrigin}/releases/download/${releaseTag}/`;
   const apks = {} as Record<AndroidUpdateAbi, AndroidUpdateAsset>;
   for (const abi of ANDROID_UPDATE_ABIS) {
     const name = `AnimeStream-${versionCode}-${abi}.apk`;
@@ -144,14 +174,14 @@ function parseRelease(value: unknown): AndroidUpdateManifest | null {
   };
 }
 
-export function parseLatestAndroidUpdate(value: unknown): AndroidUpdateManifest {
+export function parseLatestAndroidUpdate(value: unknown, repository: string): AndroidUpdateManifest {
   if (!Array.isArray(value)) {
     throw new Error('GitHub releases response must be an array');
   }
 
   let latest: AndroidUpdateManifest | null = null;
   for (const release of value) {
-    const candidate = parseRelease(release);
+    const candidate = parseRelease(release, repository);
     if (candidate && (!latest || candidate.versionCode > latest.versionCode)) {
       latest = candidate;
     }
@@ -162,9 +192,11 @@ export function parseLatestAndroidUpdate(value: unknown): AndroidUpdateManifest 
 }
 
 export async function fetchLatestAndroidUpdate(
+  repository: string | null,
   fetchImpl: FetchLike = fetch,
   timeoutMs = ANDROID_UPDATE_FETCH_TIMEOUT_MS,
 ): Promise<AndroidUpdateManifest> {
+  if (!repository) throw new AndroidUpdateNotConfiguredError();
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new RangeError('timeoutMs must be a positive finite number');
   }
@@ -175,7 +207,7 @@ export async function fetchLatestAndroidUpdate(
   }, timeoutMs);
 
   try {
-    const response = await fetchImpl(ANDROID_UPDATE_GITHUB_API_URL, {
+    const response = await fetchImpl(androidUpdateGithubApiUrl(repository), {
       method: 'GET',
       cache: 'no-store',
       headers: {
@@ -190,7 +222,7 @@ export async function fetchLatestAndroidUpdate(
       throw new Error(`GitHub releases request failed with status ${response.status}`);
     }
 
-    return parseLatestAndroidUpdate(await response.json());
+    return parseLatestAndroidUpdate(await response.json(), repository);
   } finally {
     clearTimeout(timeout);
   }

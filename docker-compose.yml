@@ -1,11 +1,11 @@
 # AnimeStream application deployment. The database is managed separately.
-# Build with manga support:
-#   docker build -t sakurajiamai/hentaiworkers-app:manga .
+# APP_IMAGE (owner/name) comes from .env; IMAGE_TAG selects the tag.
+#   docker build -t "$APP_IMAGE:manga" .
 #   IMAGE_TAG=manga PULL_POLICY=never docker compose up -d
 
 services:
   app:
-    image: sakurajiamai/hentaiworkers-app:${IMAGE_TAG:-manga}
+    image: ${APP_IMAGE:?set APP_IMAGE (owner/name) in .env}:${IMAGE_TAG:-manga}
     pull_policy: ${PULL_POLICY:-never}
     ports:
       - "${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"

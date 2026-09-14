@@ -9,6 +9,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UpdatePolicyTest {
+    private companion object {
+        const val REPOSITORY = "example-owner/example-app"
+    }
+
     @Test
     fun `automatic checks honor success and failure windows`() {
         val now = 100_000_000L
@@ -37,9 +41,9 @@ class UpdatePolicyTest {
     fun `selects first supported device ABI and falls back to universal`() {
         val manifest = manifest()
 
-        assertEquals("arm64-v8a", UpdatePolicy.selectUpdate(manifest, listOf("arm64-v8a", "armeabi-v7a"))?.abi)
-        assertEquals("x86", UpdatePolicy.selectUpdate(manifest, listOf("x86"))?.abi)
-        assertEquals("universal", UpdatePolicy.selectUpdate(manifest, listOf("riscv64"))?.abi)
+        assertEquals("arm64-v8a", select(manifest, listOf("arm64-v8a", "armeabi-v7a"))?.abi)
+        assertEquals("x86", select(manifest, listOf("x86"))?.abi)
+        assertEquals("universal", select(manifest, listOf("riscv64"))?.abi)
     }
 
     @Test
@@ -47,37 +51,37 @@ class UpdatePolicyTest {
         val valid = manifest()
         val arm = requireNotNull(valid.apks["arm64-v8a"])
 
-        assertNull(UpdatePolicy.selectUpdate(valid.copy(packageName = "invalid"), listOf("arm64-v8a")))
-        assertNull(UpdatePolicy.selectUpdate(valid.copy(releaseTag = "build-99"), listOf("arm64-v8a")))
-        assertNull(UpdatePolicy.selectUpdate(valid.copy(apks = valid.apks - "x86"), listOf("arm64-v8a")))
+        assertNull(select(valid.copy(packageName = "invalid"), listOf("arm64-v8a")))
+        assertNull(select(valid.copy(releaseTag = "build-99"), listOf("arm64-v8a")))
+        assertNull(select(valid.copy(apks = valid.apks - "x86"), listOf("arm64-v8a")))
         assertNull(
-            UpdatePolicy.selectUpdate(
+            select(
                 valid.copy(apks = valid.apks + ("riscv64" to arm)),
                 listOf("arm64-v8a"),
             ),
         )
-        assertNull(UpdatePolicy.selectUpdate(valid.copy(publishedAt = "not-a-date"), listOf("arm64-v8a")))
-        assertNull(UpdatePolicy.selectUpdate(valid.copy(versionCode = Int.MAX_VALUE), listOf("arm64-v8a")))
+        assertNull(select(valid.copy(publishedAt = "not-a-date"), listOf("arm64-v8a")))
+        assertNull(select(valid.copy(versionCode = Int.MAX_VALUE), listOf("arm64-v8a")))
         assertNull(
-            UpdatePolicy.selectUpdate(
+            select(
                 valid.copy(checksums = valid.checksums.copy(sha256 = "bad")),
                 listOf("arm64-v8a"),
             ),
         )
         assertNull(
-            UpdatePolicy.selectUpdate(
+            select(
                 valid.copy(apks = valid.apks + ("arm64-v8a" to arm.copy(url = "https://example.com/app.apk"))),
                 listOf("arm64-v8a"),
             ),
         )
         assertNull(
-            UpdatePolicy.selectUpdate(
+            select(
                 valid.copy(apks = valid.apks + ("arm64-v8a" to arm.copy(name = "wrong.apk"))),
                 listOf("arm64-v8a"),
             ),
         )
         assertNull(
-            UpdatePolicy.selectUpdate(
+            select(
                 valid.copy(apks = valid.apks + ("arm64-v8a" to arm.copy(sha256 = "bad"))),
                 listOf("arm64-v8a"),
             ),
@@ -93,9 +97,24 @@ class UpdatePolicyTest {
         assertFalse(UpdatePolicy.isSnoozed(snapshot, versionCode = 67, now = 2_000))
     }
 
+    @Test
+    fun `update checks require a configured owner slash repository`() {
+        assertNull(UpdatePolicy.releaseOrigin(""))
+        assertNull(UpdatePolicy.releaseOrigin("not a repository"))
+        assertNull(UpdatePolicy.releaseOrigin("owner/"))
+        assertEquals("https://github.com/$REPOSITORY", UpdatePolicy.releaseOrigin(REPOSITORY))
+        assertNull(UpdatePolicy.selectUpdate(manifest(), listOf("arm64-v8a"), repository = ""))
+        assertNull(UpdatePolicy.selectUpdate(manifest(), listOf("arm64-v8a"), repository = "other-owner/other-app"))
+    }
+
+    private fun select(
+        manifest: AndroidUpdateManifest,
+        deviceAbis: List<String>,
+    ) = UpdatePolicy.selectUpdate(manifest, deviceAbis, repository = REPOSITORY)
+
     private fun manifest(versionCode: Int = 67): AndroidUpdateManifest {
         val tag = "build-$versionCode"
-        val origin = "https://github.com/SakurajimMai/hentaiworkers"
+        val origin = "https://github.com/$REPOSITORY"
         val abis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86", "universal")
         return AndroidUpdateManifest(
             schemaVersion = 1,

@@ -55,7 +55,11 @@ scope, Docker image, production Compose services, and server-private imports.
   home catalog starts when `HomeScreen` enters composition, tags load on discovery, and `/api/me`
   requires a persisted session cookie. Ads load after useful home content, on demand from player or
   catalog screens that consume ads, and only after the reader's first original image is displayed.
-- Invalid API origins and media URLs fail closed or use the documented production fallback.
+- The site origin, proxied image host and release repository are injected at build time
+  (`ANIMESTREAM_API_BASE_URL`, `ANIMESTREAM_IMAGE_PROXY_HOST`, `ANIMESTREAM_UPDATE_REPOSITORY`)
+  and never written into source. Gradle rejects a missing or malformed origin; a blank image host
+  disables the `/cdn-img` rewrite and a blank repository disables update checks. Invalid runtime
+  media URLs still fail closed.
 - API JSON and image traffic may share an OkHttp connection pool and dispatcher to reuse transport
   resources, but derive both clients from the same neutral base client so their TLS configuration is
   connection-compatible. Merely injecting one pool into independently built TLS clients does not

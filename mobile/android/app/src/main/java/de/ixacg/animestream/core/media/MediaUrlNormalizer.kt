@@ -5,14 +5,22 @@ import java.net.URI
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 object MediaUrlNormalizer {
-    const val DEFAULT_ORIGIN = "https://www.ixacg.de"
-
-    private const val PROXIED_IMAGE_HOST = "image.ixacg.de"
     private const val IMAGE_ACCEPT = "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
 
-    val origin: String = validatedOrigin(BuildConfig.API_BASE_URL)
+    /**
+     * Site origin injected at build time (`ANIMESTREAM_API_BASE_URL`). Gradle validates the value;
+     * re-validating here keeps a broken injection from silently pointing the app anywhere else.
+     */
+    val origin: String =
+        requireNotNull(validatedOrigin(BuildConfig.API_BASE_URL)) {
+            "API_BASE_URL must be an absolute HTTP(S) origin"
+        }
 
-    fun validatedOrigin(raw: String?): String =
+    /** Host whose images the site proxies through `/cdn-img`; blank disables the rewrite. */
+    val proxiedImageHost: String = BuildConfig.IMAGE_PROXY_HOST.trim().lowercase()
+
+    /** Canonical `scheme://host[:port]` for a configured origin, or null when it is not an HTTP(S) origin. */
+    fun validatedOrigin(raw: String?): String? =
         raw.orEmpty().trim().trimEnd('/').toHttpUrlOrNull()
             ?.newBuilder()
             ?.encodedPath("/")
@@ -21,14 +29,14 @@ object MediaUrlNormalizer {
             ?.build()
             ?.toString()
             ?.trimEnd('/')
-            ?: DEFAULT_ORIGIN
 
     fun rewriteCdnUrl(
         raw: String,
         siteOrigin: String = origin,
+        proxiedHost: String = proxiedImageHost,
     ): String {
         val parsed = raw.toHttpUrlOrNull() ?: return raw
-        if (!parsed.host.equals(PROXIED_IMAGE_HOST, ignoreCase = true)) return parsed.toString()
+        if (proxiedHost.isBlank() || !parsed.host.equals(proxiedHost, ignoreCase = true)) return parsed.toString()
         val safeOrigin = siteOrigin.trimEnd('/').toHttpUrlOrNull() ?: return parsed.toString()
         return safeOrigin.newBuilder()
             .addPathSegment("cdn-img")

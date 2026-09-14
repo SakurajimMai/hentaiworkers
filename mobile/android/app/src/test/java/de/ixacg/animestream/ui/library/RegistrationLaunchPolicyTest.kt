@@ -14,7 +14,7 @@ class RegistrationLaunchPolicyTest {
             RegistrationLaunchPolicy.registrationUrl(" https://example.com/api?q=1#fragment "),
         )
         assertEquals(
-            "${MediaUrlNormalizer.DEFAULT_ORIGIN}/register",
+            "${MediaUrlNormalizer.origin}/register",
             RegistrationLaunchPolicy.registrationUrl("javascript:alert(1)"),
         )
     }

@@ -477,13 +477,13 @@ components:
           minimum: 0
           maximum: 1920
           default: 0
-          description: Creative width in CSS pixels. Missing or zero uses automatic layout; a fixed size needs both dimensions.
+          description: Creative width in CSS pixels. Already resolved from atOptions, iframe or img sizes when the admin left automatic sizing; missing or zero means automatic layout, and a fixed size needs both dimensions.
         height:
           type: integer
           minimum: 0
           maximum: 600
           default: 0
-          description: Creative height in CSS pixels. Fixed creatives scale down proportionally to fit the available width.
+          description: Creative height in CSS pixels. Fixed cards are letterboxed inside the 2:3 poster cell without cropping; fixed banners scale proportionally to the spanned columns.
         enabled:
           type: boolean
         name:
@@ -500,7 +500,7 @@ components:
           type: string
           enum: [card, banner]
           default: card
-          description: card stays in the poster grid; banner spans the catalog row.
+          description: card stays in one poster cell; banner spans two poster columns at the creative ratio.
 
     PublicReaderAdSlot:
       type: object
@@ -605,7 +605,7 @@ components:
         url:
           type: string
           format: uri
-          pattern: "^https://github\\.com/SakurajimMai/hentaiworkers/releases/download/build-[1-9][0-9]*/"
+          pattern: "^https://github\\.com/[A-Za-z0-9-]+/[A-Za-z0-9_.-]+/releases/download/build-[1-9][0-9]*/"
         size:
           type: integer
           minimum: 1
@@ -638,7 +638,7 @@ components:
         releasePageUrl:
           type: string
           format: uri
-          pattern: "^https://github\\.com/SakurajimMai/hentaiworkers/releases/tag/build-[1-9][0-9]*$"
+          pattern: "^https://github\\.com/[A-Za-z0-9-]+/[A-Za-z0-9_.-]+/releases/tag/build-[1-9][0-9]*$"
         apks:
           type: object
           required: [arm64-v8a, armeabi-v7a, x86_64, x86, universal]

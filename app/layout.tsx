@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { CatalogScrollRestoration } from '@/components/catalog-scroll-restoration';
+import { ADULT_RATING_META, SITE_LOCALE, SITE_NAME } from '@/lib/seo';
+import { imageProxyOriginForHints } from '@/lib/server/image-proxy';
 import { getGlobalMetaTags } from '@/lib/server/site-metadata';
 import './globals.css';
 
@@ -17,8 +19,8 @@ export const metadata: Metadata = {
     title: 'AnimeStream · 里番与漫画',
     description: '浏览里番视频与漫画内容，继续上次进度，管理你的片单。',
     type: 'website',
-    locale: 'zh_CN',
-    siteName: 'AnimeStream',
+    locale: SITE_LOCALE,
+    siteName: SITE_NAME,
   },
   twitter: {
     card: 'summary_large_image',
@@ -28,7 +30,15 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
   },
+  other: ADULT_RATING_META,
 };
 
 export const viewport: Viewport = {
@@ -45,6 +55,8 @@ const THEME_BOOT_SCRIPT = `(function(){try{var k='animestream.theme.v1';var s=lo
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const metaTags = await getGlobalMetaTags();
+  // Poster and page images come from the configured image host; connecting early shortens the LCP fetch.
+  const imageHostOrigin = imageProxyOriginForHints();
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
@@ -57,6 +69,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
         ))}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {imageHostOrigin ? <link rel="preconnect" href={imageHostOrigin} /> : null}
+        {imageHostOrigin ? <link rel="dns-prefetch" href={imageHostOrigin} /> : null}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

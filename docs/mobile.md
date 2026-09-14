@@ -189,10 +189,18 @@ Cookie。
 - 登录书架：`/api/me/favorites*`、`/api/me/watch-progress*`、
   `/api/me/manga-progress*`。
 
-生产 API origin 由 Gradle property 或环境变量 `ANIMESTREAM_API_BASE_URL` 注入，默认是
-`https://www.ixacg.de`。客户端只接受 HTTP(S) origin，并移除路径、查询和 fragment；非法值
-回退到默认站点。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用上限，启用连接
-失败重试；HTTP 5xx 不向用户暴露服务端内部错误。
+站点 origin、图片代理主机和发布仓库都在构建时由 Gradle property 或环境变量注入，源码中没有
+默认值：
+
+| 注入项 | 说明 |
+|--------|------|
+| `ANIMESTREAM_API_BASE_URL` | 必填。站点 origin，只接受 HTTP(S) 且不含路径/查询/fragment，缺失或非法时 Gradle 配置阶段直接失败 |
+| `ANIMESTREAM_IMAGE_PROXY_HOST` | 可选。需要改写到同源 `/cdn-img` 的图片主机名；留空则不改写任何图片地址 |
+| `ANIMESTREAM_UPDATE_REPOSITORY` | 可选。发布 APK 的 GitHub 仓库 `owner/name`；留空则 App 不检查更新 |
+
+GitHub Actions 从仓库变量 `ANIMESTREAM_API_BASE_URL`、`ANIMESTREAM_IMAGE_PROXY_HOST` 和当前仓库
+`github.repository` 提供这三项。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用
+上限，启用连接失败重试；HTTP 5xx 不向用户暴露服务端内部错误。
 
 首页数据只在进入首页时开始加载，里番与漫画随后并行请求：任一栏目先返回有效内容即可结束
 全屏等待，另一栏目继续补齐；局部失败不会清除已显示内容。标签进入发现页时加载；广告在首页
@@ -208,7 +216,7 @@ Cookie。
 HTML 的空位显示招租占位。图片类素材务必在后台填写与图片一致的像素尺寸，见
 [后台管理手册](./admin-guide.md)。
 
-媒体地址允许 HTTP(S) 外部源；`image.ixacg.de` 图片会改写到同源 `/cdn-img`。因此不能把
+媒体地址允许 HTTP(S) 外部源；只有配置的图片代理主机会改写到同源 `/cdn-img`。因此不能把
 “目录 API 可用”推导为“所有图片和视频源均可用”，也不能概括为所有媒体均由本站托管。
 
 ## 7. 本地开发边界
@@ -269,6 +277,8 @@ Artifact，不会发布。发布后同一任务只保留最新八个 `build-*` R
 | `ANDROID_KEY_ALIAS` | 密钥别名 |
 | `ANDROID_KEY_PASSWORD` | 密钥密码 |
 | `ANDROID_RELEASE_CERT_SHA256` | 仓库变量，固定生产证书 SHA-256 |
+| `ANIMESTREAM_API_BASE_URL` | 仓库变量，APK 使用的站点 origin |
+| `ANIMESTREAM_IMAGE_PROXY_HOST` | 仓库变量，需改写到 `/cdn-img` 的图片主机名，可留空 |
 
 四项 Secret 全部存在时生成生产签名 APK；四项全空时生成明确标记为 `internal-debug` 的内部
 Artifact，不能覆盖正式版、不能公开分发，也不会创建 Release。只配置部分 Secret 会让工作流

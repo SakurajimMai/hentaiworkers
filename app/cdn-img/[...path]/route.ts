@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveImageProxyUpstream } from '@/lib/server/image-proxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const UPSTREAM = 'https://image.ixacg.de';
 
 function safePath(parts: string[]): string | null {
   if (!parts.length) return null;
@@ -19,13 +18,27 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
+  let upstreamOrigin: string | null;
+  try {
+    upstreamOrigin = resolveImageProxyUpstream();
+  } catch (error) {
+    console.error('[cdn-img] invalid IMAGE_PROXY_UPSTREAM', error);
+    upstreamOrigin = null;
+  }
+  if (!upstreamOrigin) {
+    return new NextResponse('Image proxy is not configured', {
+      status: 503,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  }
+
   const { path } = await context.params;
   const encoded = safePath(path);
   if (!encoded) {
     return new NextResponse('Bad path', { status: 400 });
   }
 
-  const upstreamUrl = `${UPSTREAM}/${encoded}${request.nextUrl.search}`;
+  const upstreamUrl = `${upstreamOrigin}/${encoded}${request.nextUrl.search}`;
   let upstream: Response;
   try {
     upstream = await fetch(upstreamUrl, {

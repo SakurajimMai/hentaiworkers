@@ -5,6 +5,7 @@ import {
   ANDROID_UPDATE_RETRY_DELAY_MS,
   ANDROID_UPDATE_STALE_TTL_MS,
   fetchLatestAndroidUpdate,
+  resolveAndroidUpdateRepository,
 } from '@/lib/server/android-update';
 import { StaleReadCache } from '@/lib/server/shared/stale-read-cache';
 
@@ -21,6 +22,6 @@ const updateCache = new StaleReadCache<AndroidUpdateManifest>({
 });
 
 const loadUpdate: AndroidUpdateLoader = () =>
-  updateCache.get('latest', fetchLatestAndroidUpdate);
+  updateCache.get('latest', () => fetchLatestAndroidUpdate(resolveAndroidUpdateRepository()));
 
 export const GET = createAndroidUpdateHandler(loadUpdate);

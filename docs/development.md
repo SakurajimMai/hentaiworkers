@@ -25,6 +25,9 @@ cp .env.example .env
 | `DATABASE_URL` | `mysql://用户:密码@主机:端口/数据库`；密码特殊字符需 URL 编码 |
 | `DATABASE_TLS_MODE` | 只有 `localhost`、`127.0.0.1` 或 `::1` 可设为 `disabled` |
 | `SITE_URL` | 通常为 `http://localhost:3000`，不得带路径、查询或片段 |
+| `IMAGE_PROXY_UPSTREAM` | 可选；`/cdn-img/**` 代理的图片主机 origin，留空时该路由返回 503 |
+| `ANDROID_UPDATE_REPOSITORY` | 可选；发布 APK 的 GitHub 仓库 `owner/name`，留空时更新接口返回 404 |
+| `APP_IMAGE` | 使用根目录 Compose 时的镜像名 `owner/name` |
 | `SESSION_SECRET` | 至少 32 字符，不能是占位值 |
 | `APP_ENCRYPTION_KEYRING` | 非空 JSON 对象；每个值是规范 Base64 编码的 32 字节密钥 |
 | `APP_ENCRYPTION_CURRENT_KEY_ID` | 必须对应 keyring 中已有的 key id |
@@ -44,7 +47,8 @@ console.log('APP_ENCRYPTION_CURRENT_KEY_ID=primary');
 
 将输出填入本机 `.env` 的对应项。keyring 形如
 `{"primary":"<32 字节密钥的规范 Base64>"}`，不是单独一段 Base64 字符串。
-不要提交 `.env` 或把真实密钥写入文档、日志和测试夹具。
+不要提交 `.env` 或把真实密钥写入文档、日志和测试夹具。域名、图片主机、GitHub 仓库和镜像名
+这类部署信息同样只放在环境变量、Compose `.env` 或 GitHub 仓库变量中，不写进源码。
 
 远程数据库必须使用证书匹配的 DNS 主机名并保持
 `DATABASE_TLS_MODE=required`。运行时也支持相对工作目录的

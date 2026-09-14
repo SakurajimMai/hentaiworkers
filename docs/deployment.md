@@ -30,6 +30,9 @@ HTTPS 反向代理和主机升级均由操作者或外部平台负责。GitHub A
 - 数据库必须使用私有 CA。官方 Compose 和生产镜像当前没有挂载 CA 文件，单独设置
   `DATABASE_TLS_CA_FILE` 不会让宿主机文件出现在容器内。
 - 没有数据库备份或未经审核的恢复方案。
+- `deploy/.env` 尚未填写 `APP_IMAGE`、`IMAGE_PROXY_UPSTREAM` 和 `ANDROID_UPDATE_REPOSITORY`。
+  镜像不再内置这些值：缺少前者 Compose 无法启动，缺少后两者会让 APK 的图片代理返回 503、
+  更新提醒接口返回 404。
 - 不知道要部署的镜像 tag，或该 tag 尚未由 Docker workflow 发布。
 - 反向代理、域名或 `SITE_URL` 尚未确定。
 
@@ -50,6 +53,10 @@ chmod 600 deploy/.env
 | `DATABASE_TLS_MODE` | 远程生产数据库必须为 `required` |
 | `DATABASE_POOL_*` | 连接池上限、空闲连接与超时；模板值可作为起点 |
 | `SITE_URL` | 用户实际访问的 HTTPS origin，不得带路径、查询或片段 |
+| `IMAGE_PROXY_UPSTREAM` | `/cdn-img/**` 代理的图片主机 origin（如 `https://images.example`）；Android 客户端的漫画图片依赖它，留空则代理返回 503 |
+| `ANDROID_UPDATE_REPOSITORY` | 发布 APK 的 GitHub 仓库 `owner/name`；留空时 `/api/android/update` 返回 404，App 不会提示更新 |
+| `APP_IMAGE` | 镜像名 `owner/name`（不含 tag），Compose 用 `APP_IMAGE:IMAGE_TAG` 拉取 |
+| `INDEXNOW_ENDPOINT` | 可选；覆盖 IndexNow 提交地址，默认使用协议共享端点 |
 | `SESSION_SECRET` | 至少 32 字符且不能是占位值 |
 | `APP_ENCRYPTION_KEYRING` | JSON 对象；每个值是规范 Base64 的 32 字节密钥 |
 | `APP_ENCRYPTION_CURRENT_KEY_ID` | keyring 中当前存在的 key id |
@@ -123,7 +130,7 @@ PULL_POLICY=never
 在仓库根目录：
 
 ```bash
-docker build -t sakurajiamai/hentaiworkers-app:manga .
+docker build -t "$APP_IMAGE:manga" .
 cd deploy
 IMAGE_TAG=manga PULL_POLICY=never docker compose up -d
 ```

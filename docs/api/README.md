@@ -130,10 +130,12 @@ GET /api/ads
 接口允许公共读缓存；客户端仍应处理 `500`，并在广告配置不可用时继续显示核心内容。
 
 `feedSlots[]` 和 `reader.top` / `reader.bottom` 还支持可选的 `width`、`height`，
-单位为创意的 CSS 像素。两者均大于 `0` 时按原始比例展示，并缩小到当前可用宽度；
-例如 `"width": 728, "height": 90`。宽度上限 `1920`、高度上限 `600`。
+单位为创意的 CSS 像素。管理员留「自动」但 HTML 含 `atOptions`、`<iframe width height>` 或
+`<img width height>` 时，公开接口已经把推断出的像素填入这两个字段，客户端不需要再解析 HTML。
+两者均大于 `0` 时按原始比例展示：`card` 在 2:3 海报格内完整居中显示（不裁切），`banner` 等比缩放到
+所占列宽，阅读页广告缩小到可用宽度；例如 `"width": 300, "height": 250`。宽度上限 `1920`、高度上限 `600`。
 缺省或任一值为 `0` 时采用自动尺寸，自动高度同样不超过 `600`。旧客户端可忽略新增字段。
-`feedSlots[].placement` 为 `card`（目录海报格）或 `banner`（整行横幅）。缺省时，有 HTML 的旧槽位按横幅迁移。
+`feedSlots[].placement` 为 `card`（目录海报格）或 `banner`（占两列的横幅）。缺省时，有 HTML 的旧槽位按横幅迁移。
 HTML 可包含 iframe、内联脚本和外部脚本；Web 把创意放在同域 `/ads/html/...` 隔离 iframe 中，Android 使用独立 WebView。
 
 ## 3. 里番目录
@@ -249,8 +251,8 @@ GET /api/mangas/example-slug/chapters/1
 GET /api/android/update
 ```
 
-接口以 5 秒上游超时读取固定仓库
-`SakurajimMai/hentaiworkers` 的 GitHub Releases，并选择数值最大的完整 `build-N`。草稿、
+接口以 5 秒上游超时读取环境变量 `ANDROID_UPDATE_REPOSITORY`（`owner/name`）指定仓库的
+GitHub Releases，并选择数值最大的完整 `build-N`；未配置时返回 `404`。草稿、
 非 `main` 目标、缺少资产、空文件、下载路径不可信或没有 GitHub SHA-256 digest 的版本都会
 被忽略。
 
