@@ -3,8 +3,7 @@ package de.ixacg.animestream.ui.library
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
 
 internal object RegistrationLaunchPolicy {
-    fun registrationUrl(rawOrigin: String? = MediaUrlNormalizer.origin): String =
-        "${MediaUrlNormalizer.validatedOrigin(rawOrigin) ?: MediaUrlNormalizer.origin}/register"
+    fun registrationUrl(rawOrigin: String? = MediaUrlNormalizer.origin): String = "${MediaUrlNormalizer.validatedOrigin(rawOrigin) ?: MediaUrlNormalizer.origin}/register"
 
     fun launch(
         rawOrigin: String? = MediaUrlNormalizer.origin,

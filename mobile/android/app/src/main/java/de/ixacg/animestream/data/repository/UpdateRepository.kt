@@ -140,8 +140,8 @@ internal object UpdatePolicy {
     val configuredRepository: String = BuildConfig.UPDATE_REPOSITORY.trim()
 
     /** Release origin for a repository, or null when none is configured or the value is malformed. */
-    fun releaseOrigin(repository: String = configuredRepository): String? =
-        repository.trim().takeIf { REPOSITORY.matches(it) }?.let { "https://github.com/$it" }
+    fun releaseOrigin(repository: String = configuredRepository): String? = repository.trim().takeIf { REPOSITORY.matches(it) }?.let { "https://github.com/$it" }
+
     private val SHA256 = Regex("^[0-9a-fA-F]{64}$")
     private val PUBLISHED_AT = Regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$")
     private val supportedApkAbis = setOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
