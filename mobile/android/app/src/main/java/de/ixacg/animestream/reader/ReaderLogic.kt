@@ -170,6 +170,7 @@ object ReaderLogic {
     private const val MAX_PAGE_ASPECT_RATIO = 4f
     private const val MAX_UNBOUNDED_VIEWPORT_HEIGHTS = 8
     private const val MAX_PAGE_LAYOUT_HEIGHT = 24_000
+
     // Page images are latency-bound (a cold edge fetch is often 1-2 s before the first byte),
     // so a deeper disk window plus more parallel transfers keeps sequential readers ahead of
     // the network without decoding more bitmaps than the three adjacent previews.

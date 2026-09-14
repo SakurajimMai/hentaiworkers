@@ -229,8 +229,7 @@ internal class ReaderPreviewPreloader(
     private fun originalCached(imageUrl: String): Boolean = imageLoader.memoryCache?.get(MemoryCache.Key(ReaderLogic.originalMemoryCacheKey(imageUrl, retry = 0))) != null
 
     @OptIn(ExperimentalCoilApi::class)
-    private fun cachedOnDisk(imageUrl: String): Boolean =
-        runCatching { imageLoader.diskCache?.openSnapshot(imageUrl)?.use { true } == true }.getOrDefault(false)
+    private fun cachedOnDisk(imageUrl: String): Boolean = runCatching { imageLoader.diskCache?.openSnapshot(imageUrl)?.use { true } == true }.getOrDefault(false)
 
     private fun delayStartupLocked(imageUrl: String) {
         startupTargetUrl = imageUrl
