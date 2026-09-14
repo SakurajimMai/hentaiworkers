@@ -27,7 +27,7 @@ for (const relativePath of ['docker-compose.yml', 'deploy/docker-compose.yml']) 
     assert.deepEqual(Object.keys(compose.services), ['app']);
     const app = compose.services.app;
     assert.equal('build' in app, false);
-    assert.equal(app.image, 'sakurajiamai/hentaiworkers-app:${IMAGE_TAG:-manga}');
+    assert.equal(app.image, '${APP_IMAGE:?set APP_IMAGE (owner/name) in .env}:${IMAGE_TAG:-manga}', 'image name is configured, not hardcoded');
     assert.equal(app.pull_policy, '${PULL_POLICY:-never}');
     assert.deepEqual(app.ports, ['${APP_HOST_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000']);
     assert.deepEqual(app.env_file, ['.env']);
@@ -112,7 +112,11 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /contains all four supported ABIs/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /tag_name: build-\$\{\{ github\.run_number \}\}/);
-  assert.match(workflow, /ANIMESTREAM_API_BASE_URL: https:\/\/www\.ixacg\.de/);
+  assert.match(workflow, /ANIMESTREAM_API_BASE_URL: \$\{\{ vars\.ANIMESTREAM_API_BASE_URL \}\}/);
+  assert.match(workflow, /ANIMESTREAM_IMAGE_PROXY_HOST: \$\{\{ vars\.ANIMESTREAM_IMAGE_PROXY_HOST \}\}/);
+  assert.match(workflow, /ANIMESTREAM_UPDATE_REPOSITORY: \$\{\{ github\.repository \}\}/);
+  assert.match(workflow, /name: Validate client configuration/);
+  assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /Android signing secrets are only partially configured/);
   assert.match(workflow, /keytool -list/);
   assert.match(workflow, /ANDROID_RELEASE_CERT_SHA256/);
@@ -125,9 +129,30 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
     ANDROID_KEY_PASSWORD: '${{ secrets.ANDROID_KEY_PASSWORD }}',
   });
   assert.match(parsedWorkflow.jobs.release.if, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(parsedWorkflow.jobs.release.if, /github\.event_name == 'workflow_dispatch'/);
-  assert.match(parsedWorkflow.jobs.release.if, /inputs\.publish_release/);
+  assert.match(parsedWorkflow.jobs.release.if, /github\.event_name == 'push'/, 'signed main pushes publish automatically');
+  assert.match(parsedWorkflow.jobs.release.if, /github\.event_name == 'workflow_dispatch' && inputs\.publish_release/);
   assert.match(parsedWorkflow.jobs.release.if, /needs\.build\.outputs\.signing_mode == 'release'/);
+  assert.doesNotMatch(parsedWorkflow.jobs.release.if, /pull_request/);
+  assert.match(workflow, /default: true\n\s+type: boolean/);
+  const retainReleases = parsedWorkflow.jobs.release.steps.find(
+    (step) => step.name === 'Retain latest eight releases',
+  );
+  const retainScript = String(retainReleases?.with?.script ?? '');
+  assert.equal(retainReleases?.uses, 'actions/github-script@v9');
+  assert.match(retainScript, /const retainedReleaseCount = 8/);
+  assert.match(retainScript, /github\.paginate\(/);
+  assert.match(retainScript, /repos\.listReleases/);
+  assert.match(retainScript, /\^build-\(\\d\+\)\$/);
+  assert.match(retainScript, /right\.build - left\.build/);
+  assert.match(retainScript, /slice\(0, retainedReleaseCount\)/);
+  assert.match(retainScript, /release\.tag_name === currentTag/);
+  assert.match(retainScript, /repos\.deleteRelease/);
+  assert.match(retainScript, /git\.deleteRef/);
+  assert.match(retainScript, /tags\/\$\{release\.tag_name\}/);
+  assert.match(retainScript, /error\?\.status === 404/);
+  const releaseIndex = parsedWorkflow.jobs.release.steps.findIndex((step) => step.name === 'Create GitHub Release');
+  const retainIndex = parsedWorkflow.jobs.release.steps.findIndex((step) => step.name === 'Retain latest eight releases');
+  assert.ok(retainIndex > releaseIndex, 'retention runs only after the new release exists');
   assert.equal(downloadStep?.with?.name, 'AnimeStream-apk-${{ github.run_number }}');
   assert.equal(downloadStep?.with?.path, 'mobile/artifacts');
   assert.match(releasePreflight?.run ?? '', /variants=\(arm64-v8a armeabi-v7a x86_64 x86 universal\)/);
@@ -137,6 +162,8 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(String(releaseStep?.with?.files), /mobile\/artifacts\/AnimeStream-\*\.apk/);
   assert.match(String(releaseStep?.with?.files), /mobile\/artifacts\/SHA256SUMS/);
   assert.equal(releaseStep?.with?.fail_on_unmatched_files, true);
+  assert.equal(releaseStep?.with?.prerelease, false, 'builds publish as full releases, not pre-releases');
+  assert.equal(releaseStep?.with?.make_latest, true, 'the newest build carries the Latest label');
   assert.doesNotMatch(workflow, /setup-node|npm ci|expo prebuild|EXPO_PUBLIC/);
 });
 
@@ -191,13 +218,52 @@ test('mobile is a native Kotlin application without a JavaScript runtime', () =>
 test('Docker Hub workflow publishes only the application image', () => {
   const workflow = readFileSync(join(root, '.github/workflows/docker-publish.yml'), 'utf8');
 
-  assert.match(workflow, /APP_IMAGE: sakurajiamai\/hentaiworkers-app/);
+  assert.match(workflow, /APP_IMAGE: \$\{\{ vars\.APP_IMAGE \}\}/);
+  assert.match(workflow, /name: Validate image configuration/);
+  assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /images: \$\{\{ env\.APP_IMAGE \}\}/);
   assert.match(workflow, /context: \./);
   assert.match(workflow, /file: \.\/Dockerfile/);
   assert.match(workflow, /cache-from: type=gha,scope=app/);
   assert.match(workflow, /cache-to: type=gha,mode=max,scope=app/);
   assert.doesNotMatch(workflow, /WORKER_IMAGE|crawler\/Dockerfile|scope=worker/);
+});
+
+test('Docker Hub workflow keeps only the latest eight image versions', () => {
+  const source = readFileSync(join(root, '.github/workflows/docker-publish.yml'), 'utf8');
+  const parsed = parse(source) as {
+    jobs: {
+      'retain-images': {
+        name: string;
+        needs: string;
+        if: string;
+        env: Record<string, string>;
+        steps: Array<{ name?: string; shell?: string; run?: string }>;
+      };
+    };
+  };
+  const job = parsed.jobs['retain-images'];
+  const step = job.steps.find((entry) => entry.name === 'Delete older image version tags');
+  const script = step?.run ?? '';
+
+  assert.equal(job.name, 'Retain latest eight image versions');
+  assert.equal(job.needs, 'publish');
+  assert.match(job.if, /github\.event_name != 'pull_request'/);
+  assert.equal(job.env.RETAINED_IMAGE_VERSIONS, '8');
+  assert.equal(job.env.DOCKERHUB_USERNAME, '${{ secrets.DOCKERHUB_USERNAME }}');
+  assert.equal(job.env.DOCKERHUB_TOKEN, '${{ secrets.DOCKERHUB_TOKEN }}');
+  assert.equal(job.env.CURRENT_SHA, '${{ github.sha }}');
+  assert.equal(step?.shell, 'python');
+  assert.match(script, /hub\.docker\.com\/v2\/users\/login/);
+  assert.match(script, /repositories\/\{image\}\/tags\?page_size=100/);
+  assert.match(script, /re\.fullmatch\(r"\[0-9a-f\]\{7,40\}", tag\["name"\]\)/, 'only commit SHA tags count as versions');
+  assert.match(script, /tag_last_pushed/);
+  assert.match(script, /versions\[:retained\]/);
+  assert.match(script, /keep\.add\(current\)/);
+  assert.match(script, /request\("DELETE"/);
+  assert.match(script, /error\.code in \(401, 403\)/);
+  assert.match(script, /Read, Write, Delete/);
+  assert.doesNotMatch(script, /"latest"|"manga"/, 'rolling tags are never matched for deletion');
 });
 
 test('trusted workflows retain only the latest five repository Actions runs', () => {
@@ -279,4 +345,24 @@ test('deployment files keep secrets outside the image', () => {
   assert.match(dockerIgnore, /^\.env\.\*$/m);
   assert.match(gitIgnore, /^\.env\*$/m);
   assert.match(gitIgnore, /^!\.env\.example$/m);
+});
+
+test('application code carries no deployment-specific hosts, accounts or image names', () => {
+  const files = [
+    'app/cdn-img/[...path]/route.ts',
+    'app/layout.tsx',
+    'app/api/android/update/route.ts',
+    'lib/server/android-update.ts',
+    'lib/server/image-proxy.ts',
+    'lib/server/seo/indexnow.ts',
+    'docker-compose.yml',
+    'deploy/docker-compose.yml',
+    'mobile/android/app/build.gradle.kts',
+    'mobile/android/app/src/main/java/de/ixacg/animestream/core/media/MediaUrlNormalizer.kt',
+    'mobile/android/app/src/main/java/de/ixacg/animestream/data/repository/UpdateRepository.kt',
+  ];
+  for (const file of files) {
+    const source = readFileSync(join(root, file), 'utf8');
+    assert.doesNotMatch(source, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i, `${file} must read deployment values from configuration`);
+  }
 });
