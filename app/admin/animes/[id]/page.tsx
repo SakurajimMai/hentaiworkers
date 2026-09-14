@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { animeTags, animes, tags } from '@/lib/schema';
 import { AutoGrowTextarea } from '@/components/admin/auto-grow-textarea';
+import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconExternalLink, IconFilm, IconTag } from '@/components/icons';
 import { actionSaveAnime } from '../../actions';
 
@@ -41,13 +42,13 @@ export default async function AdminAnimeEditPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Link
+          <HistoryBackLink
             href="/admin/animes"
             className="inline-flex items-center gap-1.5 font-ui text-[12px] text-soft hover:text-ink transition-colors mb-2"
           >
             <IconArrowLeft size={14} />
             返回里番列表
-          </Link>
+          </HistoryBackLink>
           <div className="flex items-center gap-2 mt-1">
             <span className="grid h-6 w-6 place-items-center rounded-md bg-secondary text-soft">
               <IconFilm size={14} />
@@ -208,9 +209,9 @@ export default async function AdminAnimeEditPage({
               <button type="submit" className="btn-ink w-full">
                 保存里番
               </button>
-              <Link href="/admin/animes" className="btn-ghost w-full text-center">
+              <HistoryBackLink href="/admin/animes" className="btn-ghost w-full text-center">
                 取消返回
-              </Link>
+              </HistoryBackLink>
             </div>
           </div>
 

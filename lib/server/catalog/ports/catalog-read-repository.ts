@@ -8,6 +8,11 @@ import type {
   TagSummary,
 } from '../domain/models';
 
+export type CatalogPageLookup = Readonly<{
+  animeId: number;
+  pageSize: number;
+}>;
+
 export type TitlePrefixQuery = Readonly<{
   /** Already-escaped LIKE pattern body without trailing %. */
   prefix: string;
@@ -36,6 +41,8 @@ export interface CatalogReadRepository {
   getById(id: number): Promise<AnimeDetail | null>;
   /** Live favourite count from the system favourites lists. */
   countFavorites(animeId: number): Promise<number>;
+  /** 1-based page of the default `latest` listing that contains this work. */
+  findCatalogPage(input: CatalogPageLookup): Promise<number>;
   listTags(): Promise<ReadonlyArray<TagSummary>>;
   getSitemapData(): Promise<SitemapData>;
   listByTitlePrefix(input: TitlePrefixQuery): Promise<ReadonlyArray<AnimeSimilarItem>>;

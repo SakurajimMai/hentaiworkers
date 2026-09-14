@@ -172,3 +172,54 @@ test('application and domain modules do not import drizzle', () => {
     assert.doesNotMatch(source, /drizzle-orm|from ['\"]mysql2/);
   }
 });
+
+test('catalog page lookup reports the page a work is on, not the first page', async () => {
+  const repo = new InMemoryCatalogRepository();
+  // Newest first, so id 25 is position 0 and id 1 is position 24.
+  for (let id = 1; id <= 25; id += 1) {
+    repo.seedAnime({
+      id,
+      title: `t${id}`,
+      isActive: 1,
+      createdAt: `2026-01-${String(id).padStart(2, '0')}`,
+    });
+  }
+  repo.seedAnime({ id: 99, title: 'hidden', isActive: 0, createdAt: '2026-02-01' });
+  const service = new CatalogQueryService(repo);
+
+  assert.equal(await service.findCatalogPage(25, 10), 1, 'the newest work opens page 1');
+  assert.equal(await service.findCatalogPage(16, 10), 1, 'position 9 is still page 1');
+  assert.equal(await service.findCatalogPage(15, 10), 2, 'position 10 rolls to page 2');
+  assert.equal(await service.findCatalogPage(1, 10), 3, 'the oldest work is on the last page');
+  assert.equal(await service.findCatalogPage(1, 25), 1, 'a larger page size holds everything');
+
+  // Deactivated works are not in the listing, so they cannot place a page.
+  assert.equal(await service.findCatalogPage(99, 10), 1);
+  assert.equal(await service.findCatalogPage(4242, 10), 1, 'unknown ids fall back to page 1');
+  assert.equal(await service.findCatalogPage(0, 10), 1);
+  assert.equal(await service.findCatalogPage(-3, 10), 1);
+});
+
+test('a failing page lookup degrades to page 1 instead of breaking the detail page', async () => {
+  const repo = new InMemoryCatalogRepository();
+  repo.seedAnime({ id: 1, title: 't', isActive: 1, createdAt: '2026-01-01' });
+  const failing = Object.create(repo) as InMemoryCatalogRepository;
+  failing.findCatalogPage = async () => {
+    throw new Error('database unavailable');
+  };
+  assert.equal(await new CatalogQueryService(failing).findCatalogPage(1, 10), 1);
+});
+
+test('listings order deterministically so pagination cannot repeat or skip a row', () => {
+  const adapter = readFileSync(
+    'lib/server/infrastructure/database/mariadb-catalog-repository.ts',
+    'utf8',
+  );
+  // Both sorts need the id tiebreaker, and the page lookup mirrors the same expression.
+  assert.match(adapter, /\$\{animes\.viewCount\} DESC, \$\{animes\.id\} DESC/);
+  assert.match(adapter, /COALESCE\(\$\{animes\.updatedAt\}, \$\{animes\.createdAt\}\) DESC, \$\{animes\.id\} DESC/);
+
+  const mangaService = readFileSync('lib/manga-service.ts', 'utf8');
+  assert.match(mangaService, /desc\(mangas\.updatedAt\), desc\(mangas\.id\)/);
+  assert.match(mangaService, /desc\(score\), desc\(mangas\.updatedAt\), desc\(mangas\.id\)/);
+});

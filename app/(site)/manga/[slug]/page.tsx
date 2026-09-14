@@ -3,6 +3,8 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { MangaCard } from '@/components/MangaCard';
 import { getManga, isMangaEnabled, listMangas } from '@/lib/manga-client';
+import { findMangaCatalogPage } from '@/lib/manga-service';
+import { buildMangaListHref } from '@/components/manga-pagination';
 import { MediaImage } from '@/components/media-image';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { HistoryBackLink } from '@/components/history-back-link';
@@ -69,6 +71,9 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
   if (!manga) notFound();
   if (slug !== String(manga.id)) permanentRedirect(`/manga/${manga.id}`);
 
+  // Returning to page 1 loses the reader's place; link to the page this work is actually on.
+  // In-app navigation still wins: HistoryBackLink compares paths and prefers router.back().
+  const catalogHref = buildMangaListHref(await findMangaCatalogPage(manga.id));
   const firstChapter = manga.chapters[0]?.number;
   const user = await getIdentityService().getCurrentUser();
   const favorited = user ? await isMangaFavorite(manga.id) : false;
@@ -120,7 +125,7 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
           { name: manga.title, path: `/manga/${manga.id}` },
         ])}
       />
-      <HistoryBackLink href="/manga" className="mb-7 inline-flex items-center gap-1.5 font-ui text-[12px] text-soft transition hover:text-ink">
+      <HistoryBackLink href={catalogHref} className="mb-7 inline-flex items-center gap-1.5 font-ui text-[12px] text-soft transition hover:text-ink">
         <IconArrowLeft size={15} /> 漫画目录
       </HistoryBackLink>
 

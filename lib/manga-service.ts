@@ -1,7 +1,8 @@
 /**
  * Local manga catalog (MySQL). Ingest via POST /api/manga/publish with admin key.
  */
-import { and, desc, eq, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gt, like, or, sql, type SQL } from 'drizzle-orm';
+import { catalogPageForPrecedingCount } from '@/lib/catalog-page';
 import { db } from '@/lib/db';
 import {
   cleanMangaDisplayTitle,
@@ -302,7 +303,7 @@ export async function listMangas(params?: {
     .where(where);
   const total = Number(countRow?.count ?? 0);
 
-  let orderBy = [desc(mangas.updatedAt)];
+  let orderBy = [desc(mangas.updatedAt), desc(mangas.id)];
   if (rank) {
     await ensureMangaViewsReady();
     const since = mangaRankSince(rank);
@@ -315,7 +316,7 @@ export async function listMangas(params?: {
           SELECT SUM(view_count) FROM manga_view_days
           WHERE manga_id = ${mangas.id}
         ), 0)`;
-    orderBy = [desc(score), desc(mangas.updatedAt)];
+    orderBy = [desc(score), desc(mangas.updatedAt), desc(mangas.id)];
   }
 
   const rows = await db
@@ -333,6 +334,44 @@ export async function listMangas(params?: {
     total,
     totalPages: total ? Math.ceil(total / limit) : 0,
   };
+}
+
+/** Page size of the public /manga listing; the catalog page lookup has to match it. */
+export const MANGA_CATALOG_PAGE_SIZE = 30;
+
+/**
+ * Which page of the default /manga listing this work sits on.
+ *
+ * Detail pages link back to the catalog, and sending a reader to page 1 loses their place. The
+ * comparison mirrors listMangas' ordering exactly (updatedAt desc, id desc), so the answer is the
+ * page the work is really on rather than an estimate.
+ */
+export async function findMangaCatalogPage(
+  mangaId: number,
+  pageSize: number = MANGA_CATALOG_PAGE_SIZE,
+): Promise<number> {
+  if (!Number.isInteger(mangaId) || mangaId <= 0) return 1;
+  const size = Math.max(1, Math.trunc(pageSize));
+  const [current] = await db
+    .select({ id: mangas.id, updatedAt: mangas.updatedAt })
+    .from(mangas)
+    .where(and(eq(mangas.id, mangaId), eq(mangas.isPublished, 1)))
+    .limit(1);
+  if (!current) return 1;
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(mangas)
+    .where(
+      and(
+        eq(mangas.isPublished, 1),
+        or(
+          gt(mangas.updatedAt, current.updatedAt),
+          and(eq(mangas.updatedAt, current.updatedAt), gt(mangas.id, current.id)),
+        ),
+      ),
+    );
+  return catalogPageForPrecedingCount(Number(countRow?.count ?? 0), size);
 }
 
 /** Top used tags across published mangas, most-used first. */

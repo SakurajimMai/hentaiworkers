@@ -1,4 +1,5 @@
 import { isActiveRow, normalizeListQuery } from '../domain/recommendation';
+import { catalogPageForPrecedingCount } from '@/lib/catalog-page';
 import type {
   AnimeDetail,
   AnimeSeed,
@@ -155,6 +156,19 @@ export class InMemoryCatalogRepository implements CatalogReadRepository {
     return [...this.tags.values()]
       .map(({ id, name }) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async findCatalogPage(input: { animeId: number; pageSize: number }): Promise<number> {
+    const size = Math.max(1, Math.trunc(input.pageSize));
+    const ordered = [...this.animes.values()]
+      .filter((row) => isActiveRow(row.isActive))
+      .sort((a, b) => {
+        const left = a.updatedAt ?? a.createdAt ?? '';
+        const right = b.updatedAt ?? b.createdAt ?? '';
+        return right.localeCompare(left) || b.id - a.id;
+      });
+    const index = ordered.findIndex((row) => row.id === input.animeId);
+    return index < 0 ? 1 : catalogPageForPrecedingCount(index, size);
   }
 
   async getSitemapData(): Promise<SitemapData> {

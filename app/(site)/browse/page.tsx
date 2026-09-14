@@ -5,7 +5,7 @@ import { AnimeCard } from '@/components/AnimeCard';
 import { IconClock, IconTrendingUp } from '@/components/icons';
 import { FeedAdCard } from '@/components/feed-ad-card';
 import { Pagination } from '@/components/pagination';
-import { listAnimes, listTags, type SortType } from '@/lib/anime-service';
+import { BROWSE_CATALOG_PAGE_SIZE, listAnimes, listTags, type SortType } from '@/lib/anime-service';
 import { StructuredData } from '@/components/structured-data';
 import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
 import { FEED_BANNER_GRID_CLASS, interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
@@ -41,7 +41,7 @@ const resolveTagName = cache(async (tagId: number | undefined): Promise<string> 
 const loadBrowsePage = cache((page: number, search: string, tagId: number, sort: SortType) =>
   listAnimes({
     page,
-    limit: 40,
+    limit: BROWSE_CATALOG_PAGE_SIZE,
     search: search || undefined,
     tagId: tagId > 0 ? tagId : undefined,
     sort,

@@ -134,8 +134,12 @@ test('site shell restores catalog scroll instead of remounting a home skeleton',
   assert.match(restoration, /takeHistoryTraverse/);
   assert.match(restoration, /applyRestoredScrollY/);
   assert.match(layout, /CatalogScrollRestoration/);
-  assert.match(mangaDetail, /HistoryBackLink href="\/manga"/);
+  // The back link is history-aware and, on a direct visit, points at the catalog page that
+  // actually holds this work rather than page 1.
+  assert.match(mangaDetail, /HistoryBackLink href=\{catalogHref\}/);
+  assert.match(mangaDetail, /findMangaCatalogPage\(manga\.id\)/);
   assert.doesNotMatch(mangaDetail, /<Link href="\/manga" className="mb-7/);
+  assert.doesNotMatch(mangaDetail, /HistoryBackLink href="\/manga"/);
   assert.equal(
     existsSync(new URL('../../app/(site)/loading.tsx', import.meta.url)),
     false,

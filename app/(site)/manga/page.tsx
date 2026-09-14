@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { MangaCard } from '@/components/MangaCard';
 import { Pagination } from '@/components/pagination';
 import { isCuratedMangaTag, isMangaEnabled, listMangas } from '@/lib/manga-client';
+import { MANGA_CATALOG_PAGE_SIZE } from '@/lib/manga-service';
 import { normalizeMangaTagQuery } from '@/lib/manga-tags';
 import { isMangaRank } from '@/lib/manga-views';
 import { buildMangaListHref } from '@/components/manga-pagination';
@@ -30,7 +31,7 @@ const RANKS = [
 const loadMangaPage = cache((page: number, q: string, tag: string, rank: string) =>
   listMangas({
     page,
-    limit: 30,
+    limit: MANGA_CATALOG_PAGE_SIZE,
     q: q || undefined,
     tag: tag || undefined,
     rank: isMangaRank(rank) ? rank : undefined,

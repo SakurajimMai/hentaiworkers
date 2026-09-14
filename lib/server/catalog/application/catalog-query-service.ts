@@ -49,6 +49,18 @@ export class CatalogQueryService {
     }
   }
 
+  /** 1-based page of the default listing that holds this work; 1 when it cannot be located. */
+  async findCatalogPage(animeId: number, pageSize: number): Promise<number> {
+    if (!Number.isInteger(animeId) || animeId <= 0) return 1;
+    try {
+      const page = await this.repository.findCatalogPage({ animeId, pageSize });
+      return Number.isFinite(page) && page >= 1 ? Math.trunc(page) : 1;
+    } catch (error) {
+      console.error('findCatalogPage failed', error);
+      return 1;
+    }
+  }
+
   listTags(): Promise<ReadonlyArray<TagSummary>> {
     return this.repository.listTags();
   }

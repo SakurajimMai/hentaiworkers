@@ -28,6 +28,8 @@ import type {
   CatalogWriteAnimeInput,
   CatalogWriteRepository,
 } from '../../catalog/ports/catalog-write-repository';
+import type { CatalogPageLookup } from '../../catalog/ports/catalog-read-repository';
+import { catalogPageForPrecedingCount } from '@/lib/catalog-page';
 import { normalizeListQuery } from '../../catalog/domain/recommendation';
 import { nowIso } from '@/lib/utils';
 
@@ -58,10 +60,12 @@ export class MariaDbCatalogRepository
     return withDbRetry(async () => {
       const { page, limit, sort, activeOnly, offset } = normalizeListQuery(input);
       // "latest" uses COALESCE(updated_at, created_at) so recrawls surface as 最近更新.
+      // The id tiebreaker keeps pagination stable: without it MySQL may repeat or skip a row
+      // across page boundaries when two works share a timestamp or a view count.
       const orderBy =
         sort === 'popular'
-          ? desc(animes.viewCount)
-          : sql`COALESCE(${animes.updatedAt}, ${animes.createdAt}) DESC`;
+          ? sql`${animes.viewCount} DESC, ${animes.id} DESC`
+          : sql`COALESCE(${animes.updatedAt}, ${animes.createdAt}) DESC, ${animes.id} DESC`;
       const conditions = [];
       if (activeOnly) conditions.push(activeAnimeCondition());
       if (input.search) {
@@ -172,6 +176,37 @@ export class MariaDbCatalogRepository
     return withDbRetry(async () => {
       const [rows] = await pool.query<RowDataPacket[]>(ANIME_FAVORITE_COUNT_SQL, [animeId]);
       return Math.max(0, Number(rows[0]?.total ?? 0));
+    });
+  }
+
+  /**
+   * Mirrors the default `latest` ordering (COALESCE(updated_at, created_at) desc, id desc) so a
+   * detail page can send the viewer back to the catalog page the work is actually on.
+   */
+  findCatalogPage(input: CatalogPageLookup): Promise<number> {
+    return withDbRetry(async () => {
+      const size = Math.max(1, Math.trunc(input.pageSize));
+      const sortKey = sql`COALESCE(${animes.updatedAt}, ${animes.createdAt})`;
+      const [current] = await db
+        .select({ id: animes.id, sortKey: sql<string | null>`${sortKey}` })
+        .from(animes)
+        .where(and(eq(animes.id, input.animeId), activeAnimeCondition()))
+        .limit(1);
+      if (!current) return 1;
+
+      const [countRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(animes)
+        .where(
+          and(
+            activeAnimeCondition(),
+            sql`(
+              ${sortKey} > ${current.sortKey}
+              OR (${sortKey} = ${current.sortKey} AND ${animes.id} > ${current.id})
+            )`,
+          ),
+        );
+      return catalogPageForPrecedingCount(Number(countRow?.count ?? 0), size);
     });
   }
 

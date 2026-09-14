@@ -27,6 +27,7 @@ function delegating(
     list: (input) => repository.list(input),
     getById: (id) => repository.getById(id),
     countFavorites: (id) => repository.countFavorites(id),
+    findCatalogPage: (input) => repository.findCatalogPage(input),
     listTags: () => repository.listTags(),
     getSitemapData: () => repository.getSitemapData(),
     listByTitlePrefix: (input) => repository.listByTitlePrefix(input),

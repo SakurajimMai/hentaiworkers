@@ -19,6 +19,9 @@ export type {
 
 export type ListAnimesOptions = CatalogListQuery;
 
+/** Page size of the public /browse listing; the catalog page lookup has to match it. */
+export const BROWSE_CATALOG_PAGE_SIZE = 40;
+
 export async function listAnimes(opts: CatalogListQuery = {}) {
   return getCatalogQueryService().list(opts);
 }

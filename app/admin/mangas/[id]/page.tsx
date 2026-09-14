@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconBook, IconExternalLink, IconTrash } from '@/components/icons';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import { AdminPagination } from '@/components/admin/admin-pagination';
@@ -100,9 +101,9 @@ export default async function AdminMangaDetailPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Link href="/admin/mangas" className="inline-flex items-center gap-1.5 font-ui text-[12px] text-soft hover:text-ink transition-colors">
+          <HistoryBackLink href="/admin/mangas" className="inline-flex items-center gap-1.5 font-ui text-[12px] text-soft hover:text-ink transition-colors">
             <IconArrowLeft size={13} /> 返回漫画管理
-          </Link>
+          </HistoryBackLink>
           <p className="font-meta mb-2 mt-4 text-soft">manga #{manga.id}</p>
           <h1 className="section-title text-3xl text-ink">{manga.title}</h1>
           <p className="mt-2 font-ui text-[13px] text-soft">

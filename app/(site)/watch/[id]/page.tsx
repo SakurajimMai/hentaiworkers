@@ -8,7 +8,7 @@ import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconCalendar, IconEye } from '@/components/icons';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { WatchPlayer } from '@/components/watch-player';
-import { getAnimeById, getSimilarAnimes } from '@/lib/anime-service';
+import { BROWSE_CATALOG_PAGE_SIZE, getAnimeById, getSimilarAnimes } from '@/lib/anime-service';
 import { recordAnimeView } from '@/lib/anime-views';
 import {
   getFavoritesService,
@@ -20,6 +20,7 @@ import { StructuredData } from '@/components/structured-data';
 import { MediaImage } from '@/components/media-image';
 import { absoluteMediaUrl, breadcrumbJsonLd, isoDate, pageOpenGraph, siteOrigin } from '@/lib/seo';
 import { formatCompactCount } from '@/lib/format-count';
+import { getCatalogQueryService } from '@/lib/server/catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +77,9 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   const fanartList = anime.fanart
     ? anime.fanart.split(',').map((u) => u.trim()).filter(Boolean)
     : [];
+  // Same rule as the manga detail page: fall back to the catalog page holding this work.
+  const catalogPage = await getCatalogQueryService().findCatalogPage(id, BROWSE_CATALOG_PAGE_SIZE);
+  const catalogHref = catalogPage > 1 ? `/browse?page=${catalogPage}` : '/browse';
   const watchUrl = `${siteOrigin()}/watch/${id}`;
   const videoUrl = absoluteMediaUrl(anime.videoUrl);
 
@@ -115,7 +119,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
       />
       <div className="page-shell py-5 sm:py-8">
         <HistoryBackLink
-          href="/browse"
+          href={catalogHref}
           className="inline-flex items-center gap-2 rounded-full px-2.5 py-1.5 font-ui text-sm text-soft hover:bg-card hover:text-ink mb-5 transition"
         >
           <IconArrowLeft size={16} />
