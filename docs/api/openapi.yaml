@@ -153,7 +153,7 @@ paths:
             default: 48
         - name: sort
           in: query
-          description: "`latest` by updated_at with created_at fallback; `popular` by view_count"
+          description: "`latest` by updated_at with created_at fallback; `popular` by view_count (real deduplicated plays)"
           schema:
             type: string
             enum: [latest, popular]
@@ -755,9 +755,17 @@ components:
         viewCount:
           type: integer
           nullable: true
+          description: >-
+            Real deduplicated plays: one per viewer per anime per UTC day, counted
+            from both the web watch page and this endpoint.
         favoriteCount:
           type: integer
           nullable: true
+          description: >-
+            Live number of users who have this anime in their system favourites
+            list. `null` means the count is temporarily unavailable — treat it as
+            unknown, not as zero. The stored `animes.favorite_count` column is no
+            longer a source of truth.
         isActive:
           type: integer
           nullable: true

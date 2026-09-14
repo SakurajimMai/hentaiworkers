@@ -8,7 +8,7 @@ import {
   normalizeListQuery,
 } from '../../lib/server/catalog/domain/recommendation';
 import { InMemoryCatalogRepository } from '../../lib/server/catalog/testing/in-memory-catalog-repository';
-import { MAX_SITEMAP_URLS } from '../../lib/sitemap';
+import { MAX_SITEMAP_URLS, SITEMAP_CHUNK_SIZE, buildSitemapSections } from '../../lib/sitemap';
 
 function buildService() {
   const repo = new InMemoryCatalogRepository();
@@ -130,11 +130,12 @@ test('similar falls back to popular when no tags and no series', async () => {
   assert.ok(similar[0].viewCount! >= (similar[1]?.viewCount ?? 0));
 });
 
-test('sitemap data only includes active rows and enforces URL budget', async () => {
-  const { service, repo } = buildService();
+test('sitemap data only includes active rows with covers and large catalogs chunk into several files', async () => {
+  const { service } = buildService();
   const data = await service.getSitemapData();
   assert.equal(data.animes.some((row) => row.id === 3), false);
   assert.ok(data.tags.length >= 2);
+  assert.ok(data.animes.every((row) => 'cover' in row));
 
   const bloated = new InMemoryCatalogRepository();
   for (let i = 1; i <= MAX_SITEMAP_URLS; i += 1) {
@@ -145,7 +146,16 @@ test('sitemap data only includes active rows and enforces URL budget', async () 
     });
   }
   const overloaded = new CatalogQueryService(bloated);
-  await assert.rejects(() => overloaded.getSitemapData(), /50,000/);
+  const bulk = await overloaded.getSitemapData();
+  assert.equal(bulk.animes.length, MAX_SITEMAP_URLS);
+  const files = buildSitemapSections('https://anime.example.com', {
+    animes: bulk.animes,
+    tags: bulk.tags,
+    mangas: [],
+    mangaTags: [],
+  });
+  assert.equal(files.filter((file) => file.name.startsWith('animes-')).length, MAX_SITEMAP_URLS / SITEMAP_CHUNK_SIZE);
+  assert.ok(files.every((file) => file.entries.length <= SITEMAP_CHUNK_SIZE));
 });
 
 test('application and domain modules do not import drizzle', () => {

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { AppError } from '@/lib/server/shared/errors';
+import { mangaIndexNowPaths, notifyIndexNow } from '@/lib/server/seo/notify-indexnow';
 import { getSystemSettingsService } from '@/lib/server/system';
 import { publishMangaChapter } from '@/lib/manga-service';
 
@@ -75,6 +76,9 @@ export async function POST(req: Request) {
       coverUrl: body.coverUrl ?? body.cover_url ?? null,
       description: body.description ?? null,
     });
+
+    // New or extended chapters should reach IndexNow engines without waiting for a crawl.
+    if (result.status === 'ok') after(notifyIndexNow(mangaIndexNowPaths(result.mangaId)));
 
     return NextResponse.json(result, {
       status: result.status === 'ok' ? 201 : 200,

@@ -99,17 +99,28 @@ App 容器不会运行 SQL migration runner，也不会记录迁移版本。对�
 - `0018-manga-reading-progress.sql`
 - `0019-library-pagination-indexes.sql`
 
+目标版本包含真实里番播放量时，还必须包含：
+
+- `0020-anime-views.sql`
+
 `0019` 会在每条 DDL 前检查索引，可在部分完成后重试，但仍可能影响大表。历史
 `0010-0013` 可能留下当前 App 不读写的 works 表；不要因为编号连续就盲目重放或删除。
 
+`0020` 创建 `anime_view_days` 与 `anime_view_dedup`，并**执行** `UPDATE animes SET view_count = 0`。
+现有播放量全部是爬虫写入的随机种子，清零后详情页「N 次播放」才是真实去重计数。该重置不可逆：
+`sort=popular`、首页/相似推荐的热度回退和「N 次播放」会立即归零，并随真实流量回升，目录排序
+会明显变化。**执行这条迁移前必须先备份数据库。** 应用本身永远不会执行这条语句。
+
 ### 当前运行时 DDL
 
-“Compose 不自动迁移”不等于“App 永远不发 DDL”。当前漫画榜单与漫画进度路径可能懒执行
-`CREATE TABLE IF NOT EXISTS`，涉及：
+“Compose 不自动迁移”不等于“App 永远不发 DDL”。当前漫画榜单、漫画进度与里番播放统计路径
+可能懒执行 `CREATE TABLE IF NOT EXISTS`，涉及：
 
 - `manga_view_days`
 - `manga_view_dedup`
 - `manga_reading_progress`
+- `anime_view_days`
+- `anime_view_dedup`
 
 应通过正式迁移预先准备这些表，并在应用账号权限策略下验证榜单、漫画阅读和进度路径。
 不要依赖懒建表补齐其他 schema。

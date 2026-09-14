@@ -3,12 +3,13 @@ export function buildMangaListHref(
   q?: string,
   tag?: string,
   rank?: string,
-) {
-  const params = new URLSearchParams();
-  if (page > 1) params.set('page', String(page));
-  if (q) params.set('q', q);
-  if (tag) params.set('tag', tag);
-  if (rank) params.set('rank', rank);
-  const query = params.toString();
-  return query ? `/manga?${query}` : '/manga';
+): string {
+  // encodeURIComponent, not URLSearchParams: the sitemap and every tag chip encode a space as
+  // %20, and `+` here would make the canonical disagree with the URL that was submitted.
+  const parts: string[] = [];
+  if (page > 1) parts.push(`page=${encodeURIComponent(String(page))}`);
+  if (q) parts.push(`q=${encodeURIComponent(q)}`);
+  if (tag) parts.push(`tag=${encodeURIComponent(tag)}`);
+  if (rank) parts.push(`rank=${encodeURIComponent(rank)}`);
+  return parts.length ? `/manga?${parts.join('&')}` : '/manga';
 }

@@ -232,6 +232,11 @@ export const siteSettingsSchema = z.object({
   /** Public Telegram channel / group. Empty hides the footer link. */
   telegramUrl: z.string().max(1000).default(''),
   telegramLabel: z.string().min(1).max(40).default('Telegram'),
+  /**
+   * IndexNow key (8-128 chars of a-z, A-Z, 0-9, -). Served at /indexnow/{key}.txt and used to
+   * ping Bing/Edge, Yandex and other IndexNow engines when content changes. Empty disables pings.
+   */
+  indexNowKey: z.string().max(128).default(''),
 });
 
 export const heroSettingsSchema = z.object({

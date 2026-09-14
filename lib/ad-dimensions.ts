@@ -32,6 +32,23 @@ function optionNumber(source: string, key: string): number {
 }
 
 /**
+ * Scale an inferred creative into the bounded viewport without distorting it.
+ * Explicit admin sizes clamp each axis independently (a documented limit), but an inferred
+ * size is the creative's real shape: clamping one axis alone would invent a wrong ratio and
+ * the 2:3 card would then crop what it promises to letterbox.
+ */
+function fitInferredDimensions(width: number, height: number): { width: number; height: number } {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return { width: 0, height: 0 };
+  }
+  const scale = Math.min(1, MAX_AD_WIDTH / width, MAX_AD_HEIGHT / height);
+  return {
+    width: Math.max(1, Math.floor(width * scale)),
+    height: Math.max(1, Math.floor(height * scale)),
+  };
+}
+
+/**
  * Read a creative's CSS-pixel viewport from alliance snippets when the admin left size on 自动.
  * atOptions iframe units and explicit iframe width/height must keep that viewport so the script
  * can fill on a narrow mobile slot; the outer frame still scales down.
@@ -40,23 +57,38 @@ export function inferAdDimensionsFromHtml(html: string): { width: number; height
   const text = String(html || '');
   const atBlock = text.match(/atOptions\s*=\s*\{[\s\S]{0,500}?\}/);
   if (atBlock) {
-    const sized = normalizeAdDimensions({
-      width: optionNumber(atBlock[0], 'width'),
-      height: optionNumber(atBlock[0], 'height'),
-    });
+    const sized = fitInferredDimensions(
+      optionNumber(atBlock[0], 'width'),
+      optionNumber(atBlock[0], 'height'),
+    );
     if (sized.width > 0) return sized;
   }
-  const iframe = text.match(/<iframe\b[^>]{0,500}>/i);
-  if (iframe) {
-    const width = iframe[0].match(/\bwidth\s*=\s*["']?(\d{2,4})/i);
-    const height = iframe[0].match(/\bheight\s*=\s*["']?(\d{2,4})/i);
-    const sized = normalizeAdDimensions({
-      width: width ? Number(width[1]) : 0,
-      height: height ? Number(height[1]) : 0,
-    });
-    if (sized.width > 0) return sized;
+  // Sized embeds and plain image creatives (`<a><img width height></a>`) expose their pixels the
+  // same way. A snippet routinely carries a badge, logo or tracking pixel before the real unit,
+  // so take the largest sized element rather than whichever appears first.
+  let best = { width: 0, height: 0 };
+  for (const tag of ['iframe', 'img', 'video']) {
+    for (const element of text.matchAll(new RegExp(`<${tag}\\b[^>]{0,500}>`, 'gi'))) {
+      const sized = fitInferredDimensions(
+        attributeNumber(element[0], 'width'),
+        attributeNumber(element[0], 'height'),
+      );
+      if (sized.width * sized.height > best.width * best.height) best = sized;
+    }
   }
-  return { width: 0, height: 0 };
+  return best;
+}
+
+/**
+ * Pixel value of `width="300"` / `style="width:300px"`.
+ * Percentages stay automatic: the lookahead has to span the remaining digits, otherwise the
+ * engine backtracks and reads `100%` as a 10 pixel creative.
+ */
+function attributeNumber(tag: string, name: string): number {
+  const attribute = tag.match(new RegExp(`\\s${name}\\s*=\\s*["']?(\\d{2,4})(?![\\d\\s]*%)`, 'i'));
+  if (attribute) return Number(attribute[1]);
+  const style = tag.match(new RegExp(`[\\s;"']${name}\\s*:\\s*(\\d{2,4})px`, 'i'));
+  return style ? Number(style[1]) : 0;
 }
 
 export function resolveAdDimensions(slot: AdDimensions & { html?: string } = {}) {
@@ -82,6 +114,21 @@ export function htmlAdFrameScale(creativeWidth: number): string {
 export function htmlAdFitScale(slotWidth: number, creativeWidth: number): number {
   if (!(slotWidth > 0) || !(creativeWidth > 0)) return 1;
   return slotWidth / creativeWidth;
+}
+
+/**
+ * Letterbox a fixed creative inside a poster cell: it fills the shorter dimension and is never
+ * cropped, so a 300×250 unit sits centred in a 2:3 card and a 300×600 skyscraper fits its height.
+ */
+export function htmlAdContainScale(
+  slotWidth: number,
+  slotHeight: number,
+  creativeWidth: number,
+  creativeHeight: number,
+): number {
+  const byWidth = htmlAdFitScale(slotWidth, creativeWidth);
+  if (!(slotHeight > 0) || !(creativeHeight > 0)) return byWidth;
+  return Math.min(byWidth, slotHeight / creativeHeight);
 }
 
 /** Catalog poster ratio (width / height). */

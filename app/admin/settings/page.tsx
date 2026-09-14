@@ -6,6 +6,8 @@ import { AdSizeFields } from '@/components/admin/ad-size-fields';
 import { HeroSlidesEditor } from '@/components/admin/hero-slides-editor';
 import { SiteMetaEditor } from '@/components/admin/site-meta-editor';
 import { effectiveHeroSlides } from '@/lib/server/system/domain/settings';
+import { indexNowKeyPath } from '@/lib/server/seo/indexnow';
+import { resolveSiteUrl } from '@/lib/site-url';
 import {
   actionSaveSystemSettings,
   actionSendSmtpTest,
@@ -23,6 +25,7 @@ export default async function AdminSystemSettingsPage({
   const view = await getSystemSettingsService().getAdminView();
 
   const whitelistText = view.registration.emailWhitelist.join('\n');
+  const siteUrl = resolveSiteUrl(process.env.SITE_URL);
 
   return (
     <div className="space-y-6">
@@ -48,6 +51,7 @@ export default async function AdminSystemSettingsPage({
         <a href="#hero">幻灯片</a>
         <a href="#app">页脚</a>
         <a href="#meta">全局 Meta</a>
+        <a href="#seo">收录</a>
         <a href="#smtp">SMTP</a>
         <a href="#trust">安全验证</a>
         <a href="#player">播放器</a>
@@ -72,6 +76,9 @@ export default async function AdminSystemSettingsPage({
       )}
       {sp.error === 'meta' && (
         <div role="alert" className="notice-error">全局 Meta 标签无效，请检查名称、内容和标签数量</div>
+      )}
+      {sp.error === 'indexnow' && (
+        <div role="alert" className="notice-error">IndexNow 密钥无效：只能包含字母、数字和连字符，长度 8 到 128</div>
       )}
       {sp.error === 'verify_smtp' && (
         <div className="notice-error">
@@ -194,6 +201,32 @@ export default async function AdminSystemSettingsPage({
         <section id="meta" className="scroll-mt-24 border-y border-border py-5 space-y-4">
           <h2 className="font-ui text-sm font-semibold">全局 Meta</h2>
           <SiteMetaEditor initialTags={view.site.metaTags} />
+        </section>
+
+        <section id="seo" className="surface-card scroll-mt-24 p-5 space-y-4">
+          <h2 className="font-ui text-sm font-semibold">搜索引擎收录</h2>
+          <p className="font-ui text-[12px] text-soft leading-relaxed">
+            站点地图索引固定为 <code className="font-mono">{siteUrl}/sitemap.xml</code>，把它提交到 Google Search Console
+            和 Bing Webmaster Tools；验证标签在上方「全局 Meta」导入。填写 IndexNow 密钥后，发布漫画、编辑或上下架里番/漫画时会自动
+            通知 Bing（Edge）、Yandex 等 IndexNow 引擎；Google 不使用 IndexNow，只看站点地图。
+          </p>
+          <label className="block font-meta text-[12px]">
+            IndexNow 密钥（留空关闭）
+            <input
+              name="indexNowKey"
+              className="admin-input mt-1 font-mono text-[12px]"
+              defaultValue={view.site.indexNowKey}
+              placeholder="8 到 128 位字母、数字或连字符，例如 openssl rand -hex 16 的输出"
+              autoComplete="off"
+              maxLength={128}
+              pattern="[A-Za-z0-9\-]{8,128}"
+            />
+          </label>
+          <p className="font-ui text-[12px] text-soft">
+            {view.site.indexNowKey
+              ? <>密钥文件会由网站自动提供：<code className="font-mono">{siteUrl}{indexNowKeyPath(view.site.indexNowKey)}</code>，无需上传文件。</>
+              : '保存后网站会自动提供对应的密钥文件，无需手动上传。'}
+          </p>
         </section>
 
         {/* SMTP */}
@@ -507,8 +540,8 @@ export default async function AdminSystemSettingsPage({
             <h2 className="font-ui text-sm font-semibold">广告位</h2>
             <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
               信息流可配置多条广告，每条单独开关、单独设置「每隔 x 张卡片」。
-              目录里推荐「信息流卡片」+ 尺寸「自动」，粘贴联盟 Native / 自适应代码，广告会跟海报卡同宽同比例。
-              只有固定像素横幅（300×250 等）才选「横幅」并填写对应宽高。
+              图片或固定像素的联盟素材请在「广告尺寸」填写与素材一致的宽高（如 300×250、300×450）：
+              「信息流卡片」会把它完整放进海报格并居中，「横幅」会按该比例占两列。尺寸留「自动」只适合会自适应容器的 Native / 响应式代码。
               阅读页只在章节顶部和底部放广告，不会插入到漫画页中间。
               这里保存后，网站（含手机浏览器）和 Android App 会使用同一套广告。
             </p>

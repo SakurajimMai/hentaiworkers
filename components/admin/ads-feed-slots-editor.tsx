@@ -112,7 +112,7 @@ export function AdsFeedSlotsEditor({ initialSlots }: { initialSlots: FeedAdSlot[
                   placeholder={'<script src="https://example.com/native.js"></script>'}
                 />
                 <span className="mt-1 block font-ui text-[11px] font-normal normal-case tracking-normal text-soft">
-                  信息流卡片会跟海报同一格、同一比例，尺寸请选「自动」，粘贴联盟 Native / 自适应代码。固定 300×250 请改选「横幅」。
+                  图片或固定像素素材：在下面填写与素材一致的宽高。「信息流卡片」会等比完整放进海报格并居中，「横幅」按素材比例占两列。只有会自适应容器的 Native / 响应式代码才留「自动」。
                 </span>
               </label>
             </div>

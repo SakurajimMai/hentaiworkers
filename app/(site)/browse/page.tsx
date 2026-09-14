@@ -1,29 +1,71 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
+import { Suspense, cache } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
 import { IconClock, IconTrendingUp } from '@/components/icons';
 import { FeedAdCard } from '@/components/feed-ad-card';
 import { Pagination } from '@/components/pagination';
-import { listAnimes, type SortType } from '@/lib/anime-service';
+import { listAnimes, listTags, type SortType } from '@/lib/anime-service';
 import { StructuredData } from '@/components/structured-data';
+import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
 import { FEED_BANNER_GRID_CLASS, interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
 
 export const revalidate = 60;
 
+type BrowseSearchParams = Record<string, string | string[] | undefined>;
+
+function parseTagId(sp: BrowseSearchParams): number | undefined {
+  const raw = typeof sp.tag === 'string' ? sp.tag : Array.isArray(sp.tag) ? sp.tag[0] : undefined;
+  const id = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(id) && id > 0 ? id : undefined;
+}
+
+/**
+ * Resolve the human name from the id alone. `?tagName=` is never trusted: it decides the title,
+ * the description and the JSON-LD, so honouring it would let any URL mint an indexable page for a
+ * tag that does not exist. `cache` keeps metadata and the page body to a single lookup per request.
+ */
+const resolveTagName = cache(async (tagId: number | undefined): Promise<string> => {
+  if (!tagId) return '';
+  try {
+    return (await listTags()).find((tag) => tag.id === tagId)?.name ?? '';
+  } catch (error) {
+    console.error('resolveTagName failed', error);
+    return '';
+  }
+});
+
+/** Listing data is read by both generateMetadata and the page; share one query per request. */
+const loadBrowsePage = cache((page: number, search: string, tagId: number, sort: SortType) =>
+  listAnimes({
+    page,
+    limit: 40,
+    search: search || undefined,
+    tagId: tagId > 0 ? tagId : undefined,
+    sort,
+  }));
+
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<BrowseSearchParams>;
 }): Promise<Metadata> {
   const sp = await searchParams;
   const search = typeof sp.search === 'string' ? sp.search.trim() : '';
-  const tag = typeof sp.tagName === 'string' ? sp.tagName.trim() : '';
+  const tagId = parseTagId(sp);
+  const tag = await resolveTagName(tagId);
   const popular = sp.sort === 'popular';
   const page = Math.max(1, parseInt(String(sp.page || '1'), 10) || 1);
-  const title = search ? `搜索：${search}` : tag ? `${tag} · 里番` : popular ? '热门里番' : '最近更新里番';
+  const pageSuffix = page > 1 ? `（第 ${page} 页）` : '';
+  const title = search
+    ? `搜索：${search}`
+    : tag
+      ? `${tag} · 里番${pageSuffix}`
+      : popular
+        ? `热门里番${pageSuffix}`
+        : `最近更新里番${pageSuffix}`;
   const description = search
     ? `在 AnimeStream 中搜索包含“${search}”的里番视频。`
     : tag
@@ -32,47 +74,49 @@ export async function generateMetadata({
         ? '浏览 AnimeStream 里番片库中近期受欢迎的作品。'
         : '浏览 AnimeStream 里番片库的最近更新内容。';
   const query = new URLSearchParams();
-  if (sp.tag) query.set('tag', String(sp.tag));
+  if (tagId) query.set('tag', String(tagId));
   if (popular) query.set('sort', 'popular');
   if (page > 1) query.set('page', String(page));
   const canonical = query.toString() ? `/browse?${query.toString()}` : '/browse';
+  // A page past the end renders an empty grid, so it must not be offered as its own landing page.
+  const withinRange =
+    page === 1 ||
+    (await loadBrowsePage(page, search, tagId ?? 0, popular ? 'popular' : 'latest')
+      .then((data) => page <= Math.max(1, data.pagination.totalPages))
+      .catch(() => false));
+  // A tag id that no longer exists must not compete with the catalog page in the index.
+  const indexable = !search && (!tagId || Boolean(tag)) && withinRange;
   return {
     title,
     description,
     alternates: { canonical },
-    openGraph: {
+    openGraph: pageOpenGraph({
       title,
       description,
       type: 'website',
       url: canonical,
       images: [{ url: '/opengraph-image', alt: 'AnimeStream' }],
-    },
-    robots: search ? { index: false, follow: true } : { index: true, follow: true },
+    }),
+    robots: indexable ? indexableRobots : followOnlyRobots,
   };
 }
 
 export default async function BrowsePage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<BrowseSearchParams>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, parseInt(String(sp.page || '1'), 10) || 1);
-  const search = typeof sp.search === 'string' ? sp.search : undefined;
-  const tagId = sp.tag ? parseInt(String(sp.tag), 10) : undefined;
-  const tagName = typeof sp.tagName === 'string' ? sp.tagName : undefined;
+  const search = typeof sp.search === 'string' ? sp.search.trim() : '';
+  const tagId = parseTagId(sp);
+  const tagName = (await resolveTagName(tagId)) || undefined;
   const sort: SortType = sp.sort === 'popular' ? 'popular' : 'latest';
 
   let data: Awaited<ReturnType<typeof listAnimes>> | null = null;
   let error: string | null = null;
   try {
-    data = await listAnimes({
-      page,
-      limit: 40,
-      search,
-      tagId: Number.isFinite(tagId) ? tagId : undefined,
-      sort,
-    });
+    data = await loadBrowsePage(page, search, tagId ?? 0, sort);
   } catch (e) {
     error = e instanceof Error ? e.message : '加载失败';
   }
@@ -117,8 +161,10 @@ export default async function BrowsePage({
             '@context': 'https://schema.org',
             '@type': 'CollectionPage',
             name: `${heading} · AnimeStream`,
-            description: 'AnimeStream 里番视频目录，支持按标题、标签和热门程度浏览。',
-            url: `${process.env.SITE_URL || ''}${page > 1 ? qs({ page: String(page) }) : '/browse'}`,
+            description: tagName
+              ? `AnimeStream「${tagName}」标签下的里番作品。`
+              : 'AnimeStream 里番视频目录，支持按标题、标签和热门程度浏览。',
+            url: `${siteOrigin()}${page > 1 ? qs({ page: String(page) }) : '/browse'}`,
           }}
         />
         <div className="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-end gap-5 border-b border-border pb-6">

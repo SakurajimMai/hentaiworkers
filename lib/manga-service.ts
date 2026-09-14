@@ -354,10 +354,10 @@ export async function listTopMangaTags(limit = 24): Promise<string[]> {
 }
 
 export async function listPublishedMangaSitemapData(): Promise<
-  Array<{ id: number; slug: string; updatedAt: Date | null }>
+  Array<{ id: number; slug: string; updatedAt: Date | null; coverUrl: string | null }>
 > {
   const rows = await db
-    .select({ id: mangas.id, slug: mangas.slug, updatedAt: mangas.updatedAt })
+    .select({ id: mangas.id, slug: mangas.slug, updatedAt: mangas.updatedAt, coverUrl: mangas.coverUrl })
     .from(mangas)
     .where(eq(mangas.isPublished, 1))
     .orderBy(desc(mangas.updatedAt));

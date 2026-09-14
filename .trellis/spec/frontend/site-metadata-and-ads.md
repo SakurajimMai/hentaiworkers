@@ -12,11 +12,17 @@
   `allow-same-origin`. Resize messages must match both the frame window and per-frame identity.
   Redirect `document.body.appendChild` into `#hw-ad-content` so alliance iframes are not
   aborted by later reparenting; still measure height from `#hw-ad-content`, not the iframe viewport.
-- Feed slots have `placement: card | banner`. Cards fill one poster cell at 2:3 and load a fluid
-  ad document (`fluid=1`) so native/responsive snippets match the catalog grid. Banners occupy two
-  poster columns (`col-span-2 self-start`) at the creative's own ratio (300×250 → 6:5), scale the
-  iframe to fill that box, and must not stretch to the neighboring poster 2:3 height. Empty native
-  cards stay poster-sized. Stored HTML slots without placement migrate to banner.
+- Feed slots have `placement: card | banner`. Cards fill one poster cell at 2:3. A card whose size
+  is configured or inferred renders the fixed creative with `contain`: scaled to fit both cell
+  dimensions, centred, never cropped; only unsized cards load the fluid ad document (`fluid=1`) so
+  native/responsive snippets match the grid. Banners occupy two poster columns
+  (`col-span-2 self-start`) at the creative's own ratio (300×250 → 6:5), scale the iframe to fill
+  that box, and must not stretch to the neighboring poster 2:3 height. Empty native cards stay
+  poster-sized. Stored HTML slots without placement migrate to banner. Admin copy and docs tell
+  operators to enter the creative's real pixel size for image creatives.
+- Dimension inference (`inferAdDimensionsFromHtml`) reads `atOptions`, then `<iframe>`, `<img>`,
+  `<video>` width/height attributes or `style` pixels. Percentages and `data-*` sizes stay automatic.
+  The public `/api/ads` already carries resolved sizes, so Android never parses HTML.
 - Homepage rails interleave `card` slots next to catalog posters. The dedicated home strip is
   banners only — never drop cards from home because they are not banners. `/browse` and `/manga`
   keep both placements in the poster grid. `interleaveFeedAds` include filters must preserve the
@@ -40,3 +46,19 @@
   click destinations for HTML content using user-gesture HTTP(S) navigation in the ad document.
 - Run `npm run test:ads:browser` and `npm run test:meta:browser` when changing these contracts.
   Inspect screenshots and verify mobile/desktop field geometry as well as HTML assertions.
+
+# Search Engine Indexing
+
+- `/sitemap.xml` is an index; sections are chunked under `/sitemaps/{pages,animes-N,mangas-N,tags-N,
+  manga-tags-N}.xml` at most 10,000 URLs each with cover `<image:image>` entries. Keep builders in
+  `lib/sitemap.ts` pure and covered by `tests/sitemap.test.ts`; the routes only load the cached
+  source and render. `check:legacy` requires both route files.
+- Only curated manga tags (`manga.curatedTags`) are indexable `/manga?tag=` pages and sitemap entries;
+  other manga tag pages, search pages and reader pages stay `noindex, follow`. Paginated listings
+  canonicalise to themselves; `/browse?tag=ID` resolves the tag name server-side and unknown ids are
+  `noindex`. Pagination must render real anchors.
+- Detail pages use `pageOpenGraph` (site name + locale), `BreadcrumbList`, ISO dates and
+  `contentUrl` for videos. The root layout sets `rating: adult`, `max-image-preview: large` and a
+  preconnect to the image host.
+- IndexNow: key lives in `site.indexNowKey`, served at `/indexnow/{key}.txt`; content mutations call
+  `notifyIndexNow` inside `after()` and never throw. Keep `buildIndexNowPayload` same-origin only.

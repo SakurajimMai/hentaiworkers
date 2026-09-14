@@ -404,6 +404,29 @@ test('global meta settings round-trip, survive unrelated updates and can be remo
   assert.deepEqual(await service.getPublicMetaTags(), []);
 });
 
+test('indexnow key persists through unrelated updates, can be cleared and stays out of public config', async () => {
+  const { service } = buildService();
+  const key = 'f00dbabe1234567890abcdef12345678';
+  await service.update({ site: { indexNowKey: key } });
+  assert.equal((await service.getSettings()).site.indexNowKey, key);
+  assert.equal((await service.getAdminView()).site.indexNowKey, key);
+
+  await service.update({ site: { telegramLabel: '群组' } });
+  assert.equal((await service.getSettings()).site.indexNowKey, key, 'unrelated site updates keep the key');
+  assert.equal('indexNowKey' in toPublicSiteConfig(await service.getSettings()), false);
+
+  await service.update({ site: { indexNowKey: '' } });
+  assert.equal((await service.getSettings()).site.indexNowKey, '');
+  assert.equal(parseSystemSettings({}).site.indexNowKey, '');
+});
+
+test('parseSystemSettings does not rewrite stored smtp usernames', () => {
+  const settings = parseSystemSettings({
+    smtp: { username: 'apikey', fromEmail: 'no-reply@ixacg.de' },
+  });
+  assert.equal(settings.smtp.username, 'apikey');
+});
+
 test('saving smtp qualifies a local-part username with the from-email domain', async () => {
   const { service } = buildService();
   await service.update({

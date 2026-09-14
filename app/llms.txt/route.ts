@@ -13,7 +13,6 @@ export function GET() {
 - [Home](${siteUrl}/): latest discovery and continue-watching entry points.
 - [Browse videos](${siteUrl}/browse): searchable video catalog with latest and popular sorting.
 - [Manga catalog](${siteUrl}/manga): published manga works with title search and manga-only tag filters.
-- [Site search](${siteUrl}/search): searches videos and manga together; their tag systems stay separate.
 
 ## Content pages
 
@@ -24,12 +23,12 @@ export function GET() {
 ## Indexing guidance
 
 - The homepage, video catalog, manga catalog, and detail pages are server-rendered and may be indexed.
-- Admin, account, history, favorites, authentication, API, search-result, and reader utility routes are not primary discovery pages.
+- Admin, account, history, favorites, authentication, API, search-result, and reader utility routes are disallowed in robots.txt and are not discovery pages.
 - Content is provided by the site operator and should be attributed to the original rights holders where applicable.
 
 ## Site map
 
-- [XML sitemap](${siteUrl}/sitemap.xml)
+- [XML sitemap index](${siteUrl}/sitemap.xml): links the chunked section files under /sitemaps/ (pages, videos, manga, tags).
 - [Robots policy](${siteUrl}/robots.txt)
 `;
 

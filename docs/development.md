@@ -91,21 +91,26 @@ console.log('APP_ENCRYPTION_CURRENT_KEY_ID=primary');
 `0019-library-pagination-indexes.sql` 为里番收藏、漫画收藏、观看历史和漫画历史新增
 四个复合索引。后者会在每条 DDL 前查询 `information_schema`，部分成功后可重新执行；
 这不代表大表 DDL 没有锁、耗时或磁盘风险。
+`0020-anime-views.sql` 创建里番播放统计表 `anime_view_days` 与 `anime_view_dedup`，并执行
+`UPDATE animes SET view_count = 0` 清除爬虫随机种子；执行后 `sort=popular` 排序会立即改变，
+应用本身不会执行这条语句。
 
 `npm run db:baseline` 是从指定数据库重新导出固定核心表结构的维护工具，不会应用
 schema，也不能替代迁移。需要查看数据库时可以运行 `npm run db:studio`。
 
 ### 当前运行时 DDL
 
-Compose 不会自动执行迁移链，但当前漫画榜单和漫画进度路径仍会懒执行
+Compose 不会自动执行迁移链，但当前漫画榜单、漫画进度和里番播放统计路径仍会懒执行
 `CREATE TABLE IF NOT EXISTS`：
 
 - `manga_view_days`
 - `manga_view_dedup`
 - `manga_reading_progress`
+- `anime_view_days`
+- `anime_view_dedup`
 
 不要把该行为当作完整迁移或 schema 修复。若开发数据库账号禁止 DDL，应先确保相关迁移
-已经应用，并验证榜单、漫画章节和进度路径；当前代码仍可能发出建表语句。
+已经应用，并验证榜单、漫画章节、进度和里番播放路径；当前代码仍可能发出建表语句。
 
 ## 4. 启动与健康检查
 

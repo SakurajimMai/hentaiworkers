@@ -33,6 +33,24 @@ export async function isMangaEnabled(): Promise<boolean> {
 }
 
 /**
+ * Admin-curated manga tags. Only these tag listings are indexable landing pages and appear in
+ * the sitemap; free-form crawler tags stay noindex to avoid thousands of thin duplicates.
+ */
+export async function listCuratedMangaTags(): Promise<string[]> {
+  try {
+    return [...(await getSystemSettingsService().getSettings()).manga.curatedTags];
+  } catch {
+    return [];
+  }
+}
+
+export async function isCuratedMangaTag(tag: string): Promise<boolean> {
+  const normalized = tag.trim();
+  if (!normalized) return false;
+  return (await listCuratedMangaTags()).includes(normalized);
+}
+
+/**
  * Quick-filter tags for /manga: admin-curated tags first (their order),
  * then most-used published tags, deduped and capped.
  */

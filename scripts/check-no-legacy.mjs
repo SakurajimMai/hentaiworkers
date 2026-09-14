@@ -25,7 +25,8 @@ const forbiddenPaths = [
 
 const requiredPaths = [
   'mobile',
-  'app/sitemap.ts',
+  'app/sitemap.xml/route.ts',
+  'app/sitemaps/[name]/route.ts',
   'app/robots.ts',
   'components.json',
   'package-lock.json',

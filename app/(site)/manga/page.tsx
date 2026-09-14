@@ -1,15 +1,15 @@
 import Link from 'next/link';
-import { Suspense, type ReactNode } from 'react';
+import { Suspense, cache, type ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { MangaCard } from '@/components/MangaCard';
 import { Pagination } from '@/components/pagination';
-import { isMangaEnabled, listMangas } from '@/lib/manga-client';
+import { isCuratedMangaTag, isMangaEnabled, listMangas } from '@/lib/manga-client';
 import { normalizeMangaTagQuery } from '@/lib/manga-tags';
 import { isMangaRank } from '@/lib/manga-views';
 import { buildMangaListHref } from '@/components/manga-pagination';
 import { StructuredData } from '@/components/structured-data';
 import { FeedAdCard } from '@/components/feed-ad-card';
-import { resolveSiteUrl } from '@/lib/site-url';
+import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
 import { FEED_BANNER_GRID_CLASS, interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
@@ -26,6 +26,16 @@ const RANKS = [
   { id: 'all', label: '总榜' },
 ] as const;
 
+/** Shared between generateMetadata and the page body so the listing is queried once per request. */
+const loadMangaPage = cache((page: number, q: string, tag: string, rank: string) =>
+  listMangas({
+    page,
+    limit: 30,
+    q: q || undefined,
+    tag: tag || undefined,
+    rank: isMangaRank(rank) ? rank : undefined,
+  }));
+
 export async function generateMetadata({
   searchParams,
 }: {
@@ -35,30 +45,43 @@ export async function generateMetadata({
   const q = (sp.q || '').trim();
   const tag = normalizeMangaTagQuery(sp.tag);
   const rank = isMangaRank(sp.rank) ? sp.rank : undefined;
+  const page = Math.max(1, parseInt(sp.page || '1', 10) || 1);
   const rankLabel = rank === 'day' ? '日榜' : rank === 'week' ? '周榜' : rank === 'month' ? '月榜' : rank === 'all' ? '总榜' : '';
-  const title = tag ? `漫画标签：${tag}` : q ? `搜索漫画：${q}` : rankLabel ? `漫画${rankLabel}` : '漫画目录';
+  const pageSuffix = page > 1 ? `（第 ${page} 页）` : '';
+  const title = tag
+    ? `漫画标签：${tag}${pageSuffix}`
+    : q
+      ? `搜索漫画：${q}`
+      : rankLabel
+        ? `漫画${rankLabel}${pageSuffix}`
+        : `漫画目录${pageSuffix}`;
   const description = tag
     ? `浏览 AnimeStream 漫画标签「${tag}」下的作品。漫画标签独立于里番标签。`
     : q
       ? `在 AnimeStream 中搜索包含“${q}”的漫画作品。`
       : '浏览 AnimeStream 已发布漫画，按标题或漫画标签查找作品。';
+  // Paginated listings canonicalise to themselves so crawlers reach every page of the catalog.
+  const canonical = buildMangaListHref(page, undefined, tag || undefined, rank);
+  // A page past the end renders an empty grid, so it must not be offered as its own landing page.
+  const withinRange =
+    page === 1 ||
+    (await loadMangaPage(page, q, tag, rank ?? '')
+      .then((data) => page <= Math.max(1, data.totalPages))
+      .catch(() => false));
+  // Free-form crawler tags would create thousands of thin pages; only curated tags are landing pages.
+  const indexable = !q && (!tag || (await isCuratedMangaTag(tag))) && withinRange;
   return {
     title,
     description,
-    alternates: {
-      canonical: tag
-        ? `/manga?tag=${encodeURIComponent(tag)}`
-        : rank
-          ? `/manga?rank=${rank}`
-          : '/manga',
-    },
-    openGraph: {
+    alternates: { canonical },
+    openGraph: pageOpenGraph({
       title,
       description,
       type: 'website',
+      url: canonical,
       images: [{ url: '/opengraph-image', alt: 'AnimeStream' }],
-    },
-    robots: q || tag ? { index: false, follow: true } : { index: true, follow: true },
+    }),
+    robots: indexable ? indexableRobots : followOnlyRobots,
   };
 }
 
@@ -91,25 +114,15 @@ export default async function MangaListPage({
   let data: Awaited<ReturnType<typeof listMangas>> | null = null;
   let error: string | null = null;
   try {
-    data = await listMangas({
-      page,
-      limit: 30,
-      q: q || undefined,
-      tag: tag || undefined,
-      rank,
-    });
+    data = await loadMangaPage(page, q, tag, rank ?? '');
   } catch (e) {
     error = e instanceof Error ? e.message : '加载失败';
   }
 
   const heading = tag ? tag : q ? `「${q}」` : '漫画';
 
-  const siteUrl = resolveSiteUrl(process.env.SITE_URL);
-  const listPath = tag
-    ? `/manga?tag=${encodeURIComponent(tag)}`
-    : rank
-      ? `/manga?rank=${rank}`
-      : '/manga';
+  const siteUrl = siteOrigin();
+  const listPath = buildMangaListHref(page, undefined, tag || undefined, rank);
 
   return (
     <div className="page-shell max-w-6xl py-8 sm:py-12 pb-20">

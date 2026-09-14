@@ -84,3 +84,31 @@ export function buildPaginationHref(
   const queryString = params.toString();
   return queryString ? `${basePath}?${queryString}` : basePath;
 }
+
+/**
+ * Params that identify a listing. Anything else (display-only `tagName`, campaign tags such as
+ * `utm_*` or `fbclid`) is dropped: pagination links are crawlable, so echoing stray params would
+ * publish a parallel set of paginated URLs that disagree with the canonical.
+ */
+export const LISTING_PARAMS = ['tag', 'sort', 'search', 'q', 'rank'] as const;
+
+export function buildListingPaginationHref(
+  pathname: string,
+  currentQuery: PaginationQuery,
+  page: number,
+  keepParams: readonly string[] = LISTING_PARAMS,
+): string {
+  const params = new URLSearchParams();
+  for (const key of keepParams) {
+    const value = currentQuery[key];
+    if (value === undefined) continue;
+    const values = typeof value === 'string' ? [value] : value;
+    for (const item of values) {
+      if (item) params.append(key, item);
+    }
+  }
+  const normalizedPage = positiveInteger(page, 1);
+  if (normalizedPage > 1) params.set('page', String(normalizedPage));
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}

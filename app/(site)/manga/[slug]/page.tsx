@@ -8,7 +8,7 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconPlay } from '@/components/icons';
 import { StructuredData } from '@/components/structured-data';
-import { resolveSiteUrl } from '@/lib/site-url';
+import { breadcrumbJsonLd, isoDate, pageOpenGraph, siteOrigin } from '@/lib/seo';
 import { getIdentityService } from '@/lib/server/identity';
 import { isMangaFavorite } from '@/lib/server/manga-favorites';
 import { MangaFavoriteButton } from '@/components/manga-favorite-button';
@@ -43,13 +43,13 @@ export async function generateMetadata({
     authors: manga.author ? [{ name: manga.author }] : undefined,
     keywords: manga.tags.length ? manga.tags : undefined,
     alternates: { canonical: `/manga/${manga.id}` },
-    openGraph: {
+    openGraph: pageOpenGraph({
       title: manga.title,
       description: description.slice(0, 160),
       type: 'article',
       url: `/manga/${manga.id}`,
       images: manga.coverUrl ? [{ url: manga.coverUrl, alt: manga.title }] : undefined,
-    },
+    }),
     twitter: {
       card: 'summary_large_image',
       title: manga.title,
@@ -103,12 +103,22 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
           description: manga.description || undefined,
           image: manga.coverUrl || undefined,
           numberOfPages: manga.pageCount,
-          url: `${resolveSiteUrl(process.env.SITE_URL)}/manga/${manga.id}`,
+          url: `${siteOrigin()}/manga/${manga.id}`,
           author: manga.author ? { '@type': 'Person', name: manga.author } : undefined,
           keywords: manga.tags.length ? manga.tags.join(', ') : undefined,
-          dateModified: manga.updatedAt ? new Date(manga.updatedAt).toISOString() : undefined,
-          isPartOf: { '@type': 'CollectionPage', name: 'AnimeStream 漫画目录' },
+          dateModified: isoDate(manga.updatedAt),
+          inLanguage: 'zh-CN',
+          isFamilyFriendly: false,
+          bookFormat: 'https://schema.org/GraphicNovel',
+          isPartOf: { '@type': 'CollectionPage', name: 'AnimeStream 漫画目录', url: `${siteOrigin()}/manga` },
         }}
+      />
+      <StructuredData
+        data={breadcrumbJsonLd([
+          { name: '首页', path: '/' },
+          { name: '漫画', path: '/manga' },
+          { name: manga.title, path: `/manga/${manga.id}` },
+        ])}
       />
       <HistoryBackLink href="/manga" className="mb-7 inline-flex items-center gap-1.5 font-ui text-[12px] text-soft transition hover:text-ink">
         <IconArrowLeft size={15} /> 漫画目录

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { MAX_AD_HEIGHT, feedAdFrameRatio, htmlAdFitScale, htmlAdFrameScale, htmlAdSlotPaddingBottom, inferAdDimensionsFromHtml, normalizeAdDimensions, resolveAdDimensions } from '../../lib/ad-dimensions';
+import { MAX_AD_HEIGHT, feedAdFrameRatio, htmlAdContainScale, htmlAdFitScale, htmlAdFrameScale, htmlAdSlotPaddingBottom, inferAdDimensionsFromHtml, normalizeAdDimensions, resolveAdDimensions } from '../../lib/ad-dimensions';
 import { HTML_AD_RUNTIME } from '../../lib/client/html-ad-runtime';
 import {
   HTML_AD_MESSAGE_TYPE,
@@ -77,6 +77,54 @@ test('ad reports and creative sizes stay bounded and reject invalid numbers', ()
     { width: 728, height: 90 },
   );
   assert.deepEqual(inferAdDimensionsFromHtml('<div class="native"></div>'), { width: 0, height: 0 });
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<a href="https://ads.example/go" target="_blank"><img src="https://cdn.example/300x250.jpg" width="300" height="250" alt=""></a>'),
+    { width: 300, height: 250 },
+    'plain image creatives expose their pixel size',
+  );
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<a href="https://ads.example/go"><img src="https://cdn.example/b.png" style="width:300px;height:450px;display:block"></a>'),
+    { width: 300, height: 450 },
+  );
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<img src="https://cdn.example/fluid.png" width="100%" data-width="300" data-height="250">'),
+    { width: 0, height: 0 },
+    'percentage and data-* sizes stay automatic',
+  );
+  // The lookahead must span the remaining digits, or the engine backtracks and reads 100% as 10px.
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<a><img src="https://cdn.example/a.png" width="100%" height="100%"></a>'),
+    { width: 0, height: 0 },
+    'a fully responsive image never becomes a 10 pixel fixed creative',
+  );
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<iframe width="100%" height="250" src="https://ads.example/x"></iframe>'),
+    { width: 0, height: 0 },
+    'a percentage on either axis keeps the slot automatic',
+  );
+  // Snippets routinely carry a badge, logo or tracking pixel before the real unit.
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<div><img src="badge.png" width="15" height="15"><script src="n.js"></script><a><img src="b.png" width="300" height="250"></a></div>'),
+    { width: 300, height: 250 },
+    'the largest sized element wins, not the first one',
+  );
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<a><img width="24" height="24"></a><a><img width="300" height="250"></a>'),
+    { width: 300, height: 250 },
+  );
+  // Inferred sizes keep the creative's real shape; clamping one axis would invent a ratio and the
+  // 2:3 card would crop exactly what contain promises to letterbox.
+  assert.deepEqual(
+    inferAdDimensionsFromHtml('<a><img width="600" height="900"></a>'),
+    { width: 400, height: 600 },
+    'a tall creative is scaled proportionally into the bounds',
+  );
+  assert.deepEqual(inferAdDimensionsFromHtml('<img width="300" height="1050">'), { width: 171, height: 600 });
+  assert.deepEqual(inferAdDimensionsFromHtml('<video width="640" height="360" src="https://cdn.example/a.mp4"></video>'), { width: 640, height: 360 });
+  assert.equal(htmlAdContainScale(230, 345, 300, 250), 230 / 300, '300x250 in a poster cell is width-limited');
+  assert.equal(htmlAdContainScale(230, 345, 300, 600), 345 / 600, '300x600 in a poster cell is height-limited');
+  assert.equal(htmlAdContainScale(230, 0, 300, 250), 230 / 300, 'unknown slot height falls back to width fit');
+  assert.equal(htmlAdContainScale(0, 345, 300, 250), 1);
   assert.deepEqual(
     resolveAdDimensions({
       width: 0,

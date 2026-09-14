@@ -133,7 +133,9 @@ WHERE table_schema = DATABASE()
     'manga_pages',
     'manga_view_days',
     'manga_view_dedup',
-    'manga_reading_progress'
+    'manga_reading_progress',
+    'anime_view_days',
+    'anime_view_dedup'
   )
 ORDER BY table_name;
 
@@ -149,8 +151,12 @@ WHERE table_schema = DATABASE()
 ORDER BY table_name, index_name;
 ```
 
-结果缺失时停止启动，回到迁移审核。当前 App 的漫画榜单和漫画进度路径仍可能懒执行
-`CREATE TABLE IF NOT EXISTS`；这不是迁移成功证明，也不能补齐其他表、列或索引。
+结果缺失时停止启动，回到迁移审核。当前 App 的漫画榜单、漫画进度和里番播放统计路径仍可能
+懒执行 `CREATE TABLE IF NOT EXISTS`；这不是迁移成功证明，也不能补齐其他表、列或索引。
+
+`anime_view_days` / `anime_view_dedup` 来自 `0020-anime-views.sql`。该迁移**会执行**
+`UPDATE animes SET view_count = 0`：现有播放量全部是爬虫随机种子，重置后计数才真实。它不可逆，
+并会让 `sort=popular` 立即重排，**执行前请先备份数据库**。应用本身永远不会执行这条语句。
 
 ## 5. 拉取或确认镜像
 

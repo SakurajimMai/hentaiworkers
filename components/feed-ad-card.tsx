@@ -61,7 +61,17 @@ export function FeedAdCard({
   ) : (
     <div className={`${custom ? 'poster-frame' : 'feed-ad-card'} aspect-[2/3] w-full min-w-0`}>
       <AspectRatio ratio={2 / 3}>
-        {custom ? (
+        {custom && size.width > 0 ? (
+          // A sized image/alliance creative is letterboxed inside the poster cell instead of being cropped.
+          <HtmlAd
+            html={custom}
+            documentSrc={documentSrc}
+            width={size.width}
+            height={size.height}
+            contain
+            className="feed-ad-html"
+          />
+        ) : custom ? (
           <HtmlAd html={custom} documentSrc={documentSrc} fill className="feed-ad-html" />
         ) : (
           <FeedAdPlaceholder href={target} />

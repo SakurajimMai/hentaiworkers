@@ -68,12 +68,17 @@ Action 只做协议、鉴权与用例调用。但“所有页面都不直接访�
 | 数据 | 主要表 |
 |------|--------|
 | 里番目录与标签 | `animes`、`tags`、`anime_tags` |
+| 里番播放统计 | `anime_view_days`、`anime_view_dedup`（`animes.view_count` 为同源计数列） |
 | 用户、角色和会话版本 | `users` |
 | 站点、注册、邮件、广告与发布设置 | `system_settings` |
 | 邮箱验证与密码重置 | `email_verification_tokens`、`password_reset_tokens` |
 | 里番收藏与观看进度 | `user_lists`、`user_list_items`、`user_watch_progress`、`user_events` |
 | 漫画、章节与页面 | `mangas`、`manga_chapters`、`manga_pages` |
 | 漫画收藏、阅读进度与榜单 | `manga_favorites`、`manga_reading_progress`、`manga_view_days`、`manga_view_dedup` |
+
+`animes.favorite_count` 是历史遗留列：写入时恒为 0，从未维护，代码不得读取。里番收藏数由
+`user_lists` + `user_list_items` 中的系统收藏列表（`list_type = 'favorites' AND is_system = 1`）
+实时统计得出；旧 `user_favorites` 表只用于一次性回填。
 
 历史迁移 `0010–0013` 可能在旧库留下 works 表，主站代码不得读写它们。处理建议见
 [变更记录](./CHANGELOG.md)。
@@ -98,11 +103,15 @@ Releases 仓库。
 主站消费目录中配置的媒体 URL，不负责通用视频代理。`/cdn-img/**` 只代理固定
 `image.ixacg.de` 图片来源；不能把它描述成任意图片或视频代理。
 
+站点地图索引 `/sitemap.xml` 与分片 `/sitemaps/*.xml` 共用一份进程内缓存的目录快照（10 分钟新鲜、
+最长 6 小时兜底），`/indexnow/{key}.txt` 从系统设置读取密钥；内容变更后的 IndexNow 通知在响应完成后
+异步执行，失败只记录日志。
+
 ## 9. Schema 生命周期与健康检查
 
-应用和 Compose 不运行完整迁移链，生产 SQL 必须人工审核。当前漫画榜单与漫画进度代码仍会
-在请求路径中执行 `CREATE TABLE IF NOT EXISTS`，这是与最小权限目标并存的现状；在正式迁移
-已经创建相应表前，应用数据库账号可能仍需要 DDL 权限。
+应用和 Compose 不运行完整迁移链，生产 SQL 必须人工审核。当前漫画榜单、漫画进度与里番播放
+统计代码仍会在请求路径中执行 `CREATE TABLE IF NOT EXISTS`，这是与最小权限目标并存的现状；
+在正式迁移已经创建相应表前，应用数据库账号可能仍需要 DDL 权限。
 
 | 端点 | 检查内容 | 不证明 |
 |------|----------|--------|

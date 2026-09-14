@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   MAX_AD_HEIGHT,
+  htmlAdContainScale,
   htmlAdFitScale,
   htmlAdSlotPaddingBottom,
   resolveAdDimensions,
@@ -22,6 +23,7 @@ export function HtmlAd({
   className = '',
   fill = false,
   fitParent = false,
+  contain = false,
   minHeight = 72,
   width = 0,
   height: creativeHeight = 0,
@@ -33,6 +35,8 @@ export function HtmlAd({
   fill?: boolean;
   /** Scale the creative to the parent box instead of capping at native CSS pixels. */
   fitParent?: boolean;
+  /** Letterbox a fixed creative inside the parent box (width and height), centred and never cropped. */
+  contain?: boolean;
   minHeight?: number;
 } & AdDimensions) {
   const reactId = useId();
@@ -79,8 +83,10 @@ export function HtmlAd({
       const update = () => {
         const next = node.clientWidth;
         if (next > 0) {
-          const fitted = htmlAdFitScale(next, dimensions.width);
-          setScale(fitParent ? fitted : Math.min(1, fitted));
+          const fitted = contain
+            ? htmlAdContainScale(next, node.clientHeight, dimensions.width, dimensions.height)
+            : htmlAdFitScale(next, dimensions.width);
+          setScale(fitParent || contain ? fitted : Math.min(1, fitted));
         }
       };
       update();
@@ -104,7 +110,7 @@ export function HtmlAd({
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [fixed, fitParent, useFill, dimensions.width, html, srcDoc, src]);
+  }, [fixed, fitParent, contain, useFill, dimensions.width, dimensions.height, html, srcDoc, src]);
 
   const iframe = (
     <iframe
@@ -166,6 +172,37 @@ export function HtmlAd({
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }}
       >
         {iframe}
+      </div>
+    );
+  }
+
+  if (fixed && contain) {
+    return (
+      <div
+        ref={slot}
+        className={className}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            width: dimensions.width * scale,
+            height: dimensions.height * scale,
+            overflow: 'hidden',
+            flex: 'none',
+          }}
+        >
+          {iframe}
+        </div>
       </div>
     );
   }

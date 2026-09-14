@@ -23,7 +23,7 @@ const sourceFiles = new Set([
 ]);
 const stubModules = {
   'next/link': `import React from 'react'; export default function Link(props) { return React.createElement('a', props); }`,
-  'next/navigation': `export function useRouter() { return { refresh() {}, push(url) { window.__readerNavigation = url; } }; }`,
+  'next/navigation': `export function useRouter() { return { refresh() {}, back() { window.__readerNavigation = 'back'; }, push(url) { window.__readerNavigation = url; } }; }`,
   '@/app/(site)/auth/actions': `async function toggle(id, returnTo) {
     const response = await fetch('/fixture/favorite', { method: 'POST', body: JSON.stringify({ id, returnTo }) });
     return response.json();

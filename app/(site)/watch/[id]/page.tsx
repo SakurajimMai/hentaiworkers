@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { after } from 'next/server';
 import { AnimeCard } from '@/components/AnimeCard';
 import { FavoriteButton } from '@/components/favorite-button';
 import { HistoryBackLink } from '@/components/history-back-link';
@@ -8,6 +9,7 @@ import { IconArrowLeft, IconCalendar, IconEye } from '@/components/icons';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { WatchPlayer } from '@/components/watch-player';
 import { getAnimeById, getSimilarAnimes } from '@/lib/anime-service';
+import { recordAnimeView } from '@/lib/anime-views';
 import {
   getFavoritesService,
   getIdentityService,
@@ -16,7 +18,7 @@ import {
 import { getSystemSettingsService } from '@/lib/server/system';
 import { StructuredData } from '@/components/structured-data';
 import { MediaImage } from '@/components/media-image';
-import { resolveSiteUrl } from '@/lib/site-url';
+import { absoluteMediaUrl, breadcrumbJsonLd, isoDate, pageOpenGraph, siteOrigin } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,14 +37,15 @@ export async function generateMetadata({
   return {
     title: anime.title,
     description: description.slice(0, 160),
+    keywords: anime.tags?.length ? anime.tags.map((tag) => tag.name) : undefined,
     alternates: { canonical: `/watch/${id}` },
-    openGraph: {
+    openGraph: pageOpenGraph({
       title: anime.title,
       description: description.slice(0, 160),
       type: 'video.other',
       url: `/watch/${id}`,
       images: anime.cover ? [{ url: anime.cover, alt: anime.title }] : undefined,
-    },
+    }),
     twitter: {
       card: 'summary_large_image',
       title: anime.title,
@@ -59,6 +62,9 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   const anime = await getAnimeById(id);
   if (!anime) notFound();
 
+  // Deferred so the deduped view write never delays the player response.
+  after(recordAnimeView(id));
+
   const user = await getIdentityService().getCurrentUser();
   const [similar, favorited, progress, playerConfig] = await Promise.all([
     getSimilarAnimes(id),
@@ -69,7 +75,8 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   const fanartList = anime.fanart
     ? anime.fanart.split(',').map((u) => u.trim()).filter(Boolean)
     : [];
-  const watchUrl = `${resolveSiteUrl(process.env.SITE_URL)}/watch/${id}`;
+  const watchUrl = `${siteOrigin()}/watch/${id}`;
+  const videoUrl = absoluteMediaUrl(anime.videoUrl);
 
   return (
     <div className="pb-20 sm:pb-24">
@@ -78,12 +85,32 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
           '@context': 'https://schema.org',
           '@type': 'VideoObject',
           name: anime.title,
+          alternateName: [anime.titleJapanese, anime.titleEnglish].filter(Boolean),
           description: anime.description?.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim() || `在线观看 ${anime.title}`,
           thumbnailUrl: anime.cover ? [anime.cover] : undefined,
-          embedUrl: watchUrl,
-          uploadDate: anime.createdAt || undefined,
+          // Google requires contentUrl or embedUrl for video results; the page itself is not an embed.
+          contentUrl: videoUrl,
+          uploadDate: isoDate(anime.createdAt),
+          dateModified: isoDate(anime.updatedAt),
           url: watchUrl,
+          inLanguage: 'ja',
+          isFamilyFriendly: false,
+          keywords: anime.tags?.length ? anime.tags.map((tag) => tag.name).join(', ') : undefined,
+          interactionStatistic: anime.viewCount != null
+            ? {
+                '@type': 'InteractionCounter',
+                interactionType: { '@type': 'WatchAction' },
+                userInteractionCount: anime.viewCount,
+              }
+            : undefined,
         }}
+      />
+      <StructuredData
+        data={breadcrumbJsonLd([
+          { name: '首页', path: '/' },
+          { name: '里番', path: '/browse' },
+          { name: anime.title, path: `/watch/${id}` },
+        ])}
       />
       <div className="page-shell py-5 sm:py-8">
         <HistoryBackLink

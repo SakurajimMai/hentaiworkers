@@ -306,6 +306,7 @@ export class SystemSettingsService {
           androidDownloadLabel: input.site?.androidDownloadLabel,
           telegramUrl: input.site?.telegramUrl,
           telegramLabel: input.site?.telegramLabel,
+          indexNowKey: input.site?.indexNowKey,
         }),
       },
     });

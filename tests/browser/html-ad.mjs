@@ -248,6 +248,25 @@ try {
   const nativeBox = await page.locator('#ad-host iframe').boundingBox();
   assert.ok(Math.abs(nativeBox.height - nativeBox.width * 3 / 2) < 4, 'native card keeps the 2:3 poster ratio');
 
+  for (const [sizedWidth, sizedHeight, explicit] of [[300, 250, true], [300, 600, true], [300, 250, false]]) {
+    const creative = `<div id="creative" style="width:${sizedWidth}px;height:${sizedHeight}px;background:#147d72">sized-card</div>`;
+    frame = await render({
+      kind: 'feed',
+      ...(explicit ? { width: sizedWidth, height: sizedHeight, html: creative } : {
+        html: `<a href="https://ads.example/go"><img src="${origin}/tick?img" width="${sizedWidth}" height="${sizedHeight}" alt="" style="display:block"></a>`,
+      }),
+    });
+    const sizedSlot = await page.locator('#ad-host .poster-frame').first().boundingBox();
+    const sizedFrame = await page.locator('#ad-host iframe').boundingBox();
+    const expectedScale = Math.min(230 / sizedWidth, sizedSlot.height / sizedHeight);
+    assert.ok(Math.abs(sizedSlot.height - 230 * 3 / 2) < 4, `sized ${sizedWidth}x${sizedHeight} card keeps the 2:3 poster cell, got ${sizedSlot.height}`);
+    assert.ok(Math.abs(sizedFrame.width - sizedWidth * expectedScale) < 4, `sized ${sizedWidth}x${sizedHeight} card fits its width, got ${sizedFrame.width}`);
+    assert.ok(Math.abs(sizedFrame.height - sizedHeight * expectedScale) < 4, `sized ${sizedWidth}x${sizedHeight} card fits its height, got ${sizedFrame.height}`);
+    assert.ok(sizedFrame.y >= sizedSlot.y - 1 && sizedFrame.y + sizedFrame.height <= sizedSlot.y + sizedSlot.height + 1, 'sized card creative is never cropped by the poster cell');
+    assert.ok(Math.abs((sizedFrame.y - sizedSlot.y) - (sizedSlot.height - sizedFrame.height) / 2) < 4, 'sized card creative is centred in the cell');
+    assert.equal(await frame.evaluate(() => window.innerWidth), sizedWidth, `sized card keeps a ${sizedWidth}px creative viewport`);
+  }
+
   await page.setViewportSize({ width: 390, height: 844 });
   frame = await render({
     kind: 'feed',

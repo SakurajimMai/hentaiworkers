@@ -60,6 +60,25 @@ own its dependencies and tests, remain excluded from the App Docker context, Typ
 ESLint, and keep production configuration ignored. Catalog media fields contain
 browser-accessible URLs.
 
+The App does not run migrations, but two read paths still issue `CREATE TABLE IF NOT EXISTS`
+on the request path as a bounded, documented exception: manga ranking/progress
+(`manga_view_days`, `manga_view_dedup`, `manga_reading_progress`) and anime view tracking
+(`anime_view_days`, `anime_view_dedup`). The bootstrap is one cached promise per process that
+resets on failure, and the recording path must never throw into its caller. Prepare these tables
+through reviewed migrations (`0017`, `0018`, `0020`); lazy creation is not a migration and must not
+be extended to any other table.
+
+Anime and manga view counts are real: one counted view per viewer per work per UTC day, keyed by
+the logged-in user id or a hashed client IP. The anime path also increments `animes.view_count`,
+which stays the cheap counter behind list responses and `sort=popular`; an unknown or inactive id
+is not counted. Anime favourite counts are derived live from the system favourites lists
+(`user_lists.list_type = 'favorites' AND is_system = 1` joined to `user_list_items`). The stored
+`animes.favorite_count` column is retained for schema history only and must not be read or written.
+A count that cannot be computed is reported as `null` (unknown); never substitute a placeholder
+number. `0020-anime-views.sql` clears the crawler's random `view_count` seeds as executable SQL, so counts
+are real from the moment it is applied. Any future reset of a counter belongs in a reviewed
+migration for the same reason: the App itself must never issue that kind of bulk write.
+
 Pure control-plane tables and `anime_sources` do not belong to active App schema or migration
 tooling. Historical migrations `0010`-`0013` remain immutable, but App code must not read or
 write their works tables. Removal work never drops tables or rewrites stored catalog rows
@@ -113,6 +132,7 @@ the retention job loudly instead of silently accumulating tags.
 | Remote database disables TLS or uses a non-DNS host | Configuration parsing fails |
 | Removed route is requested | Normal Next.js 404; no compatibility handler |
 | Existing database still contains removed tables | Ignore; do not issue destructive SQL |
+| View/favourite count cannot be computed | Report `null` (unknown); never emit a stored placeholder or a synthetic number |
 | Catalog contains a removed local-media URL | Correct operationally; do not read host files from App |
 | GitHub update release is draft, non-main, incomplete, or has an invalid asset path/digest | Ignore it and select the greatest older complete `build-N`; return the documented upstream error only when no cached valid manifest exists |
 | `crawler/**/production_config.yml` exists locally | Keep ignored; commit only a sanitized example |
@@ -121,6 +141,8 @@ the retention job loudly instead of silently accumulating tags.
 
 - Good: add a catalog query through a port and MariaDB repository, then expose it from an App
   route with contract tests.
+- Good: derive a displayed count from the rows that actually own it, and report `null` when the
+  derivation fails.
 - Base: render an absolute `cover` or `video_url` already stored in `animes`.
 - Good: keep a Python producer under `crawler/` with its own dependencies and ignored runtime
   configuration.

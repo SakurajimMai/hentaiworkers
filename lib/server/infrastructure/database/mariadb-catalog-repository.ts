@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm';
-import { db, withDbRetry } from '@/lib/db';
+import type { RowDataPacket } from 'mysql2';
+import { db, pool, withDbRetry } from '@/lib/db';
 import {
   animeTags,
   animes,
@@ -33,6 +34,22 @@ import { nowIso } from '@/lib/utils';
 function activeAnimeCondition() {
   return sql`(${animes.isActive} = 1 OR ${animes.isActive} IS NULL)`;
 }
+
+/**
+ * Real favourites live in the system `favorites` list only
+ * (`user_lists.list_type = 'favorites' AND is_system = 1`). Custom lists and the
+ * backfill-only legacy `user_favorites` table are deliberately excluded.
+ * `user_list_items` is not part of the drizzle schema, so this stays raw SQL;
+ * `user_list_items_anime_id_idx` keeps the count indexed for a single anime.
+ */
+export const ANIME_FAVORITE_COUNT_SQL = `
+  SELECT COUNT(*) AS total
+  FROM user_list_items i
+  INNER JOIN user_lists l ON l.id = i.list_id
+  WHERE i.anime_id = ?
+    AND l.list_type = 'favorites'
+    AND l.is_system = 1
+`;
 
 export class MariaDbCatalogRepository
   implements CatalogReadRepository, CatalogWriteRepository
@@ -145,7 +162,16 @@ export class MariaDbCatalogRepository
         .innerJoin(animeTags, eq(tags.id, animeTags.tagId))
         .where(eq(animeTags.animeId, id));
 
-      return { ...anime, tags: tagRows };
+      // favorite_count is a dead crawler column; the live count is composed by
+      // CatalogQueryService via countFavorites().
+      return { ...anime, favoriteCount: null, tags: tagRows };
+    });
+  }
+
+  countFavorites(animeId: number): Promise<number> {
+    return withDbRetry(async () => {
+      const [rows] = await pool.query<RowDataPacket[]>(ANIME_FAVORITE_COUNT_SQL, [animeId]);
+      return Math.max(0, Number(rows[0]?.total ?? 0));
     });
   }
 
@@ -170,12 +196,18 @@ export class MariaDbCatalogRepository
             id: animes.id,
             createdAt: animes.createdAt,
             updatedAt: animes.updatedAt,
+            cover: animes.cover,
           })
           .from(animes)
           .where(activeCondition),
+        // Same active-anime join as listTags(): a tag with no visible work renders noindex,
+        // so submitting it would only earn "Submitted URL marked noindex" in Search Console.
         db
-          .select({ id: tags.id, name: tags.name })
+          .selectDistinct({ id: tags.id, name: tags.name })
           .from(tags)
+          .innerJoin(animeTags, eq(tags.id, animeTags.tagId))
+          .innerJoin(animes, eq(animeTags.animeId, animes.id))
+          .where(activeAnimeCondition())
           .orderBy(tags.name),
       ]);
       return { animes: animeRows, tags: tagRows };
@@ -280,6 +312,7 @@ export class MariaDbCatalogRepository
         fanart: input.fanart ?? null,
         isActive: input.isActive ?? 1,
         viewCount: 0,
+        // Column default only; favourite counts are never read from here.
         favoriteCount: 0,
         createdAt: nowIso(),
         updatedAt: nowIso(),

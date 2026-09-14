@@ -150,7 +150,7 @@ GET /api/animes?page=1&limit=48&sort=popular&tag=12&search=关键词
 |------|------|--------|------|
 | `page` | integer | `1` | 页码，最小为 1 |
 | `limit` | integer | `48` | 每页条数，钳制到 1..100 |
-| `sort` | string | `latest` | `latest` 按更新时间（缺失时回退创建时间）；`popular` 按浏览量 |
+| `sort` | string | `latest` | `latest` 按更新时间（缺失时回退创建时间）；`popular` 按真实播放量 `view_count` |
 | `tag` | integer | - | 里番标签 ID |
 | `search` | string | - | 模糊匹配标题、日文标题、英文标题和简介 |
 
@@ -188,6 +188,16 @@ GET /api/animes/{id}
 ```json
 { "error": "Not found" }
 ```
+
+字段含义（字段名保持不变，旧客户端无需改动）：
+
+| 字段 | 含义 |
+|------|------|
+| `viewCount` | 真实播放量。按「同一访客 · 同一作品 · 同一 UTC 日」去重，网页播放页和本接口都会计一次；已下架或不存在的作品不计数 |
+| `favoriteCount` | 实时收藏数，统计把该作品放进系统收藏列表的用户数；自定义列表不计入。`null` 表示统计暂时不可用（未知），不要当作 `0` |
+
+`animes.favorite_count` 列已不再维护，接口不会返回它的值。列表接口不返回收藏数：逐条统计
+对列表来说代价过高，详情级准确才是目标。
 
 ### 相似推荐
 
