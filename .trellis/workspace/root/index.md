@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 11
+- **Total Sessions**: 12
 - **Last Active**: 2026-09-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~324 | Active |
+| `journal-1.md` | ~345 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 12 | 2026-09-14 | 自动发布 Release 与保留最新八个 APK/镜像版本 | `7e43c12` | `main` |
 | 11 | 2026-09-14 | APK 阅读预取、信息流广告尺寸与 SEO 收录优化 | uncommitted | `main` |
 | 10 | 2026-09-06 | 发布漫画阅读优化、Meta 与 HTML 广告正式版 Build 91 | `1e98a74`, `9dc3d8f` | `main` |
 | 9 | 2026-09-06 | Native reader performance, chapter zoom, global meta and HTML banners | `e38f98ebc21b1be723db094aaee2bdf34c79c843` | `codex/reader-meta-ads-check-20260906030631488` |

@@ -322,3 +322,24 @@ Implemented native reader and web admin changes; all root and browser checks pas
 ### Status
 
 [OK] **Completed**
+
+
+## Session 12: 自动发布 Release 与保留最新八个 APK/镜像版本
+
+**Date**: 2026-09-14
+**Task**: 自动发布 Release 与保留最新八个 APK/镜像版本
+**Branch**: `main`
+
+### Summary
+
+Build 97 推送验证通过（ktlint 补丁后 89 项 JVM 测试全绿，正式签名），手动发布 Build 98；随后改为 main 正式签名构建自动发布 build-N，并在 Android 发布任务与 Docker workflow 中分别只保留最新八个 Release/SHA 镜像标签。推送 7e43c12 后 Build 99 自动发布，删除 build-72/66/62；Docker Hub 由 77 个 SHA 标签清理到 8 个。生产固定镜像 9dc3d8f 位于保留边缘，需重新固定。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7e43c12` | (see git log) |
+
+### Status
+
+[OK] **Completed**
