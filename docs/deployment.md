@@ -12,7 +12,7 @@ HTTPS 反向代理和主机升级均由操作者或外部平台负责。GitHub A
 | 组件 | 当前责任 |
 |------|----------|
 | Docker workflow | 构建并推送 App 镜像与标签 |
-| Android workflow | 检查并构建 APK；满足手动门禁时创建 GitHub prerelease |
+| Android workflow | 检查并构建 APK；正式签名的 `main` 构建自动创建 GitHub prerelease，并只保留最新八个 |
 | Compose | 启动一个 `app` 服务并检查进程存活 |
 | 操作者 | 选择镜像、准备环境、审核/执行迁移、seed、反代、烟测、升级与回滚 |
 | 外部数据库 | 创建数据库、备份、TLS、权限、容量和恢复 |
@@ -259,19 +259,18 @@ Android workflow 构建：
 - `x86`
 - `universal`
 
-`main` push 只产生待验收 Artifact。只有在同一已验证提交上手动选择
-`publish_release`、四个生产签名 Secrets 完整且证书摘要匹配时，才创建
-`build-*` GitHub prerelease。APK 不进入 App 镜像。
+`main` push 在四个生产签名 Secrets 完整且证书摘要匹配时自动创建 `build-*` GitHub
+prerelease；分支、PR 或缺少签名配置时只产生待验收 Artifact。APK 不进入 App 镜像。
 
-两个 workflow 的 cleanup 都按创建时间保留整个仓库最新五次 Actions runs，并只删除
-更早且已完成的 runs。这不是每个 workflow 五次，也不会删除：
+保留策略：
 
-- GitHub Releases 或 APK assets
-- Docker Hub image tags
-- 当前生产容器
+- Android workflow 发布后只保留最新八个 `build-*` Releases，更早的 Release 与标签一并删除。
+- Docker workflow 推送镜像后只保留 Docker Hub 上最新八个提交 SHA 版本标签；`latest`、`manga`、
+  分支名和 `v*` 语义化版本标签不会被删除。`DOCKERHUB_TOKEN` 必须具备删除权限，否则该任务失败。
+- 两个 workflow 的 cleanup 仍按创建时间保留整个仓库最新五次 Actions runs，并只删除更早且已完成的
+  runs；这与 Releases、镜像标签无关，也不会触碰当前生产容器。
 
-Releases 和镜像的保留策略需要单独管理。Android 签名、ABI 与 Build 39 迁移见
-[移动端文档](./mobile.md)。
+Android 签名、ABI 与 Build 39 迁移见 [移动端文档](./mobile.md)。
 
 ## 11. 常见故障
 
@@ -282,5 +281,6 @@ Releases 和镜像的保留策略需要单独管理。Android 签名、ABI 与 B
 | `/api/ready` 成功但功能报缺表 | ready 只做连接检查；核对实际 schema 和迁移记录 |
 | 私有 CA 文件不存在 | 官方 Compose 未挂载 CA；停止并完成独立 mount 方案 |
 | 漫画榜单/进度失败 | 核对 `0017`、`0018`、账号 DDL 权限和 App 日志 |
-| 新 APK 未出现在 Releases | 检查是否只是 main Artifact，是否手动启用 `publish_release` 并使用正式签名 |
+| 新 APK 未出现在 Releases | 确认是 `main` 的正式签名构建且工作流全绿；分支、PR 或 `internal-debug` 构建不会发布 |
+| 旧 Release 或旧镜像标签消失 | 保留策略只保留最新八个 `build-*` Release 与八个 SHA 镜像标签；需要长期保留的版本请另行归档 |
 | 旧 Actions run 消失 | cleanup 只保留仓库级最新五次；到 Releases 检查正式 APK，不把 run 当 Release |

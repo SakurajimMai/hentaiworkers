@@ -166,13 +166,11 @@ unset ADMIN_BOOTSTRAP_USER ADMIN_BOOTSTRAP_PASSWORD
 Android Lint、单元测试、Release 构建以及包名、ABI、内容和签名验证。构建五个 APK：
 `arm64-v8a`、`armeabi-v7a`、`x86_64`、`x86` 和 `universal`。
 
-`main` push 只产生待验收 Artifact；同一提交必须再手动运行
-`workflow_dispatch` 并选择 `publish_release`，才可能创建正式签名的
-`build-*` prerelease。普通分支或没有生产签名配置时只产生内部测试 Artifact。
-详见 [移动端文档](./mobile.md)。
+正式签名的 `main` 构建在验证通过后自动创建 `build-*` prerelease，并只保留最新八个；
+普通分支或没有生产签名配置时只产生内部测试 Artifact。详见 [移动端文档](./mobile.md)。
 
-Android 与 Docker workflow 的 cleanup 保留的是整个仓库最新五次 Actions runs，
-不是每个 workflow 各五次，也不会删除 GitHub Releases、Release assets 或 Docker tags。
+Docker workflow 推送镜像后只保留 Docker Hub 上最新八个提交 SHA 版本标签。Android 与 Docker
+workflow 的 cleanup 另外保留整个仓库最新五次 Actions runs，不是每个 workflow 各五次。
 
 ## 8. 代码边界
 

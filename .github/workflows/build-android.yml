@@ -12,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: Publish the verified production-signed APKs to GitHub Releases
+        description: Publish the verified production-signed APKs to GitHub Releases (main pushes always publish; untick for a verification-only manual run)
         required: false
-        default: false
+        default: true
         type: boolean
 
 concurrency:
@@ -293,11 +293,12 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
+    # Every production-signed main build publishes automatically; a manual run can opt out.
     if: >-
       github.ref == 'refs/heads/main' &&
-      github.event_name == 'workflow_dispatch' &&
-      inputs.publish_release &&
-      needs.build.outputs.signing_mode == 'release'
+      needs.build.outputs.signing_mode == 'release' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish_release))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -373,6 +374,54 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retain latest eight releases
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const retainedReleaseCount = 8;
+            const { owner, repo } = context.repo;
+            const currentTag = `build-${context.runNumber}`;
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              { owner, repo, per_page: 100 },
+            );
+
+            const builds = releases
+              .map((release) => ({
+                release,
+                build: Number(/^build-(\d+)$/.exec(release.tag_name)?.[1] ?? NaN),
+              }))
+              .filter((entry) => Number.isInteger(entry.build))
+              .sort((left, right) =>
+                right.build - left.build || right.release.id - left.release.id
+              );
+
+            const retainedIds = new Set(
+              builds.slice(0, retainedReleaseCount).map((entry) => entry.release.id),
+            );
+            for (const { release } of builds) {
+              if (retainedIds.has(release.id) || release.tag_name === currentTag) continue;
+              try {
+                await github.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+              } catch (error) {
+                if (error?.status === 404) {
+                  core.info(`Release ${release.tag_name} was already deleted`);
+                } else {
+                  throw error;
+                }
+              }
+              try {
+                await github.rest.git.deleteRef({ owner, repo, ref: `tags/${release.tag_name}` });
+              } catch (error) {
+                if (error?.status !== 404 && error?.status !== 422) throw error;
+              }
+              core.info(`Deleted release and tag ${release.tag_name}`);
+            }
+
+            core.info(
+              `Retained ${Math.min(retainedReleaseCount, builds.length)} latest build releases`,
+            );
 
   cleanup:
     name: Retain latest five Actions runs

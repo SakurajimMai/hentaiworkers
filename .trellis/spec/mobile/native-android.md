@@ -20,9 +20,11 @@ scope, Docker image, production Compose services, and server-private imports.
 - Builds 39 and earlier used the public Expo template debug certificate. It must not be reused as
   the production key; users must uninstall those builds before installing the first securely
   signed native release.
-- A `main` push produces a signed artifact for verification but does not publish. A GitHub Release
-  requires an explicit `workflow_dispatch` with `publish_release`, all four release-signing
-  secrets, and the same pinned certificate. Partial signing configuration must fail.
+- Every `main` build that passes verification with all four release-signing secrets and the pinned
+  certificate publishes a `build-N` prerelease automatically (push or `workflow_dispatch`; a manual
+  run may untick `publish_release` for a verification-only build). Branch and PR builds never
+  publish. After publishing, the release job keeps only the newest eight `build-N` releases and
+  deletes older releases together with their tags. Partial signing configuration must fail.
 - The first native launch must idempotently import the five known `RKStorage` values without
   deleting the old database or overwriting newer native rows.
 - Launcher branding uses the AnimeStream paper/ink/ember mark. Adaptive icons keep the solid
@@ -178,7 +180,7 @@ Android build environment and must:
    universal APK. Every split must contain only its target ABI and match the corresponding native
    libraries in the universal APK.
 6. Upload all five APKs and diagnostic reports; publish them to GitHub Releases only from a
-   formally signed `main` build.
+   formally signed `main` build, then prune releases beyond the newest eight.
 7. Inspect every assembled APK resource table for the launcher foreground, monochrome mark,
    splash icon, and normal/round launcher entries.
 

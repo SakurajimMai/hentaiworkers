@@ -234,7 +234,8 @@ typecheck、测试、边界检查与构建；Android 结果以 GitHub Actions �
 
 - 任意分支推送并改动 `mobile/**` 或工作流文件。
 - 改动上述路径的 Pull Request。
-- 手动运行 **Build Android APK**；只有 `main` 可以勾选 `publish_release` 创建公开 Release。
+- 手动运行 **Build Android APK**；`main` 上的手动运行默认也会发布，取消勾选 `publish_release`
+  可只做验证构建。
 
 远程构建执行：
 
@@ -249,12 +250,13 @@ typecheck、测试、边界检查与构建；Android 结果以 GitHub Actions �
 构建 Artifact 包含五个 `AnimeStream-<run>-<abi>.apk`、`SHA256SUMS` 和
 `build-info.txt`，保留 30 天；Android reports 包含 Lint、测试与诊断资料，保留 14 天。
 分支和 PR 使用内部 debug 签名，仅供内部测试。`main` push 进入 `Production` environment：
-四项签名 Secret 完整时生成正式签名的待验收 Artifact，四项全空时仍只生成标记为
-`internal-debug` 的内部 Artifact。手动勾选 `publish_release` 的任务会重新构建、验证，并且只
-在正式签名门禁通过后发布 `build-<run>` 预发布 Release。
+四项签名 Secret 完整且证书摘要匹配时，工作流在验证通过后**自动**发布 `build-<run>` 预发布
+Release（含五个 APK 与 `SHA256SUMS`）；四项全空时只生成标记为 `internal-debug` 的内部
+Artifact，不会发布。发布后同一任务只保留最新八个 `build-*` Release，更早的 Release 及其
+标签会被删除；App 内更新检查总是选择最新且资源完整的 Release。
 
 清理任务在非 PR 运行结束后，按创建时间只保留仓库级最新五次 Actions workflow runs，并删除
-更早且已完成的 runs。它**不会**自动只保留五个 GitHub Releases，也不会清理容器镜像标签。
+更早且已完成的 runs。Docker 镜像的版本标签由 Docker workflow 单独保留最新八个。
 
 ## 9. 生产签名
 
@@ -279,9 +281,10 @@ Artifact，不能覆盖正式版、不能公开分发，也不会创建 Release�
 2. 在真实设备检查五项导航、搜索/筛选、空结果、登录/退出、收藏/历史和漫画精确续读。
 3. 检查一条 MP4、一条 HLS、前贴片、暂停广告、播放错误重试和退出后的方向恢复。
 4. 检查短章、长章、坏图重试、缩放、快速拖页、章节切换、安全区、广告和后台恢复。
-5. 合并到 `main` 后验证正式签名 Artifact、五个 APK、`SHA256SUMS` 和固定证书指纹。
-6. 在目标 `main` ref 上手动运行工作流并勾选 `publish_release`，确认公开 `build-*` Release
-   含五个 APK 和 `SHA256SUMS`。
+5. 合并到 `main` 后等待工作流全绿：它会验证正式签名、五个 APK、`SHA256SUMS` 和固定证书
+   指纹，并自动发布 `build-*` Release。
+6. 在 Releases 页面确认新 Release 含五个 APK 和 `SHA256SUMS`，并在真机用其中的 APK 做最终
+   验收；需要重新发布时在 `main` 上手动运行工作流即可。
 7. 后台“系统设置 -> 移动端下载”填写正式 Release 地址与链接文字；前台页脚只接受
    `http://` 或 `https://` 地址。
 

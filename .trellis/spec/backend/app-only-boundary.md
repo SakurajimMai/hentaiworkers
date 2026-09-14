@@ -89,6 +89,12 @@ job. Sort every paginated workflow run by creation time and id, retain the lates
 and delete only older completed runs. Keep `actions: write` scoped to that cleanup job, serialize
 the two cleanup jobs with one shared concurrency group, and skip write access for pull requests.
 
+Artifact retention is separate from run retention: the Android release job keeps the newest eight
+`build-N` GitHub Releases (deleting older releases and tags), and the Docker workflow keeps the
+newest eight commit-SHA image tags on Docker Hub while never touching rolling (`latest`, `manga`,
+branch) or semver tags. The Docker Hub token must carry delete permission; a refused delete fails
+the retention job loudly instead of silently accumulating tags.
+
 ## 4. Validation & Error Matrix
 
 | Condition | Required result |

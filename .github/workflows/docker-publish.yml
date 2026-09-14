@@ -57,6 +57,83 @@ jobs:
           cache-to: type=gha,mode=max,scope=app
           provenance: false
 
+  retain-images:
+    name: Retain latest eight image versions
+    needs: publish
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RETAINED_IMAGE_VERSIONS: '8'
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      CURRENT_SHA: ${{ github.sha }}
+
+    steps:
+      # Every push tags the image with its short commit SHA; those are the "versions".
+      # Rolling tags (latest, manga, branch names) and semver tags from v* releases are kept.
+      - name: Delete older image version tags
+        shell: python
+        run: |
+          import json
+          import os
+          import re
+          import sys
+          import urllib.error
+          import urllib.request
+
+          image = os.environ["APP_IMAGE"]
+          retained = int(os.environ["RETAINED_IMAGE_VERSIONS"])
+          current = os.environ["CURRENT_SHA"][:7]
+          username = os.environ.get("DOCKERHUB_USERNAME", "")
+          token = os.environ.get("DOCKERHUB_TOKEN", "")
+          if not username or not token:
+              sys.exit("DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are required to prune image tags")
+
+          def request(method, url, body=None, jwt=None):
+              data = json.dumps(body).encode() if body is not None else None
+              headers = {"Content-Type": "application/json", "Accept": "application/json"}
+              if jwt:
+                  headers["Authorization"] = f"JWT {jwt}"
+              req = urllib.request.Request(url, data=data, method=method, headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  payload = response.read()
+                  return response.status, (json.loads(payload) if payload else None)
+
+          _, login = request("POST", "https://hub.docker.com/v2/users/login", {"username": username, "password": token})
+          jwt = login["token"]
+
+          tags = []
+          url = f"https://hub.docker.com/v2/repositories/{image}/tags?page_size=100&ordering=last_updated"
+          while url:
+              _, page = request("GET", url, jwt=jwt)
+              tags.extend(page.get("results", []))
+              url = page.get("next")
+
+          versions = [tag for tag in tags if re.fullmatch(r"[0-9a-f]{7,40}", tag["name"])]
+          versions.sort(key=lambda tag: tag.get("tag_last_pushed") or tag.get("last_updated") or "", reverse=True)
+          keep = {tag["name"] for tag in versions[:retained]}
+          keep.add(current)
+          stale = [tag["name"] for tag in versions if tag["name"] not in keep]
+
+          for name in stale:
+              try:
+                  request("DELETE", f"https://hub.docker.com/v2/repositories/{image}/tags/{name}/", jwt=jwt)
+                  print(f"Deleted image tag {image}:{name}")
+              except urllib.error.HTTPError as error:
+                  if error.code == 404:
+                      print(f"Image tag {name} was already deleted")
+                      continue
+                  if error.code in (401, 403):
+                      sys.exit(
+                          "Docker Hub refused to delete tags; DOCKERHUB_TOKEN needs an access token "
+                          "with Read, Write, Delete permissions"
+                      )
+                  raise
+
+          print(f"Retained {min(retained, len(versions))} latest image versions of {image}; kept rolling/semver tags: "
+                + ", ".join(sorted(tag["name"] for tag in tags if tag not in versions)))
+
   cleanup:
     name: Retain latest five Actions runs
     needs: publish
