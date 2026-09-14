@@ -18,6 +18,7 @@ import de.ixacg.animestream.core.model.MangaSummary
 import de.ixacg.animestream.core.model.PublicAdsConfig
 import de.ixacg.animestream.core.model.Tag
 import de.ixacg.animestream.data.repository.AvailableUpdate
+import de.ixacg.animestream.player.PlayerUiPolicy
 import de.ixacg.animestream.data.repository.SessionState
 import de.ixacg.animestream.data.repository.UpdateCheckResult
 import de.ixacg.animestream.reader.ReaderLogic
@@ -214,6 +215,10 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     private val mutablePlayerAnime = MutableStateFlow(Loadable<Anime>())
     val playerAnime: StateFlow<Loadable<Anime>> = mutablePlayerAnime.asStateFlow()
+
+    /** Milliseconds the player should resume from, or 0 to start at the beginning. */
+    private val mutablePlayerResumeMs = MutableStateFlow(0L)
+    val playerResumeMs: StateFlow<Long> = mutablePlayerResumeMs.asStateFlow()
 
     private val mutableReader = MutableStateFlow(Loadable<ReaderContent>())
     val reader: StateFlow<Loadable<ReaderContent>> = mutableReader.asStateFlow()
@@ -814,6 +819,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
 
     fun loadPlayer(id: Long) {
         playerJob?.cancel()
+        mutablePlayerResumeMs.value = 0L
         playerJob =
             viewModelScope.launch {
                 mutablePlayerAnime.value = Loadable(loading = true)
@@ -822,9 +828,38 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         mutablePlayerAnime.value = Loadable(value = anime)
                         if (MediaUrlNormalizer.normalize(anime.videoUrl) != null) {
                             library.recordAnimeHistory(anime)
+                            // Optional: a failed or absent lookup just starts the title from zero.
+                            captureResult { library.animeWatchProgress(id) }
+                                .onSuccess { progress ->
+                                    if (progress != null && !progress.completed) {
+                                        mutablePlayerResumeMs.value =
+                                            PlayerUiPolicy.resumePositionMs(
+                                                progress.positionSeconds,
+                                                progress.durationSeconds,
+                                            )
+                                    }
+                                }
                         }
                     }.onFailure { mutablePlayerAnime.value = Loadable(error = it.userMessage()) }
             }
+    }
+
+    /**
+     * Publish the real playback position. The player throttles these calls, so they are launched
+     * without cancelling the previous one; dropping the final write would lose the resume point.
+     */
+    fun recordPlaybackProgress(
+        animeId: Long,
+        positionSeconds: Long,
+        durationSeconds: Long,
+        completed: Boolean,
+    ) {
+        if (animeId <= 0 || positionSeconds < 0) return
+        viewModelScope.launch {
+            captureResult {
+                library.recordAnimePlayback(animeId, positionSeconds, durationSeconds, completed)
+            }
+        }
     }
 
     fun prepareReader(

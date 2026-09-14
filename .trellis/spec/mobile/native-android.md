@@ -72,6 +72,17 @@ scope, Docker image, production Compose services, and server-private imports.
   immediate process restart cannot lose the session.
 - Media3 owns MP4/HLS playback. Main playback waits until the pre-roll decision is ready, and
   lifecycle pauses must neither display pause ads nor resume a user-paused video.
+- The player chrome is Compose, not Media3's `PlayerView` controller (`useController = false`), and
+  its deterministic parts live in `PlayerUiPolicy` with JVM tests: seek clamping, time formatting,
+  double-tap thirds, drag-axis routing, the bounded scrub window, level adjustment, speed and fit
+  cycles, auto-hide, progress throttling, completion and resume. Chrome and overlays consume
+  `safeDrawing` insets; the video surface stays edge to edge. Gestures and controls must be inert
+  while a pre-roll or pause ad is on screen, and while the screen is locked only the unlock control
+  responds. Screen brightness is a per-screen override that must be released on disposal.
+- Playback reports the real position: throttled while playing plus once on pause and on disposal,
+  with completion at 95%. Never write a synthetic one-second marker, because the site's history and
+  continue-watching rows read these values. Resume applies a cloud position only while playback is
+  still at the start, so a late lookup cannot move a viewer who already seeked.
 - The reader remains a continuous vertical reader. Use lazy page composition and a proven
   subsampling/zoom library; do not eagerly fetch or decode the entire chapter.
 - Pinch changes the chapter canvas reading scale (1x-4x) while reader chrome remains fixed.

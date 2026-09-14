@@ -8,6 +8,7 @@ import de.ixacg.animestream.core.database.MangaFavoriteEntity
 import de.ixacg.animestream.core.database.MangaHistoryEntity
 import de.ixacg.animestream.core.database.asModel
 import de.ixacg.animestream.core.model.Anime
+import de.ixacg.animestream.core.model.CloudWatchItem
 import de.ixacg.animestream.core.model.AnimeFavorite
 import de.ixacg.animestream.core.model.AnimeHistory
 import de.ixacg.animestream.core.model.FavoriteBody
@@ -150,11 +151,41 @@ class LibraryRepository(
             )
             dao.trimAnimeHistory()
         }
-        if (isLoggedIn()) {
-            runCatching {
-                apiCall { api.putWatchProgress(anime.id, WatchProgressBody(positionSeconds = 1)) }
-                    .also(::requireSuccessful)
-            }
+        // Cloud progress is written by recordAnimePlayback with the real position instead of a
+        // one-second marker, so /history and continue-watching stay accurate across devices.
+    }
+
+    /**
+     * Cloud watch progress for one title. Best effort: signed-out viewers and failed reads return
+     * null so the player simply starts from the beginning instead of surfacing an error.
+     */
+    suspend fun animeWatchProgress(animeId: Long): CloudWatchItem? {
+        if (animeId <= 0 || !isLoggedIn()) return null
+        return runCatching {
+            apiCall { api.watchProgress() }.data.firstOrNull { it.animeId == animeId }
+        }.getOrNull()
+    }
+
+    /** Publish the real playback position for a title the viewer is actually watching. */
+    suspend fun recordAnimePlayback(
+        animeId: Long,
+        positionSeconds: Long,
+        durationSeconds: Long,
+        completed: Boolean,
+    ) {
+        if (animeId <= 0 || positionSeconds < 0) return
+        if (!isLoggedIn()) return
+        runCatching {
+            apiCall {
+                api.putWatchProgress(
+                    animeId,
+                    WatchProgressBody(
+                        positionSeconds = positionSeconds,
+                        durationSeconds = durationSeconds.coerceAtLeast(0),
+                        completed = completed,
+                    ),
+                )
+            }.also(::requireSuccessful)
         }
     }
 
