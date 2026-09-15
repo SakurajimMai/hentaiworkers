@@ -459,18 +459,18 @@ components:
           example: "1.0.0"
         features:
           type: object
-          description: Deployment switches the Android client depends on; false means disabled by configuration, not failing.
+          description: Deployment facts the Android client depends on.
           additionalProperties: false
-          required: [imageProxy, androidUpdates]
+          required: [androidUpdates, imageProxyDomain]
           properties:
-            imageProxy:
-              type: boolean
-              description: "`/cdn-img/**` proxies the configured image host (IMAGE_PROXY_UPSTREAM)."
-              example: true
             androidUpdates:
               type: boolean
-              description: "`/api/android/update` serves a release manifest (ANDROID_UPDATE_REPOSITORY)."
+              description: "`/api/android/update` serves a release manifest (ANDROID_UPDATE_REPOSITORY); false means disabled by configuration, not failing."
               example: true
+            imageProxyDomain:
+              type: string
+              description: "Domain whose hosts `/cdn-img/<host>/**` proxies (e.g. `image1.example.com`, `image2.example.com`), derived from SITE_URL."
+              example: example.com
 
     HealthError:
       type: object

@@ -212,17 +212,17 @@ Cookie。
 - 登录书架：`/api/me/favorites*`、`/api/me/watch-progress*`、
   `/api/me/manga-progress*`。
 
-站点 origin、图片代理主机和发布仓库都在构建时由 Gradle property 或环境变量注入，源码中没有
-默认值：
+站点 origin 和发布仓库在构建时由 Gradle property 或环境变量注入，源码中没有默认值：
 
 | 注入项 | 说明 |
 |--------|------|
 | `ANIMESTREAM_API_BASE_URL` | 必填。站点 origin，只接受 HTTP(S) 且不含路径/查询/fragment，缺失或非法时 Gradle 配置阶段直接失败 |
-| `ANIMESTREAM_IMAGE_PROXY_HOST` | 可选。需要改写到同源 `/cdn-img` 的图片主机名；留空则不改写任何图片地址 |
 | `ANIMESTREAM_UPDATE_REPOSITORY` | 可选。发布 APK 的 GitHub 仓库 `owner/name`；留空则 App 不检查更新 |
 
-GitHub Actions 从仓库变量 `ANIMESTREAM_API_BASE_URL`、`ANIMESTREAM_IMAGE_PROXY_HOST` 和当前仓库
-`github.repository` 提供这三项。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用
+GitHub Actions 从仓库变量 `ANIMESTREAM_API_BASE_URL` 和当前仓库 `github.repository` 提供这两项。
+图片代理的范围不需要注入：App 把与站点同一域名下的图片主机（站点为 `www.example.com` 时即
+`image1.example.com`、`image2.example.com`……）改写到 `/cdn-img/<host>/...`，域名由站点 origin
+推导，服务端用同一规则决定代理范围。目录 JSON 请求使用 8 秒连接、20 秒读取/写入和 25 秒整次调用
 上限，启用连接失败重试；HTTP 5xx 不向用户暴露服务端内部错误。
 
 首页数据只在进入首页时开始加载，里番与漫画随后并行请求：任一栏目先返回有效内容即可结束
@@ -239,13 +239,13 @@ GitHub Actions 从仓库变量 `ANIMESTREAM_API_BASE_URL`、`ANIMESTREAM_IMAGE_P
 HTML 的空位显示招租占位。图片类素材务必在后台填写与图片一致的像素尺寸，见
 [后台管理手册](./admin-guide.md)。
 
-媒体地址允许 HTTP(S) 外部源；只有配置的图片代理主机会改写到同源 `/cdn-img`。因此不能把
-“目录 API 可用”推导为“所有图片和视频源均可用”，也不能概括为所有媒体均由本站托管。
+媒体地址允许 HTTP(S) 外部源；只有与站点同一域名下的图片主机会改写到同源
+`/cdn-img/<host>/...`，其他主机直连。因此不能把“目录 API 可用”推导为“所有图片和视频源均可用”，
+也不能概括为所有媒体均由本站托管。
 
-代理本身也可能失效（服务端未配置 `IMAGE_PROXY_UPSTREAM`、上游不可达）。当 `/cdn-img` 对某张图
-返回 5xx 时，App 会用配置的图片主机直连重试一次，并沿用原来的磁盘缓存键，之后再打开同一页直接
-命中缓存；4xx 视为图片本身的状态，不重试。直连只是兜底，代理仍是主路径：部分网络无法直接访问
-图片主机，所以服务端 `/api/health` 的 `features.imageProxy` 必须为 `true`。
+代理本身也可能失效（图片上游不可达、站点临时故障）。当 `/cdn-img` 对某张图返回 5xx 时，App 会
+用路径中的图片主机直连重试一次，并沿用原来的磁盘缓存键，之后再打开同一页直接命中缓存；4xx 视为
+图片本身的状态，不重试。直连只是兜底，代理仍是主路径：部分网络无法直接访问图片主机。
 
 ## 7. 本地开发边界
 
@@ -305,8 +305,7 @@ Artifact，不会发布。发布后同一任务只保留最新八个 `build-*` R
 | `ANDROID_KEY_ALIAS` | 密钥别名 |
 | `ANDROID_KEY_PASSWORD` | 密钥密码 |
 | `ANDROID_RELEASE_CERT_SHA256` | 仓库变量，固定生产证书 SHA-256 |
-| `ANIMESTREAM_API_BASE_URL` | 仓库变量，APK 使用的站点 origin |
-| `ANIMESTREAM_IMAGE_PROXY_HOST` | 仓库变量，需改写到 `/cdn-img` 的图片主机名，可留空 |
+| `ANIMESTREAM_API_BASE_URL` | 仓库变量，APK 使用的站点 origin；图片代理范围由它推导 |
 
 四项 Secret 全部存在时生成生产签名 APK；四项全空时生成明确标记为 `internal-debug` 的内部
 Artifact，不能覆盖正式版、不能公开分发，也不会创建 Release。只配置部分 Secret 会让工作流

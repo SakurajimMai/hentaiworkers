@@ -9,8 +9,8 @@
     ],
     "version": "1.0.0",
     "features": {
-      "imageProxy": true,
-      "androidUpdates": true
+      "androidUpdates": true,
+      "imageProxyDomain": "example.com"
     }
   },
   "failure": {

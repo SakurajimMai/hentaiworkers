@@ -7,7 +7,7 @@ import {
   type HealthFeatureSource,
 } from './handler';
 import { configuredAndroidUpdateRepository } from '@/lib/server/android-update';
-import { imageProxyOriginForHints } from '@/lib/server/image-proxy';
+import { imageProxyDomainForHints } from '@/lib/server/image-proxy';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +27,10 @@ const loadHealthDatabase: HealthDatabaseLoader = async () => {
 };
 const queryHealthFromProduction = createHealthQueryDependency(loadHealthDatabase);
 
-// A deployment that lost these keys otherwise only shows up as 503/404 answers inside the app.
+// Visible from outside so an Android-only symptom can be traced to deployment configuration.
 const readDeploymentFeatures: HealthFeatureSource = () => ({
-  imageProxy: imageProxyOriginForHints() !== null,
   androidUpdates: configuredAndroidUpdateRepository() !== null,
+  imageProxyDomain: imageProxyDomainForHints(),
 });
 
 export const GET = createHealthHandler(queryHealthFromProduction, readDeploymentFeatures);

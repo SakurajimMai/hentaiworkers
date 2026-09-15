@@ -82,14 +82,15 @@ GET /api/health
   "database": "mysql",
   "result": [{ "ok": 1 }],
   "version": "1.0.0",
-  "features": { "imageProxy": true, "androidUpdates": true }
+  "features": { "androidUpdates": true, "imageProxyDomain": "example.com" }
 }
 ```
 
-`features` 报告 Android 客户端依赖的两个部署开关：`imageProxy` 为 `IMAGE_PROXY_UPSTREAM` 是否
-生效（`false` 时 `/cdn-img/**` 返回 503，App 内所有图片空白），`androidUpdates` 为
-`ANDROID_UPDATE_REPOSITORY` 是否生效（`false` 时 `/api/android/update` 返回 404，App 提示
-检查更新失败）。它们只反映配置，不代表上游当前可达。
+`features` 报告 Android 客户端依赖的部署事实：`androidUpdates` 为 `ANDROID_UPDATE_REPOSITORY`
+是否生效（`false` 时 `/api/android/update` 返回 404，App 提示检查更新失败）；`imageProxyDomain`
+是 `/cdn-img/<host>/**` 代理的图片域名（由 `SITE_URL` 推导，站点 `www.example.com` 对应
+`example.com`，其下 `image1.example.com`、`image2.example.com` 等都可代理）。它们只反映配置，
+不代表上游当前可达。
 
 失败返回 `500` 与 `{ "ok": false, "error": string }`。错误字符串可能包含底层诊断信息，
 不应把该响应公开汇入日志面板或用户界面。

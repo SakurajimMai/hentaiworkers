@@ -33,10 +33,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [28], application = Application::class)
 class ProxiedImageFallbackTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val fallback =
-        ProxiedImageFallback(
-            directUrl = { MediaUrlNormalizer.directImageUrl(it, siteOrigin = SITE, proxiedHost = IMAGE_HOST) },
-        )
+    private val fallback = ProxiedImageFallback(directUrl = { MediaUrlNormalizer.directImageUrl(it, siteOrigin = SITE) })
 
     @Test
     fun `a 5xx from the proxy retries the direct host once and keeps the proxied disk key`() =
@@ -147,9 +144,9 @@ class ProxiedImageFallbackTest {
     }
 
     private companion object {
-        const val SITE = "https://site.example"
-        const val IMAGE_HOST = "images.example"
-        const val PROXIED = "$SITE/cdn-img/file/page-1.jpg"
+        const val SITE = "https://www.site.example"
+        const val IMAGE_HOST = "images.site.example"
+        const val PROXIED = "$SITE/cdn-img/$IMAGE_HOST/file/page-1.jpg"
         const val DIRECT = "https://$IMAGE_HOST/file/page-1.jpg"
     }
 }

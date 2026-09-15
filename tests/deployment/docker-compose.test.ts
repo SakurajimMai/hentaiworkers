@@ -113,8 +113,8 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /tag_name: build-\$\{\{ github\.run_number \}\}/);
   assert.match(workflow, /ANIMESTREAM_API_BASE_URL: \$\{\{ vars\.ANIMESTREAM_API_BASE_URL \}\}/);
-  assert.match(workflow, /ANIMESTREAM_IMAGE_PROXY_HOST: \$\{\{ vars\.ANIMESTREAM_IMAGE_PROXY_HOST \}\}/);
   assert.match(workflow, /ANIMESTREAM_UPDATE_REPOSITORY: \$\{\{ github\.repository \}\}/);
+  assert.doesNotMatch(workflow, /IMAGE_PROXY/, 'the proxied image domain is derived from the API origin, never configured');
   assert.match(workflow, /name: Validate client configuration/);
   assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /Android signing secrets are only partially configured/);
@@ -220,11 +220,8 @@ test('Docker Hub workflow publishes only the application image', () => {
 
   assert.match(workflow, /APP_IMAGE: \$\{\{ vars\.APP_IMAGE \}\}/);
   assert.match(workflow, /name: Validate image configuration/);
-  assert.match(workflow, /IMAGE_PROXY_UPSTREAM: \$\{\{ vars\.IMAGE_PROXY_UPSTREAM \}\}/);
-  assert.match(workflow, /ANDROID_IMAGE_PROXY_HOST: \$\{\{ vars\.ANIMESTREAM_IMAGE_PROXY_HOST \}\}/);
-  assert.match(workflow, /must point at ANIMESTREAM_IMAGE_PROXY_HOST/, 'the image must proxy the host the APK rewrites');
-  assert.match(workflow, /IMAGE_PROXY_UPSTREAM=\$\{\{ env\.IMAGE_PROXY_UPSTREAM \}\}/);
   assert.match(workflow, /ANDROID_UPDATE_REPOSITORY=\$\{\{ github\.repository \}\}/, 'the image defaults to the repository that built it, like the APK');
+  assert.doesNotMatch(workflow, /IMAGE_PROXY/, 'the image proxy scope is derived from SITE_URL, never configured');
   assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /images: \$\{\{ env\.APP_IMAGE \}\}/);
   assert.match(workflow, /context: \./);
@@ -342,23 +339,22 @@ test('trusted workflows retain only the latest five repository Actions runs', ()
   assert.equal(cleanupScripts[0], cleanupScripts[1]);
 });
 
-test('the image carries CI-injected deployment defaults that .env can override', () => {
+test('the image carries a CI-injected update repository default that .env can override', () => {
   const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
   const runner = dockerfile.slice(dockerfile.indexOf('AS runner'));
 
-  for (const key of ['IMAGE_PROXY_UPSTREAM', 'ANDROID_UPDATE_REPOSITORY']) {
-    assert.match(runner, new RegExp(`^ARG ${key}=""$`, 'm'), `${key} has no value in source`);
-    assert.match(runner, new RegExp(`^ENV ${key}=\\$\\{${key}\\}$`, 'm'), `${key} default reaches the runtime`);
-  }
+  assert.match(runner, /^ARG ANDROID_UPDATE_REPOSITORY=""$/m, 'no value in source');
+  assert.match(runner, /^ENV ANDROID_UPDATE_REPOSITORY=\$\{ANDROID_UPDATE_REPOSITORY\}$/m, 'the default reaches the runtime');
+  assert.doesNotMatch(dockerfile, /IMAGE_PROXY/, 'the image proxy needs no deployment value');
   assert.doesNotMatch(dockerfile, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i);
 
-  // Compose passes every key of env_file, so a copied template with empty values would blank
-  // the image defaults and bring back the 503/404 failures the defaults exist to prevent.
+  // Compose passes every key of env_file, so a copied template with an empty value would blank
+  // the image default and bring back the 404 the default exists to prevent.
   for (const template of ['.env.example', 'deploy/.env.example']) {
     const source = readFileSync(join(root, template), 'utf8');
-    assert.doesNotMatch(source, /^(?:IMAGE_PROXY_UPSTREAM|ANDROID_UPDATE_REPOSITORY)=/m, `${template} leaves the image defaults in force`);
-    assert.match(source, /^# IMAGE_PROXY_UPSTREAM=/m, `${template} still documents the override`);
+    assert.doesNotMatch(source, /^ANDROID_UPDATE_REPOSITORY=/m, `${template} leaves the image default in force`);
     assert.match(source, /^# ANDROID_UPDATE_REPOSITORY=/m, `${template} still documents the override`);
+    assert.doesNotMatch(source, /IMAGE_PROXY_UPSTREAM/, `${template} no longer names an image upstream`);
   }
 });
 

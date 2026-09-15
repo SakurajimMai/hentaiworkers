@@ -25,12 +25,6 @@ require(Regex("^https?://[^/?#\\s]+$").matches(apiBaseUrl)) {
     "ANIMESTREAM_API_BASE_URL must be an absolute HTTP(S) origin without a path (Gradle property or environment variable)"
 }
 
-/** Bare host whose images the site proxies through /cdn-img; empty disables rewriting. */
-val imageProxyHost = clientSetting("ANIMESTREAM_IMAGE_PROXY_HOST").lowercase()
-require(imageProxyHost.isEmpty() || Regex("^[a-z0-9.-]+$").matches(imageProxyHost)) {
-    "ANIMESTREAM_IMAGE_PROXY_HOST must be a bare host name"
-}
-
 /** GitHub repository (owner/name) whose Releases publish the APKs; empty disables update checks. */
 val updateRepository = clientSetting("ANIMESTREAM_UPDATE_REPOSITORY")
 require(updateRepository.isEmpty() || Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}$").matches(updateRepository)) {
@@ -64,7 +58,6 @@ android {
         versionName = "2.0.0"
 
         buildConfigField("String", "API_BASE_URL", apiBaseUrl.asBuildConfigString())
-        buildConfigField("String", "IMAGE_PROXY_HOST", imageProxyHost.asBuildConfigString())
         buildConfigField("String", "UPDATE_REPOSITORY", updateRepository.asBuildConfigString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

@@ -55,15 +55,18 @@ scope, Docker image, production Compose services, and server-private imports.
   home catalog starts when `HomeScreen` enters composition, tags load on discovery, and `/api/me`
   requires a persisted session cookie. Ads load after useful home content, on demand from player or
   catalog screens that consume ads, and only after the reader's first original image is displayed.
-- The site origin, proxied image host and release repository are injected at build time
-  (`ANIMESTREAM_API_BASE_URL`, `ANIMESTREAM_IMAGE_PROXY_HOST`, `ANIMESTREAM_UPDATE_REPOSITORY`)
-  and never written into source. Gradle rejects a missing or malformed origin; a blank image host
-  disables the `/cdn-img` rewrite and a blank repository disables update checks. Invalid runtime
-  media URLs still fail closed.
+- The site origin and release repository are injected at build time (`ANIMESTREAM_API_BASE_URL`,
+  `ANIMESTREAM_UPDATE_REPOSITORY`) and never written into source. Gradle rejects a missing or
+  malformed origin; a blank repository disables update checks. Invalid runtime media URLs still
+  fail closed.
+- The proxied image scope is never configured: every image whose host is under the API origin's
+  domain (`www.example.com` -> `*.example.com`, minus the site host itself) is rewritten to
+  `/cdn-img/<host>/<path>`; other hosts load directly. The rule mirrors `lib/server/image-proxy.ts`
+  exactly (including the two-label public-suffix guard) and the two test suites share examples.
 - `/cdn-img` stays the primary image path because some networks cannot reach the image host, but
-  the proxy can itself be unconfigured or down. A 5xx answer for a proxied image retries the direct
-  image host exactly once, keeping the proxied disk cache key so the next request for that page is
-  served from disk; 4xx answers, transport failures and non-proxied addresses are never retried.
+  the proxy can itself be down. A 5xx answer for a proxied image retries the host named in the path
+  exactly once, keeping the proxied disk cache key so the next request for that page is served from
+  disk; 4xx answers, transport failures and non-proxied addresses are never retried.
 - API JSON and image traffic may share an OkHttp connection pool and dispatcher to reuse transport
   resources, but derive both clients from the same neutral base client so their TLS configuration is
   connection-compatible. Merely injecting one pool into independently built TLS clients does not

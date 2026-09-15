@@ -18,12 +18,10 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-# Deployment defaults the publish workflow injects (repository variable IMAGE_PROXY_UPSTREAM and the
-# building repository). deploy/.env still overrides them; a key set to an empty value there disables
-# that feature. Nothing deployment-specific is written here.
-ARG IMAGE_PROXY_UPSTREAM=""
+# Deployment default the publish workflow injects (the repository that built the image, whose
+# Releases publish the APK). deploy/.env still overrides it; an empty value there disables the
+# update endpoint. Nothing deployment-specific is written here.
 ARG ANDROID_UPDATE_REPOSITORY=""
-ENV IMAGE_PROXY_UPSTREAM=${IMAGE_PROXY_UPSTREAM}
 ENV ANDROID_UPDATE_REPOSITORY=${ANDROID_UPDATE_REPOSITORY}
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs

@@ -89,10 +89,10 @@ APK 更新是应用启动后的非阻塞检查与弹窗，不是通知推送、�
 
 根目录与 `deploy/` 的 Compose 清单都只启动 App。镜像名来自 `.env` 中的 `APP_IMAGE`
 （`owner/name`），tag 与拉取策略必须显式选择；清单自身的 fallback 是本地 `manga` tag 和
-`pull_policy: never`。图片代理主机与 APK 发布仓库同样通过 `IMAGE_PROXY_UPSTREAM`、
-`ANDROID_UPDATE_REPOSITORY` 配置，源码中不含任何站点专属地址；GitHub Actions 构建的镜像
-已把仓库变量 `IMAGE_PROXY_UPSTREAM` 与构建仓库烘焙为默认值，`.env` 只在需要覆盖时填写，
-`/api/health` 的 `features` 可确认两者是否生效。
+`pull_policy: never`。APK 发布仓库通过 `ANDROID_UPDATE_REPOSITORY` 配置（GitHub Actions 构建的
+镜像已把构建仓库烘焙为默认值，`.env` 只在需要覆盖时填写）；图片代理 `/cdn-img/<host>/**`
+自动覆盖 `SITE_URL` 同域名下的所有图片主机，无需配置。源码中不含任何站点专属地址，
+`/api/health` 的 `features` 可确认生效情况。
 
 ```bash
 cp deploy/.env.example deploy/.env

@@ -41,7 +41,6 @@ Runtime environment keys are App-owned:
 | `DATABASE_URL` | Required MySQL URL |
 | `DATABASE_TLS_MODE` | `required`, except local loopback may use `disabled` |
 | `SITE_URL` | Canonical public origin |
-| `IMAGE_PROXY_UPSTREAM` | Optional image host origin proxied by `/cdn-img/**`; unset returns 503. CI images default it from the repository variable of the same name |
 | `ANDROID_UPDATE_REPOSITORY` | Optional `owner/name` GitHub repository for `/api/android/update`; unset returns 404. CI images default it to the repository that built them |
 | `APP_IMAGE` | Compose image name (`owner/name`); the tag comes from `IMAGE_TAG` |
 | `INDEXNOW_ENDPOINT` | Optional override of the IndexNow submission endpoint |
@@ -52,13 +51,22 @@ Runtime environment keys are App-owned:
 Deployment identity never lives in source: hosts, GitHub accounts/repositories and registry image
 names come from these keys, from GitHub repository variables in workflows, or from Gradle
 properties in the Android build. A missing value disables the feature (503/404/skipped) rather
-than falling back to a built-in default. The publish workflow may bake repository-variable values
-and `github.repository` into the image as `ENV` defaults (`Dockerfile` `ARG`s that are empty in
-source); `deploy/.env` overrides them, and the `.env` templates keep those keys commented out so a
-copied template cannot blank the defaults. The workflow must refuse to publish an image whose
-`IMAGE_PROXY_UPSTREAM` host differs from the Android build's `ANIMESTREAM_IMAGE_PROXY_HOST`, and
-`GET /api/health` reports both switches under `features` so a deployment that lost them is visible
-from outside instead of only as 503/404 answers inside the app.
+than falling back to a built-in default. The publish workflow may bake `github.repository` into
+the image as an `ENV` default (a `Dockerfile` `ARG` that is empty in source); `deploy/.env`
+overrides it, and the `.env` templates keep the key commented out so a copied template cannot blank
+the default. `GET /api/health` reports `features.androidUpdates` and `features.imageProxyDomain` so
+a deployment problem is visible from outside instead of only as 404/403 answers inside the app.
+
+`/cdn-img/<host>/**` needs no configuration: it proxies exactly the hosts under the site's own
+domain, derived from `SITE_URL` (the site host minus its first label when it has one to spare,
+guarded by a short list of two-label public suffixes such as `co.uk`), so `image1.example.com`,
+`image2.example.com`, ... work as soon as the catalog uses them. The site host itself and every
+host outside that domain are refused (403) before any fetch, and only `image/*` bodies are relayed.
+The Android client applies the identical rule from its API origin; keep the two implementations
+(`lib/server/image-proxy.ts`, `MediaUrlNormalizer`) in step, with matching test examples. Paths
+without a host segment come from clients built before Build 112; resolve them by trying the hosts
+of the newest catalog covers (bounded attempts, in-domain only, cached) rather than by reintroducing
+a configured upstream.
 
 The App must not contain or import a data-acquisition runtime, machine identity/token API,
 shared media-output filesystem, or a second Compose service. A root `crawler/` project must
@@ -141,8 +149,9 @@ the retention job loudly instead of silently accumulating tags.
 | View/favourite count cannot be computed | Report `null` (unknown); never emit a stored placeholder or a synthetic number |
 | Catalog contains a removed local-media URL | Correct operationally; do not read host files from App |
 | GitHub update release is draft, non-main, incomplete, or has an invalid asset path/digest | Ignore it and select the greatest older complete `build-N`; return the documented upstream error only when no cached valid manifest exists |
-| Android build proxies a host the image does not name in `IMAGE_PROXY_UPSTREAM` | Docker publish workflow fails validation before building |
-| `IMAGE_PROXY_UPSTREAM` / `ANDROID_UPDATE_REPOSITORY` unset or malformed at runtime | `/api/health.features.{imageProxy,androidUpdates}` is `false`; the routes keep answering 503/404 |
+| `/cdn-img/<host>/**` names the site itself or a host outside the `SITE_URL` domain | 403 before any upstream request; never cached |
+| `/cdn-img` upstream answers non-2xx, a non-image body, or is unreachable | Relay the status (404 for non-image bodies, 502 when unreachable) with `Cache-Control: no-store` so the app can fall back to the direct host |
+| `ANDROID_UPDATE_REPOSITORY` unset or malformed at runtime | `/api/health.features.androidUpdates` is `false`; the route keeps answering 404 |
 | `crawler/**/production_config.yml` exists locally | Keep ignored; commit only a sanitized example |
 
 ## 5. Good / Base / Bad Cases

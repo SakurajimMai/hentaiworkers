@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import type {
   HealthError,
-  HealthFeatureFlags,
+  HealthFeatures,
   HealthOk,
   HealthResultRow,
 } from '@/lib/public-api-types';
 
 export type HealthQueryDependency = () => Promise<HealthResultRow[]>;
-export type HealthFeatureSource = () => HealthFeatureFlags;
+export type HealthFeatureSource = () => HealthFeatures;
 export type HealthDatabaseModule = {
   pool: {
     query(sql: string): Promise<[HealthResultRow[], unknown]>;

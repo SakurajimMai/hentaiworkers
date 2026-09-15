@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { CatalogScrollRestoration } from '@/components/catalog-scroll-restoration';
 import { ADULT_RATING_META, SITE_LOCALE, SITE_NAME } from '@/lib/seo';
-import { imageProxyOriginForHints } from '@/lib/server/image-proxy';
 import { getGlobalMetaTags } from '@/lib/server/site-metadata';
 import './globals.css';
 
@@ -55,8 +54,6 @@ const THEME_BOOT_SCRIPT = `(function(){try{var k='animestream.theme.v1';var s=lo
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const metaTags = await getGlobalMetaTags();
-  // Poster and page images come from the configured image host; connecting early shortens the LCP fetch.
-  const imageHostOrigin = imageProxyOriginForHints();
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
@@ -69,8 +66,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
         ))}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        {imageHostOrigin ? <link rel="preconnect" href={imageHostOrigin} /> : null}
-        {imageHostOrigin ? <link rel="dns-prefetch" href={imageHostOrigin} /> : null}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

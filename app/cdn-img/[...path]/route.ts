@@ -1,71 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { resolveImageProxyUpstream } from '@/lib/server/image-proxy';
+import { createImageProxyHandler } from './handler';
+import { loadRecentCatalogImageHosts } from '@/lib/server/image-proxy-hosts';
+import { StaleReadCache } from '@/lib/server/shared/stale-read-cache';
+import { resolveSiteUrl } from '@/lib/site-url';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function safePath(parts: string[]): string | null {
-  if (!parts.length) return null;
-  const joined = parts.join('/');
-  if (!joined || joined.includes('..') || joined.startsWith('/')) return null;
-  return joined
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
-}
+// Only requests without a host segment (clients older than Build 112) consult the catalog.
+const legacyHostCache = new StaleReadCache<readonly string[]>({
+  maxEntries: 1,
+  freshTtlMs: 10 * 60_000,
+  staleTtlMs: 24 * 60 * 60_000,
+  retryDelayMs: 60_000,
+  onBackgroundError: (error) => {
+    console.error('[cdn-img] background refresh of catalog image hosts failed', error);
+  },
+});
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> },
-) {
-  let upstreamOrigin: string | null;
-  try {
-    upstreamOrigin = resolveImageProxyUpstream();
-  } catch (error) {
-    console.error('[cdn-img] invalid IMAGE_PROXY_UPSTREAM', error);
-    upstreamOrigin = null;
-  }
-  if (!upstreamOrigin) {
-    return new NextResponse('Image proxy is not configured', {
-      status: 503,
-      headers: { 'Cache-Control': 'no-store' },
-    });
-  }
-
-  const { path } = await context.params;
-  const encoded = safePath(path);
-  if (!encoded) {
-    return new NextResponse('Bad path', { status: 400 });
-  }
-
-  const upstreamUrl = `${upstreamOrigin}/${encoded}${request.nextUrl.search}`;
-  let upstream: Response;
-  try {
-    upstream = await fetch(upstreamUrl, {
-      headers: {
-        Accept: request.headers.get('accept') || 'image/avif,image/webp,image/*,*/*;q=0.8',
-        'User-Agent': 'AnimeStream-ImageProxy/1.0',
-      },
-      redirect: 'follow',
-      next: { revalidate: 2592000 },
-    });
-  } catch {
-    return new NextResponse('Image upstream unreachable', { status: 502 });
-  }
-
-  const contentType = upstream.headers.get('content-type') || '';
-  if (!upstream.ok || (contentType && !contentType.startsWith('image/'))) {
-    return new NextResponse('Image not found', { status: upstream.status || 404 });
-  }
-
-  const headers = new Headers();
-  headers.set('Content-Type', contentType || 'image/jpeg');
-  headers.set('Cache-Control', 'public, max-age=2592000, immutable');
-  const length = upstream.headers.get('content-length');
-  if (length) headers.set('Content-Length', length);
-
-  return new NextResponse(upstream.body, {
-    status: 200,
-    headers,
-  });
-}
+export const GET = createImageProxyHandler({
+  siteOrigin: () => resolveSiteUrl(process.env.SITE_URL),
+  legacyHosts: () => legacyHostCache.get('recent', loadRecentCatalogImageHosts),
+});
