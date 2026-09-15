@@ -91,7 +91,7 @@ class ProxiedImageFallbackTest {
         request: ImageRequest,
         respond: (ImageRequest) -> ImageResult,
     ) = runBlocking {
-        val chain = FakeChain(request, respond)
+        val chain = FakeChain(request, respond = respond)
 
         val result = fallback.intercept(chain)
 
@@ -125,14 +125,15 @@ class ProxiedImageFallbackTest {
         return ErrorResult(null, request, HttpException(response))
     }
 
+    // `respond` stays last so call sites can pass it as a trailing lambda.
     private class FakeChain(
         override val request: ImageRequest,
-        private val respond: (ImageRequest) -> ImageResult,
         val seen: MutableList<ImageRequest> = mutableListOf(),
+        private val respond: (ImageRequest) -> ImageResult,
     ) : Interceptor.Chain {
         override val size: Size = Size.ORIGINAL
 
-        override fun withRequest(request: ImageRequest): Interceptor.Chain = FakeChain(request, respond, seen)
+        override fun withRequest(request: ImageRequest): Interceptor.Chain = FakeChain(request, seen, respond)
 
         override fun withSize(size: Size): Interceptor.Chain = this
 
