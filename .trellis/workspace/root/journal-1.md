@@ -430,3 +430,43 @@ cdn-img 上游、Android 更新仓库、Compose 镜像名、Actions 站点/图�
 - 运维：把生产 IMAGE_TAG 固定到 9274672 或更新的 tag 并 docker compose up -d，或立即在 deploy/.env 写入 IMAGE_PROXY_UPSTREAM 与 ANDROID_UPDATE_REPOSITORY；随后确认 /api/health features 均为 true
 - 真机验证 Build 110：新漫画图片、检查更新显示已是最新、播放器返回不残留画面
 - 迁移 0020 仍需人工备份后执行
+
+
+## Session 16: 图片代理改为按站点域名覆盖多台图片主机，删除 IMAGE_PROXY_UPSTREAM
+
+**Date**: 2026-09-15
+**Task**: 图片代理改为按站点域名覆盖多台图片主机，删除 IMAGE_PROXY_UPSTREAM
+**Branch**: `main`
+
+### Summary
+
+用户指出单一上游 IMAGE_PROXY_UPSTREAM 不成立（图片可能分布在 image1、image2……）。现在 /cdn-img/<host>/** 代理与 SITE_URL 同一域名下的所有图片主机（域名由 SITE_URL 推导，两段公共后缀如 co.uk 有保护），站点自身与域外主机 403 且不进上游，非图片正文不再以 200 转发；无主机段的旧路径（Build 111 及更早）按最新目录封面出现过的域内主机依次尝试。APK 按 API origin 推导同一规则改写到 /cdn-img/<host>/…，ANIMESTREAM_IMAGE_PROXY_HOST 与 IMAGE_PROXY_UPSTREAM 及其 Dockerfile/工作流注入一并删除，两个仓库变量已删。/api/health features 改为 { androidUpdates, imageProxyDomain }。生产 /root/docker/anime 已去掉 IMAGE_PROXY_UPSTREAM 并换到镜像 131f315，新旧两种路径、403 拒绝与更新清单均已在线验证；APK Build 113 发布为 Latest。
+
+### Main Changes
+
+- lib/server/image-proxy.ts 重写为域名规则 + 路径解析；新增 app/cdn-img/[...path]/handler.ts（可注入 fetch/legacyHosts）与 lib/server/image-proxy-hosts.ts（最新 100 条封面主机，StaleReadCache 10 分钟）
+- Android MediaUrlNormalizer：imageProxyDomain/isProxiedImageHost/rewriteCdnUrl/directImageUrl 全部按域名规则，BuildConfig.IMAGE_PROXY_HOST 删除
+- Dockerfile/docker-publish.yml 只保留 ANDROID_UPDATE_REPOSITORY 注入；build-android.yml 删除 ANIMESTREAM_IMAGE_PROXY_HOST；.env 模板与全部文档/规范同步
+- app/layout.tsx 移除依赖单一图片主机的 preconnect
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `131f315` | (see git log) |
+| `d07b19b` | (see git log) |
+
+### Testing
+
+- [OK] npm run typecheck / lint / test（326 项通过，新增 tests/server/image-proxy.test.ts）/ check:legacy / check:boundaries
+- [OK] Android CI Build 113 通过（ktlint、lintRelease、JVM 测试）并发布 Latest；Build 112 因 ktlint 换行规则失败后修正
+- [OK] 生产验证：/api/health features.imageProxyDomain=ixacg.de；/cdn-img/image.ixacg.de/file/... 200；旧路径 /cdn-img/file/... 200；example.com 与站点自身 403 no-store；/api/android/update 200
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 新增 image2.ixacg.de 之类主机时无需任何配置；若图片改用其他域名需先扩展域名规则
+- 迁移 0020 仍需人工备份后执行；真机验证 Build 113 新漫画图片与更新提示
