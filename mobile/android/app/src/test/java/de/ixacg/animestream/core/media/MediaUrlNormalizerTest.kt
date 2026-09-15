@@ -53,6 +53,29 @@ class MediaUrlNormalizerTest {
     }
 
     @Test
+    fun `recovers the direct image address behind a proxied one`() {
+        assertEquals(
+            "https://images.example/file/1787838438761_1111765.jpg?width=900",
+            direct("https://site.example/cdn-img/file/1787838438761_1111765.jpg?width=900"),
+        )
+        // Round trip: whatever rewriteCdnUrl produced maps back to the address it came from.
+        val original = "https://images.example/file/manga%201.jpg"
+        val proxied = MediaUrlNormalizer.rewriteCdnUrl(original, siteOrigin = SITE, proxiedHost = IMAGE_HOST)
+        assertEquals("https://site.example/cdn-img/file/manga%201.jpg", proxied)
+        assertEquals(original, direct(proxied))
+    }
+
+    @Test
+    fun `only proxied addresses on the site origin have a direct fallback`() {
+        assertNull("already direct", direct("https://images.example/file/a.jpg"))
+        assertNull("site route that is not the proxy", direct("https://site.example/api/mangas/1"))
+        assertNull("proxy path on another origin", direct("https://other.example/cdn-img/file/a.jpg"))
+        assertNull("proxy path without a file", direct("https://site.example/cdn-img"))
+        assertNull("no configured host", direct("https://site.example/cdn-img/file/a.jpg", proxiedHost = ""))
+        assertNull("not a URL", direct("javascript:alert(1)"))
+    }
+
+    @Test
     fun `filters empty and invalid media entries`() {
         assertEquals(
             listOf("https://static.other.example/one.jpg", "https://static.other.example/two.jpg"),
@@ -61,5 +84,15 @@ class MediaUrlNormalizerTest {
             ),
         )
         assertNull(MediaUrlNormalizer.normalize("javascript:alert(1)"))
+    }
+
+    private fun direct(
+        proxied: String,
+        proxiedHost: String = IMAGE_HOST,
+    ): String? = MediaUrlNormalizer.directImageUrl(proxied, siteOrigin = SITE, proxiedHost = proxiedHost)
+
+    private companion object {
+        const val SITE = "https://site.example"
+        const val IMAGE_HOST = "images.example"
     }
 }

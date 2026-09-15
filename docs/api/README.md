@@ -18,7 +18,7 @@ AnimeStream 的 HTTP 接口分成三类：
 |------|------|------|
 | GET | `/api/live` | 进程存活检查，不访问依赖 |
 | GET | `/api/ready` | 就绪检查；配置数据库时执行 `SELECT 1` |
-| GET | `/api/health` | 兼容诊断接口，包含数据库结果和版本 |
+| GET | `/api/health` | 兼容诊断接口，包含数据库结果、版本与部署功能开关 |
 | GET | `/api/ads` | 网站与 Android 使用的公开广告配置 |
 | GET | `/api/animes` | 里番分页目录 |
 | GET | `/api/animes/{id}` | 里番详情与标签 |
@@ -81,9 +81,15 @@ GET /api/health
   "ok": true,
   "database": "mysql",
   "result": [{ "ok": 1 }],
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "features": { "imageProxy": true, "androidUpdates": true }
 }
 ```
+
+`features` 报告 Android 客户端依赖的两个部署开关：`imageProxy` 为 `IMAGE_PROXY_UPSTREAM` 是否
+生效（`false` 时 `/cdn-img/**` 返回 503，App 内所有图片空白），`androidUpdates` 为
+`ANDROID_UPDATE_REPOSITORY` 是否生效（`false` 时 `/api/android/update` 返回 404，App 提示
+检查更新失败）。它们只反映配置，不代表上游当前可达。
 
 失败返回 `500` 与 `{ "ok": false, "error": string }`。错误字符串可能包含底层诊断信息，
 不应把该响应公开汇入日志面板或用户界面。
@@ -262,7 +268,8 @@ GET /api/android/update
 ```
 
 接口以 5 秒上游超时读取环境变量 `ANDROID_UPDATE_REPOSITORY`（`owner/name`）指定仓库的
-GitHub Releases，并选择数值最大的完整 `build-N`；未配置时返回 `404`。草稿、
+GitHub Releases，并选择数值最大的完整 `build-N`；未配置时返回 `404`（CI 构建的镜像默认为
+构建它的仓库，`/api/health` 的 `features.androidUpdates` 可确认是否生效）。草稿、
 非 `main` 目标、缺少资产、空文件、下载路径不可信或没有 GitHub SHA-256 digest 的版本都会
 被忽略。
 

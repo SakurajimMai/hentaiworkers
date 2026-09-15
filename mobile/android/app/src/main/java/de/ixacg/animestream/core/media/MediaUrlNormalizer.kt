@@ -2,6 +2,7 @@ package de.ixacg.animestream.core.media
 
 import de.ixacg.animestream.BuildConfig
 import java.net.URI
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 object MediaUrlNormalizer {
@@ -44,6 +45,32 @@ object MediaUrlNormalizer {
             .encodedQuery(parsed.encodedQuery)
             .build()
             .toString()
+    }
+
+    /**
+     * Inverse of [rewriteCdnUrl]: the address on the proxied image host behind a `/cdn-img` URL of
+     * the site origin, or null when [proxied] is not one. Used to retry directly when the proxy fails.
+     */
+    fun directImageUrl(
+        proxied: String,
+        siteOrigin: String = origin,
+        proxiedHost: String = proxiedImageHost,
+    ): String? {
+        if (proxiedHost.isBlank()) return null
+        val parsed = proxied.toHttpUrlOrNull() ?: return null
+        val site = siteOrigin.trimEnd('/').toHttpUrlOrNull() ?: return null
+        if (parsed.scheme != site.scheme || !parsed.host.equals(site.host, ignoreCase = true) || parsed.port != site.port) return null
+        val segments = parsed.encodedPathSegments
+        if (segments.size < 2 || segments.first() != "cdn-img") return null
+        return runCatching {
+            HttpUrl.Builder()
+                .scheme("https")
+                .host(proxiedHost)
+                .addEncodedPathSegments(segments.drop(1).joinToString("/"))
+                .encodedQuery(parsed.encodedQuery)
+                .build()
+                .toString()
+        }.getOrNull()
     }
 
     fun normalize(raw: String?): String? {

@@ -4,6 +4,15 @@
 
 ## 2026-09 — 搜索引擎收录、信息流广告尺寸与 APK 阅读预取
 
+- 修复升级到配置注入镜像后 APK 新漫画无图、检查更新失败：生产在 `deploy/.env` 没有
+  `IMAGE_PROXY_UPSTREAM` 与 `ANDROID_UPDATE_REPOSITORY` 的情况下换上了新镜像，`/cdn-img/**`
+  返回 503（旧作品只是还有边缘/设备缓存），`/api/android/update` 返回 404。Docker workflow 现在
+  把仓库变量 `IMAGE_PROXY_UPSTREAM` 与构建仓库 `github.repository` 作为镜像默认值烘焙进去
+  （`.env` 仍可覆盖，模板里这两项改为注释，避免复制模板时把默认值清空），并在构建前校验图片代理
+  上游与 APK 改写的图片主机一致；`/api/health` 新增 `features.imageProxy` /
+  `features.androidUpdates`，部署后可直接确认。APK 在 `/cdn-img` 返回 5xx 时改为直连图片主机
+  重试一次并沿用缓存键，代理故障降级为直连而不是整页空白。
+
 - 详情页返回目录不再固定回到第一页：`/manga/{id}` 与 `/watch/{id}` 现在按默认排序算出作品所在页，
   站内跳转仍优先按浏览历史返回（含标签、榜单与筛选）；后台里番/漫画详情的返回链接同样改为按历史返回。
 - 目录排序补上 `id` 次级排序（里番 `COALESCE(updated_at, created_at) DESC, id DESC`；漫画

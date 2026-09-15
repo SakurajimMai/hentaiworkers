@@ -61,6 +61,10 @@ chmod 600 deploy/.env
 - `APP_HOST_BIND=127.0.0.1`
 - `APP_PORT=13000`，或你明确选择的回环端口
 
+`IMAGE_PROXY_UPSTREAM` 与 `ANDROID_UPDATE_REPOSITORY` 保持注释即可：GitHub Actions 构建的镜像
+已带默认值（仓库变量 `IMAGE_PROXY_UPSTREAM` 与构建仓库）。只有本地构建镜像或要覆盖时才填写，
+写成空值会关闭 APK 的图片代理与更新清单。
+
 keyring 是 JSON 对象，不是单独 Base64 字符串。生成方法见
 [开发指南的配置章节](../development.md#2-配置)。
 
@@ -196,6 +200,8 @@ curl -fsS "$APP_CHECK_ORIGIN/api/ready"
 - live 返回 `{"status":"live"}`。它只证明 Node.js 进程响应。
 - ready 返回 `{"status":"ready"}`。生产有 `DATABASE_URL` 时会执行
   `SELECT 1`，但不检查完整 schema。
+- `curl -fsS "$APP_CHECK_ORIGIN/api/health"` 的 `features.imageProxy` 与
+  `features.androidUpdates` 都为 `true`，否则 APK 会新作品无图或检查更新失败。
 
 Compose healthy 只基于 live。ready 或业务路径失败时，发布仍然失败。
 

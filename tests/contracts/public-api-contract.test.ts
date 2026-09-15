@@ -564,10 +564,11 @@ test('漫画列表保持功能关闭 404 和依赖异常 500 契约', async () =
 });
 
 test('健康检查保持成功和失败黄金契约', async () => {
-  const success = createHealthHandler(async () => healthFixture.success.result);
+  const features = () => healthFixture.success.features;
+  const success = createHealthHandler(async () => healthFixture.success.result, features);
   const failure = createHealthHandler(async () => {
     throw new Error(healthFixture.failure.error);
-  });
+  }, features);
 
   const successResponse = await success();
   const failureResponse = await failure();
@@ -611,7 +612,7 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
   const schemas = getOpenApiSchemas();
   const required = {
     Error: ['error'],
-    HealthOk: ['ok', 'database', 'result', 'version'],
+    HealthOk: ['ok', 'database', 'result', 'version', 'features'],
     HealthError: ['ok', 'error'],
     Pagination: ['page', 'limit', 'total', 'totalPages'],
     AnimeListItem: ['id', 'title', 'cover', 'viewCount', 'titleEnglish'],

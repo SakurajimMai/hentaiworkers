@@ -60,6 +60,10 @@ scope, Docker image, production Compose services, and server-private imports.
   and never written into source. Gradle rejects a missing or malformed origin; a blank image host
   disables the `/cdn-img` rewrite and a blank repository disables update checks. Invalid runtime
   media URLs still fail closed.
+- `/cdn-img` stays the primary image path because some networks cannot reach the image host, but
+  the proxy can itself be unconfigured or down. A 5xx answer for a proxied image retries the direct
+  image host exactly once, keeping the proxied disk cache key so the next request for that page is
+  served from disk; 4xx answers, transport failures and non-proxied addresses are never retried.
 - API JSON and image traffic may share an OkHttp connection pool and dispatcher to reuse transport
   resources, but derive both clients from the same neutral base client so their TLS configuration is
   connection-compatible. Merely injecting one pool into independently built TLS clients does not

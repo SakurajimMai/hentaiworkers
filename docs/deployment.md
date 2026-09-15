@@ -30,9 +30,12 @@ HTTPS 反向代理和主机升级均由操作者或外部平台负责。GitHub A
 - 数据库必须使用私有 CA。官方 Compose 和生产镜像当前没有挂载 CA 文件，单独设置
   `DATABASE_TLS_CA_FILE` 不会让宿主机文件出现在容器内。
 - 没有数据库备份或未经审核的恢复方案。
-- `deploy/.env` 尚未填写 `APP_IMAGE`、`IMAGE_PROXY_UPSTREAM` 和 `ANDROID_UPDATE_REPOSITORY`。
-  镜像不再内置这些值：缺少前者 Compose 无法启动，缺少后两者会让 APK 的图片代理返回 503、
-  更新提醒接口返回 404。
+- `deploy/.env` 尚未填写 `APP_IMAGE`，Compose 无法启动。
+- 使用本地构建的镜像，却没有在 `deploy/.env` 填写 `IMAGE_PROXY_UPSTREAM` 与
+  `ANDROID_UPDATE_REPOSITORY`。CI 构建的镜像会把仓库变量 `IMAGE_PROXY_UPSTREAM` 与构建仓库
+  `github.repository` 烘焙为默认值，本地构建没有；缺少或写成空值会让 APK 的图片代理返回 503
+  （App 内新作品图片全部空白）、更新提醒接口返回 404（App 提示检查更新失败）。启动后用
+  `/api/health` 的 `features` 确认两者为 `true`。
 - 不知道要部署的镜像 tag，或该 tag 尚未由 Docker workflow 发布。
 - 反向代理、域名或 `SITE_URL` 尚未确定。
 
@@ -53,8 +56,8 @@ chmod 600 deploy/.env
 | `DATABASE_TLS_MODE` | 远程生产数据库必须为 `required` |
 | `DATABASE_POOL_*` | 连接池上限、空闲连接与超时；模板值可作为起点 |
 | `SITE_URL` | 用户实际访问的 HTTPS origin，不得带路径、查询或片段 |
-| `IMAGE_PROXY_UPSTREAM` | `/cdn-img/**` 代理的图片主机 origin（如 `https://images.example`）；Android 客户端的漫画图片依赖它，留空则代理返回 503 |
-| `ANDROID_UPDATE_REPOSITORY` | 发布 APK 的 GitHub 仓库 `owner/name`；留空时 `/api/android/update` 返回 404，App 不会提示更新 |
+| `IMAGE_PROXY_UPSTREAM` | `/cdn-img/**` 代理的图片主机 origin（如 `https://images.example`）；Android 客户端的全部图片依赖它。CI 镜像已带仓库变量 `IMAGE_PROXY_UPSTREAM` 作为默认值，通常保持注释；写成空值会让代理返回 503 |
+| `ANDROID_UPDATE_REPOSITORY` | 发布 APK 的 GitHub 仓库 `owner/name`；CI 镜像默认为构建它的仓库，通常保持注释。写成空值时 `/api/android/update` 返回 404，App 检查更新失败 |
 | `APP_IMAGE` | 镜像名 `owner/name`（不含 tag），Compose 用 `APP_IMAGE:IMAGE_TAG` 拉取 |
 | `INDEXNOW_ENDPOINT` | 可选；覆盖 IndexNow 提交地址，默认使用协议共享端点 |
 | `SESSION_SECRET` | 至少 32 字符且不能是占位值 |
@@ -196,10 +199,11 @@ curl -fsS "$APP_CHECK_ORIGIN/api/ready"
 |------|----------|--------|
 | `/api/live` | Node.js 进程可以响应 | 数据库、迁移、登录和业务可用 |
 | `/api/ready` | 生产有 `DATABASE_URL` 时 `SELECT 1` 成功 | 所有表、列、索引或业务查询可用 |
-| `/api/health` | 数据库诊断查询成功 | 完整业务可用；失败响应当前可能包含底层错误 |
+| `/api/health` | 数据库诊断查询成功；`features.imageProxy` 与 `features.androidUpdates` 为 `true` 表示 APK 依赖的图片代理与更新清单已配置 | 完整业务可用；失败响应当前可能包含底层错误 |
 
 Compose healthcheck 只调用 `/api/live`。容器显示 healthy 仍可能存在数据库或 schema
-问题。
+问题。换镜像后务必看一眼 `/api/health` 的 `features`：任一为 `false` 时网站照常可用，但 APK
+会出现新作品无图（`/cdn-img` 返回 503，旧作品只是还有缓存）或“检查更新失败”。
 
 ## 7. 反向代理
 
@@ -299,6 +303,8 @@ Android 签名、ABI 与 Build 39 迁移见 [移动端文档](./mobile.md)。
 | 容器 healthy，但页面超时 | `/api/ready`、App 日志、数据库 DNS/TLS/白名单、代表性目录查询 |
 | `/api/ready` 成功但功能报缺表 | ready 只做连接检查；核对实际 schema 和迁移记录 |
 | 私有 CA 文件不存在 | 官方 Compose 未挂载 CA；停止并完成独立 mount 方案 |
+| APK 新作品无图、旧作品正常 | `/api/health` 的 `features.imageProxy`；`.env` 是否把 `IMAGE_PROXY_UPSTREAM` 写成空值或用了本地构建镜像 |
+| APK 提示“检查更新失败” | `/api/android/update` 是否 404，`features.androidUpdates`；`ANDROID_UPDATE_REPOSITORY` 是否为空或大小写与 GitHub 不一致 |
 | 漫画榜单/进度失败 | 核对 `0017`、`0018`、账号 DDL 权限和 App 日志 |
 | 新 APK 未出现在 Releases | 确认是 `main` 的正式签名构建且工作流全绿；分支、PR 或 `internal-debug` 构建不会发布 |
 | 旧 Release 或旧镜像标签消失 | 保留策略只保留最新八个 `build-*` Release 与八个 SHA 镜像标签；需要长期保留的版本请另行归档 |

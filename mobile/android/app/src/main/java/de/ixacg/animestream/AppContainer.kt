@@ -8,6 +8,7 @@ import coil.decode.ImageDecoderDecoder
 import de.ixacg.animestream.core.database.LegacyStorageMigrator
 import de.ixacg.animestream.core.database.LibraryDatabase
 import de.ixacg.animestream.core.media.MediaUrlNormalizer
+import de.ixacg.animestream.core.media.ProxiedImageFallback
 import de.ixacg.animestream.core.network.ApiClient
 import de.ixacg.animestream.core.network.SessionCookieStore
 import de.ixacg.animestream.data.repository.AdsRepository
@@ -74,6 +75,7 @@ class AppContainer(context: Context) {
                     .build()
             }
             .components {
+                add(ProxiedImageFallback())
                 add(ReaderImageSingleFlight.Factory())
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     add(ImageDecoderDecoder.Factory())

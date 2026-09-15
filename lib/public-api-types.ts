@@ -98,11 +98,19 @@ export type HealthResultRow = {
   ok: number;
 };
 
+// Deployment switches the Android client depends on: false means the feature is disabled by
+// configuration (IMAGE_PROXY_UPSTREAM / ANDROID_UPDATE_REPOSITORY), not that it is failing.
+export type HealthFeatureFlags = {
+  imageProxy: boolean;
+  androidUpdates: boolean;
+};
+
 export type HealthOk = {
   ok: boolean;
   database: string;
   result: HealthResultRow[];
   version: string;
+  features: HealthFeatureFlags;
 };
 
 export type HealthError = {

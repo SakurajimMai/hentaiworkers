@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import type {
   HealthError,
+  HealthFeatureFlags,
   HealthOk,
   HealthResultRow,
 } from '@/lib/public-api-types';
 
 export type HealthQueryDependency = () => Promise<HealthResultRow[]>;
+export type HealthFeatureSource = () => HealthFeatureFlags;
 export type HealthDatabaseModule = {
   pool: {
     query(sql: string): Promise<[HealthResultRow[], unknown]>;
@@ -23,7 +25,10 @@ export function createHealthQueryDependency(
   };
 }
 
-export function createHealthHandler(queryHealth: HealthQueryDependency) {
+export function createHealthHandler(
+  queryHealth: HealthQueryDependency,
+  readFeatures: HealthFeatureSource,
+) {
   return async function healthHandler() {
     try {
       const rows = await queryHealth();
@@ -32,6 +37,7 @@ export function createHealthHandler(queryHealth: HealthQueryDependency) {
         database: 'mysql',
         result: rows,
         version: '1.0.0',
+        features: readFeatures(),
       };
       return NextResponse.json(response);
     } catch (e) {

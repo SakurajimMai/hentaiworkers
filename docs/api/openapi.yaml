@@ -436,7 +436,7 @@ components:
 
     HealthOk:
       type: object
-      required: [ok, database, result, version]
+      required: [ok, database, result, version, features]
       properties:
         ok:
           type: boolean
@@ -457,6 +457,20 @@ components:
         version:
           type: string
           example: "1.0.0"
+        features:
+          type: object
+          description: Deployment switches the Android client depends on; false means disabled by configuration, not failing.
+          additionalProperties: false
+          required: [imageProxy, androidUpdates]
+          properties:
+            imageProxy:
+              type: boolean
+              description: "`/cdn-img/**` proxies the configured image host (IMAGE_PROXY_UPSTREAM)."
+              example: true
+            androidUpdates:
+              type: boolean
+              description: "`/api/android/update` serves a release manifest (ANDROID_UPDATE_REPOSITORY)."
+              example: true
 
     HealthError:
       type: object

@@ -41,18 +41,24 @@ Runtime environment keys are App-owned:
 | `DATABASE_URL` | Required MySQL URL |
 | `DATABASE_TLS_MODE` | `required`, except local loopback may use `disabled` |
 | `SITE_URL` | Canonical public origin |
-| `IMAGE_PROXY_UPSTREAM` | Optional image host origin proxied by `/cdn-img/**`; unset returns 503 |
-| `ANDROID_UPDATE_REPOSITORY` | Optional `owner/name` GitHub repository for `/api/android/update`; unset returns 404 |
+| `IMAGE_PROXY_UPSTREAM` | Optional image host origin proxied by `/cdn-img/**`; unset returns 503. CI images default it from the repository variable of the same name |
+| `ANDROID_UPDATE_REPOSITORY` | Optional `owner/name` GitHub repository for `/api/android/update`; unset returns 404. CI images default it to the repository that built them |
 | `APP_IMAGE` | Compose image name (`owner/name`); the tag comes from `IMAGE_TAG` |
 | `INDEXNOW_ENDPOINT` | Optional override of the IndexNow submission endpoint |
+| `SESSION_SECRET` | Required, at least 32 characters and not a placeholder |
+| `APP_ENCRYPTION_KEYRING` | JSON keyring of canonical 32-byte Base64 keys |
+| `APP_ENCRYPTION_CURRENT_KEY_ID` | Must identify a key in the keyring |
 
 Deployment identity never lives in source: hosts, GitHub accounts/repositories and registry image
 names come from these keys, from GitHub repository variables in workflows, or from Gradle
 properties in the Android build. A missing value disables the feature (503/404/skipped) rather
-than falling back to a built-in default.
-| `SESSION_SECRET` | Required, at least 32 characters and not a placeholder |
-| `APP_ENCRYPTION_KEYRING` | JSON keyring of canonical 32-byte Base64 keys |
-| `APP_ENCRYPTION_CURRENT_KEY_ID` | Must identify a key in the keyring |
+than falling back to a built-in default. The publish workflow may bake repository-variable values
+and `github.repository` into the image as `ENV` defaults (`Dockerfile` `ARG`s that are empty in
+source); `deploy/.env` overrides them, and the `.env` templates keep those keys commented out so a
+copied template cannot blank the defaults. The workflow must refuse to publish an image whose
+`IMAGE_PROXY_UPSTREAM` host differs from the Android build's `ANIMESTREAM_IMAGE_PROXY_HOST`, and
+`GET /api/health` reports both switches under `features` so a deployment that lost them is visible
+from outside instead of only as 503/404 answers inside the app.
 
 The App must not contain or import a data-acquisition runtime, machine identity/token API,
 shared media-output filesystem, or a second Compose service. A root `crawler/` project must
@@ -135,6 +141,8 @@ the retention job loudly instead of silently accumulating tags.
 | View/favourite count cannot be computed | Report `null` (unknown); never emit a stored placeholder or a synthetic number |
 | Catalog contains a removed local-media URL | Correct operationally; do not read host files from App |
 | GitHub update release is draft, non-main, incomplete, or has an invalid asset path/digest | Ignore it and select the greatest older complete `build-N`; return the documented upstream error only when no cached valid manifest exists |
+| Android build proxies a host the image does not name in `IMAGE_PROXY_UPSTREAM` | Docker publish workflow fails validation before building |
+| `IMAGE_PROXY_UPSTREAM` / `ANDROID_UPDATE_REPOSITORY` unset or malformed at runtime | `/api/health.features.{imageProxy,androidUpdates}` is `false`; the routes keep answering 503/404 |
 | `crawler/**/production_config.yml` exists locally | Keep ignored; commit only a sanitized example |
 
 ## 5. Good / Base / Bad Cases

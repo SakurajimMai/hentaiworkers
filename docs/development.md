@@ -25,8 +25,8 @@ cp .env.example .env
 | `DATABASE_URL` | `mysql://用户:密码@主机:端口/数据库`；密码特殊字符需 URL 编码 |
 | `DATABASE_TLS_MODE` | 只有 `localhost`、`127.0.0.1` 或 `::1` 可设为 `disabled` |
 | `SITE_URL` | 通常为 `http://localhost:3000`，不得带路径、查询或片段 |
-| `IMAGE_PROXY_UPSTREAM` | 可选；`/cdn-img/**` 代理的图片主机 origin，留空时该路由返回 503 |
-| `ANDROID_UPDATE_REPOSITORY` | 可选；发布 APK 的 GitHub 仓库 `owner/name`，留空时更新接口返回 404 |
+| `IMAGE_PROXY_UPSTREAM` | 可选；`/cdn-img/**` 代理的图片主机 origin，留空时该路由返回 503。CI 镜像从同名仓库变量取默认值，本地开发需自行设置 |
+| `ANDROID_UPDATE_REPOSITORY` | 可选；发布 APK 的 GitHub 仓库 `owner/name`，留空时更新接口返回 404。CI 镜像默认为构建它的仓库 |
 | `APP_IMAGE` | 使用根目录 Compose 时的镜像名 `owner/name` |
 | `SESSION_SECRET` | 至少 32 字符，不能是占位值 |
 | `APP_ENCRYPTION_KEYRING` | 非空 JSON 对象；每个值是规范 Base64 编码的 32 字节密钥 |

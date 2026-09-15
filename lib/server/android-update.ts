@@ -22,6 +22,15 @@ export function resolveAndroidUpdateRepository(
   return candidate;
 }
 
+/** Repository for status reporting; a malformed value counts as not configured instead of throwing. */
+export function configuredAndroidUpdateRepository(): string | null {
+  try {
+    return resolveAndroidUpdateRepository();
+  } catch {
+    return null;
+  }
+}
+
 export function androidUpdateGithubApiUrl(repository: string): string {
   return `https://api.github.com/repos/${repository}/releases?per_page=100`;
 }

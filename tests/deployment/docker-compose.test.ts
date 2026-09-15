@@ -220,6 +220,11 @@ test('Docker Hub workflow publishes only the application image', () => {
 
   assert.match(workflow, /APP_IMAGE: \$\{\{ vars\.APP_IMAGE \}\}/);
   assert.match(workflow, /name: Validate image configuration/);
+  assert.match(workflow, /IMAGE_PROXY_UPSTREAM: \$\{\{ vars\.IMAGE_PROXY_UPSTREAM \}\}/);
+  assert.match(workflow, /ANDROID_IMAGE_PROXY_HOST: \$\{\{ vars\.ANIMESTREAM_IMAGE_PROXY_HOST \}\}/);
+  assert.match(workflow, /must point at ANIMESTREAM_IMAGE_PROXY_HOST/, 'the image must proxy the host the APK rewrites');
+  assert.match(workflow, /IMAGE_PROXY_UPSTREAM=\$\{\{ env\.IMAGE_PROXY_UPSTREAM \}\}/);
+  assert.match(workflow, /ANDROID_UPDATE_REPOSITORY=\$\{\{ github\.repository \}\}/, 'the image defaults to the repository that built it, like the APK');
   assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /images: \$\{\{ env\.APP_IMAGE \}\}/);
   assert.match(workflow, /context: \./);
@@ -335,6 +340,26 @@ test('trusted workflows retain only the latest five repository Actions runs', ()
   }
 
   assert.equal(cleanupScripts[0], cleanupScripts[1]);
+});
+
+test('the image carries CI-injected deployment defaults that .env can override', () => {
+  const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
+  const runner = dockerfile.slice(dockerfile.indexOf('AS runner'));
+
+  for (const key of ['IMAGE_PROXY_UPSTREAM', 'ANDROID_UPDATE_REPOSITORY']) {
+    assert.match(runner, new RegExp(`^ARG ${key}=""$`, 'm'), `${key} has no value in source`);
+    assert.match(runner, new RegExp(`^ENV ${key}=\\$\\{${key}\\}$`, 'm'), `${key} default reaches the runtime`);
+  }
+  assert.doesNotMatch(dockerfile, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i);
+
+  // Compose passes every key of env_file, so a copied template with empty values would blank
+  // the image defaults and bring back the 503/404 failures the defaults exist to prevent.
+  for (const template of ['.env.example', 'deploy/.env.example']) {
+    const source = readFileSync(join(root, template), 'utf8');
+    assert.doesNotMatch(source, /^(?:IMAGE_PROXY_UPSTREAM|ANDROID_UPDATE_REPOSITORY)=/m, `${template} leaves the image defaults in force`);
+    assert.match(source, /^# IMAGE_PROXY_UPSTREAM=/m, `${template} still documents the override`);
+    assert.match(source, /^# ANDROID_UPDATE_REPOSITORY=/m, `${template} still documents the override`);
+  }
 });
 
 test('deployment files keep secrets outside the image', () => {
