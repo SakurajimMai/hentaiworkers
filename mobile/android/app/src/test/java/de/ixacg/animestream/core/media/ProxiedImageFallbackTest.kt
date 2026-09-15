@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import androidx.test.core.app.ApplicationProvider
+import coil.annotation.ExperimentalCoilApi
 import coil.decode.DataSource
 import coil.intercept.Interceptor
 import coil.network.HttpException
@@ -26,6 +27,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+// Interceptor.Chain.withSize is still experimental in Coil 2.7; the fake chain must override it.
+@OptIn(ExperimentalCoilApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
 class ProxiedImageFallbackTest {
