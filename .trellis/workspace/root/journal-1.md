@@ -385,3 +385,48 @@ cdn-img 上游、Android 更新仓库、Compose 镜像名、Actions 站点/图�
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: 修复 APK 新漫画无图与检查更新失败（部署缺少配置注入变量）
+
+**Date**: 2026-09-15
+**Task**: 修复 APK 新漫画无图与检查更新失败（部署缺少配置注入变量）
+**Branch**: `main`
+
+### Summary
+
+生产在 deploy/.env 没有 IMAGE_PROXY_UPSTREAM 与 ANDROID_UPDATE_REPOSITORY 的情况下换上了配置注入镜像：/cdn-img 返回 503（旧作品只是还有 Cloudflare/设备缓存，所以只有新漫画无图），/api/android/update 返回 404（App 提示检查更新失败）。Docker workflow 现在把仓库变量 IMAGE_PROXY_UPSTREAM 与 github.repository 作为 build-arg 烘焙成镜像 ENV 默认值，.env 仍可覆盖但模板改为注释，构建前校验代理上游主机与 APK 改写主机一致；/api/health 新增 features.imageProxy/androidUpdates；APK 在 /cdn-img 返回 5xx 时直连图片主机重试一次并沿用磁盘缓存键。顺带修复 setup-android 默认安装已下架的 tools 包导致 Android CI 失败。镜像 9274672 起带默认值，APK Build 110 已发布为 Latest。
+
+### Main Changes
+
+- Dockerfile runner 阶段新增 ARG/ENV IMAGE_PROXY_UPSTREAM、ANDROID_UPDATE_REPOSITORY（源码中为空），docker-publish.yml 通过 build-args 注入并校验上游主机与 ANIMESTREAM_IMAGE_PROXY_HOST 一致
+- .env.example 与 deploy/.env.example 把两项改为注释：compose 会传递 env_file 的空值并覆盖镜像默认值
+- GET /api/health 新增 features { imageProxy, androidUpdates }，OpenAPI、fixture、API 文档同步
+- Android 新增 ProxiedImageFallback（Coil Interceptor）与 MediaUrlNormalizer.directImageUrl，仅对 5xx 重试一次，4xx/传输失败/非代理地址不重试
+- build-android.yml 的 setup-android 显式 packages: platform-tools
+- 部署/开发/移动端/排障文档与 Trellis 规范更新，新增仓库变量 IMAGE_PROXY_UPSTREAM
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ddf9248` | (see git log) |
+| `9274672` | (see git log) |
+| `8fb1df8` | (see git log) |
+
+### Testing
+
+- [OK] npm run typecheck / lint / test（316 项通过）/ check:legacy / check:boundaries
+- [OK] 本地 docker 验证：env_file 缺键时镜像默认值生效，KEY= 空值会清空默认值
+- [OK] Android CI Build 110：ktlint、lintRelease、JVM 测试（含 ProxiedImageFallbackTest、MediaUrlNormalizerTest 新用例）通过并发布 Latest
+- [OK] docker inspect sakurajiamai/hentaiworkers-app:9274672 确认 ENV 带两项默认值
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 运维：把生产 IMAGE_TAG 固定到 9274672 或更新的 tag 并 docker compose up -d，或立即在 deploy/.env 写入 IMAGE_PROXY_UPSTREAM 与 ANDROID_UPDATE_REPOSITORY；随后确认 /api/health features 均为 true
+- 真机验证 Build 110：新漫画图片、检查更新显示已是最新、播放器返回不残留画面
+- 迁移 0020 仍需人工备份后执行

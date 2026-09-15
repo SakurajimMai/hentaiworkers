@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-09-14
+- **Total Sessions**: 15
+- **Last Active**: 2026-09-15
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~387 | Active |
+| `journal-1.md` | ~432 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-09-15 | 修复 APK 新漫画无图与检查更新失败（部署缺少配置注入变量） | `ddf9248`, `9274672`, `8fb1df8` | `main` |
 | 14 | 2026-09-14 | 重做 APK 播放器并修复观看/收藏计数 | `509ef99` | `main` |
 | 13 | 2026-09-14 | 移除源码中的部署专属域名、仓库与镜像名 | `416fa97` | `main` |
 | 12 | 2026-09-14 | 自动发布 Release 与保留最新八个 APK/镜像版本 | `7e43c12` | `main` |
