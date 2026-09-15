@@ -39,7 +39,7 @@ object MediaUrlNormalizer {
         co.th in.th or.th ac.th go.th
         com.pk net.pk org.pk
         com.eg com.sa com.ng com.pe com.co com.ec com.ve com.uy com.py com.bo com.do com.gt com.pa com.sv com.ni com.hn com.cr
-        """.trimIndent().split(Regex("\\s+")).filter { it.isNotEmpty() }.toSet()
+        """.trimIndent().split(Regex("\\s+")).filterNot(String::isEmpty).toSet()
 
     /**
      * Site origin injected at build time (`ANIMESTREAM_API_BASE_URL`). Gradle validates the value;
