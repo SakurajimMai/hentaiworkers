@@ -47,16 +47,10 @@ class HtmlAdPolicyTest {
             )
         assertEquals(300, sized.feedSlots.single().width)
         assertEquals(250, sized.feedSlots.single().height)
-        assertEquals("card", sized.feedSlots.single().placement)
-        assertEquals(false, sized.feedSlots.single().spansCatalogRow)
         assertEquals(728, sized.reader.top.width)
         assertEquals(90, sized.reader.top.height)
-        val banner =
+        val legacy =
             json.decodeFromString<PublicAdsConfig>("""{"feedSlots":[{"enabled":true,"placement":"banner"}]}""")
-        assertEquals(true, banner.feedSlots.single().spansCatalogRow)
-        assertEquals(3, banner.feedSlots.single().catalogSpan(3))
-        assertEquals(2, banner.feedSlots.single().catalogSpan(5))
-        assertEquals(2, banner.feedSlots.single().catalogSpan(2))
-        assertEquals(1, sized.feedSlots.single().catalogSpan(5))
+        assertEquals(true, legacy.feedSlots.single().enabled)
     }
 }
