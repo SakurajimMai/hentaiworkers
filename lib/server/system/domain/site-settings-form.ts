@@ -1,3 +1,4 @@
+import { siteSeoSchema } from '@/lib/site-seo';
 import { siteMetaTagsSchema } from '@/lib/site-meta';
 import { isValidIndexNowKey } from '@/lib/server/seo/indexnow';
 import { AppError } from '../../shared/errors';
@@ -20,4 +21,16 @@ export function parseIndexNowKeyFromForm(formData: FormData): string {
     throw new AppError('RESULT_INVALID', 'IndexNow 密钥无效', 400, true, { field: 'indexNowKey' });
   }
   return key;
+}
+
+/** Omitted fields preserve existing settings; explicit empty optional fields clear them. */
+export function parseSiteSeoFromForm(formData: FormData) {
+  const entries = Object.entries({ title: 'siteTitle', subtitle: 'siteSubtitle', description: 'siteDescription', keywords: 'siteKeywords' })
+    .filter(([, field]) => formData.has(field))
+    .map(([key, field]) => [key, formData.get(field)]);
+  const result = siteSeoSchema.partial().safeParse(Object.fromEntries(entries));
+  if (!result.success) {
+    throw new AppError('RESULT_INVALID', 'SEO 设置无效：标题不能为空，且各字段不能超过长度限制', 400, true, { field: 'siteSeo' });
+  }
+  return result.data;
 }

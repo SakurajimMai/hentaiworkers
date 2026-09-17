@@ -58,7 +58,7 @@ export default async function RegisterPage({
         <h1 className="section-title text-3xl sm:text-4xl text-ink">注册</h1>
         <p className="mt-2 font-ui text-sm text-soft leading-relaxed">
           用邮箱创建账号
-          {auth.requireEmailVerification ? '；提交后请查收验证邮件' : '，登录后可跨设备同步收藏'}
+          ；提交后输入邮件中的六位验证码完成注册
           {auth.emailWhitelistEnabled ? '（仅白名单邮箱）' : ''}
           。
         </p>
@@ -127,12 +127,13 @@ export default async function RegisterPage({
               <TurnstileField siteKey={auth.turnstile.siteKey} />
             ) : null}
             <button type="submit" className="btn-ink w-full">
-              创建账号
+              发送验证码
             </button>
           </form>
         </>
       )}
 
+      <p className="mt-6 text-center font-ui text-sm"><Link href={`/verify-email?next=${encodeURIComponent(next)}`} className="text-accent">已有验证码或需要重新发送？验证邮箱</Link></p>
       <p className="mt-6 font-ui text-sm text-soft text-center">
         已有账号？{' '}
         <Link

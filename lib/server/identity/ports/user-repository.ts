@@ -35,5 +35,6 @@ export interface UserRepository {
   findByUsername(username: string): Promise<UserRecord | null>;
   create(input: CreateUserInput): Promise<UserRecord>;
   update(id: number, input: UpdateUserInput): Promise<void>;
+  deleteRegularUser(id: number): Promise<boolean>;
   list(): Promise<ReadonlyArray<UserRecord>>;
 }

@@ -510,11 +510,6 @@ components:
           type: string
         html:
           type: string
-        placement:
-          type: string
-          enum: [card, banner]
-          default: card
-          description: card stays in one poster cell; banner spans two poster columns at the creative ratio.
 
     PublicReaderAdSlot:
       type: object

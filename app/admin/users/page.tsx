@@ -1,8 +1,9 @@
+import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import { desc, like, or, sql } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/schema';
-import { actionSaveUser } from '../actions';
+import { actionSaveUser, actionDeleteUser } from '../actions';
 import { AdminPagination } from '@/components/admin/admin-pagination';
 
 export const dynamic = 'force-dynamic';
@@ -44,10 +45,12 @@ export default async function AdminUsersPage({
         <p className="font-meta mb-2">用户与权限</p>
         <h1 className="section-title text-3xl text-ink sm:text-4xl">用户</h1>
         <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-soft">
-          创建账号、改角色、启停和重置密码。停用或改密会使对方现有登录失效。
+          创建账号、改角色、启停、重置密码和删除普通用户。停用或改密会使对方现有登录失效。
         </p>
       </header>
 
+      {sp.ok === 'deleted' && <p className="notice-success">用户及其个人数据已删除。</p>}
+      {sp.error === 'delete' && <p className="notice-error">无法删除：用户不存在或为受保护的管理员账号。</p>}
       <form className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <label htmlFor="user-search" className="sr-only">
           搜索用户
@@ -198,6 +201,15 @@ export default async function AdminUsersPage({
                         保存
                       </button>
                     </form>
+                    {u.role === 'user' && (
+                      <form action={actionDeleteUser} className="mt-2">
+                        <input type="hidden" name="id" value={u.id} />
+                        <ConfirmSubmitButton className="admin-btn-action !py-1 text-red-600" title="删除用户" confirmLabel="删除"
+                          message={`确定删除 ${u.username}？其收藏、片单、观看和阅读进度会一并删除，此操作不可恢复。`}>
+                          删除用户
+                        </ConfirmSubmitButton>
+                      </form>
+                    )}
                   </td>
                 </tr>
               );

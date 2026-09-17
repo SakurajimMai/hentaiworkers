@@ -1,3 +1,5 @@
+import { getSiteSeo } from '@/lib/server/site-metadata';
+import { siteSeoTitle } from '@/lib/site-seo';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
@@ -6,7 +8,6 @@ import { GuestContinueWatching } from '@/components/continue-watching-client';
 import { HeroCarousel, type HeroItem } from '@/components/hero-carousel';
 import { HorizontalCarousel } from '@/components/horizontal-carousel';
 import { horizontalCarouselItemClass } from '@/components/horizontal-carousel-model';
-import { HtmlAd } from '@/components/html-ad';
 import { MangaCard } from '@/components/MangaCard';
 import { MediaImage } from '@/components/media-image';
 import { getAnimeById, listAnimes, recommendFromSeeds } from '@/lib/anime-service';
@@ -17,8 +18,7 @@ import {
   getWatchProgressService,
 } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
-import { interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
-import { resolveAdDimensions } from '@/lib/ad-dimensions';
+import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
 import { effectiveHeroSlides, type FeedAdSlot } from '@/lib/server/system/domain/settings';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { StructuredData } from '@/components/structured-data';
@@ -49,7 +49,6 @@ export default async function HomePage() {
   let loggedIn = false;
   let error: string | null = null;
   let feedSlots: FeedAdSlot[] = [];
-  let homeAd: { html: string; width?: number; height?: number; index: number } | undefined;
 
   try {
     const user = await getIdentityService().getCurrentUser();
@@ -71,11 +70,6 @@ export default async function HomePage() {
     mangas = mangaData;
     heroIntervalSeconds = system.hero.intervalSeconds;
     feedSlots = system.ads.feedSlots.filter((slot) => slot.enabled);
-    const homeAdIndex = feedSlots.findIndex((slot) => slot.html.trim() && isFeedBannerAd(slot));
-    const homeSlot = homeAdIndex >= 0 ? feedSlots[homeAdIndex] : undefined;
-    homeAd = homeSlot
-      ? { html: homeSlot.html, ...resolveAdDimensions(homeSlot), index: homeAdIndex }
-      : undefined;
     continueWatching = progress.filter((p) => !p.completed && p.positionSeconds > 5);
     const completedIds = progress.filter((p) => p.completed).map((p) => p.animeId);
     const favorites = favoritesPage?.items ?? [];
@@ -141,6 +135,7 @@ export default async function HomePage() {
   }
 
   const siteUrl = resolveSiteUrl(process.env.SITE_URL);
+  const seo = await getSiteSeo();
 
   return (
     <div className="pb-20 sm:pb-24">
@@ -148,7 +143,8 @@ export default async function HomePage() {
         data={{
           '@context': 'https://schema.org',
           '@type': 'WebSite',
-          name: 'AnimeStream',
+          name: seo.title,
+          description: seo.description,
           url: siteUrl,
           inLanguage: 'zh-CN',
           potentialAction: {
@@ -159,7 +155,7 @@ export default async function HomePage() {
         }}
       />
       <div className="page-shell pt-3 sm:pt-4">
-        <h1 className="sr-only">AnimeStream 里番与漫画</h1>
+        <h1 className="sr-only">{siteSeoTitle(seo)}</h1>
         <div className="space-y-14 sm:space-y-16">
         {error && (
           <div className="notice-error !text-sm">
@@ -185,17 +181,6 @@ export default async function HomePage() {
         {hero.length > 0 && (
           <HeroCarousel intervalSeconds={heroIntervalSeconds} items={hero} />
         )}
-
-        {homeAd ? (
-          <aside className="reader-ad reader-ad-banner overflow-hidden rounded-2xl border border-border bg-card" aria-label="首页广告">
-            <HtmlAd
-              html={homeAd.html}
-              documentSrc={htmlAdDocumentPath({ kind: 'feed', id: homeAd.index })}
-              width={homeAd.width}
-              height={homeAd.height}
-            />
-          </aside>
-        ) : null}
 
         {loggedIn && continueWatching.length > 0 && (
           <HorizontalCarousel title="继续观看" viewAllHref="/history">
@@ -311,7 +296,7 @@ function HomeFeedRail<T>({
   itemKey: (item: T, index: number) => string;
   renderItem: (item: T) => ReactNode;
 }) {
-  const slots = interleaveFeedAds(items, ads, itemKey, (ad) => !isFeedBannerAd(ad));
+  const slots = interleaveFeedAds(items, ads, itemKey);
   return (
     <HorizontalCarousel title={title} viewAllHref={viewAllHref}>
       {slots.map((slot) =>

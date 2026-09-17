@@ -1,3 +1,4 @@
+import { getSiteSeo } from '@/lib/server/site-metadata';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -42,6 +43,7 @@ export async function generateMetadata({
     keywords: anime.tags?.length ? anime.tags.map((tag) => tag.name) : undefined,
     alternates: { canonical: `/watch/${id}` },
     openGraph: pageOpenGraph({
+      siteName: (await getSiteSeo()).title,
       title: anime.title,
       description: description.slice(0, 160),
       type: 'video.other',

@@ -1,44 +1,16 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import { CatalogScrollRestoration } from '@/components/catalog-scroll-restoration';
-import { ADULT_RATING_META, SITE_LOCALE, SITE_NAME } from '@/lib/seo';
-import { getGlobalMetaTags } from '@/lib/server/site-metadata';
+import { buildSiteMetadata } from '@/lib/site-seo';
+import { getGlobalMetaTags, getSiteSeo } from '@/lib/server/site-metadata';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: {
-    default: 'AnimeStream · 里番与漫画',
-    template: '%s · AnimeStream',
-  },
-  metadataBase: new URL(process.env.SITE_URL || 'http://localhost:3000'),
-  description: 'AnimeStream 提供里番视频浏览、托管 MP4 播放、漫画在线阅读、观看进度同步与片单收藏。',
-  applicationName: 'AnimeStream',
-  keywords: ['里番', '在线观影', '漫画阅读', 'AnimeStream'],
-  openGraph: {
-    title: 'AnimeStream · 里番与漫画',
-    description: '浏览里番视频与漫画内容，继续上次进度，管理你的片单。',
-    type: 'website',
-    locale: SITE_LOCALE,
-    siteName: SITE_NAME,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'AnimeStream · 里番与漫画',
-    description: '里番视频与漫画内容在线浏览。',
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-      'max-video-preview': -1,
-    },
-  },
-  other: ADULT_RATING_META,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    ...buildSiteMetadata(await getSiteSeo()),
+    metadataBase: new URL(process.env.SITE_URL || 'http://localhost:3000'),
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: [

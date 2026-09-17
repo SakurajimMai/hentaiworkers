@@ -1,3 +1,4 @@
+import { getSiteSeo } from '@/lib/server/site-metadata';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Suspense, cache } from 'react';
@@ -8,7 +9,7 @@ import { Pagination } from '@/components/pagination';
 import { BROWSE_CATALOG_PAGE_SIZE, listAnimes, listTags, type SortType } from '@/lib/anime-service';
 import { StructuredData } from '@/components/structured-data';
 import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
-import { FEED_BANNER_GRID_CLASS, interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
+import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
 
@@ -91,6 +92,7 @@ export async function generateMetadata({
     description,
     alternates: { canonical },
     openGraph: pageOpenGraph({
+      siteName: (await getSiteSeo()).title,
       title,
       description,
       type: 'website',
@@ -223,9 +225,7 @@ export default async function BrowsePage({
                     href={slot.ad.href}
                     width={slot.ad.width}
                     height={slot.ad.height}
-                    banner={isFeedBannerAd(slot.ad)}
                     documentSrc={htmlAdDocumentPath({ kind: 'feed', id: slot.adIndex })}
-                    className={isFeedBannerAd(slot.ad) ? FEED_BANNER_GRID_CLASS : undefined}
                   />
                 ) : (
                   <AnimeCard key={slot.key} anime={slot.item} />

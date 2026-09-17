@@ -659,9 +659,6 @@
     height: 100%;
     overflow: hidden;
   }
-  .feed-ad-banner-card {
-    overflow: hidden;
-  }
   .feed-ad-default {
     display: flex;
     height: 100%;

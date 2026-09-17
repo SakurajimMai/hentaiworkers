@@ -248,6 +248,16 @@ export class IdentityService {
     return actual === expected;
   }
 
+  async deleteUser(id: number): Promise<void> {
+    const admin = await this.requireAdmin();
+    if (!Number.isSafeInteger(id) || id <= 0 || id === admin.id) {
+      throw new AppError('RESULT_INVALID', '不能删除当前管理员或无效用户', 400);
+    }
+    if (!await this.users.deleteRegularUser(id)) {
+      throw new AppError('RESULT_INVALID', '用户不存在或为受保护的管理员账号', 400);
+    }
+  }
+
   listUsers(): Promise<ReadonlyArray<UserRecord>> {
     return this.users.list();
   }

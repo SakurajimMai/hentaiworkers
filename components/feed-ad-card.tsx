@@ -3,7 +3,7 @@
 import { IconMegaphone } from '@/components/icons';
 import { HtmlAd } from '@/components/html-ad';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { feedAdFrameRatio, resolveAdDimensions, type AdDimensions } from '@/lib/ad-dimensions';
+import { resolveAdDimensions, type AdDimensions } from '@/lib/ad-dimensions';
 
 function FeedAdPlaceholder({ href }: { href?: string }) {
   return (
@@ -24,7 +24,6 @@ export function FeedAdCard({
   href,
   documentSrc,
   className = '',
-  banner = false,
   width,
   height,
 }: {
@@ -32,33 +31,11 @@ export function FeedAdCard({
   href?: string;
   documentSrc?: string;
   className?: string;
-  banner?: boolean;
 } & AdDimensions) {
   const custom = (html || '').trim();
   const target = (href || '').trim();
   const size = resolveAdDimensions({ width, height, html: custom });
-  const bannerRatio = feedAdFrameRatio({ banner: true, width: size.width, height: size.height });
-  const frame = banner ? (
-    <div
-      className={`poster-frame feed-ad-banner-card w-full min-w-0${custom ? '' : ' feed-ad-card'}`}
-      style={{ aspectRatio: `${bannerRatio}` }}
-    >
-      {custom ? (
-        <HtmlAd
-          html={custom}
-          documentSrc={documentSrc}
-          width={size.width}
-          height={size.height}
-          fitParent
-          className="feed-ad-html"
-        />
-      ) : (
-        <AspectRatio ratio={bannerRatio}>
-          <FeedAdPlaceholder href={target} />
-        </AspectRatio>
-      )}
-    </div>
-  ) : (
+  const frame = (
     <div className={`${custom ? 'poster-frame' : 'feed-ad-card'} aspect-[2/3] w-full min-w-0`}>
       <AspectRatio ratio={2 / 3}>
         {custom && size.width > 0 ? (
@@ -80,7 +57,7 @@ export function FeedAdCard({
     </div>
   );
 
-  const layoutClass = `block min-w-0 self-start${banner ? ' col-span-2' : ''}${className ? ` ${className}` : ''}`;
+  const layoutClass = `block min-w-0 self-start${className ? ` ${className}` : ''}`;
   if (target && !custom) {
     return (
       <a

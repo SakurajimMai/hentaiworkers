@@ -131,7 +131,6 @@ export type PublicFeedAdSlot = {
   interval: number;
   href: string;
   html: string;
-  placement?: 'card' | 'banner';
 };
 
 export type PublicReaderAdSlot = {

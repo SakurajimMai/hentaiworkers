@@ -51,7 +51,7 @@ export default async function AdminSystemSettingsPage({
         <a href="#hero">幻灯片</a>
         <a href="#app">页脚</a>
         <a href="#meta">全局 Meta</a>
-        <a href="#seo">收录</a>
+        <a href="#seo">SEO</a>
         <a href="#smtp">SMTP</a>
         <a href="#trust">安全验证</a>
         <a href="#player">播放器</a>
@@ -99,15 +99,7 @@ export default async function AdminSystemSettingsPage({
             />
             开放前台注册
           </label>
-          <label className="flex items-center gap-2 font-ui text-sm">
-            <input
-              type="checkbox"
-              name="requireEmailVerification"
-              value="1"
-              defaultChecked={view.registration.requireEmailVerification}
-            />
-            注册后须邮箱验证（依赖 SMTP）
-          </label>
+          <p className="font-ui text-sm text-soft">公开注册必须通过六位邮箱验证码验证。请先配置并测试 SMTP；未配置时前台注册不可用。</p>
           <label className="block font-meta text-[12px]">
             邮箱白名单（每行一条；空 = 允许任意有效邮箱）
             <textarea
@@ -200,10 +192,28 @@ export default async function AdminSystemSettingsPage({
 
         <section id="meta" className="scroll-mt-24 border-y border-border py-5 space-y-4">
           <h2 className="font-ui text-sm font-semibold">全局 Meta</h2>
+          <p className="font-ui text-[12px] text-soft">标题、摘要、关键词及分享标签由站点 SEO 管理；此处相同标签不会输出。请在此配置搜索引擎验证等其他 Meta 标签。</p>
           <SiteMetaEditor initialTags={view.site.metaTags} />
         </section>
 
+        {sp.error === 'seo' && <p className="notice-error">SEO 设置无效：请填写标题并检查字段长度。</p>}
         <section id="seo" className="surface-card scroll-mt-24 p-5 space-y-4">
+          <h2 className="font-ui text-sm font-semibold">站点 SEO</h2>
+          <p className="font-ui text-[12px] text-soft">首页标题由标题与副标题组成；内页标题自动附加站点标题。摘要与关键词作为全站默认值，作品页面保留自身内容摘要。</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block font-meta text-[12px]">标题（站点名称）
+              <input name="siteTitle" required maxLength={100} defaultValue={view.site.seo.title} className="admin-input mt-1" />
+            </label>
+            <label className="block font-meta text-[12px]">副标题
+              <input name="siteSubtitle" maxLength={160} defaultValue={view.site.seo.subtitle} className="admin-input mt-1" />
+            </label>
+            <label className="block font-meta text-[12px] sm:col-span-2">摘要
+              <textarea name="siteDescription" rows={3} maxLength={500} defaultValue={view.site.seo.description} className="admin-input mt-1" />
+            </label>
+            <label className="block font-meta text-[12px] sm:col-span-2">关键词（用逗号分隔）
+              <input name="siteKeywords" maxLength={1000} defaultValue={view.site.seo.keywords} className="admin-input mt-1" />
+            </label>
+          </div>
           <h2 className="font-ui text-sm font-semibold">搜索引擎收录</h2>
           <p className="font-ui text-[12px] text-soft leading-relaxed">
             站点地图索引固定为 <code className="font-mono">{siteUrl}/sitemap.xml</code>，把它提交到 Google Search Console
@@ -340,12 +350,12 @@ export default async function AdminSystemSettingsPage({
             登录需要 Turnstile
           </label>
           <label className="block font-meta text-[12px] max-w-xs">
-            邮箱验证链接有效期（分钟）
+            邮箱验证码有效期（分钟）
             <input
               name="verificationTokenTtlMinutes"
               type="number"
               min={5}
-              max={10080}
+              max={10}
               className="admin-input mt-1"
               defaultValue={view.trust.verificationTokenTtlMinutes}
             />
@@ -541,14 +551,14 @@ export default async function AdminSystemSettingsPage({
             <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
               信息流可配置多条广告，每条单独开关、单独设置「每隔 x 张卡片」。
               图片或固定像素的联盟素材请在「广告尺寸」填写与素材一致的宽高（如 300×250、300×450）：
-              「信息流卡片」会把它完整放进海报格并居中，「横幅」会按该比例占两列。尺寸留「自动」只适合会自适应容器的 Native / 响应式代码。
+              「信息流卡片」会把它完整放进海报格并居中。尺寸留「自动」只适合会自适应容器的 Native / 响应式代码。
               阅读页只在章节顶部和底部放广告，不会插入到漫画页中间。
               这里保存后，网站（含手机浏览器）和 Android App 会使用同一套广告。
             </p>
           </div>
 
           <div className="space-y-3 border-t border-border pt-4">
-            <h3 className="font-ui text-[13px] font-semibold">信息流与横幅</h3>
+            <h3 className="font-ui text-[13px] font-semibold">信息流广告</h3>
             <AdsFeedSlotsEditor initialSlots={[...view.ads.feedSlots]} />
           </div>
 

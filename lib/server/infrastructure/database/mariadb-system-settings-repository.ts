@@ -1,4 +1,4 @@
-import type { RowDataPacket } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { pool, withDbRetry } from '@/lib/db';
 import {
   parseSystemSettings,
@@ -96,13 +96,21 @@ export class MariaDbEmailVerificationTokenRepository
     });
   }
 
-  async markUsed(id: number): Promise<void> {
-    return withDbRetry(async () => {
-      await pool.query(
-        'UPDATE email_verification_tokens SET used_at = UTC_TIMESTAMP() WHERE id = ?',
-        [id],
-      );
-    });
+  async hasPendingForUser(userId: number): Promise<boolean> {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM email_verification_tokens WHERE user_id = ? AND used_at IS NULL LIMIT 1', [userId],
+    );
+    return rows.length > 0;
+  }
+
+  async consumeAndActivate(id: number): Promise<boolean> {
+    const [result] = await pool.query<ResultSetHeader>(
+      `UPDATE email_verification_tokens t INNER JOIN users u ON u.id = t.user_id
+       SET t.used_at = UTC_TIMESTAMP(), u.is_active = 1
+       WHERE t.id = ? AND t.used_at IS NULL AND t.expires_at > UTC_TIMESTAMP()
+         AND u.is_active = 0 AND u.role = 'user'`, [id],
+    );
+    return result.affectedRows > 0;
   }
 
   async deleteForUser(userId: number): Promise<void> {

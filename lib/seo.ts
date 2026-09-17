@@ -79,6 +79,7 @@ export function absoluteMediaUrl(value: string | null | undefined): string | und
 
 export function pageOpenGraph(input: {
   title: string;
+  siteName?: string;
   description: string;
   url?: string;
   images?: Array<{ url: string; alt?: string }>;
@@ -89,7 +90,7 @@ export function pageOpenGraph(input: {
     description: input.description,
     type: input.type ?? 'website',
     locale: SITE_LOCALE,
-    siteName: SITE_NAME,
+    siteName: input.siteName ?? SITE_NAME,
     url: input.url,
     images: input.images,
   };

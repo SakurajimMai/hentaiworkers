@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { resolveSiteUrl } from '@/lib/site-url';
 import type { SecretCipher } from '../../shared/secret-cipher';
 import { sha256Bytes } from '../../shared/hashing';
@@ -26,7 +26,7 @@ import {
 } from './secret-fields';
 import { assertSmtpConfigured, sendSmtpMail, sendSmtpTest } from './mailer';
 import { assertTurnstileOk } from './turnstile';
-import type { IdentityService } from '../../identity/application/identity-service';
+import { isValidEmail, normalizeEmail, type IdentityService } from '../../identity/application/identity-service';
 import {
   authRateLimitSubject,
   getAuthRateLimiter,
@@ -103,7 +103,7 @@ export type SystemSettingsUpdateInput = Readonly<{
     };
   };
   hero?: Partial<SystemSettings['hero']>;
-  site?: Partial<SystemSettings['site']>;
+  site?: Omit<Partial<SystemSettings['site']>, 'seo'> & { seo?: Partial<SystemSettings['site']['seo']> };
 }>;
 
 export class SystemSettingsService {
@@ -117,11 +117,12 @@ export class SystemSettingsService {
       fetchImpl?: typeof fetch;
       passwordResets?: PasswordResetRepository;
       rateLimiter?: AuthRateLimiter;
+      sendMail?: typeof sendSmtpMail;
     },
   ) {}
 
   private assertNotRateLimited(
-    action: 'login' | 'register' | 'password_reset',
+    action: 'login' | 'register' | 'password_reset' | 'verify_email' | 'resend_verification',
     remoteIp: string | null | undefined,
     emailOrUsername: string | null | undefined,
   ): void {
@@ -300,6 +301,7 @@ export class SystemSettingsService {
       },
       site: {
         ...current.site,
+        seo: { ...current.site.seo, ...omitUndefined(input.site?.seo ?? {}) },
         ...omitUndefined({
           metaTags: input.site?.metaTags,
           androidDownloadUrl: input.site?.androidDownloadUrl,
@@ -310,14 +312,6 @@ export class SystemSettingsService {
         }),
       },
     });
-
-    if (next.registration.requireEmailVerification && !next.smtp.enabled) {
-      throw new AppError(
-        'RESULT_INVALID',
-        '开启邮箱验证前须启用并配置 SMTP',
-        400,
-      );
-    }
 
     await this.repo.save(next);
     return this.getAdminView();
@@ -401,7 +395,7 @@ export class SystemSettingsService {
   }
 
   /**
-   * Public registration with whitelist + optional Turnstile + optional email verification.
+   * Public registration with whitelist + optional Turnstile + mandatory email code verification.
    */
   async registerPublic(input: {
     email: string;
@@ -411,26 +405,28 @@ export class SystemSettingsService {
     remoteIp?: string | null;
   }): Promise<Readonly<{ user: UserRecord; needsVerification: boolean }>> {
     this.assertNotRateLimited('register', input.remoteIp, input.email);
+    this.assertNotRateLimited('register', input.remoteIp, null);
     await this.assertRegistrationAllowed(input.email);
     await this.assertTurnstileIfRequired('register', input.turnstileToken, input.remoteIp);
 
     const settings = await this.getSettings();
-    const needsVerification = settings.registration.requireEmailVerification;
+    const needsVerification = true;
 
-    if (needsVerification && !settings.smtp.enabled) {
-      throw new AppError('CONFIG_INVALID', '邮箱验证已开启但 SMTP 未配置', 500);
-    }
+    // Validate mail readiness before creating any pending account.
+    assertSmtpConfigured(settings.smtp, settings.smtp.password ? decryptSmtpPassword(this.cipher, settings.smtp.password) : null);
 
     const user = await this.identity.registerWithEmail({
       email: input.email,
       password: input.password,
       displayName: input.displayName,
-      isActive: needsVerification ? 0 : 1,
-      autoLogin: !needsVerification,
+      isActive: 0,
+      autoLogin: false,
     });
 
-    if (needsVerification) {
+    try {
       await this.issueAndSendVerification(user);
+    } catch {
+      throw new AppError('RESULT_INVALID', '验证码发送失败，请重新发送', 502, false, { field: 'verificationMail' });
     }
 
     return { user, needsVerification };
@@ -458,21 +454,39 @@ export class SystemSettingsService {
     const smtp = assertSmtpConfigured(settings.smtp, password);
 
     await this.tokens.deleteForUser(user.id);
-    const rawToken = randomBytes(32).toString('base64url');
-    const tokenHash = sha256Bytes(rawToken);
-    const ttlMs = settings.trust.verificationTokenTtlMinutes * 60_000;
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const tokenHash = sha256Bytes(`email-code:${normalizeEmail(user.username)}:${code}`);
+    const ttlMinutes = Math.min(10, settings.trust.verificationTokenTtlMinutes);
+    const ttlMs = ttlMinutes * 60_000;
     const expiresAt = new Date(Date.now() + ttlMs);
     await this.tokens.create({ userId: user.id, tokenHash, expiresAt });
 
-    const base = resolveSiteUrl(this.options?.siteUrl || process.env.SITE_URL);
-    const link = `${base}/verify-email?token=${encodeURIComponent(rawToken)}`;
-
-    await sendSmtpMail(smtp, {
+    await (this.options?.sendMail ?? sendSmtpMail)(smtp, {
       to: user.username,
-      subject: '[AnimeStream] 请验证你的邮箱',
-      text: `请打开以下链接完成邮箱验证（${settings.trust.verificationTokenTtlMinutes} 分钟内有效）：\n\n${link}\n`,
-      html: `<p>请点击以下链接完成邮箱验证（${settings.trust.verificationTokenTtlMinutes} 分钟内有效）：</p><p><a href="${link}">${link}</a></p>`,
+      subject: '[AnimeStream] 注册邮箱验证码',
+      text: `你的注册验证码是：${code}，${ttlMinutes} 分钟内有效。请勿向他人提供验证码。`,
+      html: `<p>你的注册验证码是：<strong>${code}</strong></p><p>${ttlMinutes} 分钟内有效，请勿向他人提供验证码。</p>`,
     });
+  }
+
+  async resendVerification(email: string, remoteIp?: string | null): Promise<void> {
+    const normalized = normalizeEmail(email);
+    this.assertNotRateLimited('resend_verification', null, normalized);
+    this.assertNotRateLimited('resend_verification', remoteIp, null);
+    if (!isValidEmail(normalized)) return;
+    const user = await this.identity.getUserByUsername(normalized);
+    if (!user || user.isActive || user.role !== 'user' || !await this.tokens.hasPendingForUser(user.id)) return;
+    await this.issueAndSendVerification(user);
+  }
+
+  async verifyEmailCode(email: string, code: string, remoteIp?: string | null): Promise<UserRecord> {
+    const normalized = normalizeEmail(email);
+    this.assertNotRateLimited('verify_email', null, normalized);
+    this.assertNotRateLimited('verify_email', remoteIp, null);
+    if (!isValidEmail(normalized) || !/^\d{6}$/.test(code.trim())) {
+      throw new AppError('RESULT_INVALID', '请输入六位邮箱验证码', 400);
+    }
+    return this.consumeVerificationHash(sha256Bytes(`email-code:${normalized}:${code.trim()}`));
   }
 
   /**
@@ -560,20 +574,24 @@ export class SystemSettingsService {
 
   async verifyEmailToken(rawToken: string): Promise<UserRecord> {
     const token = rawToken.trim();
-    if (!token) {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
       throw new AppError('RESULT_INVALID', '验证链接无效', 400);
     }
-    const tokenHash = sha256Bytes(token);
+    return this.consumeVerificationHash(sha256Bytes(token));
+  }
+
+  private async consumeVerificationHash(tokenHash: Uint8Array): Promise<UserRecord> {
     const record = await this.tokens.findByTokenHash(tokenHash);
     if (!record || record.usedAt) {
       throw new AppError('RESULT_INVALID', '验证链接无效或已使用', 400);
     }
     if (new Date(record.expiresAt).getTime() < Date.now()) {
-      throw new AppError('RESULT_INVALID', '验证链接已过期，请重新注册或联系管理员', 400);
+      throw new AppError('RESULT_INVALID', '验证已过期，请重新发送验证码', 400);
     }
 
-    await this.identity.activateUser(record.userId);
-    await this.tokens.markUsed(record.id);
+    if (!await this.tokens.consumeAndActivate(record.id)) {
+      throw new AppError('RESULT_INVALID', '验证码已失效或账号无法激活', 400);
+    }
     const user = await this.identity.getUserById(record.userId);
     if (!user) {
       throw new AppError('RESULT_INVALID', '用户不存在', 404);

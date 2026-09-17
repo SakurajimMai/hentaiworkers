@@ -9,7 +9,7 @@ import { getAdminCatalogService } from '@/lib/server/catalog/admin';
 import { parseAdsSettingsFromForm } from '@/lib/server/system/domain/ads-settings-form';
 import { parsePlayerSettingsFromForm } from '@/lib/server/system/domain/player-settings-form';
 import { parseHeroSettingsFromForm } from '@/lib/server/system/domain/hero-settings-form';
-import { parseIndexNowKeyFromForm, parseSiteMetaTagsFromForm } from '@/lib/server/system/domain/site-settings-form';
+import { parseIndexNowKeyFromForm, parseSiteMetaTagsFromForm, parseSiteSeoFromForm } from '@/lib/server/system/domain/site-settings-form';
 import {
   animeIndexNowPaths,
   animeTagIndexNowPaths,
@@ -494,6 +494,18 @@ export async function actionDeleteMangaTag(formData: FormData): Promise<void> {
   }
 }
 
+export async function actionDeleteUser(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().deleteUser(Number(formData.get('id')));
+  } catch (error) {
+    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (error instanceof AppError) redirect('/admin/users?error=delete');
+    throw error;
+  }
+  revalidatePath('/admin/users');
+  redirect('/admin/users?ok=deleted');
+}
+
 export async function actionSaveUser(formData: FormData): Promise<void> {
   try {
     await getIdentityService().requireAdmin();
@@ -561,7 +573,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
     await getSystemSettingsService().update({
       registration: {
         open: formData.get('registrationOpen') === '1',
-        requireEmailVerification: formData.get('requireEmailVerification') === '1',
+        requireEmailVerification: true,
         emailWhitelist,
       },
       smtp: {
@@ -583,7 +595,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
         turnstileOnRegister: formData.get('turnstileOnRegister') === '1',
         turnstileOnLogin: formData.get('turnstileOnLogin') === '1',
         verificationTokenTtlMinutes:
-          parseInt(String(formData.get('verificationTokenTtlMinutes') || '60'), 10) || 60,
+          parseInt(String(formData.get('verificationTokenTtlMinutes') || '10'), 10) || 10,
       },
       player: parsePlayerSettingsFromForm(formData),
       ads: parseAdsSettingsFromForm(formData),
@@ -593,6 +605,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
       },
       hero: parseHeroSettingsFromForm(formData),
       site: {
+        seo: parseSiteSeoFromForm(formData),
         ...(metaTags === undefined ? {} : { metaTags }),
         androidDownloadUrl: String(formData.get('androidDownloadUrl') || '').trim(),
         androidDownloadLabel: String(formData.get('androidDownloadLabel') || '').trim() || '下载 App',
@@ -615,6 +628,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
     if (error instanceof AppError) {
       if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
       if (error.message.includes('SMTP')) redirect('/admin/settings?error=verify_smtp');
+      if (error.details?.field === 'siteSeo') redirect('/admin/settings?error=seo');
       if (error.details?.field === 'siteMetaTags') redirect('/admin/settings?error=meta');
       if (error.details?.field === 'indexNowKey') redirect('/admin/settings?error=indexnow');
     }

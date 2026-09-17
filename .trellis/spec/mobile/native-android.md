@@ -178,8 +178,8 @@ scope, Docker image, production Compose services, and server-private imports.
   remain inside the update subsystem and must never escape into `viewModelScope`.
 
 - Feed ads consume the same resolved `width`/`height` as the web. A sized `card` is letterboxed
-  inside the 2:3 poster cell (contain, centred, never cropped); a sized `banner` scales to the
-  spanned column width; automatic sizing keeps the fluid/measured paths; an empty slot shows a
+  inside the 2:3 poster cell (contain, centred, never cropped); all feed ads occupy one cell
+  and legacy placement fields are ignored. Automatic sizing keeps the fluid/measured paths; an empty slot shows a
   poster-sized placeholder. Fixed creatives measure the WebView at native CSS pixels through an
   explicit layout modifier that reports the scaled footprint; `requiredSize` + `graphicsLayer`
   centres the oversized view before scaling and shifts narrow banners out of their box.

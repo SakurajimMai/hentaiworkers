@@ -110,7 +110,7 @@ export function htmlAdFrameScale(creativeWidth: number): string {
   return `scale(calc(100cqw / ${creativeWidth}px))`;
 }
 
-/** Fit a creative CSS-pixel viewport into a slot. Catalog banners may scale above 1 to fill two columns. */
+/** Fit a creative CSS-pixel viewport into a slot. Fixed creatives may scale to fit the available slot. */
 export function htmlAdFitScale(slotWidth: number, creativeWidth: number): number {
   if (!(slotWidth > 0) || !(creativeWidth > 0)) return 1;
   return slotWidth / creativeWidth;
@@ -129,17 +129,4 @@ export function htmlAdContainScale(
   const byWidth = htmlAdFitScale(slotWidth, creativeWidth);
   if (!(slotHeight > 0) || !(creativeHeight > 0)) return byWidth;
   return Math.min(byWidth, slotHeight / creativeHeight);
-}
-
-/** Catalog poster ratio (width / height). */
-export const FEED_CARD_RATIO = 2 / 3;
-
-/** Width/height ratio used to reserve space for a feed ad before the iframe loads. */
-export function feedAdFrameRatio(options: { banner?: boolean; width?: number; height?: number } = {}): number {
-  if (options.banner) {
-    const size = normalizeAdDimensions(options);
-    if (size.width > 0) return size.width / size.height;
-    return 300 / 250;
-  }
-  return FEED_CARD_RATIO;
 }

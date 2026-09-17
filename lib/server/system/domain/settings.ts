@@ -1,3 +1,4 @@
+import { siteSeoSchema } from '@/lib/site-seo';
 import { z } from 'zod';
 import { MAX_AD_HEIGHT, MAX_AD_WIDTH, resolveAdDimensions } from '@/lib/ad-dimensions';
 import { siteMetaTagsSchema } from '@/lib/site-meta';
@@ -20,8 +21,8 @@ export const registrationSettingsSchema = z.object({
    * Entries: full email (`a@b.com`) or domain (`example.com` / `@example.com`).
    */
   emailWhitelist: z.array(z.string().min(1).max(128)).default([]),
-  /** Create inactive user until verification link is opened. Requires SMTP. */
-  requireEmailVerification: z.boolean().default(false),
+  /** Public compatibility field: verification is mandatory, including legacy false values. */
+  requireEmailVerification: z.boolean().default(true).transform(() => true),
 });
 
 export const smtpSettingsSchema = z.object({
@@ -76,7 +77,7 @@ export const turnstileSettingsSchema = z.object({
 export const trustSettingsSchema = z.object({
   turnstileOnRegister: z.boolean().default(true),
   turnstileOnLogin: z.boolean().default(false),
-  verificationTokenTtlMinutes: z.number().int().min(5).max(7 * 24 * 60).default(60),
+  verificationTokenTtlMinutes: z.number().int().min(5).max(7 * 24 * 60).default(10).transform((minutes) => Math.min(10, minutes)),
 });
 
 /** Front-end player behaviour (ArtPlayer for 里番). */
@@ -148,8 +149,6 @@ export const feedAdSlotSchema = z.object({
   href: z.string().max(1000).default(''),
   /** Empty = default “广告位招租” card. Supports iframe / HTML / script. */
   html: z.string().max(20000).default(''),
-  /** `banner` spans the catalog row; `card` stays poster-sized. */
-  placement: z.enum(['card', 'banner']).default('card'),
 });
 
 /** One HTML slot on the manga reader. */
@@ -196,16 +195,6 @@ export function migrateAdsSettings(raw: unknown): unknown {
     next.reader = { top: {}, middle: ads.mangaReader, bottom: {} };
   }
 
-  if (Array.isArray(next.feedSlots)) {
-    next.feedSlots = next.feedSlots.map((slot) => {
-      if (!slot || typeof slot !== 'object') return slot;
-      const rec = slot as Record<string, unknown>;
-      if (rec.placement === 'card' || rec.placement === 'banner') return rec;
-      const html = typeof rec.html === 'string' ? rec.html.trim() : '';
-      return { ...rec, placement: html ? 'banner' : 'card' };
-    });
-  }
-
   return next;
 }
 
@@ -225,6 +214,7 @@ export const heroSlideSchema = z.object({
 export const MAX_HERO_SLIDES = 20;
 
 export const siteSettingsSchema = z.object({
+  seo: siteSeoSchema.default({}),
   metaTags: siteMetaTagsSchema.default([]),
   /** Public Android APK / download page. Empty hides the footer link. */
   androidDownloadUrl: z.string().max(1000).default(''),
@@ -401,7 +391,7 @@ export function toPublicAuthConfig(settings: SystemSettings): PublicAuthConfig {
     settings.turnstile.secretKey != null;
 
   return {
-    registrationOpen: settings.registration.open,
+    registrationOpen: settings.registration.open && settings.smtp.enabled && Boolean(settings.smtp.host.trim() && settings.smtp.fromEmail.trim()),
     emailWhitelistEnabled: settings.registration.emailWhitelist.length > 0,
     requireEmailVerification: settings.registration.requireEmailVerification,
     turnstile: {

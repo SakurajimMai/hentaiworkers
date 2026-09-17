@@ -12,7 +12,6 @@ function emptySlot(index: number): FeedAdSlot {
     interval: 5,
     href: '',
     html: '',
-    placement: 'card',
   };
 }
 
@@ -89,19 +88,6 @@ export function AdsFeedSlotsEditor({ initialSlots }: { initialSlots: FeedAdSlot[
                   placeholder="https://example.com/ad"
                 />
               </label>
-              <label className="block font-meta text-[12px]">
-                展示方式
-                <select
-                  className="admin-input mt-1"
-                  value={slot.placement === 'banner' ? 'banner' : 'card'}
-                  onChange={(event) =>
-                    update(index, { placement: event.target.value === 'banner' ? 'banner' : 'card' })
-                  }
-                >
-                  <option value="card">信息流卡片</option>
-                  <option value="banner">横幅</option>
-                </select>
-              </label>
               <label className="block font-meta text-[12px] sm:col-span-2">
                 自定义 HTML（留空则用默认招租卡）
                 <textarea
@@ -112,7 +98,7 @@ export function AdsFeedSlotsEditor({ initialSlots }: { initialSlots: FeedAdSlot[
                   placeholder={'<script src="https://example.com/native.js"></script>'}
                 />
                 <span className="mt-1 block font-ui text-[11px] font-normal normal-case tracking-normal text-soft">
-                  图片或固定像素素材：在下面填写与素材一致的宽高。「信息流卡片」会等比完整放进海报格并居中，「横幅」按素材比例占两列。只有会自适应容器的 Native / 响应式代码才留「自动」。
+                  图片或固定像素素材：在下面填写与素材一致的宽高。「信息流卡片」会等比完整放进海报格并居中。只有会自适应容器的 Native / 响应式代码才留「自动」。
                 </span>
               </label>
             </div>

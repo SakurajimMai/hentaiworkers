@@ -356,10 +356,6 @@ fun FeedAdCard(
                         Text("广告位招租", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                ad.spansCatalogRow -> {
-                    // Banners keep the creative ratio and stretch across the spanned columns.
-                    HtmlAd(ad.html, width = ad.width, height = ad.height, fitParent = fixed)
-                }
                 else -> {
                     Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
                         if (fixed) {

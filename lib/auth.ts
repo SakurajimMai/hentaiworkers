@@ -33,7 +33,8 @@ export async function registerPublicUser(input: {
   password: string;
   displayName?: string | null;
 }) {
-  return getIdentityService().registerWithEmail(input);
+  const { getSystemSettingsService } = await import('./server/system');
+  return (await getSystemSettingsService().registerPublic(input)).user;
 }
 
 export async function requireUser(): Promise<UserRecord> {

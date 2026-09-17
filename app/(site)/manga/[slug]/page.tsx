@@ -1,3 +1,4 @@
+import { getSiteSeo } from '@/lib/server/site-metadata';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -46,6 +47,7 @@ export async function generateMetadata({
     keywords: manga.tags.length ? manga.tags : undefined,
     alternates: { canonical: `/manga/${manga.id}` },
     openGraph: pageOpenGraph({
+      siteName: (await getSiteSeo()).title,
       title: manga.title,
       description: description.slice(0, 160),
       type: 'article',

@@ -12,28 +12,20 @@
   `allow-same-origin`. Resize messages must match both the frame window and per-frame identity.
   Redirect `document.body.appendChild` into `#hw-ad-content` so alliance iframes are not
   aborted by later reparenting; still measure height from `#hw-ad-content`, not the iframe viewport.
-- Feed slots have `placement: card | banner`. Cards fill one poster cell at 2:3. A card whose size
-  is configured or inferred renders the fixed creative with `contain`: scaled to fit both cell
-  dimensions, centred, never cropped; only unsized cards load the fluid ad document (`fluid=1`) so
-  native/responsive snippets match the grid. Banners occupy two poster columns
-  (`col-span-2 self-start`) at the creative's own ratio (300×250 → 6:5), scale the iframe to fill
-  that box, and must not stretch to the neighboring poster 2:3 height. Empty native cards stay
-  poster-sized. Stored HTML slots without placement migrate to banner. Admin copy and docs tell
-  operators to enter the creative's real pixel size for image creatives.
+- Feed slots are poster cards only; no placement field, homepage strip or spanning layout.
+  Legacy placement is stripped by schema parsing while creatives and dimensions are preserved.
+  Sized cards use contain inside one 2:3 cell; unsized cards use fluid documents.
 - Dimension inference (`inferAdDimensionsFromHtml`) reads `atOptions`, then `<iframe>`, `<img>`,
   `<video>` width/height attributes or `style` pixels. Percentages and `data-*` sizes stay automatic.
   The public `/api/ads` already carries resolved sizes, so Android never parses HTML.
-- Homepage rails interleave `card` slots next to catalog posters. The dedicated home strip is
-  banners only — never drop cards from home because they are not banners. `/browse` and `/manga`
-  keep both placements in the poster grid. `interleaveFeedAds` include filters must preserve the
-  public `feedSlots` index used by `/ads/html/feed/{id}`. Banner `col-span-2` must appear as a
-  complete class in `components/` or `app/` (Tailwind does not scan `lib/`).
+- Homepage rails and catalog grids interleave all enabled feed slots. Preserve the public
+  enabled-slot index used by `/ads/html/feed/{id}`.
 - Size feed cards like catalog posters (`poster-frame` + `aspect-[2/3]` + Radix `AspectRatio`).
   Give fill iframes explicit pixel width/height from ResizeObserver; mobile WebKit treats
   `iframe { height:100% }` as 0 inside an absolute box. Fluid/fill documents must not apply
   `transform: scale(...)` — a 0 `innerWidth` before layout becomes `scale(0)` and the creative
   never recovers. Scale fixed creatives with ResizeObserver, not `100cqw`.
-- Banner creative dimensions are optional additions to the public API. Existing settings use automatic
+- Creative dimensions are optional additions to the public API. Existing settings use automatic
   layout. When stored width/height are 0, infer CSS pixels from `atOptions` or `<iframe width height>`
   so Adsterra-style 300×250 units still expose that viewport. Fixed-size frames keep the creative's
   CSS pixel viewport and scale the iframe with ResizeObserver; do not shrink `window.innerWidth`
@@ -62,3 +54,13 @@
   preconnect to the image host.
 - IndexNow: key lives in `site.indexNowKey`, served at `/indexnow/{key}.txt`; content mutations call
   `notifyIndexNow` inside `after()` and never throw. Keep `buildIndexNowPayload` same-origin only.
+
+# Configurable Site SEO
+
+- `site.seo` owns title, subtitle, description and comma-separated keywords, validated by
+  `siteSeoSchema`. Missing fields retain defaults; partial admin updates preserve stored fields.
+- `getSiteSeo` shares the metadata invalidation tag. Root metadata uses title + subtitle for
+  homepage, title as child suffix, and matching OG/Twitter defaults. Detail and listing OG uses
+  configured site name. Homepage H1 and WebSite use the same settings.
+- Legacy custom tags conflicting with SEO, social tags or index rules are filtered on output.
+  Verification tags are preserved. Admin copy explains precedence; never inject raw head HTML.

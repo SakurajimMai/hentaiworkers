@@ -1,5 +1,6 @@
 import { desc, eq, sql } from 'drizzle-orm';
-import { db, withDbRetry } from '@/lib/db';
+import type { RowDataPacket } from 'mysql2';
+import { db, pool, withDbRetry } from '@/lib/db';
 import { users } from '@/lib/schema';
 import type {
   CreateUserInput,
@@ -61,20 +62,49 @@ export class MariaDbUserRepository implements UserRepository {
       if (input.passwordHash !== undefined) patch.passwordHash = input.passwordHash;
       if (Object.keys(patch).length === 0 && !input.bumpSessionVersion) return;
 
-      if (input.bumpSessionVersion) {
-        // Atomic bump so concurrent password changes cannot reuse the same epoch.
-        await db
-          .update(users)
-          .set({
-            ...patch,
-            sessionVersion: sql`${users.sessionVersion} + 1`,
-          })
-          .where(eq(users.id, id));
-        return;
-      }
-
-      await db.update(users).set(patch).where(eq(users.id, id));
+      await db.transaction(async (tx) => {
+        await tx.update(users).set({
+          ...patch,
+          ...(input.bumpSessionVersion ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
+        }).where(eq(users.id, id));
+        // A pending registration cannot later undo an administrator's role/status decision.
+        if (input.role !== undefined || input.isActive !== undefined) {
+          await tx.execute(sql`DELETE FROM email_verification_tokens WHERE user_id = ${id}`);
+        }
+      });
     });
+  }
+
+  async deleteRegularUser(id: number): Promise<boolean> {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [rows] = await connection.query<RowDataPacket[]>(
+        'SELECT id FROM users WHERE id = ? AND role = ? FOR UPDATE', [id, 'user'],
+      );
+      if (!rows.length) {
+        await connection.rollback();
+        return false;
+      }
+      await connection.query(
+        'DELETE items FROM user_list_items items INNER JOIN user_lists lists ON lists.id = items.list_id WHERE lists.user_id = ?', [id],
+      );
+      // Fixed application-owned tables; never accept table names from a request.
+      for (const table of [
+        'user_lists', 'user_favorites', 'user_watch_progress', 'user_events',
+        'manga_favorites', 'manga_reading_progress', 'email_verification_tokens', 'password_reset_tokens',
+      ]) {
+        await connection.query(`DELETE FROM ${table} WHERE user_id = ?`, [id]);
+      }
+      await connection.query('DELETE FROM users WHERE id = ?', [id]);
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   list(): Promise<ReadonlyArray<UserRecord>> {

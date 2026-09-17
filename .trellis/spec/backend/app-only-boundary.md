@@ -205,3 +205,18 @@ services:
 ```ts
 import type { SecretCipher } from '../shared/secret-cipher';
 ```
+
+## Identity Administration And Registration
+
+- Public registration always creates an inactive ordinary user; SMTP readiness is checked first.
+  Legacy `requireEmailVerification: false` is normalized to true. The public registration entry
+  stays unavailable until SMTP host/from-address/enabled are configured.
+- Six-digit codes use cryptographic randomness, email-bound SHA-256 storage and 5–10 minute
+  expiry. Verify/resend limit both email and IP. Activation and token consumption are one atomic
+  SQL update and accept only inactive ordinary users. Legacy link tokens must match the original
+  43-character base64url format, so they cannot bypass code-attempt limits using code hash inputs.
+- Role/status changes revoke pending verification tokens in the same transaction. Verification
+  runs via a Server Action (POST), never a render-time GET that mutates sessions.
+- Admin deletion checks authorization in IdentityService, protects all admin targets, locks the
+  ordinary target and cleans personal rows before deleting users within one transaction. Existing
+  sessions fail user lookup afterward. No production deletions are performed as part of coding.

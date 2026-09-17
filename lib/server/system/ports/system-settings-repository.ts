@@ -21,6 +21,8 @@ export interface EmailVerificationTokenRepository {
     expiresAt: Date;
   }): Promise<void>;
   findByTokenHash(tokenHash: Uint8Array): Promise<EmailVerificationTokenRecord | null>;
-  markUsed(id: number): Promise<void>;
+  hasPendingForUser(userId: number): Promise<boolean>;
+  /** Atomically consume an unexpired token and activate its still-inactive ordinary user. */
+  consumeAndActivate(id: number): Promise<boolean>;
   deleteForUser(userId: number): Promise<void>;
 }

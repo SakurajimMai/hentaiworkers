@@ -44,13 +44,16 @@ export async function actionPublicRegister(formData: FormData): Promise<void> {
       remoteIp: await clientIp(),
     });
     if (result.needsVerification) {
-      redirect('/login?ok=verify');
+      redirect(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&next=${encodeURIComponent(normalizePublicNext(next, '/favorites'))}`);
     }
   } catch (error) {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof AppError) {
       if (error.code === 'SOURCE_RATE_LIMITED') {
         redirect(buildPublicRegisterHref(next, { error: 'rate' }));
+      }
+      if (error.details?.field === 'verificationMail') {
+        redirect(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&error=send`);
       }
       if (error.code === 'RESULT_CONFLICT') {
         redirect(buildPublicRegisterHref(next, { error: 'exists' }));
@@ -263,4 +266,32 @@ export async function actionResetPassword(formData: FormData): Promise<void> {
     }
     redirect(`/reset-password?token=${encodeURIComponent(token)}&error=1`);
   }
+}
+
+export async function actionVerifyEmail(formData: FormData): Promise<void> {
+  const email = String(formData.get('email') || '').trim().toLowerCase();
+  const next = normalizePublicNext(String(formData.get('next') || ''), '/favorites');
+  const token = String(formData.get('token') || '');
+  try {
+    const service = getSystemSettingsService();
+    if (token) await service.verifyEmailToken(token);
+    else await service.verifyEmailCode(email, String(formData.get('code') || ''), await clientIp());
+  } catch (error) {
+    const reason = error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED' ? 'rate' : 'code';
+    redirect(`/verify-email?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}&error=${reason}`);
+  }
+  redirect(next);
+}
+
+export async function actionResendVerification(formData: FormData): Promise<void> {
+  const email = String(formData.get('email') || '').trim().toLowerCase();
+  const next = normalizePublicNext(String(formData.get('next') || ''), '/favorites');
+  const base = `/verify-email?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`;
+  try {
+    await getSystemSettingsService().resendVerification(email, await clientIp());
+  } catch (error) {
+    const reason = error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED' ? 'rate' : 'send';
+    redirect(`${base}&error=${reason}`);
+  }
+  redirect(`${base}&ok=sent`);
 }

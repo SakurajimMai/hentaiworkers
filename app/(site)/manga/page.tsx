@@ -1,3 +1,4 @@
+import { getSiteSeo } from '@/lib/server/site-metadata';
 import Link from 'next/link';
 import { Suspense, cache, type ReactNode } from 'react';
 import type { Metadata } from 'next';
@@ -11,7 +12,7 @@ import { buildMangaListHref } from '@/components/manga-pagination';
 import { StructuredData } from '@/components/structured-data';
 import { FeedAdCard } from '@/components/feed-ad-card';
 import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
-import { FEED_BANNER_GRID_CLASS, interleaveFeedAds, isFeedBannerAd } from '@/lib/server/system/domain/ads-settings-form';
+import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
 
@@ -76,6 +77,7 @@ export async function generateMetadata({
     description,
     alternates: { canonical },
     openGraph: pageOpenGraph({
+      siteName: (await getSiteSeo()).title,
       title,
       description,
       type: 'website',
@@ -245,9 +247,7 @@ async function MangaCatalogGrid({
               href={slot.ad.href}
               width={slot.ad.width}
               height={slot.ad.height}
-              banner={isFeedBannerAd(slot.ad)}
               documentSrc={htmlAdDocumentPath({ kind: 'feed', id: slot.adIndex })}
-              className={isFeedBannerAd(slot.ad) ? FEED_BANNER_GRID_CLASS : undefined}
             />
           ) : (
             <MangaCard

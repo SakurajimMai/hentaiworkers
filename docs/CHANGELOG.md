@@ -144,3 +144,10 @@ DROP TABLE IF EXISTS anime_work_sources;
 DROP TABLE IF EXISTS anime_works;
 DROP TABLE IF EXISTS work_tags;
 ```
+
+## 2026-09-17
+
+- 移除信息流横幅选项、首页独立横幅及 Web/Android 跨列渲染；旧素材按卡片展示，公开广告配置不再返回 placement。
+- 管理员可设置站点标题、副标题、摘要和关键词，统一应用于标题模板、首页元数据与分享预览，并在保存时刷新缓存。
+- 后台支持删除普通用户及其个人数据，保护管理员账号。
+- 公开注册强制六位邮箱验证码，支持重发、有效期及单次消费；SMTP 未配置时关闭前台注册入口。旧邮件链接仍可在有效期内通过确认表单验证。

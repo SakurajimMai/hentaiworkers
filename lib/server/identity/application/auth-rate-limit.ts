@@ -4,7 +4,7 @@
  * Does not replace edge WAF / reverse-proxy limits.
  */
 
-export type AuthRateLimitAction = 'login' | 'register' | 'password_reset';
+export type AuthRateLimitAction = 'login' | 'register' | 'password_reset' | 'verify_email' | 'resend_verification';
 
 export type AuthRateLimitDecision = Readonly<{
   allowed: boolean;

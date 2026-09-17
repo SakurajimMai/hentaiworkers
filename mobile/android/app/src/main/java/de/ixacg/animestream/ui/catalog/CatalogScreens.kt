@@ -147,9 +147,6 @@ fun HomeScreen(
             items(
                 items = entries,
                 key = { it.key },
-                span = { entry ->
-                    if (entry is FeedEntry.Ad) GridItemSpan(entry.value.catalogSpan(maxLineSpan)) else GridItemSpan(1)
-                },
             ) { entry ->
                 when (entry) {
                     is FeedEntry.Content ->
@@ -263,9 +260,6 @@ fun DiscoverScreen(
                     items(
                         items = entries,
                         key = { it.key },
-                        span = { entry ->
-                            if (entry is FeedEntry.Ad) GridItemSpan(entry.value.catalogSpan(maxLineSpan)) else GridItemSpan(1)
-                        },
                     ) { entry ->
                         when (entry) {
                             is FeedEntry.Content -> AnimePosterCard(entry.value, onClick = { onAnime(entry.value.id) })
@@ -394,9 +388,6 @@ fun MangaCatalogScreen(
                     items(
                         items = entries,
                         key = { it.key },
-                        span = { entry ->
-                            if (entry is FeedEntry.Ad) GridItemSpan(entry.value.catalogSpan(maxLineSpan)) else GridItemSpan(1)
-                        },
                     ) { entry ->
                         when (entry) {
                             is FeedEntry.Content -> MangaPosterCard(entry.value, onClick = { onManga(entry.value.id) })
