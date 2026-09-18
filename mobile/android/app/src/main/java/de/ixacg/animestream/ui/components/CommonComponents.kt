@@ -346,6 +346,7 @@ fun FeedAdCard(
                 }
             }
             val fixed = HtmlAdPolicy.dimensions(ad.width, ad.height).width > 0
+            val imageUrl = remember(ad.html) { FeedAdCreative.imageUrl(ad.html) }
             when {
                 ad.html.isBlank() -> {
                     // Match the web placeholder: an empty slot still reserves one poster cell.
@@ -354,6 +355,32 @@ fun FeedAdCard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text("广告位招租", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                imageUrl != null -> {
+                    // A picture goes through the loader that already fetches every poster, and is
+                    // letterboxed in the cell whether or not the slot carries pixel dimensions.
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .then(
+                                if (ad.href.isBlank()) {
+                                    Modifier
+                                } else {
+                                    Modifier.clickable {
+                                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ad.href))) }
+                                    }
+                                },
+                            ),
+                    ) {
+                        RemoteImage(
+                            url = imageUrl,
+                            contentDescription = ad.name.ifBlank { "广告" },
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
                     }
                 }
                 else -> {

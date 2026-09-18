@@ -18,8 +18,15 @@
 - Dimension inference (`inferAdDimensionsFromHtml`) reads `atOptions`, then `<iframe>`, `<img>`,
   `<video>` width/height attributes or `style` pixels. Percentages and `data-*` sizes stay automatic.
   The public `/api/ads` already carries resolved sizes, so Android never parses HTML.
-- Homepage rails and catalog grids interleave all enabled feed slots. Preserve the public
-  enabled-slot index used by `/ads/html/feed/{id}`.
+- A feed position carries one ad, drawn at random from the enabled slots whose interval lands on
+  it, so configured creatives rotate instead of stacking a card each. The draw skips the slot shown
+  at the previous position while another candidate exists. Keep `interleaveFeedAds` and
+  `AdsRepository.interleave` on the same rule, and take the random draw through the injected `pick`
+  so tests stay deterministic. Preserve the public enabled-slot index used by `/ads/html/feed/{id}`.
+- A creative that is a single `<img>` (optionally wrapped in a link) is not markup the app needs a
+  browser for: Android renders it through its own image loader (`FeedAdCreative.imageUrl` →
+  `RemoteImage`), which brings cache, redirects and the `/cdn-img` rewrite, and letterboxes it
+  without stored pixel dimensions. Anything that runs code stays in the WebView.
 - Size feed cards like catalog posters (`poster-frame` + `aspect-[2/3]` + Radix `AspectRatio`).
   Give fill iframes explicit pixel width/height from ResizeObserver; mobile WebKit treats
   `iframe { height:100% }` as 0 inside an absolute box. Fluid/fill documents must not apply

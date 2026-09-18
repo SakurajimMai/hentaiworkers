@@ -94,22 +94,42 @@ export type FeedSlot<T> =
   | { type: 'item'; item: T; key: string }
   | { type: 'ad'; key: string; ad: FeedAdSlot; adIndex: number };
 
+export function feedAdStep(ad: FeedAdSlot): number {
+  return Math.max(1, Math.min(40, Math.floor(ad.interval) || 5));
+}
+
+/**
+ * A feed position carries **one** ad, drawn at random from the slots whose interval lands on it.
+ * Six configured creatives therefore rotate through the feed instead of stacking six cards at
+ * every position. The draw skips the slot shown at the previous position while another candidate
+ * is available, because a creative repeated back to back reads as a broken feed.
+ *
+ * `pick` is injected so callers and tests can make a rotation deterministic; it receives the
+ * candidate count and returns the index to take.
+ */
 export function interleaveFeedAds<T>(
   items: readonly T[],
   ads: readonly FeedAdSlot[],
   itemKey: (item: T, index: number) => string,
+  pick: (count: number) => number = (count) => Math.floor(Math.random() * count),
 ): FeedSlot<T>[] {
   const slots: FeedSlot<T>[] = [];
+  let previous = -1;
   items.forEach((item, index) => {
     slots.push({ type: 'item', item, key: itemKey(item, index) });
     const seen = index + 1;
-    ads.forEach((ad, adIndex) => {
-      if (!ad.enabled) return;
-      const step = Math.max(1, Math.min(40, Math.floor(ad.interval) || 5));
-      if (seen % step === 0) {
-        slots.push({ type: 'ad', key: `ad-${adIndex}-${seen}`, ad, adIndex });
-      }
-    });
+    const eligible = ads
+      .map((ad, adIndex) => ({ ad, adIndex }))
+      .filter(({ ad }) => ad.enabled && seen % feedAdStep(ad) === 0);
+    if (eligible.length === 0) return;
+    const candidates =
+      eligible.length > 1 ? eligible.filter(({ adIndex }) => adIndex !== previous) : eligible;
+    const drawn = Math.floor(pick(candidates.length));
+    const { ad, adIndex } = candidates[
+      Number.isFinite(drawn) ? Math.min(candidates.length - 1, Math.max(0, drawn)) : 0
+    ];
+    previous = adIndex;
+    slots.push({ type: 'ad', key: `ad-${adIndex}-${seen}`, ad, adIndex });
   });
   return slots;
 }

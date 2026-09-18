@@ -4,6 +4,13 @@
 
 ## 2026-09 — 搜索引擎收录、信息流广告尺寸与 APK 阅读预取
 
+- 信息流广告改为随机轮播：一个广告位只显示一条。此前每到一个位置，所有「间隔命中该位置」的广告
+  会同时插入，配置 6 条就会连排 6 张卡片；现在在这些候选里随机抽一条，并避开上一个位置刚显示过的
+  那条。网站与 APK 共用同一规则（`interleaveFeedAds` / `AdsRepository.interleave`）。
+- 纯图片信息流素材（只有一个 `<img>`，可套一层链接）在 APK 中不再走 WebView，改由 App 自己的
+  图片加载器显示：与封面同一条管线（缓存、重定向、`/cdn-img` 改写），按比例完整放进 2:3 卡片，
+  整卡可点击跳转，**后台不必再为图片素材填写像素尺寸**。含脚本或 iframe 的素材仍在 WebView 中运行。
+
 - 图片代理不再绑定单一上游：`/cdn-img/<host>/**` 代理与 `SITE_URL` 同一域名下的所有图片主机
   （站点 `www.example.com` 对应 `image1.example.com`、`image2.example.com`……），域名由
   `SITE_URL` 推导，`IMAGE_PROXY_UPSTREAM` 与 APK 的 `ANIMESTREAM_IMAGE_PROXY_HOST` 一并删除。
