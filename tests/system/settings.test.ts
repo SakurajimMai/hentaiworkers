@@ -1,3 +1,5 @@
+import { AuthRateLimiter } from '../../lib/server/identity/application/auth-rate-limit';
+import type { SendMailInput } from '../../lib/server/system/application/mailer';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomBytes } from 'node:crypto';
@@ -189,7 +191,7 @@ test('toPublicAdsConfig keeps enabled feed/reader slots and player ads', () => {
   );
   assert.equal(pub.feedSlots.length, 1);
   assert.equal(pub.feedSlots[0].html, '<b>a</b>');
-  assert.equal(pub.feedSlots[0].placement, 'banner');
+  assert.equal('placement' in pub.feedSlots[0], false);
   const inferred = toPublicAdsConfig(
     parseSystemSettings({
       ads: {
@@ -204,7 +206,7 @@ test('toPublicAdsConfig keeps enabled feed/reader slots and player ads', () => {
   );
   assert.equal(inferred.feedSlots[0].width, 300);
   assert.equal(inferred.feedSlots[0].height, 250);
-  assert.equal(inferred.feedSlots[0].placement, 'banner');
+  assert.equal('placement' in inferred.feedSlots[0], false);
   assert.equal(pub.reader.top.html, '<p>top</p>');
   assert.equal(pub.reader.bottom.enabled, false);
   assert.equal(pub.reader.bottom.html, '');
@@ -246,6 +248,7 @@ class MemorySettings implements SystemSettingsRepository {
 }
 
 class MemoryTokens implements EmailVerificationTokenRepository {
+  constructor(private users: MemoryUsers) {}
   rows: EmailVerificationTokenRecord[] = [];
   async create(input: { userId: number; tokenHash: Uint8Array; expiresAt: Date }) {
     this.rows.push({
@@ -263,9 +266,19 @@ class MemoryTokens implements EmailVerificationTokenRepository {
       this.rows.find((r) => Buffer.from(r.tokenHash).toString('hex') === key) ?? null
     );
   }
-  async markUsed(id: number) {
+  async hasPendingForUser(userId: number) {
+    return this.rows.some((row) => row.userId === userId && !row.usedAt);
+  }
+  async consumeAndActivate(id: number) {
     const row = this.rows.find((r) => r.id === id);
-    if (row) (row as { usedAt: string }).usedAt = new Date().toISOString();
+    if (!row || row.usedAt || Date.parse(row.expiresAt) <= Date.now()) return false;
+    const user = await this.users.findById(row.userId);
+    if (!user || user.isActive || user.role !== 'user') return false;
+    // Test double mirrors the atomic adapter contract; mark before the next await.
+    if (row.usedAt) return false;
+    (row as { usedAt: string }).usedAt = new Date().toISOString();
+    await this.users.update(row.userId, { isActive: 1 });
+    return true;
   }
   async deleteForUser(userId: number) {
     this.rows = this.rows.filter((r) => r.userId !== userId);
@@ -309,6 +322,12 @@ class MemoryUsers implements UserRepository {
         : cur.sessionVersion,
     });
   }
+  async deleteRegularUser(id: number) {
+    const user = await this.findById(id);
+    if (!user || user.role !== 'user') return false;
+    this.rows.delete(id);
+    return true;
+  }
   async list() {
     return [...this.rows.values()];
   }
@@ -340,17 +359,22 @@ function buildService(fetchImpl?: typeof fetch) {
   const key = randomBytes(32);
   const cipher = new AesGcmSecretCipher(keyringViewFromRecord('k1', { k1: key }));
   const settings = new MemorySettings();
-  const tokens = new MemoryTokens();
+  const users = new MemoryUsers();
+  const sessions = new MemorySession();
+  const tokens = new MemoryTokens(users);
+  const sent: SendMailInput[] = [];
   const identity = new IdentityService(
-    new MemoryUsers(),
-    new MemorySession(),
+    users,
+    sessions,
     new MemoryPasswords(),
   );
   const service = new SystemSettingsService(settings, tokens, cipher, identity, {
     siteUrl: 'https://example.com',
     fetchImpl,
+    rateLimiter: new AuthRateLimiter(),
+    sendMail: async (_smtp, message) => { sent.push(message); },
   });
-  return { service, settings, identity };
+  return { service, settings, identity, users, sessions, tokens, sent };
 }
 
 test('registration closed and whitelist enforced', async () => {
@@ -383,11 +407,12 @@ test('registration closed and whitelist enforced', async () => {
     (e: unknown) => e instanceof AppError && e.details?.field === 'whitelist',
   );
 
+  await service.update({ smtp: { enabled: true, host: 'smtp.example.com', fromEmail: 'sender@example.com' } });
   const ok = await service.registerPublic({
     email: 'x@allowed.com',
     password: 'password1',
   });
-  assert.equal(ok.needsVerification, false);
+  assert.equal(ok.needsVerification, true);
   assert.equal(ok.user.username, 'x@allowed.com');
 });
 
@@ -475,16 +500,13 @@ test('smtp password and turnstile secret persist encrypted and stay masked in ad
   assert.equal(pub.turnstile.onRegister, true);
 });
 
-test('require email verification without smtp is rejected on update', async () => {
-  const { service } = buildService();
-  await assert.rejects(
-    () =>
-      service.update({
-        registration: { open: true, requireEmailVerification: true, emailWhitelist: [] },
-        smtp: { enabled: false },
-      }),
-    AppError,
-  );
+test('missing SMTP closes public registration and cannot create users', async () => {
+  const { service, identity } = buildService();
+  await service.update({ registration: { requireEmailVerification: false }, smtp: { enabled: false } });
+  assert.equal((await service.getPublicAuthConfig()).registrationOpen, false);
+  assert.equal((await service.getPublicAuthConfig()).requireEmailVerification, true);
+  await assert.rejects(() => service.registerPublic({ email: 'no@example.com', password: 'password1' }));
+  assert.equal((await identity.listUsers()).length, 0);
 });
 
 test('turnstile required on register calls siteverify', async () => {
@@ -495,6 +517,7 @@ test('turnstile required on register calls siteverify', async () => {
   };
   const { service } = buildService(fetchImpl);
   await service.update({
+    smtp: { enabled: true, host: 'smtp.example.com', fromEmail: 'sender@example.com' },
     turnstile: { enabled: true, siteKey: 's', secretKey: 'sec' },
     trust: { turnstileOnRegister: true, turnstileOnLogin: false },
     registration: { open: true, emailWhitelist: [], requireEmailVerification: false },
@@ -505,4 +528,76 @@ test('turnstile required on register calls siteverify', async () => {
     turnstileToken: 'token',
   });
   assert.equal(called, true);
+});
+
+test('site SEO saves, survives partial updates and supports explicit clearing', async () => {
+  const { service } = buildService();
+  await service.update({ site: { seo: { title: '新站点', subtitle: '副标题', description: '摘要', keywords: '动画,漫画' } } });
+  await service.update({ site: { telegramLabel: '群组' } });
+  assert.equal((await service.getAdminView()).site.seo.title, '新站点');
+  await service.update({ site: { seo: { subtitle: '', keywords: '' } } });
+  assert.deepEqual((await service.getSettings()).site.seo, {
+    title: '新站点', subtitle: '', description: '摘要', keywords: '',
+  });
+});
+
+async function pendingRegistration(email = 'code@example.com') {
+  const fixture = buildService();
+  await fixture.service.update({ smtp: { enabled: true, host: 'smtp.example.com', fromEmail: 'sender@example.com' } });
+  const result = await fixture.service.registerPublic({ email, password: 'password1' });
+  const code = fixture.sent[0].text.match(/\d{6}/)?.[0];
+  assert.ok(code);
+  return { ...fixture, result, code, email };
+}
+
+test('registration requires an email-bound code before activation and session creation', async () => {
+  const { service, result, sessions, tokens, code, email } = await pendingRegistration();
+  assert.equal(result.needsVerification, true);
+  assert.equal(result.user.isActive, 0);
+  assert.equal(sessions.data.isLoggedIn, false);
+  await assert.rejects(() => service.loginPublic({ emailOrUsername: email, password: 'password1' }));
+  assert.equal(tokens.rows[0].tokenHash.length, 32);
+  await assert.rejects(() => service.verifyEmailCode('other@example.com', code));
+  const user = await service.verifyEmailCode(email.toUpperCase(), code);
+  assert.equal(user.isActive, 1);
+  assert.equal(sessions.data.userId, user.id);
+  await assert.rejects(() => service.verifyEmailCode(email, code));
+});
+
+test('expired codes fail; resend replaces old credentials and verifies only once', async () => {
+  const { service, tokens, sent, email } = await pendingRegistration();
+  tokens.rows[0] = { ...tokens.rows[0], expiresAt: new Date(0).toISOString() };
+  const expiredCode = sent[0].text.match(/\d{6}/)![0];
+  await assert.rejects(() => service.verifyEmailCode(email, expiredCode));
+  await service.resendVerification(email);
+  assert.equal(tokens.rows.length, 1);
+  assert.equal(sent.length, 2);
+  const code = sent[1].text.match(/\d{6}/)![0];
+  const results = await Promise.allSettled([service.verifyEmailCode(email, code), service.verifyEmailCode(email, code)]);
+  assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+  await service.resendVerification(email);
+  assert.equal(sent.length, 2, 'active accounts cannot request activation codes');
+});
+
+test('verification limits attempts by email even when the source IP changes', async () => {
+  const { service, email, code } = await pendingRegistration();
+  for (let index = 0; index < 10; index++) {
+    await assert.rejects(() => service.verifyEmailCode(email, 'invalid', `192.0.2.${index}`));
+  }
+  await assert.rejects(() => service.verifyEmailCode(email, code, '192.0.2.99'),
+    (error: unknown) => error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED');
+});
+
+test('resend ignores deleted, active and non-pending disabled accounts', async () => {
+  const { service, identity, sent } = buildService();
+  await identity.createUser({ username: 'disabled@example.com', password: 'password1', role: 'user', isActive: 0 });
+  await service.resendVerification('disabled@example.com');
+  await service.resendVerification('missing@example.com');
+  assert.equal(sent.length, 0);
+});
+
+test('legacy token endpoint cannot bypass the email-code attempt limit', async () => {
+  const { service, email, code, sessions } = await pendingRegistration();
+  await assert.rejects(() => service.verifyEmailToken(`email-code:${email}:${code}`));
+  assert.equal(sessions.data.isLoggedIn, false);
 });

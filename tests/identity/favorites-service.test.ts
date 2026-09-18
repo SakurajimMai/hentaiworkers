@@ -61,6 +61,12 @@ class MemoryUsers implements UserRepository {
     });
   }
 
+  async deleteRegularUser(id: number) {
+    const user = await this.findById(id);
+    if (!user || user.role !== 'user') return false;
+    this.rows.delete(id);
+    return true;
+  }
   async list() {
     return [...this.rows.values()];
   }

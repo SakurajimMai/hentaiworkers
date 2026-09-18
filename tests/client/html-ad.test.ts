@@ -1,7 +1,7 @@
+import { MAX_AD_HEIGHT, htmlAdContainScale, htmlAdFitScale, htmlAdFrameScale, htmlAdSlotPaddingBottom, inferAdDimensionsFromHtml, normalizeAdDimensions, resolveAdDimensions } from '../../lib/ad-dimensions';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { MAX_AD_HEIGHT, feedAdFrameRatio, htmlAdContainScale, htmlAdFitScale, htmlAdFrameScale, htmlAdSlotPaddingBottom, inferAdDimensionsFromHtml, normalizeAdDimensions, resolveAdDimensions } from '../../lib/ad-dimensions';
 import { HTML_AD_RUNTIME } from '../../lib/client/html-ad-runtime';
 import {
   HTML_AD_MESSAGE_TYPE,
@@ -57,9 +57,6 @@ test('ad reports and creative sizes stay bounded and reject invalid numbers', ()
   assert.equal(htmlAdFitScale(432, 300), 432 / 300);
   assert.equal(htmlAdFitScale(160, 300), 160 / 300);
   assert.equal(htmlAdFitScale(0, 300), 1);
-  assert.equal(feedAdFrameRatio({}), 2 / 3);
-  assert.equal(feedAdFrameRatio({ banner: true, width: 300, height: 250 }), 300 / 250);
-  assert.equal(htmlAdSlotPaddingBottom(feedAdFrameRatio({}), 1), '150%');
   assert.deepEqual(
     inferAdDimensionsFromHtml(`<script>
       atOptions = {

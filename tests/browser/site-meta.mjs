@@ -32,7 +32,7 @@ const serverBundle = await build({
     setup(api) {
       api.onResolve({ filter: /^@\/lib\/server\/site-metadata$/ }, ({ path }) => ({ path, namespace: 'fixture' }));
       api.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
-        contents: `export async function getGlobalMetaTags() { return ${JSON.stringify(tags)}; }`,
+        contents: `export async function getSiteSeo() { return { title: '自定义站点', subtitle: '每日更新', description: '自定义摘要', keywords: '动画,漫画' }; } export async function getGlobalMetaTags() { return ${JSON.stringify(tags)}; }`,
         loader: 'js',
       }));
     },
@@ -42,6 +42,10 @@ const layoutModule = { exports: {} };
 new Function('module', 'exports', 'require', serverBundle.outputFiles[0].text)(
   layoutModule, layoutModule.exports, createRequire(import.meta.url),
 );
+const seoMetadata = await layoutModule.exports.generateMetadata();
+assert.equal(seoMetadata.title.default, '自定义站点 · 每日更新');
+assert.equal(seoMetadata.description, '自定义摘要');
+assert.deepEqual(seoMetadata.keywords, ['动画', '漫画']);
 const markup = '<!doctype html>' + renderToStaticMarkup(await layoutModule.exports.default({
   children: createElement('main', { id: 'root', className: 'page-shell py-6' }),
 }));

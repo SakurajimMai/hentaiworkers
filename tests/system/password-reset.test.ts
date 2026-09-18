@@ -36,7 +36,8 @@ class MemoryTokens implements EmailVerificationTokenRepository {
   async findByTokenHash() {
     return null;
   }
-  async markUsed() {}
+  async hasPendingForUser() { return false; }
+  async consumeAndActivate() { return false; }
   async deleteForUser() {}
 }
 

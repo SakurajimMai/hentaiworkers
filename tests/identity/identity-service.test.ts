@@ -61,6 +61,12 @@ class MemoryUsers implements UserRepository {
     });
   }
 
+  async deleteRegularUser(id: number) {
+    const user = await this.findById(id);
+    if (!user || user.role !== 'user') return false;
+    this.rows.delete(id);
+    return true;
+  }
   async list() {
     return [...this.rows.values()];
   }
@@ -291,4 +297,23 @@ test('requireUser and getCurrentUser honor session', async () => {
   const me = await service.requireUser();
   assert.equal(me.id, created.id);
   assert.equal((await service.getCurrentUser())?.id, created.id);
+});
+
+test('only administrators can delete ordinary users; admin accounts are protected', async () => {
+  const { users, service, sessions } = build();
+  const admin = await service.createUser({ username: 'admin', password: 'password1', role: 'admin' });
+  const otherAdmin = await service.createUser({ username: 'other-admin', password: 'password1', role: 'admin' });
+  const ordinary = await service.createUser({ username: 'ordinary', password: 'password1', role: 'user' });
+  await assert.rejects(() => service.deleteUser(ordinary.id));
+  await service.login('ordinary', 'password1');
+  const oldSession = { ...sessions.data };
+  await assert.rejects(() => service.deleteUser(ordinary.id));
+  await service.login('admin', 'password1');
+  await assert.rejects(() => service.deleteUser(admin.id));
+  await assert.rejects(() => service.deleteUser(otherAdmin.id));
+  await assert.rejects(() => service.deleteUser(NaN));
+  await service.deleteUser(ordinary.id);
+  assert.equal(await users.findById(ordinary.id), null);
+  sessions.data = oldSession;
+  await assert.rejects(() => service.requireUser());
 });

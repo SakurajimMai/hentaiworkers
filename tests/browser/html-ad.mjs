@@ -208,36 +208,10 @@ try {
 
   frame = await render({
     kind: 'feed',
-    banner: true,
     html: `<script>atOptions = { 'key': 'x', 'format': 'iframe', 'height': 250, 'width': 300, 'params': {} };</script><div id="creative" style="width:300px;height:250px;background:#147d72">inferred</div>`,
   });
   assert.equal(await frame.evaluate(() => window.innerWidth), 300, 'atOptions width is used when admin size is 自动');
   assert.ok((await page.locator('#ad-host iframe').boundingBox()).height > 80);
-
-  frame = await render({
-    kind: 'feed',
-    banner: true,
-    width: 300,
-    height: 250,
-    html: '<div id="creative" style="width:300px;height:250px;background:#147d72">banner</div>',
-  });
-  assert.equal(await page.evaluate(() => document.querySelector('.feed-ad-banner-card') != null), true);
-  assert.ok((await page.locator('#ad-host iframe').boundingBox()).height > 80);
-
-  frame = await render({
-    kind: 'feed',
-    banner: true,
-    hostWidth: 432,
-    width: 300,
-    height: 250,
-    html: '<div id="creative" style="width:300px;height:250px;background:#147d72">catalog-banner</div>',
-  });
-  assert.equal(await frame.evaluate(() => window.innerWidth), 300, 'catalog banner keeps a 300px alliance viewport');
-  const catalogBanner = await page.locator('#ad-host iframe').boundingBox();
-  assert.ok(Math.abs(catalogBanner.width - 432) < 4, `banner fills the two-column slot, got ${catalogBanner.width}`);
-  assert.ok(Math.abs(catalogBanner.height - 432 * 250 / 300) < 4, `banner keeps 300x250 ratio in the slot, got ${catalogBanner.height}`);
-  const catalogSlot = await page.locator('#ad-host .feed-ad-banner-card').boundingBox();
-  assert.ok(Math.abs(catalogSlot.height - catalogBanner.height) < 4, 'banner chrome must not add empty poster padding');
 
   frame = await render({
     kind: 'feed',
