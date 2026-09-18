@@ -46,7 +46,7 @@ export default async function AdminSystemSettingsPage({
         </button>
       </div>
 
-      <nav className="admin-section-nav sticky top-[3.5rem] z-20 -mx-1 bg-background/90 px-1 py-2 backdrop-blur-md border-b border-border/80" aria-label="系统设置分区">
+      <nav className="admin-section-nav sticky top-[var(--admin-header-height)] z-20 -mx-1 bg-background/90 px-1 py-2 backdrop-blur-md border-b border-border/80" aria-label="系统设置分区">
         <a href="#registration">注册</a>
         <a href="#hero">幻灯片</a>
         <a href="#app">页脚</a>

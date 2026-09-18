@@ -15,6 +15,7 @@
     "test:reader:browser": "node tests/browser/manga-reader.mjs",
     "test:ads:browser": "node tests/browser/html-ad.mjs",
     "test:meta:browser": "node tests/browser/site-meta.mjs",
+    "test:admin:browser": "node tests/browser/admin-nav.mjs",
     "check:legacy": "node scripts/check-no-legacy.mjs",
     "check:boundaries": "node scripts/check-app-boundaries.mjs",
     "db:baseline": "node scripts/export-schema-baseline.mjs",

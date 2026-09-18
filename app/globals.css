@@ -118,6 +118,24 @@
     @apply border-border;
   }
 
+  /* Admin chrome geometry. The top bar keeps one height at every width; below `lg`
+     the compact nav row joins it. Sticky admin content offsets read
+     --admin-header-height instead of repeating a literal, so they follow the bar
+     when the viewport shrinks — browser zoom and OS display scaling both land the
+     panel on narrow viewports where the header is two rows tall. */
+  :root {
+    --admin-bar-height: 3.5rem;
+    --admin-nav-row-height: 3.25rem;
+    /* The trailing pixel is the header's own bottom hairline. */
+    --admin-header-height: calc(var(--admin-bar-height) + var(--admin-nav-row-height) + 1px);
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      --admin-header-height: calc(var(--admin-bar-height) + 1px);
+    }
+  }
+
   html {
     scroll-behavior: smooth;
     overflow-x: clip;
@@ -479,6 +497,12 @@
     padding: 0.55rem 0.8rem;
     color: hsl(var(--foreground));
     box-shadow: 0 1px 0 hsla(var(--shadow-color), 0.02);
+  }
+
+  /* Every admin row — bar, compact nav, page body — is measured from this shell so
+     the header never drifts out of line with the content underneath it. */
+  .admin-shell {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
   }
 
   .admin-section-nav {

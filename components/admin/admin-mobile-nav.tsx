@@ -29,12 +29,14 @@ export function AdminMobileNav({ items }: { items: AdminNavItem[] }) {
       : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
   return (
-    <div className="border-t border-border px-4 py-2 sm:px-6">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-        <p className="font-meta normal-case tracking-normal text-[11px]">维护工作区</p>
+    <div className="border-t border-border">
+      {/* Height comes from the shared variable so --admin-header-height keeps telling
+          sticky page content the truth about where this bar ends. */}
+      <div className="admin-shell flex h-[calc(var(--admin-nav-row-height)-1px)] items-center justify-between gap-3">
+        <p className="font-meta truncate normal-case tracking-normal text-[11px]">维护工作区</p>
         <button
           type="button"
-          className="inline-flex min-h-9 items-center gap-2 rounded-full border border-border bg-card px-3 font-ui text-[12px] font-medium text-foreground transition hover:bg-secondary"
+          className="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-3 font-ui text-[12px] font-medium text-foreground transition hover:bg-secondary"
           aria-expanded={open}
           aria-controls="admin-mobile-menu"
           onClick={() => setOpen((value) => !value)}
@@ -46,7 +48,7 @@ export function AdminMobileNav({ items }: { items: AdminNavItem[] }) {
       {open && (
         <nav
           id="admin-mobile-menu"
-          className="mx-auto grid max-w-6xl grid-cols-2 gap-1.5 pt-2 font-ui text-[13px]"
+          className="admin-shell grid grid-cols-2 gap-1.5 pb-3 font-ui text-[13px]"
           aria-label="移动端后台导航"
         >
           {items.map((item) => {

@@ -51,20 +51,15 @@ export function AdminNavGlyph({
   return <Icon size={size} className={className} />;
 }
 
-export function AdminNav({
-  items,
-  className = '',
-  compact = false,
-}: {
-  items: AdminNavItem[];
-  className?: string;
-  compact?: boolean;
-}) {
+export function AdminNav({ items, className = '' }: { items: AdminNavItem[]; className?: string }) {
   const pathname = usePathname() || '';
 
   return (
     <nav
-      className={`flex flex-wrap items-center gap-1 font-ui text-[13px] text-soft ${className}`}
+      // The bar is a fixed height, so the links must never wrap out of it. They stay on
+      // one nowrap row that can shrink and scroll instead — the last resort when a
+      // zoomed-in or scaled display leaves less room than the labels need.
+      className={`flex min-w-0 items-center gap-1 overflow-x-auto scrollbar-hide -mx-1 px-1 py-1 font-ui text-[13px] text-soft ${className}`}
       aria-label="后台导航"
     >
       {items.map((item) => {
@@ -76,9 +71,7 @@ export function AdminNav({
             key={item.href}
             href={item.href}
             aria-current={active ? 'page' : undefined}
-            className={`inline-flex items-center gap-1.5 shrink-0 rounded-full transition-all duration-200 ${
-              compact ? 'px-2.5 py-1 text-[12px]' : 'px-3 py-1.5 text-[13px]'
-            } ${
+            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] transition-all duration-200 ${
               active
                 ? 'bg-card text-ink font-medium shadow-sm border border-border/70'
                 : 'hover:bg-card/70 hover:text-ink'
@@ -93,17 +86,15 @@ export function AdminNav({
           </Link>
         );
       })}
-      {!compact && (
-        <Link
-          href="/"
-          target="_blank"
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[13px] transition-colors hover:bg-card hover:text-ink text-soft ml-1"
-          title="在新标签页打开前台"
-        >
-          <span>前台</span>
-          <IconExternalLink size={12} className="opacity-70" />
-        </Link>
-      )}
+      <Link
+        href="/"
+        target="_blank"
+        className="ml-1 inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[13px] text-soft transition-colors hover:bg-card hover:text-ink"
+        title="在新标签页打开前台"
+      >
+        <span>前台</span>
+        <IconExternalLink size={12} className="opacity-70" />
+      </Link>
     </nav>
   );
 }
