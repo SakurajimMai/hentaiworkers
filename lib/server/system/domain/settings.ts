@@ -374,7 +374,6 @@ export function parseSystemSettings(value: unknown): SystemSettings {
 /** Public, non-secret view for login/register pages. */
 export type PublicAuthConfig = Readonly<{
   registrationOpen: boolean;
-  emailWhitelistEnabled: boolean;
   requireEmailVerification: boolean;
   turnstile: Readonly<{
     enabled: boolean;
@@ -392,7 +391,8 @@ export function toPublicAuthConfig(settings: SystemSettings): PublicAuthConfig {
 
   return {
     registrationOpen: settings.registration.open && settings.smtp.enabled && Boolean(settings.smtp.host.trim() && settings.smtp.fromEmail.trim()),
-    emailWhitelistEnabled: settings.registration.emailWhitelist.length > 0,
+    // Whether a whitelist exists stays server-side: the register page no longer announces it,
+    // and a visitor who is not on it learns so from the submit error.
     requireEmailVerification: settings.registration.requireEmailVerification,
     turnstile: {
       enabled: turnstileReady,

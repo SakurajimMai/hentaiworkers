@@ -7,6 +7,7 @@ import { AppError, isAuthRequiredError } from '@/lib/server/shared/errors';
 import {
   buildPublicLoginHref,
   buildPublicRegisterHref,
+  buildVerificationHref,
   normalizePublicNext,
 } from '@/lib/server/shared/auth-navigation';
 import {
@@ -44,7 +45,8 @@ export async function actionPublicRegister(formData: FormData): Promise<void> {
       remoteIp: await clientIp(),
     });
     if (result.needsVerification) {
-      redirect(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&next=${encodeURIComponent(normalizePublicNext(next, '/favorites'))}`);
+      // The code step lives on the register page itself, so the visitor never leaves it.
+      redirect(buildVerificationHref('/register', { email: email.trim().toLowerCase(), next }));
     }
   } catch (error) {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
@@ -53,7 +55,8 @@ export async function actionPublicRegister(formData: FormData): Promise<void> {
         redirect(buildPublicRegisterHref(next, { error: 'rate' }));
       }
       if (error.details?.field === 'verificationMail') {
-        redirect(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}&error=send`);
+        // The account exists but is inactive: keep the visitor on the code step so they can resend.
+        redirect(buildVerificationHref('/register', { email: email.trim().toLowerCase(), next, error: 'send' }));
       }
       if (error.code === 'RESULT_CONFLICT') {
         redirect(buildPublicRegisterHref(next, { error: 'exists' }));
@@ -271,6 +274,7 @@ export async function actionResetPassword(formData: FormData): Promise<void> {
 export async function actionVerifyEmail(formData: FormData): Promise<void> {
   const email = String(formData.get('email') || '').trim().toLowerCase();
   const next = normalizePublicNext(String(formData.get('next') || ''), '/favorites');
+  const from = String(formData.get('from') || '');
   const token = String(formData.get('token') || '');
   try {
     const service = getSystemSettingsService();
@@ -278,20 +282,22 @@ export async function actionVerifyEmail(formData: FormData): Promise<void> {
     else await service.verifyEmailCode(email, String(formData.get('code') || ''), await clientIp());
   } catch (error) {
     const reason = error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED' ? 'rate' : 'code';
-    redirect(`/verify-email?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}&error=${reason}`);
+    redirect(buildVerificationHref(from, { email, next, error: reason }));
   }
-  redirect(next);
+  // Verifying activates the account but does not open a session: the visitor signs in with the
+  // password they just chose.
+  redirect(buildPublicLoginHref(next, { ok: 'verified' }));
 }
 
 export async function actionResendVerification(formData: FormData): Promise<void> {
   const email = String(formData.get('email') || '').trim().toLowerCase();
   const next = normalizePublicNext(String(formData.get('next') || ''), '/favorites');
-  const base = `/verify-email?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`;
+  const from = String(formData.get('from') || '');
   try {
     await getSystemSettingsService().resendVerification(email, await clientIp());
   } catch (error) {
     const reason = error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED' ? 'rate' : 'send';
-    redirect(`${base}&error=${reason}`);
+    redirect(buildVerificationHref(from, { email, next, error: reason }));
   }
-  redirect(`${base}&ok=sent`);
+  redirect(buildVerificationHref(from, { email, next, ok: 'sent' }));
 }

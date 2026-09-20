@@ -22,6 +22,7 @@ export default async function VerifyEmailPage({ searchParams }: {
       {sp.ok === 'sent' && <p className="notice-success">若该邮箱有待验证的注册申请，新的验证码已发送，请检查收件箱和垃圾邮件。</p>}
       <form action={actionVerifyEmail} className="surface-panel p-6 space-y-4">
         <input type="hidden" name="next" value={next} />
+        <input type="hidden" name="from" value="/verify-email" />
         {token ? <input type="hidden" name="token" value={token} /> : <>
           <label className="admin-label">注册邮箱
             <input name="email" type="email" defaultValue={email} maxLength={64} required autoComplete="email" className="admin-input mt-1" />
@@ -34,6 +35,7 @@ export default async function VerifyEmailPage({ searchParams }: {
       </form>
       <form action={actionResendVerification} className="surface-panel p-6 space-y-3">
         <input type="hidden" name="next" value={next} />
+        <input type="hidden" name="from" value="/verify-email" />
         <label className="admin-label">没收到邮件？填写注册邮箱后重新发送
           <input name="email" type="email" defaultValue={email} required maxLength={64} autoComplete="email" className="admin-input mt-1" />
         </label>

@@ -66,7 +66,7 @@ export default async function LoginPage({
       )}
       {ok === 'verified' && (
         <div className="mb-4 notice-success !text-sm">
-          邮箱已验证，你已登录。
+          邮箱已验证，账号已激活，请登录。
         </div>
       )}
       {ok === 'password' && (

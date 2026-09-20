@@ -388,7 +388,9 @@ export class SystemSettingsService {
       });
     }
     if (!isEmailAllowedByWhitelist(email, settings.registration.emailWhitelist)) {
-      throw new AppError('RESULT_INVALID', '该邮箱不在允许注册的白名单中', 403, false, {
+      // Names neither the whitelist nor its contents: who may register is the operator's
+      // business, and the visitor only needs to know this address will not work.
+      throw new AppError('RESULT_INVALID', '不支持使用该邮箱注册', 403, false, {
         field: 'whitelist',
       });
     }
