@@ -7,7 +7,6 @@ import {
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
   parseSystemSettings,
-  qualifySmtpUsername,
   toPublicAuthConfig,
   type PublicAuthConfig,
   type SystemSettings,
@@ -215,13 +214,10 @@ export class SystemSettingsService {
           host: input.smtp?.host,
           port: input.smtp?.port,
           secure: input.smtp?.secure,
-          username:
-            input.smtp?.username === undefined
-              ? undefined
-              : qualifySmtpUsername(
-                  input.smtp.username,
-                  input.smtp.fromEmail ?? current.smtp.fromEmail,
-                ),
+          // Stored exactly as entered. Some providers authenticate with the full address and
+          // others with the bare mailbox name; only the operator knows which, and appending a
+          // domain to what they typed silently overwrote their setting on every save.
+          username: input.smtp?.username?.trim(),
           fromEmail: input.smtp?.fromEmail,
           fromName: input.smtp?.fromName,
         }),

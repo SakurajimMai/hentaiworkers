@@ -5,7 +5,6 @@ import { getIdentityService } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
 import {
   buildPublicLoginHref,
-  buildPublicRegisterHref,
   normalizePublicNext,
 } from '@/lib/server/shared/auth-navigation';
 import {
@@ -135,12 +134,6 @@ export default async function RegisterPage({
               没收到？重新发送验证码
             </button>
           </form>
-
-          <p className="mt-4 text-center font-ui text-sm">
-            <Link href={buildPublicRegisterHref(next)} className="text-accent">
-              换个邮箱注册
-            </Link>
-          </p>
         </>
       ) : !auth.registrationOpen ? (
         <div className="surface-panel p-6 space-y-4">

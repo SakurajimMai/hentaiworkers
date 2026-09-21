@@ -38,21 +38,6 @@ export const smtpSettingsSchema = z.object({
   fromName: z.string().max(128).default('AnimeStream'),
 });
 
-/**
- * Many control panels show a local-part mailbox name (`admin`) while SMTP AUTH
- * requires the full address (`admin@domain`). Qualify using the From domain.
- * Empty username stays empty so unauthenticated send remains possible.
- */
-export function qualifySmtpUsername(username: string, fromEmail: string): string {
-  const user = username.trim();
-  if (!user || user.includes('@')) return user;
-  const at = fromEmail.trim().lastIndexOf('@');
-  if (at <= 0 || at === fromEmail.trim().length - 1) return user;
-  const domain = fromEmail.trim().slice(at + 1).trim();
-  if (!domain || domain.includes('@')) return user;
-  return `${user}@${domain}`;
-}
-
 /** Admin-only: whether outbound mail can actually be sent. Never expose to the public site. */
 export function isOutboundMailReady(smtp: {
   enabled: boolean;

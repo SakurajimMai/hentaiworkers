@@ -21,7 +21,6 @@ import {
   isEmailAllowedByWhitelist,
   isOutboundMailReady,
   parseSystemSettings,
-  qualifySmtpUsername,
   toPublicAdsConfig,
   toPublicAuthConfig,
   toPublicSiteConfig,
@@ -467,8 +466,15 @@ test('saving smtp qualifies a local-part username with the from-email domain', a
     },
   });
   const view = await service.getAdminView();
-  assert.equal(view.smtp.username, 'admin@ixacg.de');
-  assert.equal(qualifySmtpUsername('admin', 'no-reply@ixacg.de'), view.smtp.username);
+  // A bare mailbox name is what some providers authenticate with, so it round-trips untouched
+  // instead of being qualified with the From domain.
+  assert.equal(view.smtp.username, 'admin');
+
+  await service.update({ smtp: { username: '  no-reply  ' } });
+  assert.equal((await service.getAdminView()).smtp.username, 'no-reply');
+
+  await service.update({ smtp: { username: 'postmaster@ixacg.de' } });
+  assert.equal((await service.getAdminView()).smtp.username, 'postmaster@ixacg.de');
 });
 
 test('smtp password and turnstile secret persist encrypted and stay masked in admin view', async () => {
