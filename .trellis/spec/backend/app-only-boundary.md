@@ -208,16 +208,21 @@ import type { SecretCipher } from '../shared/secret-cipher';
 
 ## Identity Administration And Registration
 
-- Public registration always creates an inactive ordinary user; SMTP readiness is checked first.
+- Public registration writes only a pending request, never a user or session; SMTP readiness is checked first.
+  `IdentityService.prepareRegistration` returns validated credentials with a password hash and has no write side effects.
+  `PendingRegistrationRepository.complete` locks the unexpired email-bound challenge, inserts the ordinary
+  active user and deletes the challenge in one transaction. Errors and replay cannot create accounts.
+  Verification does not establish a session; the visitor signs in after successful registration.
   Legacy `requireEmailVerification: false` is normalized to true. The public registration entry
   stays unavailable until SMTP host/from-address/enabled are configured.
 - Six-digit codes use cryptographic randomness, email-bound SHA-256 storage and 5–10 minute
-  expiry. Verify/resend limit both email and IP. Activation and token consumption are one atomic
-  SQL update and accept only inactive ordinary users. Legacy link tokens must match the original
+  expiry. Verify/resend limit both email and IP. Legacy activation tokens accept only inactive
+  ordinary users; existing accounts are never overwritten by new requests. Legacy link tokens must match the original
   43-character base64url format, so they cannot bypass code-attempt limits using code hash inputs.
 - Initial verification delivery and resends share a normalized-email 120-second cooldown,
-  consumed before asynchronous delivery work, including failed sends. Both code pages read the
-  same process-local limiter for countdowns; this is best-effort across restarts/instances.
+  stored in `pending_registrations.sent_at` and reserved under a row lock before SMTP delivery,
+  including failed sends. Both code pages read the remaining database cooldown; refreshes, restarts
+  and multiple instances cannot reset it. Legacy inactive-account resends retain the process-local limiter.
   SMTP port 465 uses implicit TLS, 587 uses STARTTLS, and custom ports honor the configured mode.
   Log only SMTP diagnostic codes/phase, never credentials, recipients or code contents.
 - Role/status changes revoke pending verification tokens in the same transaction. Verification

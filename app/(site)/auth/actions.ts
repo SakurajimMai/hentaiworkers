@@ -52,10 +52,10 @@ export async function actionPublicRegister(formData: FormData): Promise<void> {
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     if (error instanceof AppError) {
       if (error.code === 'SOURCE_RATE_LIMITED') {
-        redirect(buildPublicRegisterHref(next, { error: 'rate' }));
+        redirect(buildVerificationHref('/register', { email: email.trim().toLowerCase(), next, error: 'rate' }));
       }
       if (error.details?.field === 'verificationMail') {
-        // The account exists but is inactive: keep the visitor on the code step so they can resend.
+        // Only the pending request exists; keep the visitor on the code step to retry.
         redirect(buildVerificationHref('/register', { email: email.trim().toLowerCase(), next, error: 'send' }));
       }
       if (error.code === 'RESULT_CONFLICT') {
@@ -284,7 +284,7 @@ export async function actionVerifyEmail(formData: FormData): Promise<void> {
     const reason = error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED' ? 'rate' : 'code';
     redirect(buildVerificationHref(from, { email, next, error: reason }));
   }
-  // Verifying activates the account but does not open a session: the visitor signs in with the
+  // Verifying creates the account but does not open a session: the visitor signs in with the
   // password they just chose.
   redirect(buildPublicLoginHref(next, { ok: 'verified' }));
 }

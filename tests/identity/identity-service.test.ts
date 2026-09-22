@@ -241,42 +241,27 @@ test('middleware and iron adapter source share session-config module', () => {
   assert.doesNotMatch(middlewareSource, /cookieName:\s*['\"]animestream_session['\"]/);
 });
 
-test('registerWithEmail normalizes email, sets user role, and logs in', async () => {
-  const { sessions, service } = build();
-  const user = await service.registerWithEmail({
-    email: '  Alice@Example.COM ',
-    password: 'password1',
-    displayName: 'Alice',
-  });
-  assert.equal(user.username, 'alice@example.com');
-  assert.equal(user.role, 'user');
-  assert.equal(user.displayName, 'Alice');
-  assert.equal(sessions.data.isLoggedIn, true);
-  assert.equal(sessions.data.userId, user.id);
-
-  await assert.rejects(
-    () => service.registerWithEmail({ email: 'alice@example.com', password: 'password1' }),
-    (error: unknown) => {
-      assert.ok(error instanceof AppError);
-      assert.equal(error.code, 'RESULT_CONFLICT');
-      return true;
-    },
-  );
-
-  await assert.rejects(
-    () => service.registerWithEmail({ email: 'not-an-email', password: 'password1' }),
-    (error: unknown) => {
-      assert.ok(error instanceof AppError);
-      assert.equal(error.details?.field, 'email');
-      return true;
-    },
-  );
+test('preparing registration validates and hashes credentials without creating a user or session', async () => {
+  const { sessions, service, users } = build();
+  const pending = await service.prepareRegistration({ email: '  Alice@Example.COM ', password: 'password1', displayName: 'Alice' });
+  assert.equal(pending.email, 'alice@example.com');
+  assert.equal(pending.displayName, 'Alice');
+  assert.notEqual(pending.passwordHash, 'password1');
+  assert.equal(sessions.data.isLoggedIn, false);
+  assert.equal(await users.findByUsername(pending.email), null);
+  await assert.rejects(() => service.prepareRegistration({ email: 'not-an-email', password: 'password1' }),
+    (error: unknown) => error instanceof AppError && error.details?.field === 'email');
+  await assert.rejects(() => service.prepareRegistration({ email: pending.email, password: 'short' }),
+    (error: unknown) => error instanceof AppError && error.details?.field === 'password');
+  await service.createUser({ username: pending.email, password: 'password1', role: 'user' });
+  await assert.rejects(() => service.prepareRegistration({ email: pending.email, password: 'password1' }),
+    (error: unknown) => error instanceof AppError && error.code === 'RESULT_CONFLICT');
 });
 
 test('loginPublic accepts email case-insensitively', async () => {
   const { service } = build();
-  await service.registerWithEmail({
-    email: 'bob@example.com',
+  await service.createUser({
+    username: 'bob@example.com', role: 'user',
     password: 'password1',
   });
   await service.logout();
@@ -290,10 +275,11 @@ test('requireUser and getCurrentUser honor session', async () => {
   await assert.rejects(() => service.requireUser(), AppError);
   assert.equal(await service.getCurrentUser(), null);
 
-  const created = await service.registerWithEmail({
-    email: 'c@example.com',
+  const created = await service.createUser({
+    username: 'c@example.com', role: 'user',
     password: 'password1',
   });
+  await service.loginPublic('c@example.com', 'password1');
   const me = await service.requireUser();
   assert.equal(me.id, created.id);
   assert.equal((await service.getCurrentUser())?.id, created.id);

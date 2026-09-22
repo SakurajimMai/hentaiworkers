@@ -163,10 +163,8 @@ test('toggle favorite requires login then adds and removes', async () => {
   const { identity, favorites } = build();
   await assert.rejects(() => favorites.toggle(10), AppError);
 
-  await identity.registerWithEmail({
-    email: 'fan@example.com',
-    password: 'password1',
-  });
+  await identity.createUser({ username: 'fan@example.com', password: 'password1', role: 'user' });
+  await identity.loginPublic('fan@example.com', 'password1');
 
   assert.equal(await favorites.isFavorite(10), false);
   assert.deepEqual(await favorites.toggle(10), { favorited: true });
@@ -177,10 +175,8 @@ test('toggle favorite requires login then adds and removes', async () => {
 
 test('listMine returns favorited anime summaries', async () => {
   const { identity, favorites } = build();
-  await identity.registerWithEmail({
-    email: 'list@example.com',
-    password: 'password1',
-  });
+  await identity.createUser({ username: 'list@example.com', password: 'password1', role: 'user' });
+  await identity.loginPublic('list@example.com', 'password1');
   await favorites.add(3);
   await favorites.add(7);
   const list = await favorites.listMine();
@@ -191,10 +187,8 @@ test('listMine returns favorited anime summaries', async () => {
 
 test('listMinePage returns bounded pages and clamps an out-of-range page', async () => {
   const { identity, favorites } = build();
-  await identity.registerWithEmail({
-    email: 'pages@example.com',
-    password: 'password1',
-  });
+  await identity.createUser({ username: 'pages@example.com', password: 'password1', role: 'user' });
+  await identity.loginPublic('pages@example.com', 'password1');
   for (let id = 1; id <= 65; id += 1) {
     await favorites.add(id);
   }
@@ -213,10 +207,8 @@ test('listMinePage returns bounded pages and clamps an out-of-range page', async
 
 test('listMinePage normalizes invalid values and caps page size', async () => {
   const { identity, favorites, favoritesRepo } = build();
-  await identity.registerWithEmail({
-    email: 'bounded@example.com',
-    password: 'password1',
-  });
+  await identity.createUser({ username: 'bounded@example.com', password: 'password1', role: 'user' });
+  await identity.loginPublic('bounded@example.com', 'password1');
   await favorites.add(1);
 
   const bounded = await favorites.listMinePage(0, 500);
@@ -232,10 +224,8 @@ test('listMinePage normalizes invalid values and caps page size', async () => {
 
 test('listMinePage falls back after the last page is removed', async () => {
   const { identity, favorites } = build();
-  await identity.registerWithEmail({
-    email: 'delete-page@example.com',
-    password: 'password1',
-  });
+  await identity.createUser({ username: 'delete-page@example.com', password: 'password1', role: 'user' });
+  await identity.loginPublic('delete-page@example.com', 'password1');
   for (let id = 1; id <= 21; id += 1) await favorites.add(id);
   const lastPage = await favorites.listMinePage(2, 20);
   assert.equal(lastPage.items.length, 1);

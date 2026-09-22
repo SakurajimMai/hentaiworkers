@@ -17,11 +17,11 @@ export default async function VerifyEmailPage({ searchParams }: {
   const email = typeof sp.email === 'string' ? sp.email : '';
   const token = typeof sp.token === 'string' ? sp.token : '';
   const next = normalizePublicNext(sp.next, '/favorites');
-  const retryAfter = getSystemSettingsService().verificationRetryAfter(email);
+  const retryAfter = await getSystemSettingsService().verificationRetryAfter(email);
   return (
     <div className="mx-auto max-w-md px-4 py-16 space-y-5">
       <h1 className="section-title text-3xl">验证邮箱</h1>
-      <p className="font-ui text-sm text-soft">输入注册邮箱收到的六位验证码，验证通过后账号才会激活。验证码最多十分钟内有效。</p>
+      <p className="font-ui text-sm text-soft">输入注册邮箱收到的六位验证码，验证通过后才会创建账号，完成注册。验证码最多十分钟内有效。</p>
       {sp.error && <p className="notice-error">{sp.error === 'rate' ? '尝试次数过多，请稍后再试。' : sp.error === 'send' ? '邮件发送失败，请稍后重新发送。' : '验证码无效、已使用或已过期，请检查邮箱或重新发送。'}</p>}
       {sp.ok === 'sent' && <p className="notice-success">若该邮箱有待验证的注册申请，新的验证码已发送，请检查收件箱和垃圾邮件。</p>}
       <ValidatedForm action={actionVerifyEmail} className="surface-panel p-6 space-y-4">

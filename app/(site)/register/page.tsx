@@ -74,7 +74,7 @@ export default async function RegisterPage({
 
   const service = getSystemSettingsService();
   const auth = await service.getPublicAuthConfig();
-  const retryAfter = service.verificationRetryAfter(awaitingCode);
+  const retryAfter = await service.verificationRetryAfter(awaitingCode);
 
   return (
     <div className="mx-auto max-w-md px-4 sm:px-6 py-12 sm:py-16">
@@ -98,8 +98,7 @@ export default async function RegisterPage({
       )}
 
       {awaitingCode ? (
-        // The account is created but inactive until this code is accepted. Registration being
-        // closed meanwhile must not strand someone who already has a code in their inbox.
+        // Only a pending request exists. The server creates the user after accepting the code.
         <>
           <ValidatedForm action={actionVerifyEmail} className="surface-panel p-6 sm:p-7 space-y-4">
             <input type="hidden" name="next" value={next} />
@@ -122,7 +121,7 @@ export default async function RegisterPage({
                 placeholder="六位数字"
               />
               <p className="mt-2 font-ui text-[12px] leading-relaxed text-soft">
-                {error === 'send' ? `验证码未能发送至 ${awaitingCode}，请等待倒计时结束后重试。` : `验证码已发送至 ${awaitingCode}，十分钟内有效；验证通过后账号才会激活。`}
+                {error === 'send' ? `验证码未能发送至 ${awaitingCode}，请等待倒计时结束后重试。` : `验证码已发送至 ${awaitingCode}，十分钟内有效；验证通过后才会创建账号，完成注册。`}
               </p>
             </div>
             <button type="submit" className="btn-ink w-full">

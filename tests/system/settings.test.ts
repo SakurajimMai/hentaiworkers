@@ -1,3 +1,4 @@
+import type { PendingRegistration, PendingRegistrationRepository } from '../../lib/server/system/ports/pending-registration-repository';
 import { AuthRateLimiter } from '../../lib/server/identity/application/auth-rate-limit';
 import type { SendMailInput } from '../../lib/server/system/application/mailer';
 import assert from 'node:assert/strict';
@@ -284,6 +285,34 @@ class MemoryTokens implements EmailVerificationTokenRepository {
   }
 }
 
+class MemoryRegistrations implements PendingRegistrationRepository {
+  rows: PendingRegistration[] = [];
+  private sentAt = new Map<string, number>();
+  constructor(private users: UserRepository, private now: () => number) {}
+  async findByEmail(email: string) { return this.rows.find(row => row.email === email) ?? null; }
+  async retryAfter(email: string) {
+    const sent = this.sentAt.get(email);
+    return sent === undefined ? 0 : Math.max(0, Math.ceil((sent + 120_000 - this.now()) / 1000));
+  }
+  async save(input: PendingRegistration) {
+    const retry = await this.retryAfter(input.email);
+    if (retry) return retry;
+    this.rows = this.rows.filter(row => row.email !== input.email);
+    this.rows.push(input);
+    this.sentAt.set(input.email, this.now());
+    return 0;
+  }
+  async complete(hash: Uint8Array) {
+    const row = this.rows.find(row => Buffer.from(row.tokenHash).equals(Buffer.from(hash)) && row.expiresAt.getTime() > Date.now());
+    if (!row) return null;
+    // Consume before awaiting, mirroring the adapter's transaction lock.
+    this.rows = this.rows.filter(item => item !== row);
+    const user = await this.users.create({ username: row.email, passwordHash: row.passwordHash, displayName: row.displayName, role: 'user', isActive: 1 });
+    this.sentAt.delete(row.email);
+    return user.id;
+  }
+}
+
 class MemoryUsers implements UserRepository {
   private seq = 1;
   private readonly rows = new Map<number, UserRecord>();
@@ -362,6 +391,7 @@ function buildService(fetchImpl?: typeof fetch) {
   const users = new MemoryUsers();
   const sessions = new MemorySession();
   const tokens = new MemoryTokens(users);
+  const registrations = new MemoryRegistrations(users, () => now);
   const sent: SendMailInput[] = [];
   let failMail = false;
   const identity = new IdentityService(
@@ -371,6 +401,7 @@ function buildService(fetchImpl?: typeof fetch) {
   );
   const service = new SystemSettingsService(settings, tokens, cipher, identity, {
     siteUrl: 'https://example.com',
+    registrations,
     fetchImpl,
     rateLimiter: new AuthRateLimiter({ now: () => now }),
     sendMail: async (_smtp, message) => {
@@ -378,7 +409,7 @@ function buildService(fetchImpl?: typeof fetch) {
       sent.push(message);
     },
   });
-  return { service, settings, identity, users, sessions, tokens, sent, setMailFailure: (fail: boolean) => { failMail = fail; }, advance: (ms: number) => { now += ms; } };
+  return { service, settings, identity, users, sessions, tokens, registrations, sent, setMailFailure: (fail: boolean) => { failMail = fail; }, advance: (ms: number) => { now += ms; } };
 }
 
 test('registration closed and whitelist enforced', async () => {
@@ -417,7 +448,7 @@ test('registration closed and whitelist enforced', async () => {
     password: 'password1',
   });
   assert.equal(ok.needsVerification, true);
-  assert.equal(ok.user.username, 'x@allowed.com');
+  assert.equal(ok.email, 'x@allowed.com');
 });
 
 test('global meta settings round-trip, survive unrelated updates and can be removed', async () => {
@@ -561,28 +592,31 @@ async function pendingRegistration(email = 'code@example.com') {
   return { ...fixture, result, code, email };
 }
 
-test('registration requires an email-bound code before activation and session creation', async () => {
-  const { service, result, sessions, tokens, code, email } = await pendingRegistration();
+test('registration creates no user before verification, and requires login after completion', async () => {
+  const { service, result, sessions, registrations, users, code, email } = await pendingRegistration();
   assert.equal(result.needsVerification, true);
-  assert.equal(result.user.isActive, 0);
+  assert.equal((await users.list()).length, 0);
   assert.equal(sessions.data.isLoggedIn, false);
-  await assert.rejects(() => service.loginPublic({ emailOrUsername: email, password: 'password1' }));
-  assert.equal(tokens.rows[0].tokenHash.length, 32);
+  assert.equal(await service.loginPublic({ emailOrUsername: email, password: 'password1' }), null);
+  assert.equal(registrations.rows[0].tokenHash.length, 32);
   await assert.rejects(() => service.verifyEmailCode('other@example.com', code));
   const user = await service.verifyEmailCode(email.toUpperCase(), code);
   assert.equal(user.isActive, 1);
-  assert.equal(sessions.data.userId, user.id);
+  assert.equal((await users.list()).length, 1);
+  assert.equal(sessions.data.isLoggedIn, false);
+  assert.equal((await service.loginPublic({ emailOrUsername: email, password: 'password1' }))?.id, user.id);
   await assert.rejects(() => service.verifyEmailCode(email, code));
 });
 
 test('expired codes fail; resend replaces old credentials and verifies only once', async () => {
-  const { service, tokens, sent, email, advance } = await pendingRegistration();
-  tokens.rows[0] = { ...tokens.rows[0], expiresAt: new Date(0).toISOString() };
+  const { service, registrations, sent, email, advance, users } = await pendingRegistration();
+  registrations.rows[0] = { ...registrations.rows[0], expiresAt: new Date(0) };
   const expiredCode = sent[0].text.match(/\d{6}/)![0];
   await assert.rejects(() => service.verifyEmailCode(email, expiredCode));
+  assert.equal((await users.list()).length, 0);
   advance(120_000);
   await service.resendVerification(email);
-  assert.equal(tokens.rows.length, 1);
+  assert.equal(registrations.rows.length, 1);
   assert.equal(sent.length, 2);
   const code = sent[1].text.match(/\d{6}/)![0];
   const results = await Promise.allSettled([service.verifyEmailCode(email, code), service.verifyEmailCode(email, code)]);
@@ -617,7 +651,7 @@ test('legacy token endpoint cannot bypass the email-code attempt limit', async (
 
 test('initial verification and resends share a 120 second cooldown across IPs', async () => {
   const { service, email, sent, advance } = await pendingRegistration();
-  assert.equal(service.verificationRetryAfter(email), 120);
+  assert.equal(await service.verificationRetryAfter(email), 120);
   advance(119_000);
   await assert.rejects(() => service.resendVerification(email.toUpperCase(), '192.0.2.10'),
     (error: unknown) => error instanceof AppError && error.details?.retryAfterSeconds === 1);
@@ -625,20 +659,21 @@ test('initial verification and resends share a 120 second cooldown across IPs', 
   advance(1000);
   await service.resendVerification(email, '192.0.2.11');
   assert.equal(sent.length, 2);
-  assert.equal(service.verificationRetryAfter(email), 120);
+  assert.equal(await service.verificationRetryAfter(email), 120);
   await assert.rejects(() => service.resendVerification(email, '192.0.2.12'),
     (error: unknown) => error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED');
 });
 
 
-test('failed initial delivery leaves a recoverable pending account and enforces cooldown', async () => {
-  const { service, setMailFailure, advance, sent, tokens } = buildService();
+test('failed delivery creates no account and can be retried after the persistent cooldown', async () => {
+  const { service, setMailFailure, advance, sent, registrations, users } = buildService();
   await service.update({ smtp: { enabled: true, host: 'smtp.example.com', fromEmail: 'sender@example.com' } });
   setMailFailure(true);
   await assert.rejects(() => service.registerPublic({ email: 'retry@example.com', password: 'password1' }),
     (error: unknown) => error instanceof AppError && error.details?.field === 'verificationMail');
-  assert.equal(tokens.rows.length, 1);
-  assert.equal(service.verificationRetryAfter('retry@example.com'), 120);
+  assert.equal(registrations.rows.length, 1);
+  assert.equal((await users.list()).length, 0);
+  assert.equal(await service.verificationRetryAfter('retry@example.com'), 120);
   await assert.rejects(() => service.resendVerification('retry@example.com'),
     (error: unknown) => error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED');
   setMailFailure(false);

@@ -148,17 +148,12 @@ export class IdentityService {
     await this.users.update(id, patch);
   }
 
-  /**
-   * Public site registration: email is stored as username (unique login id).
-   * Role is always `user` — cannot self-elevate to admin.
-   */
-  async registerWithEmail(input: {
+  /** Validate and hash a registration request without creating a user or session. */
+  async prepareRegistration(input: {
     email: string;
     password: string;
     displayName?: string | null;
-    isActive?: number;
-    autoLogin?: boolean;
-  }): Promise<UserRecord> {
+  }): Promise<{ email: string; passwordHash: string; displayName: string | null }> {
     const email = normalizeEmail(input.email);
     if (!isValidEmail(email)) {
       throw new AppError('RESULT_INVALID', '请输入有效邮箱', 400, false, { field: 'email' });
@@ -166,22 +161,14 @@ export class IdentityService {
     if (input.password.length < 8) {
       throw new AppError('RESULT_INVALID', '密码至少 8 位', 400, false, { field: 'password' });
     }
-    const existing = await this.users.findByUsername(email);
-    if (existing) {
+    if (await this.users.findByUsername(email)) {
       throw new AppError('RESULT_CONFLICT', '该邮箱已注册', 409, false, { field: 'email' });
     }
-    const isActive = input.isActive ?? 1;
-    const user = await this.users.create({
-      username: email,
+    return {
+      email,
       passwordHash: await this.passwords.hash(input.password),
-      role: 'user',
-      displayName: input.displayName?.trim() || email.split('@')[0] || null,
-      isActive,
-    });
-    if (input.autoLogin !== false && isActive === 1) {
-      await this.establishSession(user);
-    }
-    return user;
+      displayName: (input.displayName?.trim() || email.split('@')[0]).slice(0, 64),
+    };
   }
 
   /** Public login: email or username + password. */

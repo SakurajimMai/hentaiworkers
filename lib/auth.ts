@@ -34,7 +34,7 @@ export async function registerPublicUser(input: {
   displayName?: string | null;
 }) {
   const { getSystemSettingsService } = await import('./server/system');
-  return (await getSystemSettingsService().registerPublic(input)).user;
+  return getSystemSettingsService().registerPublic(input);
 }
 
 export async function requireUser(): Promise<UserRecord> {

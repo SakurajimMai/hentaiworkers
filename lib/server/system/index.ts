@@ -1,3 +1,4 @@
+import type { PendingRegistrationRepository } from './ports/pending-registration-repository';
 import { createRequire } from 'node:module';
 import {
   AesGcmSecretCipher,
@@ -21,6 +22,7 @@ let overrides: {
   tokens?: EmailVerificationTokenRepository;
   cipher?: SecretCipher;
   passwordResets?: PasswordResetRepository;
+  registrations?: PendingRegistrationRepository;
 } = {};
 
 function defaultSettingsRepo(): SystemSettingsRepository {
@@ -35,6 +37,13 @@ function defaultTokenRepo(): EmailVerificationTokenRepository {
     MariaDbEmailVerificationTokenRepository: new () => EmailVerificationTokenRepository;
   };
   return new mod.MariaDbEmailVerificationTokenRepository();
+}
+
+function defaultRegistrations(): PendingRegistrationRepository {
+  const mod = require('../infrastructure/database/mariadb-pending-registration-repository') as {
+    MariaDbPendingRegistrationRepository: new () => PendingRegistrationRepository;
+  };
+  return new mod.MariaDbPendingRegistrationRepository();
 }
 
 function defaultPasswordResets(): PasswordResetRepository {
@@ -61,6 +70,7 @@ export function getSystemSettingsService(): SystemSettingsService {
       {
         siteUrl: process.env.SITE_URL,
         passwordResets: overrides.passwordResets ?? defaultPasswordResets(),
+        registrations: overrides.registrations ?? defaultRegistrations(),
       },
     );
   }
@@ -78,6 +88,7 @@ export function setSystemSettingsDependenciesForTests(deps?: {
   tokens?: EmailVerificationTokenRepository;
   cipher?: SecretCipher;
   passwordResets?: PasswordResetRepository;
+  registrations?: PendingRegistrationRepository;
 }): void {
   overrides = deps ?? {};
   service = undefined;

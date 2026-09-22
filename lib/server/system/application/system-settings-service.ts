@@ -1,3 +1,4 @@
+import type { PendingRegistration, PendingRegistrationRepository } from '../ports/pending-registration-repository';
 import { randomBytes, randomInt } from 'node:crypto';
 import { resolveSiteUrl } from '@/lib/site-url';
 import type { SecretCipher } from '../../shared/secret-cipher';
@@ -118,6 +119,7 @@ export class SystemSettingsService {
       passwordResets?: PasswordResetRepository;
       rateLimiter?: AuthRateLimiter;
       sendMail?: typeof sendSmtpMail;
+      registrations?: PendingRegistrationRepository;
     },
   ) {}
 
@@ -394,7 +396,7 @@ export class SystemSettingsService {
   }
 
   /**
-   * Public registration with whitelist + optional Turnstile + mandatory email code verification.
+   * Start an email verification request. This must never create a user or session.
    */
   async registerPublic(input: {
     email: string;
@@ -402,37 +404,48 @@ export class SystemSettingsService {
     displayName?: string | null;
     turnstileToken?: string | null;
     remoteIp?: string | null;
-  }): Promise<Readonly<{ user: UserRecord; needsVerification: boolean }>> {
+  }): Promise<Readonly<{ email: string; needsVerification: true }>> {
     this.assertNotRateLimited('register', input.remoteIp, input.email);
     this.assertNotRateLimited('register', input.remoteIp, null);
     await this.assertRegistrationAllowed(input.email);
     await this.assertTurnstileIfRequired('register', input.turnstileToken, input.remoteIp);
 
     const settings = await this.getSettings();
-    const needsVerification = true;
-
-    // Validate mail readiness before creating any pending account.
     assertSmtpConfigured(settings.smtp, settings.smtp.password ? decryptSmtpPassword(this.cipher, settings.smtp.password) : null);
+    const registration = await this.identity.prepareRegistration(input);
+    await this.issueRegistrationCode(registration);
+    return { email: registration.email, needsVerification: true };
+  }
 
-    const user = await this.identity.registerWithEmail({
-      email: input.email,
-      password: input.password,
-      displayName: input.displayName,
-      isActive: 0,
-      autoLogin: false,
+  private pendingRegistrations(): PendingRegistrationRepository {
+    if (!this.options?.registrations) throw new AppError('CONFIG_INVALID', '注册验证存储未配置', 503);
+    return this.options.registrations;
+  }
+
+  private async issueRegistrationCode(input: Pick<PendingRegistration, 'email' | 'passwordHash' | 'displayName'>): Promise<void> {
+    const settings = await this.getSettings();
+    const smtp = assertSmtpConfigured(settings.smtp, settings.smtp.password ? decryptSmtpPassword(this.cipher, settings.smtp.password) : null);
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const ttlMinutes = Math.min(10, settings.trust.verificationTokenTtlMinutes);
+    const retryAfterSeconds = await this.pendingRegistrations().save({
+      ...input,
+      tokenHash: sha256Bytes(`email-code:${input.email}:${code}`),
+      expiresAt: new Date(Date.now() + ttlMinutes * 60_000),
     });
-
+    if (retryAfterSeconds > 0) {
+      throw new AppError('SOURCE_RATE_LIMITED', '请等待倒计时结束后重新发送', 429, true, { retryAfterSeconds });
+    }
     try {
-      await this.issueAndSendVerification(user);
-    } catch (error) {
-      createLogger().error('Registration verification delivery failed', {
-        userId: user.id,
-        code: error instanceof AppError ? error.code : 'UNKNOWN',
+      await (this.options?.sendMail ?? sendSmtpMail)(smtp, {
+        to: input.email,
+        subject: `[${settings.site.seo.title || 'AnimeStream'}] 注册邮箱验证码`,
+        text: `你的注册验证码是：${code}，${ttlMinutes} 分钟内有效。验证通过后才会创建账号。请勿向他人提供验证码。`,
+        html: `<p>你的注册验证码是：<strong>${code}</strong></p><p>${ttlMinutes} 分钟内有效，验证通过后才会创建账号。请勿向他人提供验证码。</p>`,
       });
+    } catch (error) {
+      createLogger().error('Registration verification delivery failed', { code: error instanceof AppError ? error.code : 'UNKNOWN' });
       throw new AppError('RESULT_INVALID', '验证码发送失败，请重新发送', 502, false, { field: 'verificationMail' });
     }
-
-    return { user, needsVerification };
   }
 
   async loginPublic(input: {
@@ -449,8 +462,12 @@ export class SystemSettingsService {
     return this.identity.loginPublic(input.emailOrUsername, input.password);
   }
 
-  verificationRetryAfter(email: string): number {
-    return (this.options?.rateLimiter ?? getAuthRateLimiter()).verificationRetryAfter(normalizeEmail(email));
+  async verificationRetryAfter(email: string): Promise<number> {
+    if (!isValidEmail(normalizeEmail(email))) return 0;
+    return Math.max(
+      await this.pendingRegistrations().retryAfter(normalizeEmail(email)),
+      (this.options?.rateLimiter ?? getAuthRateLimiter()).verificationRetryAfter(normalizeEmail(email)),
+    );
   }
 
   async issueAndSendVerification(user: UserRecord): Promise<void> {
@@ -487,7 +504,12 @@ export class SystemSettingsService {
     this.assertNotRateLimited('resend_verification', null, normalized);
     this.assertNotRateLimited('resend_verification', remoteIp, null);
     if (!isValidEmail(normalized)) return;
+    const registration = await this.pendingRegistrations().findByEmail(normalized);
     const user = await this.identity.getUserByUsername(normalized);
+    if (!user && registration) {
+      await this.issueRegistrationCode(registration);
+      return;
+    }
     if (!user || user.isActive || user.role !== 'user' || !await this.tokens.hasPendingForUser(user.id)) return;
     await this.issueAndSendVerification(user);
   }
@@ -499,7 +521,15 @@ export class SystemSettingsService {
     if (!isValidEmail(normalized) || !/^\d{6}$/.test(code.trim())) {
       throw new AppError('RESULT_INVALID', '请输入六位邮箱验证码', 400);
     }
-    return this.consumeVerificationHash(sha256Bytes(`email-code:${normalized}:${code.trim()}`));
+    const tokenHash = sha256Bytes(`email-code:${normalized}:${code.trim()}`);
+    const userId = await this.pendingRegistrations().complete(tokenHash);
+    if (userId !== null) {
+      const user = await this.identity.getUserById(userId);
+      if (!user) throw new AppError('INTERNAL_ERROR', '注册结果不可用', 500);
+      return user;
+    }
+    // Existing inactive accounts from older deployments can still finish their verification.
+    return this.consumeVerificationHash(tokenHash);
   }
 
   /**
@@ -610,7 +640,6 @@ export class SystemSettingsService {
     if (!user) {
       throw new AppError('RESULT_INVALID', '用户不存在', 404);
     }
-    await this.identity.establishSession(user);
     return user;
   }
 }
