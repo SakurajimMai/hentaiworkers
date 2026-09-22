@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { TurnstileField } from '@/components/turnstile-field';
@@ -97,7 +98,7 @@ export default async function RegisterPage({
         // The account is created but inactive until this code is accepted. Registration being
         // closed meanwhile must not strand someone who already has a code in their inbox.
         <>
-          <form action={actionVerifyEmail} className="surface-panel p-6 sm:p-7 space-y-4">
+          <ValidatedForm action={actionVerifyEmail} className="surface-panel p-6 sm:p-7 space-y-4">
             <input type="hidden" name="next" value={next} />
             <input type="hidden" name="from" value="/register" />
             <input type="hidden" name="email" value={awaitingCode} />
@@ -124,7 +125,7 @@ export default async function RegisterPage({
             <button type="submit" className="btn-ink w-full">
               完成注册
             </button>
-          </form>
+          </ValidatedForm>
 
           <form action={actionResendVerification} className="mt-4 text-center">
             <input type="hidden" name="next" value={next} />
@@ -143,7 +144,7 @@ export default async function RegisterPage({
           </Link>
         </div>
       ) : (
-        <form action={actionPublicRegister} className="surface-panel p-6 sm:p-7 space-y-4">
+        <ValidatedForm action={actionPublicRegister} className="surface-panel p-6 sm:p-7 space-y-4">
           <input type="hidden" name="next" value={next} />
           <div>
             <label className="admin-label" htmlFor="email">
@@ -193,7 +194,7 @@ export default async function RegisterPage({
           <button type="submit" className="btn-ink w-full">
             发送验证码
           </button>
-        </form>
+        </ValidatedForm>
       )}
 
       <p className="mt-6 font-ui text-sm text-soft text-center">

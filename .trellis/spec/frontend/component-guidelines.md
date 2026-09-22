@@ -61,6 +61,28 @@ Questions to answer:
 - Label carousel regions from their visible heading. Arrow controls need explicit labels and an
   `aria-controls` relationship to the scroll track.
 - Touch scrolling and scroll snapping remain available even when desktop arrow controls are hidden.
+- Use `ConfirmDialog` / `ConfirmSubmitButton` for confirmations. The styled HTML dialog uses
+  `showModal()` for top-layer rendering and background inertness; do not replace it with
+  `window.confirm()` or a fixed child of a clipped/transformed table container.
+- Focus the cancel action when opening. Close the dialog and restore focus synchronously before
+  invoking confirmation callbacks, so `requestSubmit()` can focus an invalid field without later
+  cleanup stealing that focus. Cancellation must never submit; confirmation must submit once.
+- Use `ValidatedForm` instead of `form` when a public/admin form contains constraints (including
+  email/number types and controls inside dynamic editors). It preserves native constraints and
+  server actions while canceling native validation bubbles and displaying field-level messages:
+  ```tsx
+  <ValidatedForm action={actionSaveUser}>
+    <label htmlFor="email">Email</label>
+    <input id="email" name="email" type="email" required />
+    <button type="submit">Save</button>
+  </ValidatedForm>
+  ```
+- Never add `noValidate` or call `form.submit()` merely to remove browser validation bubbles.
+  Invalid forms must remain blocked. Keep server validation authoritative, existing hint IDs intact,
+  and remove only wrapper-owned feedback when a field is corrected, removed, reset or disabled.
+- `npm run test:dialogs:browser` checks cancellation, submit-once, invalid/corrected inputs, dynamic
+  editors, focus restoration/containment, themes, reduced motion and narrow/short viewports.
+  Set `CHROME_PATH` to a local Chromium executable when Chrome is not installed at the default path.
 
 ---
 

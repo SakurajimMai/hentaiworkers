@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth';
 import { listAdminMangaTagUsage } from '@/lib/server/manga-admin';
@@ -88,7 +89,7 @@ export default async function AdminMangaTagsPage({
             </Link>
           )}
         </form>
-        <form action={actionAddMangaTag} className="flex gap-2">
+        <ValidatedForm action={actionAddMangaTag} className="flex gap-2">
           <input
             name="name"
             required
@@ -99,7 +100,7 @@ export default async function AdminMangaTagsPage({
           <button type="submit" className="btn-ink shrink-0">
             新增
           </button>
-        </form>
+        </ValidatedForm>
       </div>
 
       <div className="surface-card overflow-x-auto">
@@ -132,7 +133,7 @@ export default async function AdminMangaTagsPage({
                   <span className="admin-chip">{row.curated ? '常用标签' : '作品使用'}</span>
                 </td>
                 <td>
-                  <form action={actionRenameMangaTag} className="flex flex-wrap items-center gap-2">
+                  <ValidatedForm action={actionRenameMangaTag} className="flex flex-wrap items-center gap-2">
                     <input type="hidden" name="from" value={row.tag} />
                     <input
                       name="to"
@@ -143,7 +144,7 @@ export default async function AdminMangaTagsPage({
                     <button type="submit" className="admin-btn-action !py-1">
                       保存
                     </button>
-                  </form>
+                  </ValidatedForm>
                 </td>
                 <td>
                   <form action={actionDeleteMangaTag}>

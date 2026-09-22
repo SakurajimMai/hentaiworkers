@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import {
   IconChevronLeft,
@@ -139,7 +140,7 @@ export function AdminPagination({
               </span>
             )}
           </nav>
-          <form method="get" action={basePath} className="flex items-center gap-1.5">
+          <ValidatedForm method="get" action={basePath} className="flex items-center gap-1.5">
             {Object.entries(query ?? {}).map(([key, value]) =>
               value && key !== pageParam ? (
                 <input key={key} type="hidden" name={key} value={value} />
@@ -160,7 +161,7 @@ export function AdminPagination({
             <button type="submit" className="btn-ghost !h-10 !px-3 !text-[12px]">
               跳转
             </button>
-          </form>
+          </ValidatedForm>
         </div>
       ) : null}
     </div>

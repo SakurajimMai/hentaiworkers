@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -128,7 +129,7 @@ export default async function AccountPage({
             {formatDate(user.createdAt as Date | string | null | undefined)}
           </p>
         </div>
-        <form action={actionUpdateProfile} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <ValidatedForm action={actionUpdateProfile} className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="flex-1">
             <label className="admin-label" htmlFor="displayName">
               显示名（站内展示，可留空）
@@ -145,7 +146,7 @@ export default async function AccountPage({
           <button type="submit" className="btn-ink shrink-0 !text-[13px]">
             保存资料
           </button>
-        </form>
+        </ValidatedForm>
       </section>
 
       <section className="surface-panel p-5 sm:p-6 space-y-4">
@@ -155,7 +156,7 @@ export default async function AccountPage({
             修改成功后需要用新密码重新登录。
           </p>
         </div>
-        <form action={actionChangeMyPassword} className="grid gap-3 sm:grid-cols-3">
+        <ValidatedForm action={actionChangeMyPassword} className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="admin-label" htmlFor="current">
               当前密码
@@ -202,7 +203,7 @@ export default async function AccountPage({
               更新密码
             </button>
           </div>
-        </form>
+        </ValidatedForm>
       </section>
     </div>
   );

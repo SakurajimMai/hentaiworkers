@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { requireAdmin } from '@/lib/auth';
 import { getSystemSettingsService } from '@/lib/server/system';
@@ -95,7 +96,7 @@ export default async function AdminAccountPage({
         </Link>
       </section>
 
-      <form action={actionChangePassword} className="surface-card p-5 sm:p-6 space-y-4">
+      <ValidatedForm action={actionChangePassword} className="surface-card p-5 sm:p-6 space-y-4">
         <div>
           <h2 className="font-ui text-sm font-semibold text-ink">修改密码</h2>
           <p className="mt-1 font-ui text-[12px] leading-relaxed text-soft">
@@ -153,7 +154,7 @@ export default async function AdminAccountPage({
             管理其他用户
           </Link>
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }

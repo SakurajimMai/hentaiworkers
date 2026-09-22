@@ -591,6 +591,22 @@
   .text-danger {
     color: hsl(var(--danger));
   }
+  .form-field-error {
+    @apply mt-1.5 block max-w-full font-ui text-[12px] leading-relaxed;
+    color: hsl(var(--danger));
+    overflow-wrap: anywhere;
+  }
+  .validated-form [aria-invalid="true"] {
+    border-color: hsl(var(--danger));
+  }
+  .validated-form:has(> .form-field-error) {
+    flex-wrap: wrap;
+  }
+  .validated-form > .form-field-error {
+    flex-basis: 100%;
+    order: 1;
+    grid-column: 1 / -1;
+  }
   .link-danger {
     color: hsl(var(--danger));
     text-underline-offset: 2px;

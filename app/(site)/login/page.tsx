@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { TurnstileField } from '@/components/turnstile-field';
@@ -80,7 +81,7 @@ export default async function LoginPage({
         </div>
       )}
 
-      <form action={actionPublicLogin} className="surface-panel p-6 sm:p-7 space-y-4">
+      <ValidatedForm action={actionPublicLogin} className="surface-panel p-6 sm:p-7 space-y-4">
         <input type="hidden" name="next" value={next} />
         <div>
           <label className="admin-label" htmlFor="email">
@@ -124,7 +125,7 @@ export default async function LoginPage({
         <button type="submit" className="btn-ink w-full">
           登录
         </button>
-      </form>
+      </ValidatedForm>
 
       <p className="mt-6 font-ui text-sm text-soft text-center">
         还没有账号？{' '}

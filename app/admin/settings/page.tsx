@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import { getSystemSettingsService } from '@/lib/server/system';
 import { requireAdmin } from '@/lib/auth';
 import { AdminMangaPublishSecret } from '@/components/admin-manga-publish-secret';
@@ -86,7 +87,7 @@ export default async function AdminSystemSettingsPage({
         </div>
       )}
 
-      <form id="system-settings-form" action={actionSaveSystemSettings} className="space-y-6">
+      <ValidatedForm id="system-settings-form" action={actionSaveSystemSettings} className="space-y-6">
         {/* Registration + whitelist */}
         <section id="registration" className="surface-card scroll-mt-24 p-5 space-y-4">
           <h2 className="font-ui text-sm font-semibold">注册与邮箱白名单</h2>
@@ -682,9 +683,9 @@ SITE_PUBLISH_SECRET=与上方相同的密钥`}</pre>
         <button type="submit" className="btn-ink">
           保存全部设置
         </button>
-      </form>
+      </ValidatedForm>
 
-      <form action={actionSendSmtpTest} className="surface-card p-5 space-y-3 max-w-lg">
+      <ValidatedForm action={actionSendSmtpTest} className="surface-card p-5 space-y-3 max-w-lg">
         <h2 className="font-ui text-sm font-semibold">发送 SMTP 测试邮件</h2>
         <label className="block font-meta text-[12px]">
           收件邮箱
@@ -699,7 +700,7 @@ SITE_PUBLISH_SECRET=与上方相同的密钥`}</pre>
         <button type="submit" className="btn-ghost">
           发送测试
         </button>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }

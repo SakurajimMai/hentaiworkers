@@ -57,11 +57,20 @@ export function ConfirmSubmitButton({
           setOpen(false);
           setPendingForm(null);
           if (form) {
-            // Native submit bypasses the button path and runs the form action.
+            // Request submission preserves native validation and the server action.
             if (typeof form.requestSubmit === 'function') {
               form.requestSubmit();
             } else {
-              form.submit();
+              // A temporary submitter keeps validation in older browsers too.
+              const submitter = document.createElement('button');
+              submitter.type = 'submit';
+              submitter.hidden = true;
+              form.appendChild(submitter);
+              try {
+                submitter.click();
+              } finally {
+                submitter.remove();
+              }
             }
           }
         }}

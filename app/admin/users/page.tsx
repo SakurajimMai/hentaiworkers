@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import { ConfirmSubmitButton } from '@/components/confirm-submit-button';
 import { desc, like, or, sql } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/auth';
@@ -74,7 +75,7 @@ export default async function AdminUsersPage({
         </div>
       </form>
 
-      <form action={actionSaveUser} className="surface-card grid gap-3 p-5 sm:grid-cols-2">
+      <ValidatedForm action={actionSaveUser} className="surface-card grid gap-3 p-5 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <h2 className="font-ui text-sm font-semibold text-ink">创建用户</h2>
         </div>
@@ -120,7 +121,7 @@ export default async function AdminUsersPage({
         <button type="submit" className="btn-ink w-fit sm:col-span-2">
           创建用户
         </button>
-      </form>
+      </ValidatedForm>
 
       <AdminPagination
         page={page}
@@ -168,7 +169,7 @@ export default async function AdminUsersPage({
                     </div>
                   </td>
                   <td>
-                    <form action={actionSaveUser} className="flex flex-wrap items-center gap-2">
+                    <ValidatedForm action={actionSaveUser} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="id" value={u.id} />
                       <input type="hidden" name="username" value={u.username} />
                       <select
@@ -200,7 +201,7 @@ export default async function AdminUsersPage({
                       <button type="submit" className="admin-btn-action !py-1">
                         保存
                       </button>
-                    </form>
+                    </ValidatedForm>
                     {u.role === 'user' && (
                       <form action={actionDeleteUser} className="mt-2">
                         <input type="hidden" name="id" value={u.id} />

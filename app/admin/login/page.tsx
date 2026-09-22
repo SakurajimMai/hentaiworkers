@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
@@ -41,7 +42,7 @@ export default async function AdminLoginPage({
           <div className="notice-error">用户名或密码不正确。</div>
         )}
 
-        <form action={actionLogin} className="surface-panel p-6 sm:p-7 space-y-4">
+        <ValidatedForm action={actionLogin} className="surface-panel p-6 sm:p-7 space-y-4">
           <div>
             <label className="admin-label" htmlFor="username">
               用户名
@@ -71,7 +72,7 @@ export default async function AdminLoginPage({
           <button type="submit" className="btn-ink w-full">
             进入管理中心
           </button>
-        </form>
+        </ValidatedForm>
 
         <p className="text-center font-ui text-sm text-soft">
           <Link

@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { actionResetPassword } from '../auth/actions';
 
@@ -66,7 +67,7 @@ export default async function ResetPasswordPage({
           </Link>
         </div>
       ) : (
-        <form action={actionResetPassword} className="surface-panel p-6 sm:p-7 space-y-4">
+        <ValidatedForm action={actionResetPassword} className="surface-panel p-6 sm:p-7 space-y-4">
           <input type="hidden" name="token" value={token} />
           <div>
             <label className="admin-label" htmlFor="password">
@@ -99,7 +100,7 @@ export default async function ResetPasswordPage({
           <button type="submit" className="btn-ink w-full">
             更新密码
           </button>
-        </form>
+        </ValidatedForm>
       )}
     </div>
   );

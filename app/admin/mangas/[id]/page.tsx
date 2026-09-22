@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { HistoryBackLink } from '@/components/history-back-link';
@@ -159,7 +160,7 @@ export default async function AdminMangaDetailPage({
       )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <form action={actionSaveManga} className="surface-card space-y-5 p-6">
+        <ValidatedForm action={actionSaveManga} className="surface-card space-y-5 p-6">
           <input type="hidden" name="id" value={manga.id} />
           <div>
             <label htmlFor="title" className="admin-label">标题 *</label>
@@ -199,7 +200,7 @@ export default async function AdminMangaDetailPage({
             <button type="submit" className="btn-ink">保存漫画</button>
             <span className="font-ui text-[12px] text-soft">最后更新：{formatDate(manga.updatedAt)}</span>
           </div>
-        </form>
+        </ValidatedForm>
 
         <aside className="space-y-4">
           <div className="surface-card overflow-hidden">

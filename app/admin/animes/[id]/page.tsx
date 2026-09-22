@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { eq } from 'drizzle-orm';
@@ -75,7 +76,7 @@ export default async function AdminAnimeEditPage({
         )}
       </div>
 
-      <form action={actionSaveAnime} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <ValidatedForm action={actionSaveAnime} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         {anime && <input type="hidden" name="id" value={anime.id} />}
 
         {/* Left Column: Main form */}
@@ -269,7 +270,7 @@ export default async function AdminAnimeEditPage({
             </div>
           </div>
         </aside>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }

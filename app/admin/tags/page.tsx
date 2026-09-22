@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import { inArray, like, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { animeTags, tags } from '@/lib/schema';
@@ -77,7 +78,7 @@ export default async function AdminTagsPage({
         </button>
       </form>
 
-      <form
+      <ValidatedForm
         action={actionSaveTag}
         className="surface-card p-5 flex flex-col sm:flex-row gap-3 sm:items-end"
       >
@@ -92,7 +93,7 @@ export default async function AdminTagsPage({
         <button type="submit" className="btn-ink">
           添加
         </button>
-      </form>
+      </ValidatedForm>
 
       <div className="surface-card overflow-x-auto">
         <table className="admin-table">
@@ -109,7 +110,7 @@ export default async function AdminTagsPage({
               <tr key={tag.id}>
                 <td className="tabular text-soft font-mono text-[12px]">{tag.id}</td>
                 <td>
-                  <form action={actionSaveTag} className="flex flex-wrap gap-2 items-center">
+                  <ValidatedForm action={actionSaveTag} className="flex flex-wrap gap-2 items-center">
                     <input type="hidden" name="id" value={tag.id} />
                     <input
                       name="name"
@@ -127,7 +128,7 @@ export default async function AdminTagsPage({
                     <button type="submit" className="admin-btn-action !py-1">
                       保存
                     </button>
-                  </form>
+                  </ValidatedForm>
                 </td>
                 <td>
                   <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-foreground tabular">

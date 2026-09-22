@@ -1,3 +1,4 @@
+import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { actionRequestPasswordReset } from '../auth/actions';
 
@@ -44,7 +45,7 @@ export default async function ForgotPasswordPage({
         </div>
       )}
 
-      <form action={actionRequestPasswordReset} className="surface-panel p-6 sm:p-7 space-y-4">
+      <ValidatedForm action={actionRequestPasswordReset} className="surface-panel p-6 sm:p-7 space-y-4">
         <div>
           <label className="admin-label" htmlFor="email">
             邮箱
@@ -62,7 +63,7 @@ export default async function ForgotPasswordPage({
         <button type="submit" className="btn-ink w-full">
           发送重置链接
         </button>
-      </form>
+      </ValidatedForm>
 
       <p className="font-ui text-sm text-soft text-center">
         <Link href="/login" className="text-ink font-medium underline underline-offset-2 decoration-line hover:decoration-ink">
