@@ -96,11 +96,11 @@ class UnifiedCrawler:
                 'organize_by_date': True
             },
             'database': {
-                'host': '192.168.1.7',
-                'port': 3306,
-                'user': 'root',
-                'password': '123456',
-                'database': 'hentai',
+                'host': os.getenv('DB_HOST', 'localhost'),
+                'port': int(os.getenv('DB_PORT', '3306')),
+                'user': os.getenv('DB_USER', 'root'),
+                'password': os.getenv('DB_PASSWORD', ''),
+                'database': os.getenv('DB_NAME', 'anime'),
                 'charset': 'utf8mb4'
             }
         }
@@ -110,20 +110,20 @@ class UnifiedCrawler:
         db_config = self.config.get('database', {})
         
         # 处理host:port格式
-        host = db_config.get('host', '160.30.208.2:3306')
+        host = db_config.get('host', os.getenv('DB_HOST', 'localhost'))
         if ':' in host:
             host_ip, port = host.split(':', 1)
             port = int(port)
         else:
             host_ip = host
-            port = db_config.get('port', 3306)
+            port = int(db_config.get('port', os.getenv('DB_PORT', '3306')))
         
         self.db_config = {
             'host': host_ip,
             'port': port,
-            'user': db_config.get('user', 'sql23721_hentai'),
-            'password': db_config.get('password', '507877550@lihao'),
-            'database': db_config.get('database', 'sql23721_hentai'),
+            'user': db_config.get('user', os.getenv('DB_USER', 'root')),
+            'password': db_config.get('password', os.getenv('DB_PASSWORD', '')),
+            'database': db_config.get('database', os.getenv('DB_NAME', 'anime')),
             'charset': db_config.get('charset', 'utf8mb4')
         }
     

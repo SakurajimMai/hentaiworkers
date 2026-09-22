@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { BrandMark } from '@/components/brand-mark';
 import { IconClock, IconMenu, IconSearch, IconX } from '@/components/icons';
@@ -14,9 +14,11 @@ import {
 } from '@/lib/client/search-history';
 
 export function SiteHeaderClient({
+  siteTitle = 'AnimeStream',
   accountSlot,
   mobileAccountSlot,
 }: {
+  siteTitle?: string;
   accountSlot: ReactNode;
   mobileAccountSlot?: ReactNode;
 }) {
@@ -25,8 +27,24 @@ export function SiteHeaderClient({
   const [menuOpen, setMenuOpen] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [portalReady, setPortalReady] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    const handleGlobalSlash = (e: KeyboardEvent) => {
+      if (
+        e.key === '/' &&
+        !focused &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)
+      ) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalSlash);
+    return () => window.removeEventListener('keydown', handleGlobalSlash);
+  }, [focused]);
 
   useEffect(() => {
     setPortalReady(true);
@@ -79,14 +97,14 @@ export function SiteHeaderClient({
       <div className="page-shell flex min-h-14 items-center gap-2.5 sm:gap-4 !max-w-6xl">
         <Link
           href="/"
-          aria-label="AnimeStream 首页"
+          aria-label={`${siteTitle} 首页`}
           className="flex items-center gap-2.5 shrink-0 group"
         >
           <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-[8px] bg-[#121318] transition group-hover:scale-[1.03]">
             <BrandMark className="h-8 w-8" />
           </span>
           <span className="hidden sm:inline font-ui text-[14px] font-semibold tracking-tight text-ink">
-            AnimeStream
+            {siteTitle}
           </span>
         </Link>
 
@@ -115,6 +133,7 @@ export function SiteHeaderClient({
               className={`absolute left-3 transition-colors ${focused ? 'text-primary' : 'text-muted-foreground'}`}
             />
             <input
+              ref={inputRef}
               type="search"
               placeholder="搜索里番和漫画"
               value={q}
@@ -132,10 +151,15 @@ export function SiteHeaderClient({
                   : 'border-border hover:border-muted-foreground'
               }`}
             />
+            {!q && !focused && (
+              <span className="pointer-events-none absolute right-3 hidden sm:inline-flex items-center justify-center rounded-[5px] border border-border/80 bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground select-none">
+                /
+              </span>
+            )}
             {q && (
               <button
                 type="button"
-                className="absolute right-2.5 grid h-5 w-5 place-items-center rounded-full text-soft hover:bg-secondary hover:text-ink transition-colors"
+                className="absolute right-2.5 grid h-5 w-5 place-items-center rounded-full text-soft hover:bg-secondary hover:text-ink transition-colors cursor-pointer"
                 aria-label="清空输入"
                 onClick={() => setQ('')}
               >

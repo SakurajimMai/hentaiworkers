@@ -156,8 +156,8 @@ function FavoriteControl({
       aria-pressed={on}
       className={
         on
-          ? 'inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 font-ui text-[12px] font-medium text-accent transition active:scale-[0.98] disabled:opacity-70'
-          : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 font-ui text-[12px] font-medium text-soft transition hover:border-ink/20 hover:bg-secondary active:scale-[0.98] disabled:opacity-70'
+          ? 'inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 font-ui text-[12px] font-medium text-accent transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 active:scale-[0.98] disabled:opacity-70'
+          : 'inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 font-ui text-[12px] font-medium text-soft transition cursor-pointer hover:border-ink/20 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 active:scale-[0.98] disabled:opacity-70'
       }
     >
       <span aria-hidden>{on ? '♥' : '♡'}</span>

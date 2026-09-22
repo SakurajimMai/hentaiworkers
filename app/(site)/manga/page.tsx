@@ -57,11 +57,13 @@ export async function generateMetadata({
       : rankLabel
         ? `漫画${rankLabel}${pageSuffix}`
         : `漫画目录${pageSuffix}`;
+  const seo = await getSiteSeo().catch(() => ({ title: 'AnimeStream', subtitle: '里番与漫画' }));
+  const brand = seo.title || 'AnimeStream';
   const description = tag
-    ? `浏览 AnimeStream 漫画标签「${tag}」下的作品。漫画标签独立于里番标签。`
+    ? `浏览 ${brand} 漫画标签「${tag}」下的作品。漫画标签独立于里番标签。`
     : q
-      ? `在 AnimeStream 中搜索包含“${q}”的漫画作品。`
-      : '浏览 AnimeStream 已发布漫画，按标题或漫画标签查找作品。';
+      ? `在 ${brand} 中搜索包含“${q}”的漫画作品。`
+      : `浏览 ${brand} 已发布漫画，按标题或漫画标签查找作品。`;
   // Paginated listings canonicalise to themselves so crawlers reach every page of the catalog.
   const canonical = buildMangaListHref(page, undefined, tag || undefined, rank);
   // A page past the end renders an empty grid, so it must not be offered as its own landing page.
@@ -77,12 +79,12 @@ export async function generateMetadata({
     description,
     alternates: { canonical },
     openGraph: pageOpenGraph({
-      siteName: (await getSiteSeo()).title,
+      siteName: brand,
       title,
       description,
       type: 'website',
       url: canonical,
-      images: [{ url: '/opengraph-image', alt: 'AnimeStream' }],
+      images: [{ url: '/opengraph-image', alt: brand }],
     }),
     robots: indexable ? indexableRobots : followOnlyRobots,
   };
@@ -115,17 +117,19 @@ export default async function MangaListPage({
   }
 
   let data: Awaited<ReturnType<typeof listMangas>> | null = null;
-  let error: string | null = null;
+  let hasError = false;
   try {
     data = await loadMangaPage(page, q, tag, rank ?? '');
-  } catch (e) {
-    error = e instanceof Error ? e.message : '加载失败';
+  } catch {
+    hasError = true;
   }
 
   const heading = tag ? tag : q ? `「${q}」` : '漫画';
 
   const siteUrl = siteOrigin();
   const listPath = buildMangaListHref(page, undefined, tag || undefined, rank);
+
+  const siteTitle = (await getSiteSeo().catch(() => ({ title: 'AnimeStream' }))).title || 'AnimeStream';
 
   return (
     <div className="page-shell max-w-6xl py-8 sm:py-12 pb-20">
@@ -136,7 +140,7 @@ export default async function MangaListPage({
           name: heading,
           description: tag
             ? `漫画标签「${tag}」`
-            : 'AnimeStream 已发布漫画目录。',
+            : `${siteTitle} 已发布漫画目录。`,
           url: `${siteUrl}${listPath}`,
         }}
       />
@@ -171,18 +175,13 @@ export default async function MangaListPage({
         </nav>
       </header>
 
-      {error && (
-        <div className="mb-8 rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-4 font-ui text-sm text-destructive">
-          {error}
-          {error.includes("doesn't exist") || error.includes('Unknown table') ? (
-            <span className="block mt-1 text-[12px]">
-              请先执行数据库迁移 <code>drizzle/migrations/0014-mangas.sql</code>
-            </span>
-          ) : null}
+      {hasError && (
+        <div className="mb-8 notice-error !text-sm">
+          漫画内容暂时无法加载，请稍后刷新重试。
         </div>
       )}
 
-      {!error && data && data.data.length === 0 && (
+      {!hasError && data && data.data.length === 0 && (
         <div className="surface-panel max-w-2xl px-6 py-12 text-center sm:px-10">
           <p className="font-meta mb-3">没有找到作品</p>
           <h2 className="section-title text-2xl text-ink">

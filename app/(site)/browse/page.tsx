@@ -67,13 +67,15 @@ export async function generateMetadata({
       : popular
         ? `热门里番${pageSuffix}`
         : `最近更新里番${pageSuffix}`;
+  const seo = await getSiteSeo().catch(() => ({ title: 'AnimeStream', subtitle: '里番与漫画' }));
+  const brand = seo.title || 'AnimeStream';
   const description = search
-    ? `在 AnimeStream 中搜索包含“${search}”的里番视频。`
+    ? `在 ${brand} 中搜索包含“${search}”的里番视频。`
     : tag
-      ? `浏览 AnimeStream 的「${tag}」标签作品。`
+      ? `浏览 ${brand} 的「${tag}」标签作品。`
       : popular
-        ? '浏览 AnimeStream 里番片库中近期受欢迎的作品。'
-        : '浏览 AnimeStream 里番片库的最近更新内容。';
+        ? `浏览 ${brand} 里番片库中近期受欢迎的作品。`
+        : `浏览 ${brand} 里番片库的最近更新内容。`;
   const query = new URLSearchParams();
   if (tagId) query.set('tag', String(tagId));
   if (popular) query.set('sort', 'popular');
@@ -92,12 +94,12 @@ export async function generateMetadata({
     description,
     alternates: { canonical },
     openGraph: pageOpenGraph({
-      siteName: (await getSiteSeo()).title,
+      siteName: brand,
       title,
       description,
       type: 'website',
       url: canonical,
-      images: [{ url: '/opengraph-image', alt: 'AnimeStream' }],
+      images: [{ url: '/opengraph-image', alt: brand }],
     }),
     robots: indexable ? indexableRobots : followOnlyRobots,
   };
@@ -116,11 +118,11 @@ export default async function BrowsePage({
   const sort: SortType = sp.sort === 'popular' ? 'popular' : 'latest';
 
   let data: Awaited<ReturnType<typeof listAnimes>> | null = null;
-  let error: string | null = null;
+  let hasError = false;
   try {
     data = await loadBrowsePage(page, search, tagId ?? 0, sort);
-  } catch (e) {
-    error = e instanceof Error ? e.message : '加载失败';
+  } catch {
+    hasError = true;
   }
 
   const heading = search
@@ -155,6 +157,8 @@ export default async function BrowsePage({
     ? interleaveFeedAds(data.data, feedSlots, (item) => String(item.id))
     : null;
 
+  const siteTitle = (await getSiteSeo().catch(() => ({ title: 'AnimeStream' }))).title || 'AnimeStream';
+
   return (
     <div className="pb-20 sm:pb-24">
       <div className="page-shell max-w-6xl pt-8 sm:pt-12">
@@ -162,10 +166,10 @@ export default async function BrowsePage({
           data={{
             '@context': 'https://schema.org',
             '@type': 'CollectionPage',
-            name: `${heading} · AnimeStream`,
+            name: `${heading} · ${siteTitle}`,
             description: tagName
-              ? `AnimeStream「${tagName}」标签下的里番作品。`
-              : 'AnimeStream 里番视频目录，支持按标题、标签和热门程度浏览。',
+              ? `${siteTitle}「${tagName}」标签下的里番作品。`
+              : `${siteTitle} 里番视频目录，支持按标题、标签和热门程度浏览。`,
             url: `${siteOrigin()}${page > 1 ? qs({ page: String(page) }) : '/browse'}`,
           }}
         />
@@ -195,9 +199,9 @@ export default async function BrowsePage({
           </div>
         </div>
 
-        {error && (
+        {hasError && (
           <div className="notice-error !text-sm !py-4">
-            加载失败：{error}
+            里番列表加载失败，请稍后刷新重试。
           </div>
         )}
 

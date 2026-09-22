@@ -129,9 +129,8 @@ export default async function HomePage() {
           fanart: anime.fanart,
         }));
     }
-  } catch (e) {
-    console.error(e);
-    error = e instanceof Error ? e.message : '加载失败';
+  } catch {
+    error = '加载失败';
   }
 
   const siteUrl = resolveSiteUrl(process.env.SITE_URL);
@@ -159,7 +158,7 @@ export default async function HomePage() {
         <div className="space-y-14 sm:space-y-16">
         {error && (
           <div className="notice-error !text-sm">
-            无法加载内容：{error}
+            精选内容暂时加载异常，请稍后刷新重试。
           </div>
         )}
 

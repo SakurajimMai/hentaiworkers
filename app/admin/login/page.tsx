@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { BrandMark } from '@/components/brand-mark';
+import { getSiteSeo } from '@/lib/server/site-metadata';
 import { actionLogin } from '../actions';
 
 export default async function AdminLoginPage({
@@ -10,11 +11,15 @@ export default async function AdminLoginPage({
 }: {
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
-  const session = await getSession();
+  const [session, sp, seo] = await Promise.all([
+    getSession(),
+    searchParams,
+    getSiteSeo().catch(() => ({ title: 'AnimeStream' })),
+  ]);
   if (session.isLoggedIn && session.role === 'admin') {
     redirect('/admin');
   }
-  const sp = await searchParams;
+  const siteTitle = seo.title || 'AnimeStream';
 
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-12">
@@ -25,7 +30,7 @@ export default async function AdminLoginPage({
               <BrandMark className="h-10 w-10" />
             </span>
             <div>
-              <p className="font-ui text-sm font-semibold text-ink leading-tight">AnimeStream</p>
+              <p className="font-ui text-sm font-semibold text-ink leading-tight">{siteTitle}</p>
               <p className="font-meta text-[11px] text-soft">管理控制台</p>
             </div>
           </div>

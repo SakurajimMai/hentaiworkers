@@ -1,11 +1,16 @@
 import { ImageResponse } from 'next/og';
 import { BrandMark } from '@/components/brand-mark';
+import { getSiteSeo } from '@/lib/server/site-metadata';
 
 export const alt = 'AnimeStream 里番与漫画';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export default function OpenGraphImage() {
+export default async function OpenGraphImage() {
+  const seo = await getSiteSeo().catch(() => ({ title: 'AnimeStream', subtitle: '里番与漫画' }));
+  const title = seo.title || 'AnimeStream';
+  const subtitle = seo.subtitle || '里番与漫画';
+
   return new ImageResponse(
     (
       <div
@@ -23,8 +28,8 @@ export default function OpenGraphImage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 34 }}>
           <BrandMark style={{ width: 128, height: 128 }} />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 72, fontWeight: 700 }}>AnimeStream</div>
-            <div style={{ fontSize: 34, marginTop: 18, opacity: 0.7 }}>里番与漫画</div>
+            <div style={{ fontSize: 72, fontWeight: 700 }}>{title}</div>
+            <div style={{ fontSize: 34, marginTop: 18, opacity: 0.7 }}>{subtitle}</div>
           </div>
         </div>
       </div>

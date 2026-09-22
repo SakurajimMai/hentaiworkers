@@ -74,11 +74,12 @@ export async function sendSmtpMail(
 export async function sendSmtpTest(
   smtp: ResolvedSmtp,
   to: string,
+  siteTitle: string = 'AnimeStream',
 ): Promise<void> {
   await sendSmtpMail(smtp, {
     to,
-    subject: '[AnimeStream] SMTP 测试邮件',
-    text: '这是一封来自 AnimeStream 管理后台的 SMTP 配置测试邮件。若你收到此信，说明 SMTP 配置正常。',
-    html: '<p>这是一封来自 <strong>AnimeStream</strong> 管理后台的 SMTP 配置测试邮件。</p><p>若你收到此信，说明 SMTP 配置正常。</p>',
+    subject: `[${siteTitle}] SMTP 测试邮件`,
+    text: `这是一封来自 ${siteTitle} 管理后台的 SMTP 配置测试邮件。若你收到此信，说明 SMTP 配置正常。`,
+    html: `<p>这是一封来自 <strong>${siteTitle}</strong> 管理后台的 SMTP 配置测试邮件。</p><p>若你收到此信，说明 SMTP 配置正常。</p>`,
   });
 }

@@ -18,10 +18,13 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
 export function AdminHeader({
   username,
   logoutAction,
+  siteTitle = 'AnimeStream',
 }: {
   username?: string;
   logoutAction: () => void | Promise<void>;
+  siteTitle?: string;
 }) {
+  const initials = siteTitle.slice(0, 2).toUpperCase() || 'AS';
   return (
     <header className="sticky top-0 z-40 border-b border-border/90 bg-background/88 backdrop-blur-md">
       <div className="admin-shell flex h-[var(--admin-bar-height)] items-center gap-4">
@@ -31,11 +34,11 @@ export function AdminHeader({
         >
           <span className="inline-flex items-center gap-2.5">
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary font-mono text-[11px] font-bold text-primary-foreground shadow-sm transition group-hover:scale-105">
-              AS
+              {initials}
             </span>
             {/* Between `lg` and `xl` the nav needs this space more than the wordmark does. */}
             <span className="flex flex-col leading-none lg:hidden xl:flex">
-              <span className="text-[13px] font-semibold text-ink">AnimeStream</span>
+              <span className="text-[13px] font-semibold text-ink">{siteTitle}</span>
               <span className="font-meta text-[9px] normal-case tracking-normal text-muted-foreground mt-0.5">管理中心</span>
             </span>
           </span>

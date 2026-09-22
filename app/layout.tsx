@@ -3,12 +3,19 @@ import { Suspense } from 'react';
 import { CatalogScrollRestoration } from '@/components/catalog-scroll-restoration';
 import { buildSiteMetadata } from '@/lib/site-seo';
 import { getGlobalMetaTags, getSiteSeo } from '@/lib/server/site-metadata';
+import { resolveSiteUrl } from '@/lib/site-url';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
+  let siteUrl = 'http://localhost:3000';
+  try {
+    siteUrl = resolveSiteUrl(process.env.SITE_URL);
+  } catch {
+    // Fall back to localhost during static prerendering when SITE_URL is unset
+  }
   return {
     ...buildSiteMetadata(await getSiteSeo()),
-    metadataBase: new URL(process.env.SITE_URL || 'http://localhost:3000'),
+    metadataBase: new URL(siteUrl),
   };
 }
 

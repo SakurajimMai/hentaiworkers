@@ -3,13 +3,14 @@ import { SiteHeaderClient } from '@/components/site-header-client';
 import { UserMenu } from '@/components/user-menu';
 import { getIdentityService } from '@/lib/server/identity';
 
-export async function SiteHeader() {
+export async function SiteHeader({ siteTitle }: { siteTitle?: string } = {}) {
   const user = await getIdentityService().getCurrentUser();
   const name = user ? user.displayName || user.username : '';
   const isAdmin = user?.role === 'admin';
 
   return (
     <SiteHeaderClient
+      siteTitle={siteTitle}
       accountSlot={
         user ? (
           <UserMenu name={name} isAdmin={isAdmin} />

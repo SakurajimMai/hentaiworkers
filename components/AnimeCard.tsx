@@ -24,7 +24,11 @@ export function AnimeCard({
   priority?: boolean;
 }) {
   return (
-    <Link href={`/watch/${anime.id}`} className={`group block ${className}`}>
+    <Link
+      href={`/watch/${anime.id}`}
+      className={`group block rounded-[1rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 focus-visible:ring-offset-4 focus-visible:ring-offset-background ${className}`}
+      aria-label={`观看 ${anime.title}`}
+    >
       <div className="poster-frame">
         <AspectRatio ratio={2 / 3}>
           <MediaImage

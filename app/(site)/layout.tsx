@@ -3,6 +3,7 @@ import { SiteHeader } from '@/components/site-header';
 import { WatchProgressMergeOnLogin } from '@/components/watch-progress-merge';
 import { getIdentityService } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
+import { getSiteSeo } from '@/lib/server/site-metadata';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,17 +23,19 @@ async function readPublicSiteConfig() {
 }
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const [user, site] = await Promise.all([
+  const [user, site, seo] = await Promise.all([
     getIdentityService().getCurrentUser(),
     readPublicSiteConfig(),
+    getSiteSeo(),
   ]);
+  const siteTitle = seo.title || 'AnimeStream';
 
   return (
     <div className="site-shell min-h-dvh bg-background text-foreground flex flex-col">
       <a href="#main-content" className="skip-link">
         跳到主要内容
       </a>
-      <SiteHeader />
+      <SiteHeader siteTitle={siteTitle} />
       <WatchProgressMergeOnLogin enabled={!!user} />
       <main id="main-content" className="flex-1">
         {children}
@@ -42,7 +45,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-8">
             <div className="max-w-sm">
               <p className="font-ui text-[15px] font-semibold tracking-tight text-ink">
-                AnimeStream
+                {siteTitle}
               </p>
             </div>
             <div
@@ -138,7 +141,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border pt-5">
             <p className="font-meta normal-case tracking-normal text-[11px]">
-              © {new Date().getFullYear()} AnimeStream
+              © {new Date().getFullYear()} {siteTitle}
             </p>
             <p className="font-ui text-[12px] text-soft">
               播放依赖源站与网络环境 · 权利归原作者与发行方

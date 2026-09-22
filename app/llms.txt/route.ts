@@ -1,12 +1,17 @@
 import { resolveSiteUrl } from '@/lib/site-url';
+import { getSiteSeo } from '@/lib/server/site-metadata';
 
 export const dynamic = 'force-dynamic';
 
-export function GET() {
-  const siteUrl = resolveSiteUrl(process.env.SITE_URL);
-  const body = `# AnimeStream
+export async function GET() {
+  const [siteUrl, seo] = await Promise.all([
+    resolveSiteUrl(process.env.SITE_URL),
+    getSiteSeo().catch(() => ({ title: 'AnimeStream', subtitle: '里番与漫画' })),
+  ]);
+  const brand = seo.title || 'AnimeStream';
+  const body = `# ${brand}
 
-> AnimeStream is a Chinese-language media catalog for browsing hosted video works and reading published manga content.
+> ${brand} is a Chinese-language media catalog for browsing hosted video works and reading published manga content.
 
 ## Public entry points
 

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: '隐私说明',
-  description: 'AnimeStream 如何处理账号、观看进度与收藏数据。',
+  description: '本站如何处理账号、观看进度与收藏数据。',
   alternates: { canonical: '/privacy' },
 };
 

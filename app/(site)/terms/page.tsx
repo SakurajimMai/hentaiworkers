@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: '使用条款',
-  description: 'AnimeStream 服务使用约定与内容说明。',
+  description: '本站服务使用约定与内容说明。',
   alternates: { canonical: '/terms' },
 };
 
@@ -20,7 +20,7 @@ export default function TermsPage() {
           <section className="space-y-2">
             <h2 className="section-title text-xl text-ink">服务性质</h2>
             <p className="text-soft">
-              AnimeStream 提供在线片库浏览、播放、收藏和观看进度同步。能否顺利播放，取决于作品来源和你当时的网络情况。
+              本站提供在线片库浏览、播放、收藏和观看进度同步。能否顺利播放，取决于作品来源和你当时的网络情况。
             </p>
           </section>
 

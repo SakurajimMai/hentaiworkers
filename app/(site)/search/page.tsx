@@ -4,6 +4,7 @@ import { AnimeCard } from '@/components/AnimeCard';
 import { MangaCard } from '@/components/MangaCard';
 import { listAnimes } from '@/lib/anime-service';
 import { isMangaEnabled, listMangas } from '@/lib/manga-client';
+import { getSiteSeo } from '@/lib/server/site-metadata';
 
 export const revalidate = 60;
 
@@ -14,13 +15,17 @@ export async function generateMetadata({
 }: {
   searchParams: SearchParams;
 }): Promise<Metadata> {
-  const { q: raw } = await searchParams;
+  const [{ q: raw }, seo] = await Promise.all([
+    searchParams,
+    getSiteSeo().catch(() => ({ title: 'AnimeStream' })),
+  ]);
   const q = (raw || '').trim();
+  const brand = seo.title || 'AnimeStream';
   return {
     title: q ? `搜索：${q}` : '搜索',
     description: q
-      ? `在 AnimeStream 中同时搜索包含“${q}”的里番与漫画。`
-      : '搜索 AnimeStream 里番与漫画。',
+      ? `在 ${brand} 中同时搜索包含“${q}”的里番与漫画。`
+      : `搜索 ${brand} 里番与漫画。`,
     alternates: { canonical: '/search' },
     robots: { index: false, follow: true },
   };
@@ -67,12 +72,8 @@ export default async function SearchPage({
 
   const animes = animesResult.status === 'fulfilled' ? animesResult.value : null;
   const mangas = mangasResult.status === 'fulfilled' ? mangasResult.value : null;
-  const animeError = animesResult.status === 'rejected'
-    ? (animesResult.reason instanceof Error ? animesResult.reason.message : '里番搜索失败')
-    : null;
-  const mangaError = mangasResult.status === 'rejected'
-    ? (mangasResult.reason instanceof Error ? mangasResult.reason.message : '漫画搜索失败')
-    : null;
+  const animeError = animesResult.status === 'rejected' ? '里番搜索暂时不可用，请稍后重试。' : null;
+  const mangaError = mangasResult.status === 'rejected' ? '漫画搜索暂时不可用，请稍后重试。' : null;
 
   const animeHits = animes?.data.length ?? 0;
   const mangaHits = mangas?.data.length ?? 0;
@@ -136,7 +137,7 @@ export default async function SearchPage({
             )}
           </div>
           {animeError && (
-            <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-4 font-ui text-sm text-destructive">
+            <div className="notice-error !text-sm">
               {animeError}
             </div>
           )}
@@ -173,7 +174,7 @@ export default async function SearchPage({
               )}
             </div>
             {mangaError && (
-              <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-4 font-ui text-sm text-destructive">
+              <div className="notice-error !text-sm">
                 {mangaError}
               </div>
             )}

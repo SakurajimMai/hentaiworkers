@@ -424,7 +424,7 @@
   }
 
   .btn-ink {
-    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200 cursor-pointer;
     background: hsl(var(--ink));
     color: hsl(var(--background));
     border-radius: 999px;
@@ -448,7 +448,7 @@
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200 cursor-pointer;
     background: transparent;
     color: hsl(var(--ink));
     border: 1px solid hsl(var(--line));
@@ -473,7 +473,7 @@
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200;
+    @apply inline-flex items-center justify-center gap-2 font-ui text-sm font-medium transition-all duration-200 cursor-pointer;
     color: hsl(var(--danger));
     background: hsl(var(--danger-soft));
     border: 1px solid hsl(var(--danger-border));
@@ -790,7 +790,7 @@
   }
 
   .theme-trigger {
-    @apply inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 font-ui text-[12px] text-foreground transition;
+    @apply inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 font-ui text-[12px] text-foreground transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25;
   }
   .theme-trigger:hover {
     background: hsl(var(--secondary));
@@ -802,7 +802,7 @@
     @apply absolute right-0 top-[calc(100%+0.5rem)] z-[60] min-w-28 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-ink;
   }
   .theme-option {
-    @apply flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 font-ui text-[12px] text-foreground transition;
+    @apply flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 font-ui text-[12px] text-foreground transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25;
   }
   .theme-option:hover,
   .theme-option[aria-checked="true"] {

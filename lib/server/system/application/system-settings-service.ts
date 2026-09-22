@@ -319,7 +319,7 @@ export class SystemSettingsService {
       ? decryptSmtpPassword(this.cipher, settings.smtp.password)
       : null;
     const resolved = assertSmtpConfigured(settings.smtp, password);
-    await sendSmtpTest(resolved, to.trim());
+    await sendSmtpTest(resolved, to.trim(), settings.site.seo.title || 'AnimeStream');
   }
 
   /** Whether public manga pages are enabled (no secret exposed). */
@@ -459,9 +459,10 @@ export class SystemSettingsService {
     const expiresAt = new Date(Date.now() + ttlMs);
     await this.tokens.create({ userId: user.id, tokenHash, expiresAt });
 
+    const siteTitle = settings.site.seo.title || 'AnimeStream';
     await (this.options?.sendMail ?? sendSmtpMail)(smtp, {
       to: user.username,
-      subject: '[AnimeStream] 注册邮箱验证码',
+      subject: `[${siteTitle}] 注册邮箱验证码`,
       text: `你的注册验证码是：${code}，${ttlMinutes} 分钟内有效。请勿向他人提供验证码。`,
       html: `<p>你的注册验证码是：<strong>${code}</strong></p><p>${ttlMinutes} 分钟内有效，请勿向他人提供验证码。</p>`,
     });
@@ -528,10 +529,11 @@ export class SystemSettingsService {
         });
         const base = resolveSiteUrl(this.options?.siteUrl || process.env.SITE_URL);
         const link = `${base}/reset-password?token=${encodeURIComponent(rawToken)}`;
+        const siteTitle = settings.site.seo.title || 'AnimeStream';
         try {
           await sendSmtpMail(smtp, {
             to: user.username,
-            subject: '[AnimeStream] 重置密码',
+            subject: `[${siteTitle}] 重置密码`,
             text: `请在 60 分钟内打开链接重置密码：\n\n${link}\n\n若非本人操作请忽略。`,
             html: `<p>请在 60 分钟内打开链接重置密码：</p><p><a href="${link}">${link}</a></p><p>若非本人操作请忽略。</p>`,
           });

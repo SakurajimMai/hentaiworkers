@@ -175,7 +175,7 @@ export function HeroCarousel({
             type="button"
             aria-label="上一张"
             onClick={() => go(active - 1)}
-            className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid"
+            className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
           >
             <IconChevronLeft size={18} />
           </button>
@@ -183,7 +183,7 @@ export function HeroCarousel({
             type="button"
             aria-label="下一张"
             onClick={() => go(active + 1)}
-            className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid"
+            className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
           >
             <IconChevronRight size={18} />
           </button>
@@ -195,7 +195,7 @@ export function HeroCarousel({
                 aria-label={`显示：${item.title}`}
                 aria-current={idx === active ? 'true' : undefined}
                 onClick={() => go(idx)}
-                className={`h-2 rounded-full transition-all duration-300 ${
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
                   idx === active ? 'w-5 bg-white' : 'w-2 bg-white/40'
                 }`}
               />

@@ -67,7 +67,7 @@ export function Pagination({
             <span
               key={it}
               aria-current="page"
-              className={cn(buttonVariants({ variant: 'default', size: 'icon' }), 'tabular')}
+              className={cn(buttonVariants({ variant: 'default', size: 'icon' }), 'tabular !cursor-default')}
             >
               {it}
             </span>

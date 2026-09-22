@@ -100,6 +100,8 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
     // The work page remains usable if recommendations are temporarily unavailable.
   }
 
+  const siteTitle = (await getSiteSeo().catch(() => ({ title: 'AnimeStream' }))).title || 'AnimeStream';
+
   return (
     <div className="page-shell py-7 sm:py-11 pb-20">
       <StructuredData
@@ -117,7 +119,7 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
           inLanguage: 'zh-CN',
           isFamilyFriendly: false,
           bookFormat: 'https://schema.org/GraphicNovel',
-          isPartOf: { '@type': 'CollectionPage', name: 'AnimeStream 漫画目录', url: `${siteOrigin()}/manga` },
+          isPartOf: { '@type': 'CollectionPage', name: `${siteTitle} 漫画目录`, url: `${siteOrigin()}/manga` },
         }}
       />
       <StructuredData

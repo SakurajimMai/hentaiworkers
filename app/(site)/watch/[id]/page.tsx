@@ -179,7 +179,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
                 {anime.createdAt && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 font-ui text-[11px] font-medium text-accent">
                     <IconCalendar size={12} />
-                    {anime.createdAt}
+                    {anime.createdAt.slice(0, 10)}
                   </span>
                 )}
               </div>
