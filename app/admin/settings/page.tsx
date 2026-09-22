@@ -280,7 +280,7 @@ export default async function AdminSystemSettingsPage({
                 value="1"
                 defaultChecked={view.smtp.secure}
               />
-              使用 TLS（secure，常见 465；关闭则多为 587 + STARTTLS）
+              自定义端口使用隐式 TLS（465 自动启用；587 自动使用 STARTTLS）
             </label>
             <label className="block font-meta text-[12px]">
               用户名

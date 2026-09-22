@@ -1,3 +1,4 @@
+import { VerificationResendButton } from '@/components/verification-resend-button';
 import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -71,7 +72,9 @@ export default async function RegisterPage({
     redirect(user.role === 'admin' ? '/admin' : next);
   }
 
-  const auth = await getSystemSettingsService().getPublicAuthConfig();
+  const service = getSystemSettingsService();
+  const auth = await service.getPublicAuthConfig();
+  const retryAfter = service.verificationRetryAfter(awaitingCode);
 
   return (
     <div className="mx-auto max-w-md px-4 sm:px-6 py-12 sm:py-16">
@@ -119,7 +122,7 @@ export default async function RegisterPage({
                 placeholder="六位数字"
               />
               <p className="mt-2 font-ui text-[12px] leading-relaxed text-soft">
-                验证码已发送至 {awaitingCode}，十分钟内有效；验证通过后账号才会激活。
+                {error === 'send' ? `验证码未能发送至 ${awaitingCode}，请等待倒计时结束后重试。` : `验证码已发送至 ${awaitingCode}，十分钟内有效；验证通过后账号才会激活。`}
               </p>
             </div>
             <button type="submit" className="btn-ink w-full">
@@ -131,9 +134,7 @@ export default async function RegisterPage({
             <input type="hidden" name="next" value={next} />
             <input type="hidden" name="from" value="/register" />
             <input type="hidden" name="email" value={awaitingCode} />
-            <button type="submit" className="btn-ghost">
-              没收到？重新发送验证码
-            </button>
+            <VerificationResendButton retryAt={Date.now() + retryAfter * 1000} initialSeconds={retryAfter} />
           </form>
         </>
       ) : !auth.registrationOpen ? (

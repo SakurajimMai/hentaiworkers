@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { AppError } from '../../shared/errors';
+import { createLogger } from '../../shared/logger';
 import type { SmtpSettings } from '../domain/settings';
 
 export type SendMailInput = Readonly<{
@@ -26,10 +27,13 @@ export function assertSmtpConfigured(smtp: SmtpSettings, password: string | null
   if (!smtp.host.trim() || !smtp.fromEmail.trim()) {
     throw new AppError('CONFIG_INVALID', 'SMTP 主机与发件人邮箱必填', 400);
   }
+  if (smtp.username.trim() && !password) {
+    throw new AppError('CONFIG_INVALID', 'SMTP 已配置登录账号但未配置密码', 400);
+  }
   return {
     host: smtp.host.trim(),
     port: smtp.port,
-    secure: smtp.secure,
+    secure: smtp.port === 465 ? true : smtp.port === 587 ? false : smtp.secure,
     username: smtp.username.trim(),
     password: password ?? '',
     fromEmail: smtp.fromEmail.trim(),
@@ -45,6 +49,9 @@ export async function sendSmtpMail(
     host: smtp.host,
     port: smtp.port,
     secure: smtp.secure,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
     auth: smtp.username
       ? {
           user: smtp.username,
@@ -64,6 +71,11 @@ export async function sendSmtpMail(
       html: message.html,
     });
   } catch (error) {
+    const failure = error as { code?: string; command?: string; responseCode?: number };
+    createLogger().error('SMTP delivery failed', {
+      host: smtp.host, port: smtp.port, secure: smtp.secure,
+      code: failure?.code, command: failure?.command, responseCode: failure?.responseCode,
+    });
     const msg = error instanceof Error ? error.message : String(error);
     throw new AppError('RESULT_INVALID', `邮件发送失败: ${msg}`, 502);
   } finally {

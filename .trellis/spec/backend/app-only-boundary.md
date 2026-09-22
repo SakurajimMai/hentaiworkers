@@ -215,6 +215,11 @@ import type { SecretCipher } from '../shared/secret-cipher';
   expiry. Verify/resend limit both email and IP. Activation and token consumption are one atomic
   SQL update and accept only inactive ordinary users. Legacy link tokens must match the original
   43-character base64url format, so they cannot bypass code-attempt limits using code hash inputs.
+- Initial verification delivery and resends share a normalized-email 120-second cooldown,
+  consumed before asynchronous delivery work, including failed sends. Both code pages read the
+  same process-local limiter for countdowns; this is best-effort across restarts/instances.
+  SMTP port 465 uses implicit TLS, 587 uses STARTTLS, and custom ports honor the configured mode.
+  Log only SMTP diagnostic codes/phase, never credentials, recipients or code contents.
 - Role/status changes revoke pending verification tokens in the same transaction. Verification
   runs via a Server Action (POST), never a render-time GET that mutates sessions.
 - Admin deletion checks authorization in IdentityService, protects all admin targets, locks the

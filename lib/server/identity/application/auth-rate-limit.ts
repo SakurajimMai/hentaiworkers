@@ -25,6 +25,8 @@ export type AuthRateLimitOptions = Readonly<{
   now?: () => number;
 }>;
 
+export const VERIFICATION_RESEND_SECONDS = 120;
+
 const DEFAULT_MAX = 10;
 const DEFAULT_WINDOW_MS = 15 * 60 * 1000;
 
@@ -60,6 +62,18 @@ export class AuthRateLimiter {
       };
     }
     bucket.count += 1;
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  verificationRetryAfter(email: string): number {
+    const bucket = this.buckets.get(`verification_send:${email.trim().toLowerCase()}`);
+    return bucket ? Math.max(0, Math.ceil((bucket.windowStartedAt + VERIFICATION_RESEND_SECONDS * 1000 - this.now()) / 1000)) : 0;
+  }
+
+  consumeVerificationSend(email: string): AuthRateLimitDecision {
+    const retryAfterSeconds = this.verificationRetryAfter(email);
+    if (retryAfterSeconds) return { allowed: false, retryAfterSeconds };
+    this.buckets.set(`verification_send:${email.trim().toLowerCase()}`, { count: 1, windowStartedAt: this.now() });
     return { allowed: true, retryAfterSeconds: 0 };
   }
 

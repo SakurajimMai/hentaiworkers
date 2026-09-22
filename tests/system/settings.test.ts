@@ -355,6 +355,7 @@ class MemoryPasswords implements PasswordHasher {
 }
 
 function buildService(fetchImpl?: typeof fetch) {
+  let now = Date.now();
   const key = randomBytes(32);
   const cipher = new AesGcmSecretCipher(keyringViewFromRecord('k1', { k1: key }));
   const settings = new MemorySettings();
@@ -362,6 +363,7 @@ function buildService(fetchImpl?: typeof fetch) {
   const sessions = new MemorySession();
   const tokens = new MemoryTokens(users);
   const sent: SendMailInput[] = [];
+  let failMail = false;
   const identity = new IdentityService(
     users,
     sessions,
@@ -370,10 +372,13 @@ function buildService(fetchImpl?: typeof fetch) {
   const service = new SystemSettingsService(settings, tokens, cipher, identity, {
     siteUrl: 'https://example.com',
     fetchImpl,
-    rateLimiter: new AuthRateLimiter(),
-    sendMail: async (_smtp, message) => { sent.push(message); },
+    rateLimiter: new AuthRateLimiter({ now: () => now }),
+    sendMail: async (_smtp, message) => {
+      if (failMail) throw new Error('SMTP unavailable');
+      sent.push(message);
+    },
   });
-  return { service, settings, identity, users, sessions, tokens, sent };
+  return { service, settings, identity, users, sessions, tokens, sent, setMailFailure: (fail: boolean) => { failMail = fail; }, advance: (ms: number) => { now += ms; } };
 }
 
 test('registration closed and whitelist enforced', async () => {
@@ -571,10 +576,11 @@ test('registration requires an email-bound code before activation and session cr
 });
 
 test('expired codes fail; resend replaces old credentials and verifies only once', async () => {
-  const { service, tokens, sent, email } = await pendingRegistration();
+  const { service, tokens, sent, email, advance } = await pendingRegistration();
   tokens.rows[0] = { ...tokens.rows[0], expiresAt: new Date(0).toISOString() };
   const expiredCode = sent[0].text.match(/\d{6}/)![0];
   await assert.rejects(() => service.verifyEmailCode(email, expiredCode));
+  advance(120_000);
   await service.resendVerification(email);
   assert.equal(tokens.rows.length, 1);
   assert.equal(sent.length, 2);
@@ -606,4 +612,39 @@ test('legacy token endpoint cannot bypass the email-code attempt limit', async (
   const { service, email, code, sessions } = await pendingRegistration();
   await assert.rejects(() => service.verifyEmailToken(`email-code:${email}:${code}`));
   assert.equal(sessions.data.isLoggedIn, false);
+});
+
+
+test('initial verification and resends share a 120 second cooldown across IPs', async () => {
+  const { service, email, sent, advance } = await pendingRegistration();
+  assert.equal(service.verificationRetryAfter(email), 120);
+  advance(119_000);
+  await assert.rejects(() => service.resendVerification(email.toUpperCase(), '192.0.2.10'),
+    (error: unknown) => error instanceof AppError && error.details?.retryAfterSeconds === 1);
+  assert.equal(sent.length, 1);
+  advance(1000);
+  await service.resendVerification(email, '192.0.2.11');
+  assert.equal(sent.length, 2);
+  assert.equal(service.verificationRetryAfter(email), 120);
+  await assert.rejects(() => service.resendVerification(email, '192.0.2.12'),
+    (error: unknown) => error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED');
+});
+
+
+test('failed initial delivery leaves a recoverable pending account and enforces cooldown', async () => {
+  const { service, setMailFailure, advance, sent, tokens } = buildService();
+  await service.update({ smtp: { enabled: true, host: 'smtp.example.com', fromEmail: 'sender@example.com' } });
+  setMailFailure(true);
+  await assert.rejects(() => service.registerPublic({ email: 'retry@example.com', password: 'password1' }),
+    (error: unknown) => error instanceof AppError && error.details?.field === 'verificationMail');
+  assert.equal(tokens.rows.length, 1);
+  assert.equal(service.verificationRetryAfter('retry@example.com'), 120);
+  await assert.rejects(() => service.resendVerification('retry@example.com'),
+    (error: unknown) => error instanceof AppError && error.code === 'SOURCE_RATE_LIMITED');
+  setMailFailure(false);
+  advance(120_000);
+  await service.resendVerification('retry@example.com');
+  assert.equal(sent.length, 1);
+  const code = sent[0].text.match(/\d{6}/)![0];
+  assert.equal((await service.verifyEmailCode('retry@example.com', code)).isActive, 1);
 });

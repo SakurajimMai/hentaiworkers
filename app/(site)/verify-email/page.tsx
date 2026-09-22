@@ -1,3 +1,5 @@
+import { getSystemSettingsService } from '@/lib/server/system';
+import { VerificationResendButton } from '@/components/verification-resend-button';
 import { ValidatedForm } from '@/components/validated-form';
 import Link from 'next/link';
 import type { Metadata } from 'next';
@@ -15,6 +17,7 @@ export default async function VerifyEmailPage({ searchParams }: {
   const email = typeof sp.email === 'string' ? sp.email : '';
   const token = typeof sp.token === 'string' ? sp.token : '';
   const next = normalizePublicNext(sp.next, '/favorites');
+  const retryAfter = getSystemSettingsService().verificationRetryAfter(email);
   return (
     <div className="mx-auto max-w-md px-4 py-16 space-y-5">
       <h1 className="section-title text-3xl">验证邮箱</h1>
@@ -40,7 +43,7 @@ export default async function VerifyEmailPage({ searchParams }: {
         <label className="admin-label">没收到邮件？填写注册邮箱后重新发送
           <input name="email" type="email" defaultValue={email} required maxLength={64} autoComplete="email" className="admin-input mt-1" />
         </label>
-        <button type="submit" className="btn-ghost">重新发送验证码</button>
+        <VerificationResendButton retryAt={Date.now() + retryAfter * 1000} initialSeconds={retryAfter} />
       </ValidatedForm>
       <p className="font-ui text-sm"><Link href="/register" className="text-accent">返回注册</Link> · <Link href="/login" className="text-accent">去登录</Link></p>
     </div>

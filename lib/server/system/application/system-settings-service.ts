@@ -3,6 +3,7 @@ import { resolveSiteUrl } from '@/lib/site-url';
 import type { SecretCipher } from '../../shared/secret-cipher';
 import { sha256Bytes } from '../../shared/hashing';
 import { AppError } from '../../shared/errors';
+import { createLogger } from '../../shared/logger';
 import {
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
@@ -423,7 +424,11 @@ export class SystemSettingsService {
 
     try {
       await this.issueAndSendVerification(user);
-    } catch {
+    } catch (error) {
+      createLogger().error('Registration verification delivery failed', {
+        userId: user.id,
+        code: error instanceof AppError ? error.code : 'UNKNOWN',
+      });
       throw new AppError('RESULT_INVALID', '验证码发送失败，请重新发送', 502, false, { field: 'verificationMail' });
     }
 
@@ -444,7 +449,16 @@ export class SystemSettingsService {
     return this.identity.loginPublic(input.emailOrUsername, input.password);
   }
 
+  verificationRetryAfter(email: string): number {
+    return (this.options?.rateLimiter ?? getAuthRateLimiter()).verificationRetryAfter(normalizeEmail(email));
+  }
+
   async issueAndSendVerification(user: UserRecord): Promise<void> {
+    const decision = (this.options?.rateLimiter ?? getAuthRateLimiter()).consumeVerificationSend(user.username);
+    if (!decision.allowed) {
+      throw new AppError('SOURCE_RATE_LIMITED', `请 ${decision.retryAfterSeconds} 秒后重新发送验证码`, 429, true,
+        { field: 'rate_limit', retryAfterSeconds: decision.retryAfterSeconds });
+    }
     const settings = await this.getSettings();
     const password = settings.smtp.password
       ? decryptSmtpPassword(this.cipher, settings.smtp.password)
