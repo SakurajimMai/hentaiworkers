@@ -58,6 +58,13 @@ const tailwindConfig = {
         },
         line: 'hsl(var(--line))',
       },
+      // Accent as text pairs with its own foreground token. Only `text-accent` moves; `bg-accent`,
+      // `border-accent` and `ring-accent` keep the brand ember from `colors`.
+      textColor: {
+        accent: {
+          DEFAULT: 'hsl(var(--accent-text))',
+        },
+      },
       boxShadow: {
         soft: '0 2px 10px hsla(var(--shadow-color), 0.08)',
         whisper: '0 1px 0 hsla(var(--shadow-color), 0.04), 0 8px 24px hsla(var(--shadow-color), 0.1)',

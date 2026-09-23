@@ -81,7 +81,11 @@ export default async function AdminAnimesPage({
 
       <form className="surface-card p-3 sm:p-4 flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1 sm:max-w-sm">
+          <label htmlFor="anime-search" className="sr-only">
+            搜索里番
+          </label>
           <input
+            id="anime-search"
             name="q"
             defaultValue={q}
             placeholder="搜索里番标题或日文原名"

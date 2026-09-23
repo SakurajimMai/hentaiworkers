@@ -311,7 +311,7 @@ export default async function AdminMangaDetailPage({
                       </span>
                     </td>
                     <td>
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
                         <Link
                           href={mangaContentHref(manga.id, { chapter: chapter.id, view })}
                           className="admin-btn-action"

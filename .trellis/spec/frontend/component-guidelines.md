@@ -53,10 +53,28 @@ Questions to answer:
   row gets tight instead of letting it wrap out of the bar.
 - Admin rows (bar, compact nav, page body) share `.admin-shell`, and anything sticky below the
   admin header offsets itself by `--admin-header-height` rather than repeating the pixel value.
+- An admin table sits in an `overflow-x-auto` wrapper and every cell that must stay one line says
+  so (`whitespace-nowrap` dates and counts, `truncate` slugs, `shrink-0 whitespace-nowrap` pills
+  and row action buttons, row control clusters without `flex-wrap`). The browser's own min-content
+  width is then the right minimum, and the wrapper scrolls below it; do not add a fixed `min-w`
+  floor, which only forces a scrollbar before it is needed. Dense lists with covers swap to the
+  card list below `lg`. A two-character status must never break across lines.
 
 ---
 
 ## Accessibility
+
+- Every colour used as text pairs with a token that clears WCAG AA (4.5:1 under 18.66px bold /
+  24px) on each surface it sits on, in both themes. The ember accent is a fill colour; as text it
+  resolves through `--accent-text` (Tailwind `text-accent` is wired to it in `textColor`), which is
+  deeper in the light theme because `--accent` itself reads only 3.3–3.7:1 there.
+- Placeholders take `--muted-foreground` from the base layer. Preflight's own rule is
+  `input::placeholder`, so an override needs the same selector to win; a bare `::placeholder` does
+  not. Do not thin the placeholder with an alpha: 75% of the muted token falls to 3.1:1.
+- Controls meet the 24×24 CSS px web target. Keep a small visual (carousel dot, inline text link)
+  and give the control around it `min-h-6`/`h-6 w-6` rather than enlarging the glyph. Quiet text
+  links take `.link-soft`, which carries the target and the hover colour.
+- A search box with only an icon beside it carries an `aria-label`; the placeholder is not its name.
 
 - Label carousel regions from their visible heading. Arrow controls need explicit labels and an
   `aria-controls` relationship to the scroll track.

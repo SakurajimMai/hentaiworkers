@@ -67,7 +67,11 @@ export default async function AdminTagsPage({
       )}
 
       <form className="flex gap-2">
+        <label htmlFor="tag-search" className="sr-only">
+          搜索里番标签
+        </label>
         <input
+          id="tag-search"
           name="q"
           defaultValue={q}
           placeholder="搜索标签名"

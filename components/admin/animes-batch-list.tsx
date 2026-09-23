@@ -38,7 +38,7 @@ export function AnimesBatchList({
       <AdminBatchToolbar action={batchAction} selectedIds={selectedIds} count={count} />
 
       <div className="surface-card overflow-hidden">
-        <div className="space-y-2.5 p-3 md:hidden">
+        <div className="space-y-2.5 p-3 lg:hidden">
           {rows.map((row) => (
             <article key={row.id} className={`admin-mobile-card ${selected.has(row.id) ? '!bg-accent-soft/50 !border-accent/30' : ''}`}>
               <div className="flex items-start gap-3">
@@ -61,7 +61,7 @@ export function AnimesBatchList({
                     <Link href={`/admin/animes/${row.id}`} className="min-w-0 font-ui text-[14px] font-medium leading-snug text-ink hover:underline">
                       {row.title}
                     </Link>
-                    <span className={`status-pill shrink-0 ${row.isActive ? 'status-pill-on' : 'status-pill-off'}`}>
+                    <span className={`status-pill ${row.isActive ? 'status-pill-on' : 'status-pill-off'}`}>
                       {row.isActive ? '上架' : '下架'}
                     </span>
                   </div>
@@ -97,7 +97,7 @@ export function AnimesBatchList({
           {rows.length === 0 && <p className="px-3 py-8 text-center font-ui text-[13px] text-soft">暂无里番</p>}
         </div>
 
-        <div className="hidden overflow-x-auto md:block">
+        <div className="hidden overflow-x-auto lg:block">
           <table className="admin-table">
             <thead>
               <tr>
@@ -135,7 +135,7 @@ export function AnimesBatchList({
                           无图
                         </div>
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 max-w-[22rem]">
                         <Link
                           href={`/admin/animes/${row.id}`}
                           className="font-medium text-ink hover:underline underline-offset-2 block truncate"
@@ -155,7 +155,7 @@ export function AnimesBatchList({
                     </span>
                   </td>
                   <td>
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center gap-1.5">
                       <Link
                         href={`/admin/animes/${row.id}`}
                         className="admin-btn-action"

@@ -187,18 +187,23 @@ export function HeroCarousel({
           >
             <IconChevronRight size={18} />
           </button>
-          <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-ink/40 px-2 py-1 backdrop-blur-sm sm:bottom-5 sm:left-auto sm:right-5 sm:translate-x-0 sm:py-1.5">
+          <div className="absolute bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100%-1rem)] flex-wrap -translate-x-1/2 items-center justify-center rounded-full bg-ink/40 px-1 backdrop-blur-sm sm:bottom-5 sm:left-auto sm:right-5 sm:translate-x-0">
             {items.map((item, idx) => (
+              // The dot stays 8px; the button around it carries the 24px target the pointer needs.
               <button
                 key={item.id}
                 type="button"
                 aria-label={`显示：${item.title}`}
                 aria-current={idx === active ? 'true' : undefined}
                 onClick={() => go(idx)}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-                  idx === active ? 'w-5 bg-white' : 'w-2 bg-white/40'
-                }`}
-              />
+                className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+              >
+                <span
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    idx === active ? 'w-5 bg-white' : 'w-2 bg-white/40'
+                  }`}
+                />
+              </button>
             ))}
           </div>
         </>

@@ -74,7 +74,11 @@ export default async function AdminMangaTagsPage({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form className="flex gap-2">
+          <label htmlFor="manga-tag-search" className="sr-only">
+            搜索漫画标签
+          </label>
           <input
+            id="manga-tag-search"
             name="q"
             defaultValue={q}
             placeholder="搜索标签名"
@@ -133,7 +137,7 @@ export default async function AdminMangaTagsPage({
                   <span className="admin-chip">{row.curated ? '常用标签' : '作品使用'}</span>
                 </td>
                 <td>
-                  <ValidatedForm action={actionRenameMangaTag} className="flex flex-wrap items-center gap-2">
+                  <ValidatedForm action={actionRenameMangaTag} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                     <input type="hidden" name="from" value={row.tag} />
                     <input
                       name="to"

@@ -135,6 +135,7 @@ export function SiteHeaderClient({
             <input
               ref={inputRef}
               type="search"
+              aria-label="搜索里番和漫画"
               placeholder="搜索里番和漫画"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -159,7 +160,7 @@ export function SiteHeaderClient({
             {q && (
               <button
                 type="button"
-                className="absolute right-2.5 grid h-5 w-5 place-items-center rounded-full text-soft hover:bg-secondary hover:text-ink transition-colors cursor-pointer"
+                className="absolute right-2 grid h-6 w-6 place-items-center rounded-full text-soft hover:bg-secondary hover:text-ink transition-colors cursor-pointer"
                 aria-label="清空输入"
                 onClick={() => setQ('')}
               >

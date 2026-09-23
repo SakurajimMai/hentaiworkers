@@ -104,7 +104,7 @@ export default async function LoginPage({
             </label>
             <Link
               href="/forgot-password"
-              className="font-ui text-[12px] text-soft hover:text-ink"
+              className="link-soft font-ui text-[12px]"
             >
               忘记密码？
             </Link>

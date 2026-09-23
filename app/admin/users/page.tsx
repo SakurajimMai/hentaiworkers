@@ -169,7 +169,7 @@ export default async function AdminUsersPage({
                     </div>
                   </td>
                   <td>
-                    <ValidatedForm action={actionSaveUser} className="flex flex-wrap items-center gap-2">
+                    <ValidatedForm action={actionSaveUser} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                       <input type="hidden" name="id" value={u.id} />
                       <input type="hidden" name="username" value={u.username} />
                       <select

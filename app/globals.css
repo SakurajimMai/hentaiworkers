@@ -26,6 +26,10 @@
     /* Single warm accent — desaturated ember */
     --accent: 22 72% 48%;
     --accent-soft: 24 55% 94%;
+    /* The same ember as text. At 48% it reads 3.3–3.7:1 on every light surface, under the 4.5:1
+       small text needs; 38% clears all of them (4.8 on accent-soft, 5.2 on the page, 5.5 on cards).
+       Fills, borders and rings keep --accent. */
+    --accent-text: 22 72% 38%;
     --surface: 40 30% 99%;
     --surface-2: 40 16% 95%;
     --ink: 30 6% 10%;
@@ -61,6 +65,7 @@
     --ring: 40 14% 93%;
     --accent: 22 62% 58%;
     --accent-soft: 22 22% 16%;
+    --accent-text: var(--accent);
     --surface: 240 6% 12%;
     --surface-2: 240 7% 10%;
     --ink: 40 14% 93%;
@@ -95,6 +100,7 @@
       --ring: 40 14% 93%;
       --accent: 22 62% 58%;
       --accent-soft: 22 22% 16%;
+      --accent-text: var(--accent);
       --surface: 240 6% 12%;
       --surface-2: 240 7% 10%;
       --ink: 40 14% 93%;
@@ -177,6 +183,15 @@
 
   p {
     text-wrap: pretty;
+  }
+
+  /* Preflight leaves every placeholder at gray-400, which is 2.5:1 on the light surfaces; the
+     muted token holds 4.9:1 or better in both themes and still reads well below typed text.
+     The selectors match preflight's own `input::placeholder` so this later rule wins. */
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+    opacity: 1;
   }
 
   :focus-visible {
@@ -377,7 +392,7 @@
   }
 
   .admin-btn-action {
-    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12px] font-medium text-foreground transition-all duration-150;
+    @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[12px] font-medium text-foreground transition-all duration-150;
     border: 1px solid hsl(var(--line));
     background: hsl(var(--surface));
   }
@@ -387,7 +402,7 @@
     color: hsl(var(--ink));
   }
   .admin-btn-action-danger {
-    @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12px] font-medium text-danger transition-all duration-150;
+    @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[12px] font-medium text-danger transition-all duration-150;
     border: 1px solid hsl(var(--danger-border));
     background: hsl(var(--danger-soft));
   }
@@ -395,8 +410,10 @@
     filter: brightness(0.96);
   }
 
+  /* A two-character status must read as one word. Squeezed into a narrow table column it used to
+     wrap into a circle with the characters stacked, which reads as a different control entirely. */
   .status-pill {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-normal;
+    @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium tracking-normal;
   }
   .status-pill::before {
     content: "";
@@ -529,9 +546,6 @@
   .admin-mobile-card {
     @apply surface-card p-4;
   }
-  .admin-input::placeholder {
-    color: hsl(var(--muted-foreground) / 0.75);
-  }
   .admin-input:hover {
     border-color: hsl(var(--muted-foreground) / 0.55);
   }
@@ -613,6 +627,12 @@
   }
   .link-danger:hover {
     text-decoration: underline;
+  }
+
+  /* A quiet text link that still meets the 24px control target; size and family come from the
+     surrounding text or the caller. */
+  .link-soft {
+    @apply inline-flex min-h-6 items-center text-soft transition-colors hover:text-ink;
   }
 
   .page-shell {

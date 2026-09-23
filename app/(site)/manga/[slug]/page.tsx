@@ -129,7 +129,7 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
           { name: manga.title, path: `/manga/${manga.id}` },
         ])}
       />
-      <HistoryBackLink href={catalogHref} className="mb-7 inline-flex items-center gap-1.5 font-ui text-[12px] text-soft transition hover:text-ink">
+      <HistoryBackLink href={catalogHref} className="link-soft mb-7 gap-1.5 font-ui text-[12px]">
         <IconArrowLeft size={15} /> 漫画目录
       </HistoryBackLink>
 

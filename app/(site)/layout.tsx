@@ -57,17 +57,17 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 <p className="font-meta mb-2.5">浏览</p>
                 <ul className="space-y-1.5 text-soft">
                   <li>
-                    <Link href="/browse" className="hover:text-ink transition-colors">
+                    <Link href="/browse" className="link-soft">
                       里番
                     </Link>
                   </li>
                   <li>
-                    <Link href="/manga" className="hover:text-ink transition-colors">
+                    <Link href="/manga" className="link-soft">
                       漫画
                     </Link>
                   </li>
                   <li>
-                    <Link href="/history" className="hover:text-ink transition-colors">
+                    <Link href="/history" className="link-soft">
                       历史
                     </Link>
                   </li>
@@ -75,7 +75,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                     <li>
                       <a
                         href={site.androidDownloadUrl}
-                        className="hover:text-ink transition-colors"
+                        className="link-soft"
                         rel="noopener noreferrer"
                         target="_blank"
                       >
@@ -89,17 +89,17 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 <p className="font-meta mb-2.5">账号</p>
                 <ul className="space-y-1.5 text-soft">
                   <li>
-                    <Link href="/favorites" className="hover:text-ink transition-colors">
+                    <Link href="/favorites" className="link-soft">
                       收藏
                     </Link>
                   </li>
                   <li>
-                    <Link href="/login" className="hover:text-ink transition-colors">
+                    <Link href="/login" className="link-soft">
                       登录
                     </Link>
                   </li>
                   <li>
-                    <Link href="/register" className="hover:text-ink transition-colors">
+                    <Link href="/register" className="link-soft">
                       注册
                     </Link>
                   </li>
@@ -109,12 +109,12 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                 <p className="font-meta mb-2.5">关于</p>
                 <ul className="space-y-1.5 text-soft">
                   <li>
-                    <Link href="/privacy" className="hover:text-ink transition-colors">
+                    <Link href="/privacy" className="link-soft">
                       隐私说明
                     </Link>
                   </li>
                   <li>
-                    <Link href="/terms" className="hover:text-ink transition-colors">
+                    <Link href="/terms" className="link-soft">
                       使用条款
                     </Link>
                   </li>
@@ -127,7 +127,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
                     <li>
                       <a
                         href={site.telegramUrl}
-                        className="hover:text-ink transition-colors"
+                        className="link-soft"
                         rel="noopener noreferrer"
                         target="_blank"
                       >

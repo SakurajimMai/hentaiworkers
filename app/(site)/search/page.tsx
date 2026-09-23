@@ -130,7 +130,7 @@ export default async function SearchPage({
             {animes && animeTotal != null && animeTotal > animeHits && (
               <Link
                 href={`/browse?search=${encodeURIComponent(q)}`}
-                className="font-ui text-[12px] text-soft transition hover:text-ink"
+                className="link-soft font-ui text-[12px]"
               >
                 全部里番结果 →
               </Link>
@@ -167,7 +167,7 @@ export default async function SearchPage({
               {mangas && mangaTotal != null && mangaTotal > mangaHits && (
                 <Link
                   href={`/manga?q=${encodeURIComponent(q)}`}
-                  className="font-ui text-[12px] text-soft transition hover:text-ink"
+                  className="link-soft font-ui text-[12px]"
                 >
                   全部漫画结果 →
                 </Link>

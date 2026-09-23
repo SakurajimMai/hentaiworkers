@@ -79,7 +79,7 @@ export default async function AdminMangasPage({
       </form>
 
       <div className="surface-card overflow-hidden">
-        <div className="space-y-2.5 p-3 md:hidden">
+        <div className="space-y-2.5 p-3 lg:hidden">
           {result.data.map((manga) => (
             <article key={manga.id} className="admin-mobile-card">
               <div className="flex gap-3">
@@ -102,7 +102,7 @@ export default async function AdminMangasPage({
                     <Link href={`/admin/mangas/${manga.id}`} className="min-w-0 font-ui text-[14px] font-medium leading-snug text-ink hover:underline">
                       {manga.title}
                     </Link>
-                    <span className={`status-pill shrink-0 ${manga.isPublished ? 'status-pill-on' : 'status-pill-off'}`}>
+                    <span className={`status-pill ${manga.isPublished ? 'status-pill-on' : 'status-pill-off'}`}>
                       {manga.isPublished ? '上架' : '下架'}
                     </span>
                   </div>
@@ -140,7 +140,7 @@ export default async function AdminMangasPage({
           {result.data.length === 0 && <p className="px-3 py-8 text-center font-ui text-[13px] text-soft">暂无漫画</p>}
         </div>
 
-        <div className="hidden overflow-x-auto md:block">
+        <div className="hidden overflow-x-auto lg:block">
           <table className="admin-table">
             <thead>
               <tr>
@@ -167,7 +167,7 @@ export default async function AdminMangasPage({
                       ) : (
                         <div className="h-14 w-10 shrink-0 rounded-md border border-border bg-secondary" />
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 max-w-[22rem]">
                         <Link
                           href={`/admin/mangas/${manga.id}`}
                           className="font-medium text-ink hover:underline underline-offset-2"
@@ -191,7 +191,7 @@ export default async function AdminMangasPage({
                   </td>
                   <td className="whitespace-nowrap text-[12px] text-muted-foreground">{formatDate(manga.updatedAt)}</td>
                   <td>
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center gap-1.5">
                       <Link
                         href={`/admin/mangas/${manga.id}`}
                         className="admin-btn-action"
