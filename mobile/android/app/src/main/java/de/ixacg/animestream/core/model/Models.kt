@@ -137,6 +137,8 @@ data class MangaListResponse(
 data class MangaChapterResponse(
     val manga: MangaChapterManga,
     val chapter: MangaChapterDetail,
+    /** Site setting 阅读页直连图床: load stored page URLs as-is, with no /cdn-img and no prefetch. */
+    val directImages: Boolean = false,
 )
 
 @Serializable

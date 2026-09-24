@@ -129,15 +129,18 @@ object MediaUrlNormalizer {
             ?.toString()
     }
 
-    fun normalize(raw: String?): String? {
+    /**
+     * A usable absolute http(s) address for [raw], left on the host it names. The reader uses this
+     * when the site turns on 阅读页直连图床, so pages skip `/cdn-img` entirely.
+     */
+    fun normalizeDirect(raw: String?): String? {
         val value = raw?.trim().orEmpty()
         if (value.isBlank()) return null
-        val absolute =
-            value.toHttpUrlOrNull()?.toString()
-                ?: runCatching { URI(value).toASCIIString().toHttpUrlOrNull()?.toString() }.getOrNull()
-                ?: return null
-        return rewriteCdnUrl(absolute)
+        return value.toHttpUrlOrNull()?.toString()
+            ?: runCatching { URI(value).toASCIIString().toHttpUrlOrNull()?.toString() }.getOrNull()
     }
+
+    fun normalize(raw: String?): String? = normalizeDirect(raw)?.let { rewriteCdnUrl(it) }
 
     fun split(raw: String?): List<String> = raw.orEmpty().split(',').mapNotNull(::normalize).distinct()
 

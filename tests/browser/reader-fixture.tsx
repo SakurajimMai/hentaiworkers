@@ -6,6 +6,7 @@ const run = params.get('run') || 'default';
 const pageCount = Number(params.get('count') || 80);
 const initialPage = Number(params.get('initial') || 0);
 const omittedPages = new Set((params.get('omitted') || '').split(',').filter(Boolean).map(Number));
+const directImages = params.get('direct') === '1';
 const session = Promise.resolve({ available: true, authenticated: params.get('guest') !== '1' });
 const favorite = Promise.resolve({ available: true, favorited: false });
 const readerAds = Promise.resolve({
@@ -31,6 +32,7 @@ function render(chapterNumber: number) {
       session={session}
       favorite={favorite}
       readerAds={readerAds}
+      directImages={directImages}
     />,
   );
 }

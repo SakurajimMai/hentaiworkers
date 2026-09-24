@@ -121,6 +121,8 @@ data class ReaderContent(
     val currentPage: Int = 0,
     val mangaLoaded: Boolean = true,
     val favoriteLoaded: Boolean = true,
+    /** Pages load straight from their stored URLs; the reader warms and prefetches nothing. */
+    val directImages: Boolean = false,
 ) {
     val chapterIndex: Int = manga.chapters.indexOfFirst { it.number == chapter.number }
     val previousChapter = manga.chapters.getOrNull(chapterIndex - 1)
@@ -164,9 +166,13 @@ private fun MangaChapterResponse.readerManga(chapter: MangaChapterDetail): Manga
     )
 
 private fun MangaChapterResponse.normalizedForReader(): MangaChapterResponse {
+    // Direct mode keeps every page on the host it was stored with; otherwise image hosts under the
+    // site's domain are rewritten to /cdn-img.
+    val normalize: (String?) -> String? =
+        if (directImages) MediaUrlNormalizer::normalizeDirect else MediaUrlNormalizer::normalize
     val normalizedPages =
         chapter.pages.mapNotNull { page ->
-            MediaUrlNormalizer.normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
+            normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
         }.distinctBy { it.index }
     return copy(chapter = chapter.copy(pages = normalizedPages))
 }
@@ -948,7 +954,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                         }
                     }
             }
-            warmReaderTarget(previous.chapter.pages, mangaId, chapterNumber, restoredPage)
+            if (!previous.directImages) warmReaderTarget(previous.chapter.pages, mangaId, chapterNumber, restoredPage)
             activeReaderRequestId = requestId
             updateReaderPrefetchWindow()
             return
@@ -986,6 +992,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
                                 currentPage = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
                                 mangaLoaded = cachedMangaLoaded,
                                 favoriteLoaded = cachedFavoriteLoaded,
+                                directImages = response.directImages,
                             )
                         if (identity.generation != readerRequestGeneration) return@coroutineScope
 
@@ -1057,7 +1064,11 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
         chapterNumber: Double,
         requestedPage: Int,
         preparationRevision: Long = activeReaderPreparationRevision,
-    ) = warmReaderTarget(response.chapter.pages, mangaId, chapterNumber, requestedPage, preparationRevision)
+    ) {
+        // Direct mode loads only what is on screen; there is no target to warm ahead of it.
+        if (response.directImages) return
+        warmReaderTarget(response.chapter.pages, mangaId, chapterNumber, requestedPage, preparationRevision)
+    }
 
     private fun warmReaderTarget(
         pages: List<MangaPage>,
@@ -1129,6 +1140,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
     private fun updateReaderPrefetchWindow(visiblePages: Set<Int>? = null) {
         if (!readerPrefetchActive || activeReaderPreparationRevision != readerPreparationRevision) return
         val content = mutableReader.value.value ?: return
+        if (content.directImages) return
         readerPreviewOwnerRevision = activeReaderPreparationRevision
         readerPreviewPreloader.updateWindow(
             mangaId = content.manga.id,
@@ -1146,7 +1158,7 @@ class AnimeStreamViewModel(private val container: AppContainer) : ViewModel() {
      * touches the active prefetch window, and is cancelled with the reader.
      */
     private fun warmUpcomingChapter(content: ReaderContent) {
-        if (!readerPrefetchActive) return
+        if (!readerPrefetchActive || content.directImages) return
         val next = content.nextChapter ?: return
         if (
             !ReaderLogic.shouldWarmNextChapter(

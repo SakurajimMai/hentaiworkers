@@ -934,6 +934,12 @@ components:
                   type: array
                   items:
                     $ref: "#/components/schemas/MangaPage"
+        directImages:
+          type: boolean
+          description: >-
+            Admin setting 阅读页直连图床. When true, clients load each page from its `imageUrl` as-is,
+            without rewriting to `/cdn-img` and without prefetching; the page URLs themselves are
+            identical in both modes. Absent from older servers, which clients treat as false.
 
   responses:
     ServerError:

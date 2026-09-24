@@ -47,6 +47,7 @@ test('章节 API 保持公开 JSON shape，并只调一次 reader-data', async (
   });
   const handler = createMangaChapterHandler({
     isMangaEnabled: async () => true,
+    loadReaderConfig: async () => ({ directImages: false }),
     loadReaderData: async (identifier, chapterNumber) => {
       loads += 1;
       assert.equal(identifier, '41');
@@ -75,6 +76,7 @@ test('章节 API 保持公开 JSON shape，并只调一次 reader-data', async (
       coverUrl: 'https://image.example/cover.jpg',
     },
     chapter: readerData.chapter,
+    directImages: false,
   });
   finishView?.();
 });
@@ -95,10 +97,12 @@ test('章节 API 在栏目关闭、参数非法或内容不存在时保持 404',
   const disabled = createMangaChapterHandler({
     ...dependencies,
     isMangaEnabled: async () => false,
+    loadReaderConfig: async () => ({ directImages: false }),
   });
   const enabled = createMangaChapterHandler({
     ...dependencies,
     isMangaEnabled: async () => true,
+    loadReaderConfig: async () => ({ directImages: false }),
   });
 
   const disabledResponse = await disabled(
@@ -128,6 +132,7 @@ test('章节 API 查询异常保持 500 且不记录浏览', async () => {
   let schedules = 0;
   const handler = createMangaChapterHandler({
     isMangaEnabled: async () => true,
+    loadReaderConfig: async () => ({ directImages: false }),
     loadReaderData: async () => {
       throw new Error('synthetic chapter failure');
     },
@@ -147,6 +152,7 @@ test('章节 API 查询异常保持 500 且不记录浏览', async () => {
 test('章节 API 浏览统计失败不会改变成功响应', async () => {
   const handler = createMangaChapterHandler({
     isMangaEnabled: async () => true,
+    loadReaderConfig: async () => ({ directImages: false }),
     loadReaderData: async () => readerData,
     recordView: async () => {
       throw new Error('synthetic view failure');
@@ -169,6 +175,7 @@ test('章节 API 无法注册 after task 时仍返回章节', async () => {
   try {
     const handler = createMangaChapterHandler({
       isMangaEnabled: async () => true,
+      loadReaderConfig: async () => ({ directImages: false }),
       loadReaderData: async () => readerData,
       recordView: async () => undefined,
       scheduleAfter: () => {
@@ -183,4 +190,27 @@ test('章节 API 无法注册 after task 时仍返回章节', async () => {
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+test('章节 API 带出「阅读页直连图床」开关，读取失败时回落到代理模式', async () => {
+  const build = (loadReaderConfig: () => Promise<{ directImages: boolean }>) => createMangaChapterHandler({
+    isMangaEnabled: async () => true,
+    loadReaderData: async () => readerData,
+    loadReaderConfig,
+    recordView: async () => undefined,
+    scheduleAfter: () => undefined,
+  });
+
+  const direct = await build(async () => ({ directImages: true }))(new Request('http://fixture.invalid'), requestParams());
+  assert.equal(direct.status, 200);
+  const directBody = await direct.json();
+  assert.equal(directBody.directImages, true);
+  // Direct mode changes how the app loads pages, never the URLs the API hands out.
+  assert.deepEqual(directBody.chapter.pages, readerData.chapter.pages);
+
+  const failing = await build(async () => {
+    throw new Error('settings unavailable');
+  })(new Request('http://fixture.invalid'), requestParams());
+  assert.equal(failing.status, 200);
+  assert.equal((await failing.json()).directImages, false);
 });

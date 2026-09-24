@@ -6,9 +6,19 @@ export type ReaderPageIntersection = Readonly<{
 }>;
 
 export type ReaderImageRequestPolicy = Readonly<{
-  loading: 'eager';
-  fetchPriority: 'high' | 'low';
+  loading: 'eager' | 'lazy';
+  fetchPriority: 'high' | 'low' | 'auto';
 }>;
+
+/**
+ * Direct mode (admin 漫画阅读 → 阅读页直连图床): every page is a plain <img> on its stored URL and
+ * the browser alone decides when it downloads. Native lazy loading still fetches whatever is on
+ * screen immediately; it only keeps a long chapter from requesting every page at once.
+ */
+export const READER_DIRECT_IMAGE_POLICY: ReaderImageRequestPolicy = {
+  loading: 'lazy',
+  fetchPriority: 'auto',
+};
 
 export type ReaderAdRenderPolicy = Readonly<{
   reserveSlot: boolean;

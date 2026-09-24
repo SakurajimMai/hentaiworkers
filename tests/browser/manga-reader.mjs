@@ -256,6 +256,7 @@ async function openScenario(name, options = {}) {
   if (options.restored !== undefined) params.set('restored', String(options.restored));
   if (options.omitted) params.set('omitted', options.omitted.join(','));
   if (options.guest) params.set('guest', '1');
+  if (options.direct) params.set('direct', '1');
   const url = `${origin}/?${params}`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-reader-shell]').waitFor();
@@ -398,6 +399,34 @@ try {
       assert.ok(fixture.record.requests.filter((entry) => entry.index !== 1).every((entry) => entry.attempt === 1));
       await fixture.page.waitForTimeout(1000);
       assert.equal(fixture.record.progress.length, 0);
+    } finally { await fixture.close(); }
+  });
+
+  await test('direct mode renders every page as a plain lazy <img> on its stored URL', async () => {
+    const fixture = await openScenario('direct', { direct: true, count: 40, delay: 60 });
+    try {
+      const run = new URL(fixture.url).searchParams.get('run');
+      const pages = await fixture.page.evaluate(() => [...document.querySelectorAll('[data-page-index]')].map((node) => {
+        const image = node.querySelector('img.reader-image');
+        return {
+          index: Number(node.dataset.pageIndex),
+          src: image?.getAttribute('src') ?? null,
+          loading: image?.getAttribute('loading') ?? null,
+          priority: image?.getAttribute('fetchpriority') ?? null,
+          pending: Boolean(node.querySelector('.reader-image-pending')),
+        };
+      }));
+      assert.equal(pages.length, 40);
+      assert.ok(pages.every((entry) => !entry.pending), 'no admission placeholders: every page is an <img> from the first render');
+      assert.ok(pages.every((entry) => entry.src === `/images/${run}/1/${entry.index}.png`), 'each page loads its stored URL as-is');
+      assert.ok(pages.every((entry) => entry.loading === 'lazy'), 'the browser alone decides when a page downloads');
+      assert.ok(pages.every((entry) => entry.priority === null || entry.priority === 'auto'), 'no scheduler-assigned priorities');
+      await readable(fixture.page, 0);
+      await waitFor(() => fixture.record.ads.length > 0, 'reader ads still follow the first readable page');
+      const upFront = fixture.record.requests.length;
+      assert.ok(upFront < 40, `lazy loading must not request the whole chapter at once (got ${upFront})`);
+      await jump(fixture.page, 30);
+      await readable(fixture.page, 30);
     } finally { await fixture.close(); }
   });
 

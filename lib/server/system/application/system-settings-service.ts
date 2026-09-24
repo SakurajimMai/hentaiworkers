@@ -59,6 +59,7 @@ export type SystemSettingsAdminView = Readonly<{
     enabled: boolean;
     publishSecretConfigured: boolean;
     curatedTags: ReadonlyArray<string>;
+    directImages: boolean;
   }>;
   ads: SystemSettings['ads'];
   hero: SystemSettings['hero'];
@@ -94,6 +95,7 @@ export type SystemSettingsUpdateInput = Readonly<{
     /** Plaintext publish key; empty/undefined keeps previous. */
     publishSecret?: string;
     curatedTags: string[];
+    directImages: boolean;
   }>;
   ads?: Partial<SystemSettings['ads']> & {
     feedSlots?: SystemSettings['ads']['feedSlots'];
@@ -171,6 +173,7 @@ export class SystemSettingsService {
         enabled: s.manga.enabled,
         publishSecretConfigured: s.manga.publishSecret != null,
         curatedTags: s.manga.curatedTags,
+        directImages: s.manga.directImages,
       },
       ads: s.ads,
       hero: s.hero,
@@ -266,6 +269,7 @@ export class SystemSettingsService {
         ...omitUndefined({
           enabled: input.manga?.enabled,
           curatedTags: input.manga?.curatedTags,
+          directImages: input.manga?.directImages,
         }),
         publishSecret: mergeEncryptedSecret(
           current.manga.publishSecret,
@@ -329,6 +333,12 @@ export class SystemSettingsService {
   async isMangaEnabled(): Promise<boolean> {
     const settings = await this.getSettings();
     return settings.manga.enabled;
+  }
+
+  /** Public, non-secret reader switches shared by the web reader and the chapter API. */
+  async getMangaReaderConfig(): Promise<Readonly<{ directImages: boolean }>> {
+    const settings = await this.getSettings();
+    return { directImages: settings.manga.directImages };
   }
 
   /**

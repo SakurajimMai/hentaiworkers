@@ -8,7 +8,7 @@ import {
   type MangaReaderFavoriteState,
   type MangaReaderSessionState,
 } from '@/components/manga-reader';
-import { getMangaReaderData, isMangaEnabled } from '@/lib/manga-client';
+import { getMangaReaderConfig, getMangaReaderData, isMangaEnabled } from '@/lib/manga-client';
 import { recordMangaView } from '@/lib/manga-views';
 import { getIdentityService } from '@/lib/server/identity';
 import { isMangaFavorite } from '@/lib/server/manga-favorites';
@@ -86,9 +86,10 @@ export default async function MangaReadPage({ params }: { params: Params }) {
   const number = parseInt(numberRaw, 10);
   if (!Number.isFinite(number) || number < 1) notFound();
 
-  const [enabled, readerData] = await Promise.all([
+  const [enabled, readerData, readerConfig] = await Promise.all([
     isMangaEnabled(),
     getCachedReaderData(slug, number),
+    getMangaReaderConfig(),
   ]);
   if (!enabled || !readerData) notFound();
   if (slug !== String(readerData.manga.id)) {
@@ -111,6 +112,7 @@ export default async function MangaReadPage({ params }: { params: Params }) {
       session={session}
       favorite={favorite}
       readerAds={readerAds}
+      directImages={readerConfig.directImages}
     />
   );
 }

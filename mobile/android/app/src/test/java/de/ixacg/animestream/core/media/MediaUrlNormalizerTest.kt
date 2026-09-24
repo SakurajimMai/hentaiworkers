@@ -99,6 +99,19 @@ class MediaUrlNormalizerTest {
     }
 
     @Test
+    fun `direct mode keeps an image on its own host where the default path would proxy it`() {
+        val stored = "https://image.${MediaUrlNormalizer.proxiedImageDomain}/manga/1806/1.jpg"
+        assertEquals(stored, MediaUrlNormalizer.normalizeDirect(stored))
+        assertEquals(stored, MediaUrlNormalizer.normalizeDirect("  $stored  "))
+        assertTrue(MediaUrlNormalizer.normalize(stored)!!.startsWith("${MediaUrlNormalizer.origin}/cdn-img/"))
+        // Both paths reject the same unusable entries.
+        for (raw in listOf(null, "", "   ", "not a url", "ftp://image.example/a.jpg")) {
+            assertNull(MediaUrlNormalizer.normalizeDirect(raw))
+            assertNull(MediaUrlNormalizer.normalize(raw))
+        }
+    }
+
+    @Test
     fun `filters empty and invalid media entries`() {
         assertEquals(
             listOf("https://static.other.example/one.jpg", "https://static.other.example/two.jpg"),

@@ -683,3 +683,26 @@ test('failed delivery creates no account and can be retried after the persistent
   const code = sent[0].text.match(/\d{6}/)![0];
   assert.equal((await service.verifyEmailCode('retry@example.com', code)).isActive, 1);
 });
+
+test('reader direct-image switch defaults off, saves from the admin form and reads back publicly', async () => {
+  const { service } = buildService();
+  assert.equal((await service.getAdminView()).manga.directImages, false);
+  assert.deepEqual(await service.getMangaReaderConfig(), { directImages: false });
+
+  await service.update({ manga: { directImages: true } });
+  assert.equal((await service.getAdminView()).manga.directImages, true);
+  assert.deepEqual(await service.getMangaReaderConfig(), { directImages: true });
+
+  // Saving other manga fields leaves the switch where it was.
+  await service.update({ manga: { enabled: true } });
+  assert.equal((await service.getAdminView()).manga.directImages, true);
+
+  await service.update({ manga: { directImages: false } });
+  assert.deepEqual(await service.getMangaReaderConfig(), { directImages: false });
+});
+
+test('stored settings from before the switch existed parse with direct images off', () => {
+  const legacy = parseSystemSettings({ manga: { enabled: true, curatedTags: ['纯爱'] } });
+  assert.equal(legacy.manga.directImages, false);
+  assert.deepEqual(legacy.manga.curatedTags, ['纯爱']);
+});

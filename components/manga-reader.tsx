@@ -26,6 +26,7 @@ import {
   clampReaderPage,
   getReaderAdRenderPolicy,
   getReaderImageRequestPolicy,
+  READER_DIRECT_IMAGE_POLICY,
   getStoredReaderPage,
   isReaderViewportTransition,
   READER_INITIAL_PREFETCH_DELAY_MS,
@@ -67,6 +68,8 @@ type MangaReaderProps = {
   favorite: Promise<MangaReaderFavoriteState>;
   readerAds: Promise<MangaReaderAds>;
   initialPage?: number;
+  /** Admin 阅读页直连图床: plain <img> per page, no admission scheduling or prefetch. */
+  directImages?: boolean;
 };
 
 export function MangaReader(props: MangaReaderProps) {
@@ -83,6 +86,7 @@ function MangaReaderEntry({
   favorite,
   readerAds,
   initialPage = 0,
+  directImages = false,
 }: MangaReaderProps) {
   const boundedInitialPage = pages.find((page) => page.index === initialPage)?.index
     ?? pages[clampReaderPage(initialPage, pages.length)]?.index
@@ -112,12 +116,16 @@ function MangaReaderEntry({
     [chapterNumber, mangaId],
   );
   const totalPages = pageCount || pages.length;
+  const everyPage = useMemo(() => new Set(pages.map((page) => page.index)), [pages]);
 
   const settlePage = useCallback((index: number, result: 'success' | 'error') => {
+    if (directImages) return;
     if (scheduler.settle(index, result)) setAdmittedPages(scheduler.admittedPages);
-  }, [scheduler]);
+  }, [directImages, scheduler]);
 
-  const retryPage = useCallback((index: number) => scheduler.retry(index), [scheduler]);
+  const retryPage = useCallback((index: number) => {
+    if (!directImages) scheduler.retry(index);
+  }, [directImages, scheduler]);
 
   const registerPage = useCallback((index: number, element: HTMLElement | null) => {
     if (element) pageRefs.current.set(index, element);
@@ -154,21 +162,23 @@ function MangaReaderEntry({
       setActivePage(restoredPage);
       setAdsReady(false);
     }
-    const restoredScheduler = new ReaderImageScheduler(indexes, restoredPage, false);
-    setScheduler(restoredScheduler);
-    setAdmittedPages(restoredScheduler.admittedPages);
     if (restoredPage > 0) {
       pageRefs.current.get(restoredPage)?.scrollIntoView(READER_RESTORE_SCROLL_OPTIONS);
     } else {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
+    // Direct mode mounts every page up front; there is nothing to admit or prefetch.
+    if (directImages) return undefined;
+    const restoredScheduler = new ReaderImageScheduler(indexes, restoredPage, false);
+    setScheduler(restoredScheduler);
+    setAdmittedPages(restoredScheduler.admittedPages);
     // Give the critical transfer a short head start. A slow or failed first image
     // cannot hold speculative work indefinitely, and viewport admission bypasses this.
     const prefetchTimer = window.setTimeout(() => {
       if (restoredScheduler.enablePrefetch()) setAdmittedPages(restoredScheduler.admittedPages);
     }, READER_INITIAL_PREFETCH_DELAY_MS);
     return () => window.clearTimeout(prefetchTimer);
-  }, [boundedInitialPage, pages.length, readerKey]);
+  }, [boundedInitialPage, directImages, pages.length, readerKey]);
 
   const refreshViewport = useCallback(() => {
     // IntersectionObserver entries are only deltas. Refresh geometry so long pages
@@ -182,12 +192,12 @@ function MangaReaderEntry({
     const visible = intersections.filter((entry) => entry.bottom > 0 && entry.top < window.innerHeight);
     const next = selectActiveReaderPage(visible, window.innerHeight, activePageRef.current);
     if (next != null) {
-      if (scheduler.updateViewport(next, visible.map((entry) => entry.index))) {
+      if (!directImages && scheduler.updateViewport(next, visible.map((entry) => entry.index))) {
         setAdmittedPages(scheduler.admittedPages);
       }
       commitActivePage(next);
     }
-  }, [commitActivePage, scheduler]);
+  }, [commitActivePage, directImages, scheduler]);
 
   useEffect(() => {
     const nodes = [...pageRefs.current.values()];
@@ -322,7 +332,8 @@ function MangaReaderEntry({
           <ReaderPageList
             title={title}
             pages={pages}
-            admittedPages={admittedPages}
+            admittedPages={directImages ? everyPage : admittedPages}
+            directImages={directImages}
             priorityPage={activePage}
             initialPriorityPage={initialPriorityPage}
             nonCriticalReady={adsReady}
@@ -477,6 +488,7 @@ const ReaderPageList = memo(function ReaderPageList({
   title,
   pages,
   admittedPages,
+  directImages,
   priorityPage,
   initialPriorityPage,
   nonCriticalReady,
@@ -489,6 +501,7 @@ const ReaderPageList = memo(function ReaderPageList({
   title: string;
   pages: ReaderPage[];
   admittedPages: ReadonlySet<number>;
+  directImages: boolean;
   priorityPage: number;
   initialPriorityPage: number;
   nonCriticalReady: boolean;
@@ -513,6 +526,7 @@ const ReaderPageList = memo(function ReaderPageList({
           title={title}
           page={page}
           admitted={admittedPages.has(page.index)}
+          directImages={directImages}
           priority={page.index === priorityPage}
           initialPriority={page.index === initialPriorityPage}
           registerPage={registerPage}
@@ -534,6 +548,7 @@ const ReaderPageItem = memo(function ReaderPageItem({
   title,
   page,
   admitted,
+  directImages,
   priority,
   initialPriority,
   registerPage,
@@ -544,6 +559,7 @@ const ReaderPageItem = memo(function ReaderPageItem({
   title: string;
   page: ReaderPage;
   admitted: boolean;
+  directImages: boolean;
   priority: boolean;
   initialPriority: boolean;
   registerPage: (index: number, element: HTMLElement | null) => void;
@@ -554,7 +570,7 @@ const ReaderPageItem = memo(function ReaderPageItem({
   const elementRef = useRef<HTMLElement | null>(null);
   const readableImage = useRef<HTMLImageElement | null>(null);
   const readableFrame = useRef<number | null>(null);
-  const requestPolicy = getReaderImageRequestPolicy(priority);
+  const requestPolicy = directImages ? READER_DIRECT_IMAGE_POLICY : getReaderImageRequestPolicy(priority);
 
   const setElement = useCallback((element: HTMLElement | null) => {
     elementRef.current = element;

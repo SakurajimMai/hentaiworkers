@@ -114,6 +114,11 @@ export const mangaSettingsSchema = z.object({
    * Shown in admin 漫画标签 and as quick filters on /manga even before use.
    */
   curatedTags: z.array(z.string().min(1).max(40)).max(200).default([]),
+  /**
+   * Reader pages load straight from the stored image URLs on web and Android: no /cdn-img proxy
+   * and no staged loading or prefetch. Off keeps the proxy and the scheduled pipeline.
+   */
+  directImages: z.boolean().default(false),
 });
 
 export const MAX_FEED_ADS = 12;

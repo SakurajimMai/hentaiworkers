@@ -57,6 +57,7 @@ export default async function AdminSystemSettingsPage({
         <a href="#trust">安全验证</a>
         <a href="#player">播放器</a>
         <a href="#ads">广告</a>
+        <a href="#manga-reader">漫画阅读</a>
         <a href="#manga">漫画发布</a>
         <a href="#turnstile">Turnstile</a>
       </nav>
@@ -615,6 +616,27 @@ export default async function AdminSystemSettingsPage({
         </section>
 
         {/* Manga publish */}
+        <section id="manga-reader" className="surface-card scroll-mt-24 p-5 space-y-4">
+          <h2 className="font-ui text-sm font-semibold">漫画阅读</h2>
+          <label className="flex items-start gap-2 font-ui text-sm">
+            <input
+              type="checkbox"
+              name="mangaDirectImages"
+              value="1"
+              defaultChecked={view.manga.directImages}
+              className="mt-0.5"
+            />
+            <span>
+              阅读页直连图床
+              <span className="mt-1 block font-ui text-[12px] leading-relaxed text-soft">
+                开启后，网页和 APK 的漫画阅读页都直接用图片原地址加载：不经过本站{' '}
+                <code className="text-foreground">/cdn-img</code> 代理，也不做分批加载和预取。
+                关闭时恢复代理与预取。APK 需要升级到含此功能的版本才会生效，旧版本仍走代理。
+              </span>
+            </span>
+          </label>
+        </section>
+
         <section id="manga" className="surface-card scroll-mt-24 p-5 space-y-4">
           <h2 className="font-ui text-sm font-semibold">漫画发布（TG → 图床 → 本站）</h2>
           <p className="font-ui text-[12px] text-soft leading-relaxed">

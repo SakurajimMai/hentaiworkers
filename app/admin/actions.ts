@@ -601,6 +601,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
       ads: parseAdsSettingsFromForm(formData),
       manga: {
         enabled: formData.get('mangaEnabled') === '1',
+        directImages: formData.get('mangaDirectImages') === '1',
         publishSecret: String(formData.get('mangaPublishSecret') || '') || undefined,
       },
       hero: parseHeroSettingsFromForm(formData),

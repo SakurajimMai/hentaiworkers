@@ -32,6 +32,15 @@ export async function isMangaEnabled(): Promise<boolean> {
   }
 }
 
+/** Reader switches; an unreadable setting keeps the default proxied, scheduled pipeline. */
+export async function getMangaReaderConfig(): Promise<Readonly<{ directImages: boolean }>> {
+  try {
+    return await getSystemSettingsService().getMangaReaderConfig();
+  } catch {
+    return { directImages: false };
+  }
+}
+
 /**
  * Admin-curated manga tags. Only these tag listings are indexable landing pages and appear in
  * the sitemap; free-form crawler tags stay noindex to avoid thousands of thin duplicates.
