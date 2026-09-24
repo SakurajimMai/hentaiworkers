@@ -17,6 +17,7 @@
     "test:meta:browser": "node tests/browser/site-meta.mjs",
     "test:admin:browser": "node tests/browser/admin-nav.mjs",
     "test:dialogs:browser": "node tests/browser/dialogs.mjs",
+    "test:auth:browser": "node tests/browser/verification-resend.mjs",
     "check:legacy": "node scripts/check-no-legacy.mjs",
     "check:boundaries": "node scripts/check-app-boundaries.mjs",
     "db:baseline": "node scripts/export-schema-baseline.mjs",

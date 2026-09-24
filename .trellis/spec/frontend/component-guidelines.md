@@ -75,6 +75,13 @@ Questions to answer:
   and give the control around it `min-h-6`/`h-6 w-6` rather than enlarging the glyph. Quiet text
   links take `.link-soft`, which carries the target and the hover colour.
 - A search box with only an icon beside it carries an `aria-label`; the placeholder is not its name.
+- Web storage goes through `localStore()` / `sessionStore()` from `lib/client/safe-storage`. With
+  site data blocked, reading `window.localStorage` (even inside `typeof`) throws, and an unguarded
+  read in a header effect removed the whole header for those visitors. Writes sit in their own
+  `try`, since a full or read-only store rejects `setItem` on browsers that allow the read.
+- Row actions that belong together share one `flex flex-wrap` row inside the cell (a delete form
+  beside the save form), so a second action lands beside the first wherever the cell has room and
+  only drops below it on a genuinely narrow row — never as a permanent extra line.
 
 - Label carousel regions from their visible heading. Arrow controls need explicit labels and an
   `aria-controls` relationship to the scroll track.

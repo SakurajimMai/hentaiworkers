@@ -1,3 +1,4 @@
+import { localStore } from './safe-storage';
 /** Guest watch progress in localStorage; merged to server after login. */
 
 export const WATCH_PROGRESS_STORAGE_KEY = 'animestream.watchProgress.v1';
@@ -12,14 +13,11 @@ export type LocalWatchProgress = {
   cover?: string | null;
 };
 
-function canUseStorage(): boolean {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-}
-
 export function readLocalWatchProgress(): LocalWatchProgress[] {
-  if (!canUseStorage()) return [];
+  const store = localStore();
+  if (!store) return [];
   try {
-    const raw = window.localStorage.getItem(WATCH_PROGRESS_STORAGE_KEY);
+    const raw = store.getItem(WATCH_PROGRESS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -48,8 +46,13 @@ export function readLocalWatchProgress(): LocalWatchProgress[] {
 }
 
 export function writeLocalWatchProgress(rows: LocalWatchProgress[]): void {
-  if (!canUseStorage()) return;
-  window.localStorage.setItem(WATCH_PROGRESS_STORAGE_KEY, JSON.stringify(rows.slice(0, 100)));
+  const store = localStore();
+  if (!store) return;
+  try {
+    store.setItem(WATCH_PROGRESS_STORAGE_KEY, JSON.stringify(rows.slice(0, 100)));
+  } catch {
+    // Full or read-only storage: playback continues, the guest position is just not kept.
+  }
 }
 
 export function upsertLocalWatchProgress(row: LocalWatchProgress): void {
@@ -63,8 +66,11 @@ export function removeLocalWatchProgress(animeId: number): void {
 }
 
 export function clearLocalWatchProgress(): void {
-  if (!canUseStorage()) return;
-  window.localStorage.removeItem(WATCH_PROGRESS_STORAGE_KEY);
+  try {
+    localStore()?.removeItem(WATCH_PROGRESS_STORAGE_KEY);
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
 }
 
 export function isCompletedProgress(position: number, duration: number, flag?: boolean): boolean {

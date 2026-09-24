@@ -169,48 +169,50 @@ export default async function AdminUsersPage({
                     </div>
                   </td>
                   <td>
-                    <ValidatedForm action={actionSaveUser} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-                      <input type="hidden" name="id" value={u.id} />
-                      <input type="hidden" name="username" value={u.username} />
-                      <select
-                        name="role"
-                        defaultValue={u.role}
-                        className="admin-input max-w-[7rem] !py-1 text-[12px]"
-                        aria-label={`角色 ${u.username}`}
-                      >
-                        <option value="user">普通用户</option>
-                        <option value="admin">管理员</option>
-                      </select>
-                      <label className="field-check text-[12px]">
-                        <input
-                          type="checkbox"
-                          name="isActive"
-                          value="1"
-                          defaultChecked={!!u.isActive}
-                        />
-                        启用
-                      </label>
-                      <input
-                        name="password"
-                        type="password"
-                        placeholder="重置密码（可选）"
-                        className="admin-input max-w-[9.5rem] !py-1 text-[12px]"
-                        minLength={8}
-                        autoComplete="new-password"
-                      />
-                      <button type="submit" className="admin-btn-action !py-1">
-                        保存
-                      </button>
-                    </ValidatedForm>
-                    {u.role === 'user' && (
-                      <form action={actionDeleteUser} className="mt-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ValidatedForm action={actionSaveUser} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                         <input type="hidden" name="id" value={u.id} />
-                        <ConfirmSubmitButton className="admin-btn-action !py-1 text-red-600" title="删除用户" confirmLabel="删除"
-                          message={`确定删除 ${u.username}？其收藏、片单、观看和阅读进度会一并删除，此操作不可恢复。`}>
-                          删除用户
-                        </ConfirmSubmitButton>
-                      </form>
-                    )}
+                        <input type="hidden" name="username" value={u.username} />
+                        <select
+                          name="role"
+                          defaultValue={u.role}
+                          className="admin-input max-w-[7rem] !py-1 text-[12px]"
+                          aria-label={`角色 ${u.username}`}
+                        >
+                          <option value="user">普通用户</option>
+                          <option value="admin">管理员</option>
+                        </select>
+                        <label className="field-check text-[12px]">
+                          <input
+                            type="checkbox"
+                            name="isActive"
+                            value="1"
+                            defaultChecked={!!u.isActive}
+                          />
+                          启用
+                        </label>
+                        <input
+                          name="password"
+                          type="password"
+                          placeholder="重置密码（可选）"
+                          className="admin-input max-w-[9.5rem] !py-1 text-[12px]"
+                          minLength={8}
+                          autoComplete="new-password"
+                        />
+                        <button type="submit" className="admin-btn-action !py-1">
+                          保存
+                        </button>
+                      </ValidatedForm>
+                      {u.role === 'user' && (
+                        <form action={actionDeleteUser} className="shrink-0">
+                          <input type="hidden" name="id" value={u.id} />
+                          <ConfirmSubmitButton className="admin-btn-action-danger !py-1" title="删除用户" confirmLabel="删除"
+                            message={`确定删除 ${u.username}？其收藏、片单、观看和阅读进度会一并删除，此操作不可恢复。`}>
+                            删除用户
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -16,6 +16,7 @@ import {
   takeHistoryTraverse,
   writeCatalogScrollY,
 } from '@/lib/client/catalog-scroll-restoration';
+import { sessionStore } from '@/lib/client/safe-storage';
 
 installCatalogScrollHistoryListener();
 
@@ -28,13 +29,16 @@ export function CatalogScrollRestoration() {
 
   useEffect(() => {
     const key = catalogLocationKey(pathname, search);
+    // Evaluating the bare `sessionStorage` global throws when the browser blocks site data; one
+    // guarded lookup serves the whole effect and a null store simply skips remembering.
+    const store = sessionStore();
     const previousKey = previousKeyRef.current;
     const traverse = takeHistoryTraverse();
     previousKeyRef.current = key;
 
     if (!traverse && previousKey && previousKey !== key) {
       try {
-        sessionStorage.setItem(CATALOG_RETURN_KEY, previousKey);
+        store?.setItem(CATALOG_RETURN_KEY, previousKey);
       } catch {
         // Ignore storage failures; history back still works via the browser button.
       }
@@ -48,12 +52,12 @@ export function CatalogScrollRestoration() {
     let cancelled = false;
     let frame = 0;
     const started = performance.now();
-    const saved = shouldRestoreCatalogScroll({
+    const saved = store && shouldRestoreCatalogScroll({
       traverse,
       pathname,
       hash: window.location.hash,
     })
-      ? parseStoredScrollY(readCatalogScrollY(sessionStorage, key))
+      ? parseStoredScrollY(readCatalogScrollY(store, key))
       : null;
 
     if (saved != null) {
@@ -81,7 +85,7 @@ export function CatalogScrollRestoration() {
 
     const persist = () => {
       if (restoringRef.current) return;
-      writeCatalogScrollY(sessionStorage, key, window.scrollY);
+      if (store) writeCatalogScrollY(store, key, window.scrollY);
     };
     let saveFrame = 0;
     const onScroll = () => {

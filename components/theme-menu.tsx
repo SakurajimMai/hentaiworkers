@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { IconMoon, IconSun } from '@/components/icons';
+import { localStore } from '@/lib/client/safe-storage';
 import {
   THEME_CHANGE_EVENT,
   THEME_STORAGE_KEY,
@@ -17,7 +18,7 @@ export function ThemeMenu({ compact = false }: { compact?: boolean }) {
 
   useEffect(() => {
     const next = resolveThemeMode(
-      window.localStorage.getItem(THEME_STORAGE_KEY),
+      localStore()?.getItem(THEME_STORAGE_KEY) ?? null,
       window.matchMedia('(prefers-color-scheme: dark)').matches,
     );
     setMode(next);
@@ -33,7 +34,11 @@ export function ThemeMenu({ compact = false }: { compact?: boolean }) {
   const toggleMode = () => {
     const next: ThemeMode = mode === 'dark' ? 'light' : 'dark';
     setMode(next);
-    window.localStorage.setItem(THEME_STORAGE_KEY, next);
+    try {
+      localStore()?.setItem(THEME_STORAGE_KEY, next);
+    } catch {
+      // The choice still applies to this page when it cannot be remembered.
+    }
     applyTheme(next);
     window.dispatchEvent(new CustomEvent<ThemeMode>(THEME_CHANGE_EVENT, { detail: next }));
   };

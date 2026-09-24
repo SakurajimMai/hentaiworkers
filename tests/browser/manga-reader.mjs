@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
 import postcss from 'postcss';
@@ -66,6 +67,22 @@ async function bundle(baseline) {
 }
 
 const bundles = { current: await bundle(false), baseline: await bundle(true) };
+// The reader points its sandboxed ad frames at the site's ad document route. Serve the document
+// production would build for the fixture creative; the page fallback below would otherwise hand
+// the frame the reader itself, and a nested reader throws on storage inside the sandbox.
+const adBuilderBundle = await build({
+  entryPoints: [join(repository, 'lib/client/html-ad.ts')],
+  bundle: true,
+  write: false,
+  platform: 'node',
+  format: 'cjs',
+  logLevel: 'silent',
+});
+const adBuilder = { exports: {} };
+new Function('module', 'exports', 'require', adBuilderBundle.outputFiles[0].text)(adBuilder, adBuilder.exports, createRequire(import.meta.url));
+const { buildHtmlAdSrcDoc } = adBuilder.exports;
+// Keep in step with `readerAds` in reader-fixture.tsx: 640x72 creatives whose images the server counts.
+const readerAdHtml = (run, position) => `<img src="/ad/${run}/${position}.png" width="640" height="72" alt="Test ad" />`;
 const css = await postcss([tailwindcss(join(repository, 'tailwind.config.js'))])
   .process(await readFile(join(repository, 'app/globals.css'), 'utf8'), { from: join(repository, 'app/globals.css') });
 const bitmap = await sharp({ create: { width: 900, height: 1280, channels: 3, background: '#a7cfcc' } }).png().toBuffer();
@@ -136,6 +153,14 @@ const server = createServer(async (request, response) => {
       scenario?.progress.push(JSON.parse(body));
       response.writeHead(200, { 'Content-Type': 'application/json' }).end('{}');
     }
+    return;
+  }
+  const adDocument = url.pathname.match(/^\/ads\/html\/reader\/(top|bottom)$/);
+  if (adDocument) {
+    const run = new URL(request.headers.referer || 'http://localhost').searchParams.get('run') || 'default';
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }).end(
+      buildHtmlAdSrcDoc(readerAdHtml(run, adDocument[1]), url.searchParams.get('mid') || 'ad', { width: 640, height: 72 }),
+    );
     return;
   }
   if (url.pathname === '/reader.js') {
