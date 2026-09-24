@@ -211,7 +211,7 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
               <p className="font-meta mb-2">继续浏览</p>
               <h2 className="section-title text-2xl text-ink sm:text-3xl">推荐内容</h2>
             </div>
-            <Link href="/manga" className="font-ui text-[12px] text-soft transition hover:text-ink">
+            <Link href="/manga" className="link-soft font-ui text-[12px]">
               查看全部
             </Link>
           </div>

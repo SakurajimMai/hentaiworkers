@@ -149,7 +149,7 @@ export default async function MangaListPage({
         <h1 className="section-title text-4xl text-ink sm:text-5xl">{heading}</h1>
         {(tag || q) && (
           <p className="mt-4">
-            <Link href="/manga" className="font-ui text-[13px] text-soft transition hover:text-ink">
+            <Link href="/manga" className="link-soft font-ui text-[13px]">
               查看全部漫画
             </Link>
           </p>
