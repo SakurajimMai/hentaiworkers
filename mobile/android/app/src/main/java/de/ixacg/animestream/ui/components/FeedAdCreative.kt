@@ -4,8 +4,8 @@ package de.ixacg.animestream.ui.components
  * Tells a plain image creative apart from one that needs a browser.
  *
  * An `<img>` pasted into the admin feed slot carries no script, no frame and no size, so putting
- * it in a WebView buys nothing and costs the app its own image pipeline: cache, redirects, the
- * `/cdn-img` rewrite and the headers every poster already loads with. Creatives that do run code
+ * it in a WebView buys nothing and costs the app its own image pipeline: cache, redirects and the
+ * headers every poster already loads with. Creatives that do run code
  * (alliance snippets, iframes, `document.write`) stay on [HtmlAd].
  */
 object FeedAdCreative {

@@ -121,7 +121,7 @@ data class ReaderContent(
     val currentPage: Int = 0,
     val mangaLoaded: Boolean = true,
     val favoriteLoaded: Boolean = true,
-    /** Pages load straight from their stored URLs; the reader warms and prefetches nothing. */
+    /** Site setting 阅读页直连图床: the reader warms and prefetches nothing. */
     val directImages: Boolean = false,
 ) {
     val chapterIndex: Int = manga.chapters.indexOfFirst { it.number == chapter.number }
@@ -166,13 +166,9 @@ private fun MangaChapterResponse.readerManga(chapter: MangaChapterDetail): Manga
     )
 
 private fun MangaChapterResponse.normalizedForReader(): MangaChapterResponse {
-    // Direct mode keeps every page on the host it was stored with; otherwise image hosts under the
-    // site's domain are rewritten to /cdn-img.
-    val normalize: (String?) -> String? =
-        if (directImages) MediaUrlNormalizer::normalizeDirect else MediaUrlNormalizer::normalize
     val normalizedPages =
         chapter.pages.mapNotNull { page ->
-            normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
+            MediaUrlNormalizer.normalize(page.imageUrl)?.let { page.copy(imageUrl = it) }
         }.distinctBy { it.index }
     return copy(chapter = chapter.copy(pages = normalizedPages))
 }

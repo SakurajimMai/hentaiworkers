@@ -65,10 +65,7 @@ chmod 600 deploy/.env
 | `IMAGE_TAG` | 本地构建使用 `manga`；远端生产使用已发布的不可变 tag |
 | `PULL_POLICY` | 本地构建使用 `never`；远端拉取使用 `always` |
 
-Android 客户端的图片代理不需要任何变量：`/cdn-img/<host>/**` 代理与 `SITE_URL` 同一域名下的
-全部图片主机（站点为 `www.example.com` 时即 `image1.example.com`、`image2.example.com`……），
-新增图片主机无需改动服务端或 App；域外主机与站点自身一律拒绝。`/api/health` 的
-`features.imageProxyDomain` 显示推导出的域名。
+网站与 APK 都按目录里的原地址直连图片和视频，服务端不转发媒体，也没有相关变量。
 
 Session/keyring 的正确生成方式见
 [开发指南](./development.md#2-配置)。keyring 与数据库备份必须一起安全保管，
@@ -201,12 +198,11 @@ curl -fsS "$APP_CHECK_ORIGIN/api/ready"
 |------|----------|--------|
 | `/api/live` | Node.js 进程可以响应 | 数据库、迁移、登录和业务可用 |
 | `/api/ready` | 生产有 `DATABASE_URL` 时 `SELECT 1` 成功 | 所有表、列、索引或业务查询可用 |
-| `/api/health` | 数据库诊断查询成功；`features.androidUpdates` 为 `true` 表示更新清单已配置，`features.imageProxyDomain` 是 `/cdn-img` 代理的图片域名 | 完整业务可用；失败响应当前可能包含底层错误 |
+| `/api/health` | 数据库诊断查询成功；`features.androidUpdates` 为 `true` 表示更新清单已配置 | 完整业务可用；失败响应当前可能包含底层错误 |
 
 Compose healthcheck 只调用 `/api/live`。容器显示 healthy 仍可能存在数据库或 schema
 问题。换镜像后务必看一眼 `/api/health` 的 `features`：`androidUpdates` 为 `false` 时网站照常
-可用，但 APK 会提示“检查更新失败”；`imageProxyDomain` 与图片主机不在同一域名时 APK 不会
-走代理，图片直连图片主机。
+可用，但 APK 会提示“检查更新失败”。
 
 ## 7. 反向代理
 
@@ -306,7 +302,7 @@ Android 签名、ABI 与 Build 39 迁移见 [移动端文档](./mobile.md)。
 | 容器 healthy，但页面超时 | `/api/ready`、App 日志、数据库 DNS/TLS/白名单、代表性目录查询 |
 | `/api/ready` 成功但功能报缺表 | ready 只做连接检查；核对实际 schema 和迁移记录 |
 | 私有 CA 文件不存在 | 官方 Compose 未挂载 CA；停止并完成独立 mount 方案 |
-| APK 新作品无图、旧作品正常 | 图片主机是否在 `features.imageProxyDomain` 之下；直接请求 `/cdn-img/<图片主机>/<路径>` 看状态码（403 表示域外主机，5xx 表示上游不可达） |
+| APK 新作品无图、旧作品正常 | 用手机浏览器直接打开目录里的图片原地址，确认图片主机可达并返回图片 |
 | APK 提示“检查更新失败” | `/api/android/update` 是否 404，`features.androidUpdates`；`ANDROID_UPDATE_REPOSITORY` 是否为空或大小写与 GitHub 不一致 |
 | 漫画榜单/进度失败 | 核对 `0017`、`0018`、账号 DDL 权限和 App 日志 |
 | 新 APK 未出现在 Releases | 确认是 `main` 的正式签名构建且工作流全绿；分支、PR 或 `internal-debug` 构建不会发布 |

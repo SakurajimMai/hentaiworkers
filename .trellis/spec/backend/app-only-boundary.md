@@ -54,19 +54,11 @@ properties in the Android build. A missing value disables the feature (503/404/s
 than falling back to a built-in default. The publish workflow may bake `github.repository` into
 the image as an `ENV` default (a `Dockerfile` `ARG` that is empty in source); `deploy/.env`
 overrides it, and the `.env` templates keep the key commented out so a copied template cannot blank
-the default. `GET /api/health` reports `features.androidUpdates` and `features.imageProxyDomain` so
-a deployment problem is visible from outside instead of only as 404/403 answers inside the app.
+the default. `GET /api/health` reports `features.androidUpdates` so a deployment problem is
+visible from outside instead of only as a 404 inside the app.
 
-`/cdn-img/<host>/**` needs no configuration: it proxies exactly the hosts under the site's own
-domain, derived from `SITE_URL` (the site host minus its first label when it has one to spare,
-guarded by a short list of two-label public suffixes such as `co.uk`), so `image1.example.com`,
-`image2.example.com`, ... work as soon as the catalog uses them. The site host itself and every
-host outside that domain are refused (403) before any fetch, and only `image/*` bodies are relayed.
-The Android client applies the identical rule from its API origin; keep the two implementations
-(`lib/server/image-proxy.ts`, `MediaUrlNormalizer`) in step, with matching test examples. Paths
-without a host segment come from clients built before Build 112; resolve them by trying the hosts
-of the newest catalog covers (bounded attempts, in-domain only, cached) rather than by reintroducing
-a configured upstream.
+The App does not proxy images or videos. The website and the Android client load every catalog
+media URL directly from the host it names; do not reintroduce `/cdn-img` or any other media relay.
 
 The App must not contain or import a data-acquisition runtime, machine identity/token API,
 shared media-output filesystem, or a second Compose service. A root `crawler/` project must
@@ -149,8 +141,6 @@ the retention job loudly instead of silently accumulating tags.
 | View/favourite count cannot be computed | Report `null` (unknown); never emit a stored placeholder or a synthetic number |
 | Catalog contains a removed local-media URL | Correct operationally; do not read host files from App |
 | GitHub update release is draft, non-main, incomplete, or has an invalid asset path/digest | Ignore it and select the greatest older complete `build-N`; return the documented upstream error only when no cached valid manifest exists |
-| `/cdn-img/<host>/**` names the site itself or a host outside the `SITE_URL` domain | 403 before any upstream request; never cached |
-| `/cdn-img` upstream answers non-2xx, a non-image body, or is unreachable | Relay the status (404 for non-image bodies, 502 when unreachable) with `Cache-Control: no-store` so the app can fall back to the direct host |
 | `ANDROID_UPDATE_REPOSITORY` unset or malformed at runtime | `/api/health.features.androidUpdates` is `false`; the route keeps answering 404 |
 | `crawler/**/production_config.yml` exists locally | Keep ignored; commit only a sanitized example |
 

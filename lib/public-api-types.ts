@@ -99,11 +99,9 @@ export type HealthResultRow = {
 };
 
 // Deployment facts the Android client depends on. `androidUpdates` is false when
-// ANDROID_UPDATE_REPOSITORY is unset or malformed (disabled by configuration, not failing);
-// `imageProxyDomain` is the domain whose hosts `/cdn-img/<host>/**` proxies, derived from SITE_URL.
+// ANDROID_UPDATE_REPOSITORY is unset or malformed (disabled by configuration, not failing).
 export type HealthFeatures = {
   androidUpdates: boolean;
-  imageProxyDomain: string;
 };
 
 export type HealthOk = {

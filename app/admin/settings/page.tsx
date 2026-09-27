@@ -629,9 +629,8 @@ export default async function AdminSystemSettingsPage({
             <span>
               阅读页直连图床
               <span className="mt-1 block font-ui text-[12px] leading-relaxed text-soft">
-                开启后，网页和 APK 的漫画阅读页都直接用图片原地址加载：不经过本站{' '}
-                <code className="text-foreground">/cdn-img</code> 代理，也不做分批加载和预取。
-                关闭时恢复代理与预取。APK 需要升级到含此功能的版本才会生效，旧版本仍走代理。
+                开启后，网页和 APK 的漫画阅读页不做分批加载和预取，每页显示时才加载。
+                关闭时按可见页优先分批加载，并预取后续页。两种模式都直接从图片原地址加载。
               </span>
             </span>
           </label>

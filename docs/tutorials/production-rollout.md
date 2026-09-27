@@ -62,8 +62,7 @@ chmod 600 deploy/.env
 - `APP_PORT=13000`，或你明确选择的回环端口
 
 `ANDROID_UPDATE_REPOSITORY` 保持注释即可：GitHub Actions 构建的镜像已把构建仓库烘焙为默认值。
-只有本地构建镜像或要覆盖时才填写，写成空值会关闭 APK 的更新清单。图片代理 `/cdn-img/<host>/**`
-自动覆盖 `SITE_URL` 同域名下的图片主机，不需要变量。
+只有本地构建镜像或要覆盖时才填写，写成空值会关闭 APK 的更新清单。
 
 keyring 是 JSON 对象，不是单独 Base64 字符串。生成方法见
 [开发指南的配置章节](../development.md#2-配置)。
@@ -201,7 +200,7 @@ curl -fsS "$APP_CHECK_ORIGIN/api/ready"
 - ready 返回 `{"status":"ready"}`。生产有 `DATABASE_URL` 时会执行
   `SELECT 1`，但不检查完整 schema。
 - `curl -fsS "$APP_CHECK_ORIGIN/api/health"` 的 `features.androidUpdates` 为 `true`（否则 APK
-  检查更新失败），`features.imageProxyDomain` 是图片主机所在的域名（否则 APK 不走代理）。
+  检查更新失败）。
 
 Compose healthy 只基于 live。ready 或业务路径失败时，发布仍然失败。
 

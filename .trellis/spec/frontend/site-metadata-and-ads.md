@@ -25,7 +25,7 @@
   so tests stay deterministic. Preserve the public enabled-slot index used by `/ads/html/feed/{id}`.
 - A creative that is a single `<img>` (optionally wrapped in a link) is not markup the app needs a
   browser for: Android renders it through its own image loader (`FeedAdCreative.imageUrl` →
-  `RemoteImage`), which brings cache, redirects and the `/cdn-img` rewrite, and letterboxes it
+  `RemoteImage`), which brings cache and redirects, and letterboxes it
   without stored pixel dimensions. Anything that runs code stays in the WebView.
 - Size feed cards like catalog posters (`poster-frame` + `aspect-[2/3]` + Radix `AspectRatio`).
   Give fill iframes explicit pixel width/height from ResizeObserver; mobile WebKit treats

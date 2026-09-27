@@ -461,16 +461,12 @@ components:
           type: object
           description: Deployment facts the Android client depends on.
           additionalProperties: false
-          required: [androidUpdates, imageProxyDomain]
+          required: [androidUpdates]
           properties:
             androidUpdates:
               type: boolean
               description: "`/api/android/update` serves a release manifest (ANDROID_UPDATE_REPOSITORY); false means disabled by configuration, not failing."
               example: true
-            imageProxyDomain:
-              type: string
-              description: "Domain whose hosts `/cdn-img/<host>/**` proxies (e.g. `image1.example.com`, `image2.example.com`), derived from SITE_URL."
-              example: example.com
 
     HealthError:
       type: object
@@ -937,9 +933,9 @@ components:
         directImages:
           type: boolean
           description: >-
-            Admin setting 阅读页直连图床. When true, clients load each page from its `imageUrl` as-is,
-            without rewriting to `/cdn-img` and without prefetching; the page URLs themselves are
-            identical in both modes. Absent from older servers, which clients treat as false.
+            Admin setting 阅读页直连图床. When true, clients load each page from its `imageUrl` only
+            when it is shown, without staged loading or prefetching. Clients always load pages from
+            their `imageUrl` as-is. Absent from older servers, which clients treat as false.
 
   responses:
     ServerError:

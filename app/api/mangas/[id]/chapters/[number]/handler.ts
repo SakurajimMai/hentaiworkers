@@ -9,7 +9,7 @@ export type MangaReaderDataLoader = (
 export type MangaChapterHandlerDependencies = {
   isMangaEnabled: () => Promise<boolean>;
   loadReaderData: MangaReaderDataLoader;
-  /** Admin 阅读页直连图床. Tells the app to load stored URLs as-is, without /cdn-img or prefetch. */
+  /** Admin 阅读页直连图床. Tells the app to load each page only when shown, without prefetch. */
   loadReaderConfig: () => Promise<Readonly<{ directImages: boolean }>>;
   recordView: (mangaId: number) => Promise<void>;
   scheduleAfter: (task: Promise<unknown>) => void;

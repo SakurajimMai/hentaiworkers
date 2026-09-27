@@ -115,8 +115,8 @@ export const mangaSettingsSchema = z.object({
    */
   curatedTags: z.array(z.string().min(1).max(40)).max(200).default([]),
   /**
-   * Reader pages load straight from the stored image URLs on web and Android: no /cdn-img proxy
-   * and no staged loading or prefetch. Off keeps the proxy and the scheduled pipeline.
+   * Reader pages load each stored image URL only when shown on web and Android: no staged
+   * loading or prefetch. Off keeps the scheduled pipeline. Page URLs are direct in both modes.
    */
   directImages: z.boolean().default(false),
 });

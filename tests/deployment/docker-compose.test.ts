@@ -114,7 +114,7 @@ test('Android APK workflow builds mobile and publishes a GitHub Release', () => 
   assert.match(workflow, /tag_name: build-\$\{\{ github\.run_number \}\}/);
   assert.match(workflow, /ANIMESTREAM_API_BASE_URL: \$\{\{ vars\.ANIMESTREAM_API_BASE_URL \}\}/);
   assert.match(workflow, /ANIMESTREAM_UPDATE_REPOSITORY: \$\{\{ github\.repository \}\}/);
-  assert.doesNotMatch(workflow, /IMAGE_PROXY/, 'the proxied image domain is derived from the API origin, never configured');
+  assert.doesNotMatch(workflow, /IMAGE_PROXY/, 'the app loads media directly; there is no image proxy to configure');
   assert.match(workflow, /name: Validate client configuration/);
   assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /Android signing secrets are only partially configured/);
@@ -221,7 +221,7 @@ test('Docker Hub workflow publishes only the application image', () => {
   assert.match(workflow, /APP_IMAGE: \$\{\{ vars\.APP_IMAGE \}\}/);
   assert.match(workflow, /name: Validate image configuration/);
   assert.match(workflow, /ANDROID_UPDATE_REPOSITORY=\$\{\{ github\.repository \}\}/, 'the image defaults to the repository that built it, like the APK');
-  assert.doesNotMatch(workflow, /IMAGE_PROXY/, 'the image proxy scope is derived from SITE_URL, never configured');
+  assert.doesNotMatch(workflow, /IMAGE_PROXY/, 'the server has no image proxy to configure');
   assert.doesNotMatch(workflow, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i, 'workflow carries no deployment-specific names');
   assert.match(workflow, /images: \$\{\{ env\.APP_IMAGE \}\}/);
   assert.match(workflow, /context: \./);
@@ -345,7 +345,7 @@ test('the image carries a CI-injected update repository default that .env can ov
 
   assert.match(runner, /^ARG ANDROID_UPDATE_REPOSITORY=""$/m, 'no value in source');
   assert.match(runner, /^ENV ANDROID_UPDATE_REPOSITORY=\$\{ANDROID_UPDATE_REPOSITORY\}$/m, 'the default reaches the runtime');
-  assert.doesNotMatch(dockerfile, /IMAGE_PROXY/, 'the image proxy needs no deployment value');
+  assert.doesNotMatch(dockerfile, /IMAGE_PROXY/, 'the server has no image proxy to configure');
   assert.doesNotMatch(dockerfile, /ixacg\.de|SakurajimMai|hentaiworkers|sakurajiamai/i);
 
   // Compose passes every key of env_file, so a copied template with an empty value would blank
@@ -354,7 +354,7 @@ test('the image carries a CI-injected update repository default that .env can ov
     const source = readFileSync(join(root, template), 'utf8');
     assert.doesNotMatch(source, /^ANDROID_UPDATE_REPOSITORY=/m, `${template} leaves the image default in force`);
     assert.match(source, /^# ANDROID_UPDATE_REPOSITORY=/m, `${template} still documents the override`);
-    assert.doesNotMatch(source, /IMAGE_PROXY_UPSTREAM/, `${template} no longer names an image upstream`);
+    assert.doesNotMatch(source, /IMAGE_PROXY_UPSTREAM/, `${template} names no image upstream`);
   }
 });
 
@@ -370,11 +370,9 @@ test('deployment files keep secrets outside the image', () => {
 
 test('application code carries no deployment-specific hosts, accounts or image names', () => {
   const files = [
-    'app/cdn-img/[...path]/route.ts',
     'app/layout.tsx',
     'app/api/android/update/route.ts',
     'lib/server/android-update.ts',
-    'lib/server/image-proxy.ts',
     'lib/server/seo/indexnow.ts',
     'docker-compose.yml',
     'deploy/docker-compose.yml',
