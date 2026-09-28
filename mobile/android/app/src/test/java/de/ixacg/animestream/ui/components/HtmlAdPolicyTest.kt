@@ -26,6 +26,13 @@ class HtmlAdPolicyTest {
     }
 
     @Test
+    fun floatingFrameKeepsAVisibleRectWhileReportingZero() {
+        assertEquals(1f, HtmlAdPolicy.floatingFrameHeight(0f))
+        assertEquals(1f, HtmlAdPolicy.floatingFrameHeight(Float.NaN))
+        assertEquals(129f, HtmlAdPolicy.floatingFrameHeight(129f))
+    }
+
+    @Test
     fun fitScaleLetterboxesCardsAndFillsBannersWithoutCropping() {
         val banner = HtmlAdPolicy.Dimensions(300, 250)
         // Poster cell 170x255: width-limited, may not exceed the cell height.

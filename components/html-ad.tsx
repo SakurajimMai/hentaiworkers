@@ -262,7 +262,9 @@ export function HtmlAd({
         width: '100%',
         overflow: 'hidden',
         marginInline: 'auto',
-        height,
+        // A floating frame never collapses below 1px: browsers may stop rendering an empty frame,
+        // and then the unit could never report its real height. Hosts reserve the reported height.
+        height: floating ? Math.max(1, height) : height,
         maxHeight: MAX_AD_HEIGHT,
       }}
     >

@@ -16,6 +16,13 @@ object HtmlAdPolicy {
             Dimensions()
         }
 
+    /**
+     * A floating unit reports 0 before it draws and once it is closed, but its WebView must keep a
+     * non-empty visible rect: WebView stops producing frames (and requestAnimationFrame) when its
+     * visible rect is empty, so a collapsed frame could never report the unit's real height.
+     */
+    fun floatingFrameHeight(measured: Float): Float = if (measured.isFinite()) measured.coerceAtLeast(1f) else 1f
+
     /** `allowZero` is for floating units, which report 0 once closed or before they draw. */
     fun measuredHeight(
         height: Double,

@@ -115,6 +115,8 @@ fun HtmlAd(
                 dimensions.height.dp * scale
             } else if (fillParent && boundedHeight) {
                 maxHeight
+            } else if (floating) {
+                HtmlAdPolicy.floatingFrameHeight(measuredHeight).dp
             } else {
                 measuredHeight.dp
             }

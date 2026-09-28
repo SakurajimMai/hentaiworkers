@@ -329,7 +329,8 @@ try {
     assert.equal(placed.transform, 'none', 'fixed units must anchor to the frame viewport, not a transformed box');
     assert.ok(placed.top >= -0.5 && placed.bottom <= placed.viewport + 0.5, `the floating banner is fully inside its frame: ${JSON.stringify(placed)}`);
     await frame.locator('#close').click();
-    await heightIs(0);
+    // Closed: the frame keeps a 1px visible rect so it can still render and report; it never collapses to 0.
+    await page.waitForFunction(() => Math.round(document.querySelector('#ad-host iframe').getBoundingClientRect().height) === 1);
   }
   assert.deepEqual(errors, []);
   console.log(`HTML ads browser checks passed: desktop/mobile sizes, parser and async nested scripts, source isolation, resizing, embedded pixels, feed/player lifecycle, click URLs and floating units. Screenshots: ${artifacts}`);
