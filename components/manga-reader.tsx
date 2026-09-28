@@ -56,6 +56,8 @@ export type MangaReaderAds = Readonly<{
   bottomHtml: string;
   topSize?: AdDimensions;
   bottomSize?: AdDimensions;
+  /** Dock the bottom creative to the screen bottom while reading instead of after the last page. */
+  bottomFloating?: boolean;
 }>;
 
 type MangaReaderProps = {
@@ -665,6 +667,32 @@ const ReaderPageItem = memo(function ReaderPageItem({
   );
 });
 
+/**
+ * A self-positioning (悬浮) alliance unit docked to the screen bottom. The creative still runs in the
+ * sandboxed ad document; the dock follows the height it covers and the reader reserves that height,
+ * so the last page and the to-top button stay reachable. Closing the unit collapses the dock.
+ */
+function FloatingReaderAd({ html }: { html: string }) {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--reader-floating-ad-height', `${height}px`);
+    return () => {
+      root.style.removeProperty('--reader-floating-ad-height');
+    };
+  }, [height]);
+  return (
+    <aside className="reader-ad-floating" aria-label="章节底部悬浮广告">
+      <HtmlAd
+        html={html}
+        documentSrc={htmlAdDocumentPath({ kind: 'reader', id: 'bottom' })}
+        floating
+        onHeightChange={setHeight}
+      />
+    </aside>
+  );
+}
+
 function ReaderAdSlot({
   state,
   position,
@@ -680,6 +708,9 @@ function ReaderAdSlot({
   const dimensions = normalizeAdDimensions(size);
   const policy = getReaderAdRenderPolicy(html, contentReady);
   if (!policy.reserveSlot) return null;
+  if (position === 'bottom' && ads.bottomFloating) {
+    return policy.mountContent ? <FloatingReaderAd html={html} /> : null;
+  }
   return (
     <aside
       className="reader-ad reader-ad-banner"

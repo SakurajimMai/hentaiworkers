@@ -149,6 +149,8 @@ scope, Docker image, production Compose services, and server-private imports.
 - Only Telephoto's original `isImageDisplayed` signal for an actually visible page can latch reader
   readiness and unlock ads, including already-cached ad HTML. A prepared preview or a precomposed
   offscreen page must never unlock reader ads. Preserve the original-image frame wait and retry UI.
+  `ReaderLogic.bottomAdPlacement` decides the bottom slot: nothing before readiness, a floating
+  unit docked above the page list (and above the bottom bar while it shows), else after the last page.
 - An image whose scaled height can exceed practical Compose item constraints must use a finite
   subsampling viewport with base-scale vertical pan and nested-scroll handoff. Do not squash the
   image, clip away unreachable content, or request an intrinsic million-pixel layout height.

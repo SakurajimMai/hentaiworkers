@@ -157,9 +157,14 @@ const server = createServer(async (request, response) => {
   }
   const adDocument = url.pathname.match(/^\/ads\/html\/reader\/(top|bottom)$/);
   if (adDocument) {
-    const run = new URL(request.headers.referer || 'http://localhost').searchParams.get('run') || 'default';
+    const referer = new URL(request.headers.referer || 'http://localhost').searchParams;
+    const run = referer.get('run') || 'default';
+    const mid = url.searchParams.get('mid') || 'ad';
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }).end(
-      buildHtmlAdSrcDoc(readerAdHtml(run, adDocument[1]), url.searchParams.get('mid') || 'ad', { width: 640, height: 72 }),
+      adDocument[1] === 'bottom' && referer.get('floating') === '1'
+        // A 悬浮 unit: pinned to its viewport bottom, adding no height to the content box.
+        ? buildHtmlAdSrcDoc(`<ins style="display:block;width:100%;position:fixed;left:0;bottom:0"><img src="/ad/${run}/bottom.png" alt="Test ad" style="display:block;width:100%;height:90px" /></ins>`, mid, {}, '', false, true)
+        : buildHtmlAdSrcDoc(readerAdHtml(run, adDocument[1]), mid, { width: 640, height: 72 }),
     );
     return;
   }
@@ -257,6 +262,7 @@ async function openScenario(name, options = {}) {
   if (options.omitted) params.set('omitted', options.omitted.join(','));
   if (options.guest) params.set('guest', '1');
   if (options.direct) params.set('direct', '1');
+  if (options.floating) params.set('floating', '1');
   const url = `${origin}/?${params}`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-reader-shell]').waitFor();
@@ -427,6 +433,28 @@ try {
       assert.ok(upFront < 40, `lazy loading must not request the whole chapter at once (got ${upFront})`);
       await jump(fixture.page, 30);
       await readable(fixture.page, 30);
+    } finally { await fixture.close(); }
+  });
+
+  await test('a floating bottom ad docks to the screen bottom and reserves its height', async () => {
+    const fixture = await openScenario('floating', { floating: true, mobile: true, count: 12, delay: 40 });
+    try {
+      await readable(fixture.page, 0);
+      await fixture.page.waitForFunction(() => {
+        const frame = document.querySelector('.reader-ad-floating iframe');
+        return frame != null && Math.abs(frame.getBoundingClientRect().height - 90) < 2;
+      }, undefined, { timeout: 8000 });
+      const layout = await fixture.page.evaluate(() => ({
+        dockBottom: document.querySelector('.reader-ad-floating').getBoundingClientRect().bottom,
+        viewport: innerHeight,
+        inline: document.querySelectorAll('[aria-label="章节底部广告"]').length,
+        reserved: getComputedStyle(document.documentElement).getPropertyValue('--reader-floating-ad-height').trim(),
+        stagePadding: parseFloat(getComputedStyle(document.querySelector('.reader-stage')).paddingBottom),
+      }));
+      assert.equal(layout.inline, 0, 'a floating unit is not also placed after the last page');
+      assert.ok(Math.abs(layout.dockBottom - layout.viewport) < 1, `the dock sits on the screen bottom: ${JSON.stringify(layout)}`);
+      assert.equal(layout.reserved, '90px');
+      assert.ok(layout.stagePadding >= 90, 'the last page scrolls clear of the ad');
     } finally { await fixture.close(); }
   });
 

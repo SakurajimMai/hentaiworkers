@@ -531,6 +531,13 @@ components:
           type: integer
           minimum: 1
           maximum: 50
+        floating:
+          type: boolean
+          default: false
+          description: >-
+            Bottom slot only. The creative positions itself (悬浮 alliance units), so clients dock it
+            to the bottom of the screen while reading instead of placing it after the last page, and
+            ignore width/height. Absent from older servers, which clients treat as false.
 
     PublicPlayerPreRollAd:
       type: object

@@ -11,7 +11,7 @@
   "reader": {
     "top": { "enabled": false, "html": "", "interval": 5 },
     "middle": { "enabled": false, "html": "", "interval": 5 },
-    "bottom": { "enabled": false, "html": "", "interval": 5 }
+    "bottom": { "enabled": false, "html": "", "interval": 5, "floating": false }
   },
   "player": {
     "preRollAd": {

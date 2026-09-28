@@ -610,6 +610,22 @@ export default async function AdminSystemSettingsPage({
                   placeholder={'<script>/* 联盟广告代码 */</script>'}
                 />
               </label>
+              <label className="field-check items-start text-sm">
+                <input
+                  type="checkbox"
+                  name="adsReaderBottomFloating"
+                  value="1"
+                  defaultChecked={view.ads.reader.bottom.floating}
+                  className="mt-0.5"
+                />
+                <span>
+                  悬浮在屏幕底部
+                  <span className="mt-1 block font-ui text-[12px] leading-relaxed text-soft">
+                    联盟给的是悬浮 / 漂浮类代码（广告自己贴在屏幕底部）时勾选：阅读时广告一直显示在屏幕底部，
+                    用户可点广告自带的关闭按钮关掉，下面的「广告尺寸」不生效。不勾选时广告显示在章节末尾。
+                  </span>
+                </span>
+              </label>
               <AdSizeFields name="adsReaderBottom" initial={view.ads.reader.bottom} />
             </div>
           </div>

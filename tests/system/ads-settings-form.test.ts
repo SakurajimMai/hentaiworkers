@@ -5,6 +5,7 @@ import {
   parseAdsSettingsFromForm,
 } from '../../lib/server/system/domain/ads-settings-form';
 import { parseSystemSettings, toPublicAdsConfig } from '../../lib/server/system/domain/settings';
+import { buildPublicHtmlAdDocument } from '../../lib/server/system/domain/html-ad-slot-document';
 
 function form(entries: Record<string, string>): FormData {
   const fd = new FormData();
@@ -61,6 +62,24 @@ test('parseAdsSettingsFromForm reads multiple feed slots and reader positions', 
   assert.equal(parsed.reader.top.html, '<p>top</p>');
   assert.equal(parsed.reader.middle.enabled, false);
   assert.equal(parsed.reader.bottom.enabled, true);
+  assert.equal(parsed.reader.bottom.floating, false);
+  assert.equal(parsed.reader.top.floating, false);
+});
+
+test('parseAdsSettingsFromForm only lets the bottom reader slot float', () => {
+  const parsed = parseAdsSettingsFromForm(
+    form({
+      adsReaderTopEnabled: '1',
+      adsReaderTopHtml: '<p>top</p>',
+      adsReaderTopFloating: '1',
+      adsReaderBottomEnabled: '1',
+      adsReaderBottomHtml: '<script>float()</script>',
+      adsReaderBottomFloating: '1',
+    }),
+  );
+  assert.equal(parsed.reader.bottom.floating, true);
+  assert.equal(parsed.reader.top.floating, false);
+  assert.equal(parsed.reader.middle.floating, false);
 });
 
 test('interleaveFeedAds places one slot per position, drawn from the intervals that land there', () => {
@@ -181,4 +200,36 @@ test('partial, absent, or invalid banner dimensions select automatic layout', ()
   assert.equal(parsed.reader.bottom.width, 0);
   assert.equal(parsed.reader.bottom.height, 0);
   assert.equal(parsed.feedSlots[0].width, 0);
+});
+
+test('a floating bottom reader slot survives the public config and gets a floating ad document', () => {
+  const legacy = parseSystemSettings({ ads: { reader: { bottom: { enabled: true, html: '<p>old</p>' } } } });
+  assert.equal(legacy.ads.reader.bottom.floating, false, 'settings saved before the option read as not floating');
+
+  const pub = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: {
+        reader: {
+          bottom: { enabled: true, html: '<ins id="u"></ins>', interval: 5, width: 640, height: 200, floating: true },
+        },
+      },
+    }),
+  );
+  assert.equal(pub.reader.bottom.floating, true);
+  assert.equal(pub.reader.middle.floating, false);
+
+  const floating = buildPublicHtmlAdDocument(pub, ['reader', 'bottom'], 'mid-1');
+  assert.ok(floating);
+  assert.match(floating, /"floating":true/);
+  assert.match(floating, /"width":0,"height":0/, 'the admin size does not box a floating unit');
+  assert.match(floating, /#hw-ad-content\{[^}]*width:100%;min-height:0;height:100%/);
+
+  const inline = buildPublicHtmlAdDocument(
+    toPublicAdsConfig(parseSystemSettings({ ads: { reader: { bottom: { enabled: true, html: '<p>x</p>', width: 320, height: 50 } } } })),
+    ['reader', 'bottom'],
+    'mid-2',
+  );
+  assert.ok(inline);
+  assert.match(inline, /"floating":false/);
+  assert.match(inline, /width:320px;height:50px/);
 });

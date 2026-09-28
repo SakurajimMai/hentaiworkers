@@ -1,6 +1,7 @@
 package de.ixacg.animestream.reader
 
 import de.ixacg.animestream.core.model.MangaPage
+import de.ixacg.animestream.core.model.ReaderAdSlot
 import kotlin.math.roundToInt
 
 data class VisibleReaderPage(
@@ -16,7 +17,24 @@ internal enum class ReaderPrefetchKind {
 
 internal data class ReaderPrefetchPage(val page: MangaPage, val kind: ReaderPrefetchKind)
 
+internal enum class ReaderBottomAd {
+    None,
+    AfterLastPage,
+    Floating,
+}
+
 object ReaderLogic {
+    /** Where the chapter-bottom ad goes; nothing until the first original page is displayed. */
+    internal fun bottomAdPlacement(
+        readerReady: Boolean,
+        slot: ReaderAdSlot,
+    ): ReaderBottomAd =
+        when {
+            !readerReady || !slot.enabled || slot.html.isBlank() -> ReaderBottomAd.None
+            slot.floating -> ReaderBottomAd.Floating
+            else -> ReaderBottomAd.AfterLastPage
+        }
+
     fun readingScale(scale: Float): Float = if (scale.isFinite()) scale.coerceIn(1f, MAX_READING_SCALE) else 1f
 
     fun boundedReadingOffsetX(

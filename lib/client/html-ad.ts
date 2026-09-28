@@ -15,12 +15,13 @@ export function buildHtmlAdSrcDoc(
   dimensions: AdDimensions = {},
   clickUrl = '',
   fill = false,
+  floating = false,
 ): string {
-  const { width, height } = normalizeAdDimensions(dimensions);
-  const config = JSON.stringify({ id: messageId, width, height, clickUrl: clickUrl.trim(), fill }).replace(/</g, '\\u003c');
+  const { width, height } = floating ? { width: 0, height: 0 } : normalizeAdDimensions(dimensions);
+  const config = JSON.stringify({ id: messageId, width, height, clickUrl: clickUrl.trim(), fill, floating }).replace(/</g, '\\u003c');
   const box = width
     ? `width:${width}px;height:${height}px;overflow:hidden`
-    : `width:100%;min-height:0${fill ? ';height:100%' : ''}`;
+    : `width:100%;min-height:0${fill || floating ? ';height:100%' : ''}`;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -37,11 +38,16 @@ img,video,iframe,ins{max-width:100%}iframe{border:0}
 </html>`;
 }
 
-export function parseHtmlAdSizeMessage(data: unknown, expectedId: string): number | null {
+/** `allowZero` is for floating slots, which report 0 once the unit is closed or has not drawn yet. */
+export function parseHtmlAdSizeMessage(
+  data: unknown,
+  expectedId: string,
+  { allowZero = false }: { allowZero?: boolean } = {},
+): number | null {
   if (!data || typeof data !== 'object') return null;
   const rec = data as Record<string, unknown>;
   if (rec.type !== HTML_AD_MESSAGE_TYPE || rec.id !== expectedId) return null;
-  if (typeof rec.h !== 'number' || !Number.isFinite(rec.h) || rec.h <= 0) return null;
+  if (typeof rec.h !== 'number' || !Number.isFinite(rec.h) || rec.h < 0 || (rec.h === 0 && !allowZero)) return null;
   return Math.min(MAX_AD_HEIGHT, Math.ceil(rec.h));
 }
 

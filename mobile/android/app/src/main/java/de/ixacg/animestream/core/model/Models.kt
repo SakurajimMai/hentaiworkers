@@ -166,6 +166,8 @@ data class ReaderAdSlot(
     val interval: Int = 5,
     val width: Int = 0,
     val height: Int = 0,
+    /** Bottom slot only: a self-positioning (悬浮) unit docked to the screen bottom while reading. */
+    val floating: Boolean = false,
 )
 
 @Serializable

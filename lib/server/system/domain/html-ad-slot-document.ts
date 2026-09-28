@@ -22,7 +22,9 @@ export function buildPublicHtmlAdDocument(
   if (ref.kind === 'reader') {
     const slot = ads.reader[ref.id];
     if (!slot?.html.trim()) return null;
-    return buildHtmlAdSrcDoc(slot.html, mid, resolveAdDimensions(slot));
+    return slot.floating
+      ? buildHtmlAdSrcDoc(slot.html, mid, {}, '', false, true)
+      : buildHtmlAdSrcDoc(slot.html, mid, resolveAdDimensions(slot));
   }
   const ad = ref.id === 'preroll' ? ads.player.preRollAd : ads.player.pauseAd;
   if (!ad.enabled || !ad.html.trim()) return null;

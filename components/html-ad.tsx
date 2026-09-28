@@ -25,6 +25,8 @@ export function HtmlAd({
   fitParent = false,
   contain = false,
   minHeight = 72,
+  floating = false,
+  onHeightChange,
   width = 0,
   height: creativeHeight = 0,
 }: {
@@ -38,12 +40,18 @@ export function HtmlAd({
   /** Letterbox a fixed creative inside the parent box (width and height), centred and never cropped. */
   contain?: boolean;
   minHeight?: number;
+  /**
+   * The creative pins itself to the viewport (悬浮). The frame follows the area it covers, 0 once
+   * closed; the admin size is ignored.
+   */
+  floating?: boolean;
+  onHeightChange?: (height: number) => void;
 } & AdDimensions) {
   const reactId = useId();
   const messageId = useMemo(() => reactId.replace(/:/g, ''), [reactId]);
   const dimensions = useMemo(
-    () => resolveAdDimensions({ width, height: creativeHeight, html }),
-    [width, creativeHeight, html],
+    () => (floating ? { width: 0, height: 0 } : resolveAdDimensions({ width, height: creativeHeight, html })),
+    [floating, width, creativeHeight, html],
   );
   const fixed = dimensions.width > 0;
   const useFill = fill && !fixed;
@@ -55,10 +63,11 @@ export function HtmlAd({
     () =>
       src
         ? undefined
-        : buildHtmlAdSrcDoc(html, messageId, dimensions, '', useFill),
-    [src, html, messageId, dimensions, useFill],
+        : buildHtmlAdSrcDoc(html, messageId, dimensions, '', useFill, floating),
+    [src, html, messageId, dimensions, useFill, floating],
   );
-  const initialHeight = Math.min(MAX_AD_HEIGHT, Math.max(1, minHeight));
+  // A floating frame starts 1px tall: the unit needs a laid-out viewport before it can be measured.
+  const initialHeight = floating ? 1 : Math.min(MAX_AD_HEIGHT, Math.max(1, minHeight));
   const [height, setHeight] = useState(initialHeight);
   const [scale, setScale] = useState(1);
   const [fillBox, setFillBox] = useState({ width: 0, height: 0 });
@@ -69,12 +78,16 @@ export function HtmlAd({
     setHeight(initialHeight);
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return;
-      const next = parseHtmlAdSizeMessage(event.data, messageId);
+      const next = parseHtmlAdSizeMessage(event.data, messageId, { allowZero: floating });
       if (next != null) setHeight(next);
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [messageId, initialHeight, html]);
+  }, [messageId, initialHeight, html, floating]);
+
+  useEffect(() => {
+    onHeightChange?.(height);
+  }, [height, onHeightChange]);
 
   useLayoutEffect(() => {
     const node = slot.current;

@@ -1,6 +1,7 @@
 package de.ixacg.animestream.reader
 
 import de.ixacg.animestream.core.model.MangaPage
+import de.ixacg.animestream.core.model.ReaderAdSlot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -253,5 +254,16 @@ class ReaderLogicTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `bottom ad waits for the first page and docks floating units to the screen bottom`() {
+        val inline = ReaderAdSlot(enabled = true, html = "<ins></ins>")
+        val floating = inline.copy(floating = true)
+        assertEquals(ReaderBottomAd.None, ReaderLogic.bottomAdPlacement(readerReady = false, slot = floating))
+        assertEquals(ReaderBottomAd.None, ReaderLogic.bottomAdPlacement(readerReady = true, slot = floating.copy(enabled = false)))
+        assertEquals(ReaderBottomAd.None, ReaderLogic.bottomAdPlacement(readerReady = true, slot = floating.copy(html = "  ")))
+        assertEquals(ReaderBottomAd.AfterLastPage, ReaderLogic.bottomAdPlacement(readerReady = true, slot = inline))
+        assertEquals(ReaderBottomAd.Floating, ReaderLogic.bottomAdPlacement(readerReady = true, slot = floating))
     }
 }

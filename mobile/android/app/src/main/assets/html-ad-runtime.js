@@ -82,11 +82,41 @@
       nativeAppend.call(content, node);
     }
   }
+  // Floating units pin themselves to the viewport (position:fixed; bottom:0) and add no height to
+  // the content box. Measure what their visible boxes cover instead; 0 once the unit is closed.
+  function visibleExtent(content) {
+    var top = Infinity;
+    var bottom = -Infinity;
+    var nodes = content.getElementsByTagName('*');
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') continue;
+      var rect = node.getBoundingClientRect();
+      if (!(rect.width > 0 && rect.height > 0)) continue;
+      if (getComputedStyle(node).visibility === 'hidden') continue;
+      if (rect.top < top) top = rect.top;
+      if (rect.bottom > bottom) bottom = rect.bottom;
+    }
+    return bottom > top ? bottom - top : 0;
+  }
   function report() {
     frame = 0;
     adoptOrphans();
     var content = document.getElementById('hw-ad-content');
     if (!content) return;
+    if (config.floating) {
+      // A transform would make the content box, not the viewport, the anchor of fixed units.
+      if (previousScale !== 1) {
+        content.style.transform = 'none';
+        previousScale = 1;
+      }
+      var floatingHeight = Math.min(600, Math.ceil(visibleExtent(content)));
+      if (floatingHeight === previousHeight) return;
+      previousHeight = floatingHeight;
+      if (parent !== window) parent.postMessage({ type: 'hw-ad-size', id: config.id, h: floatingHeight }, '*');
+      if (window.HtmlAdBridge) window.HtmlAdBridge.resize(config.id, floatingHeight);
+      return;
+    }
     if (config.fill) {
       if (previousScale !== 1) {
         content.style.transform = 'none';

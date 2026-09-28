@@ -16,7 +16,11 @@ object HtmlAdPolicy {
             Dimensions()
         }
 
-    fun measuredHeight(height: Double): Float? = height.takeIf { it.isFinite() && it > 0 }?.coerceAtMost(MAX_HEIGHT.toDouble())?.toFloat()
+    /** `allowZero` is for floating units, which report 0 once closed or before they draw. */
+    fun measuredHeight(
+        height: Double,
+        allowZero: Boolean = false,
+    ): Float? = height.takeIf { it.isFinite() && (it > 0 || (allowZero && it == 0.0)) }?.coerceAtMost(MAX_HEIGHT.toDouble())?.toFloat()
 
     /**
      * Scale that places a fixed creative inside a slot without cropping. Banners fit the slot

@@ -7,11 +7,13 @@ const pageCount = Number(params.get('count') || 80);
 const initialPage = Number(params.get('initial') || 0);
 const omittedPages = new Set((params.get('omitted') || '').split(',').filter(Boolean).map(Number));
 const directImages = params.get('direct') === '1';
+const floatingBottom = params.get('floating') === '1';
 const session = Promise.resolve({ available: true, authenticated: params.get('guest') !== '1' });
 const favorite = Promise.resolve({ available: true, favorited: false });
 const readerAds = Promise.resolve({
   topHtml: `<img src="/ad/${run}/top.png" width="640" height="72" alt="Test ad" />`,
   bottomHtml: `<img src="/ad/${run}/bottom.png" width="640" height="72" alt="Test ad" />`,
+  bottomFloating: floatingBottom,
 });
 const restored = params.get('restored');
 if (restored !== null) localStorage.setItem('manga-progress:42:1', restored);

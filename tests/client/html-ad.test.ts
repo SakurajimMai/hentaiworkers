@@ -48,6 +48,10 @@ test('ad reports and creative sizes stay bounded and reject invalid numbers', ()
     assert.equal(parseHtmlAdSizeMessage({ type: HTML_AD_MESSAGE_TYPE, id: 'ad', h }, 'ad'), null);
   }
   assert.equal(parseHtmlAdSizeMessage({ type: HTML_AD_MESSAGE_TYPE, id: 'ad', h: 20000 }, 'ad'), MAX_AD_HEIGHT);
+  // Floating slots collapse to 0 once the unit is closed; everything else still rejects 0.
+  assert.equal(parseHtmlAdSizeMessage({ type: HTML_AD_MESSAGE_TYPE, id: 'ad', h: 0 }, 'ad', { allowZero: true }), 0);
+  assert.equal(parseHtmlAdSizeMessage({ type: HTML_AD_MESSAGE_TYPE, id: 'ad', h: -1 }, 'ad', { allowZero: true }), null);
+  assert.equal(parseHtmlAdSizeMessage({ type: HTML_AD_MESSAGE_TYPE, id: 'ad', h: NaN }, 'ad', { allowZero: true }), null);
   assert.deepEqual(normalizeAdDimensions({ width: 970, height: 250 }), { width: 970, height: 250 });
   assert.deepEqual(normalizeAdDimensions({ width: 4000, height: 9000 }), { width: 1920, height: 600 });
   assert.deepEqual(normalizeAdDimensions({ width: 970 }), { width: 0, height: 0 });

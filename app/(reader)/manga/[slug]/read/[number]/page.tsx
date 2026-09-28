@@ -55,6 +55,7 @@ async function readReaderAds(): Promise<MangaReaderAds> {
       bottomHtml: ads.reader.bottom.enabled ? ads.reader.bottom.html : '',
       topSize: { width: ads.reader.top.width, height: ads.reader.top.height },
       bottomSize: { width: ads.reader.bottom.width, height: ads.reader.bottom.height },
+      bottomFloating: ads.reader.bottom.enabled && ads.reader.bottom.floating,
     };
   } catch (error) {
     console.error('readReaderAds failed', error);

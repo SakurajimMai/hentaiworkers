@@ -32,6 +32,12 @@
   `iframe { height:100% }` as 0 inside an absolute box. Fluid/fill documents must not apply
   `transform: scale(...)` — a 0 `innerWidth` before layout becomes `scale(0)` and the creative
   never recovers. Scale fixed creatives with ResizeObserver, not `100cqw`.
+- Floating (悬浮) units pin themselves to the viewport (`position:fixed; bottom:0`) and add no
+  height to the content box, so an in-flow slot measures 1px and a `transform` on `#hw-ad-content`
+  re-anchors them to that 0-height box (the creative ends up above the frame). The reader bottom slot's
+  `floating` flag runs the document with `config.floating`: no transform, height = the area covered by
+  visible descendants (0 once the unit closes), and the host docks the frame to the screen bottom,
+  reserving that height (`--reader-floating-ad-height` on web, list content padding on Android).
 - Creative dimensions are optional additions to the public API. Existing settings use automatic
   layout. When stored width/height are 0, infer CSS pixels from `atOptions` or `<iframe width height>`
   so Adsterra-style 300×250 units still expose that viewport. Fixed-size frames keep the creative's

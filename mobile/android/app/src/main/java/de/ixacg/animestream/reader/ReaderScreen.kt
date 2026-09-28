@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -70,6 +71,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -120,6 +122,10 @@ fun ReaderScreen(
     var visibleReaderPages by remember(readerRequestId, chapterKey) { mutableStateOf(setOf(initialPage)) }
     var readerReady by remember(readerRequestId, chapterKey) { mutableStateOf(false) }
     val topAdEnabled = readerReady && ads.reader.top.enabled && ads.reader.top.html.isNotBlank()
+    val bottomAd = ReaderLogic.bottomAdPlacement(readerReady, ads.reader.bottom)
+    var floatingAdHeight by remember(readerRequestId, chapterKey) { mutableStateOf(0.dp) }
+    var bottomChromeHeight by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
     val pageStartIndex = if (topAdEnabled) 1 else 0
     val initialListIndex =
         content?.let {
@@ -226,6 +232,8 @@ fun ReaderScreen(
                         state = listState,
                         userScrollEnabled = !canvasState.hasMultiplePointers,
                         modifier = Modifier.fillMaxSize(),
+                        // Keep 本话完 and the next-chapter button clear of a floating bottom ad.
+                        contentPadding = PaddingValues(bottom = if (bottomAd == ReaderBottomAd.Floating) floatingAdHeight else 0.dp),
                     ) {
                         if (topAdEnabled) {
                             item(key = "reader-top-ad") {
@@ -275,7 +283,7 @@ fun ReaderScreen(
                                 }
                             }
                         }
-                        if (readerReady && ads.reader.bottom.enabled && ads.reader.bottom.html.isNotBlank()) {
+                        if (bottomAd == ReaderBottomAd.AfterLastPage) {
                             item(key = "reader-bottom-ad") {
                                 HtmlAd(
                                     ads.reader.bottom.html,
@@ -288,6 +296,26 @@ fun ReaderScreen(
                     }
                 }
             }
+        }
+
+        if (bottomAd == ReaderBottomAd.Floating) {
+            // Above the page list, under the reader chrome; sits on top of the bottom bar while it shows.
+            val bottomChromeShown = chromeVisible && pages.isNotEmpty()
+            HtmlAd(
+                ads.reader.bottom.html,
+                modifier =
+                    Modifier.align(Alignment.BottomCenter).then(
+                        if (bottomChromeShown) {
+                            Modifier.padding(bottom = bottomChromeHeight)
+                        } else {
+                            Modifier.windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                            )
+                        },
+                    ),
+                floating = true,
+                onHeightChange = { floatingAdHeight = it.dp },
+            )
         }
 
         AnimatedVisibility(
@@ -340,7 +368,10 @@ fun ReaderScreen(
             visible = chromeVisible && pages.isNotEmpty(),
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier =
+                Modifier.align(Alignment.BottomCenter).onSizeChanged { size ->
+                    bottomChromeHeight = with(density) { size.height.toDp() }
+                },
         ) {
             Surface(color = Color(0xE6111111)) {
                 Column(

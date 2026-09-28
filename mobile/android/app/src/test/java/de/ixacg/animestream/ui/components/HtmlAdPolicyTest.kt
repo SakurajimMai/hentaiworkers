@@ -17,6 +17,12 @@ class HtmlAdPolicyTest {
         assertNull(HtmlAdPolicy.measuredHeight(Double.NaN))
         assertNull(HtmlAdPolicy.measuredHeight(Double.POSITIVE_INFINITY))
         assertNull(HtmlAdPolicy.measuredHeight(-1.0))
+        assertNull(HtmlAdPolicy.measuredHeight(0.0))
+        // Floating units collapse to 0 once closed; negative and non-finite reports stay rejected.
+        assertEquals(0f, HtmlAdPolicy.measuredHeight(0.0, allowZero = true))
+        assertEquals(129f, HtmlAdPolicy.measuredHeight(129.0, allowZero = true))
+        assertNull(HtmlAdPolicy.measuredHeight(-1.0, allowZero = true))
+        assertNull(HtmlAdPolicy.measuredHeight(Double.NaN, allowZero = true))
     }
 
     @Test
@@ -41,6 +47,9 @@ class HtmlAdPolicyTest {
         val old = json.decodeFromString<PublicAdsConfig>("""{"reader":{"top":{"enabled":true,"html":"<div>ad</div>"}}}""")
         assertEquals(0, old.reader.top.width)
         assertEquals(0, old.reader.top.height)
+        assertEquals(false, old.reader.bottom.floating)
+        val floating = json.decodeFromString<PublicAdsConfig>("""{"reader":{"bottom":{"enabled":true,"html":"<ins></ins>","floating":true}}}""")
+        assertEquals(true, floating.reader.bottom.floating)
         val sized =
             json.decodeFromString<PublicAdsConfig>(
                 """{"feedSlots":[{"enabled":true,"width":300,"height":250}],"reader":{"top":{"width":728,"height":90}}}""",

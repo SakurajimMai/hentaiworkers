@@ -13,17 +13,20 @@ export function parseAdsSettingsFromForm(formData: FormData) {
         enabled: formData.get('adsReaderTopEnabled') === '1',
         html: String(formData.get('adsReaderTopHtml') || '').slice(0, 20000),
         interval: 5,
+        floating: false,
       },
       middle: {
         enabled: false,
         html: '',
         interval: 5,
+        floating: false,
       },
       bottom: {
         ...parseDimensions(formData, 'adsReaderBottom'),
         enabled: formData.get('adsReaderBottomEnabled') === '1',
         html: String(formData.get('adsReaderBottomHtml') || '').slice(0, 20000),
         interval: 5,
+        floating: formData.get('adsReaderBottomFloating') === '1',
       },
     },
   };

@@ -148,6 +148,11 @@ export const readerAdSlotSchema = z.object({
   html: z.string().max(20000).default(''),
   /** Only used by the mid-chapter slot. */
   interval: z.number().int().min(1).max(50).default(5),
+  /**
+   * Bottom slot only: dock the creative to the bottom of the screen while reading, for alliance
+   * units that position themselves (悬浮/漂浮) instead of rendering in place. Size is ignored.
+   */
+  floating: z.boolean().default(false),
 });
 
 export const adsSettingsSchema = z.object({
@@ -294,7 +299,7 @@ export function toPublicAdsConfig(settings: SystemSettings): PublicAdsConfig {
     reader: {
       top: publicReaderSlot(settings.ads.reader.top),
       // Mid-chapter interval ads were removed from the reader UX.
-      middle: { enabled: false, html: '', interval: 5 },
+      middle: { enabled: false, html: '', interval: 5, floating: false },
       bottom: publicReaderSlot(settings.ads.reader.bottom),
     },
     player: {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,13 +35,16 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import org.json.JSONObject
 
-private class HtmlAdSizeBridge(private val onResize: (String, Float) -> Unit) {
+private class HtmlAdSizeBridge(
+    private val allowZero: Boolean,
+    private val onResize: (String, Float) -> Unit,
+) {
     @JavascriptInterface
     fun resize(
         id: String,
         height: Double,
     ) {
-        HtmlAdPolicy.measuredHeight(height)?.let { onResize(id, it) }
+        HtmlAdPolicy.measuredHeight(height, allowZero)?.let { onResize(id, it) }
     }
 }
 
@@ -55,17 +59,24 @@ fun HtmlAd(
     fill: Boolean = false,
     fitParent: Boolean = false,
     contain: Boolean = false,
+    // The creative pins itself to the viewport (悬浮): follow the area it covers, 0 once closed.
+    floating: Boolean = false,
+    onHeightChange: ((Float) -> Unit)? = null,
 ) {
     if (html.isBlank()) return
     val context = LocalContext.current
-    val dimensions = HtmlAdPolicy.dimensions(width, height)
-    val messageId = remember(html, dark, dimensions, clickUrl, fill) { UUID.randomUUID().toString() }
+    val dimensions = if (floating) HtmlAdPolicy.Dimensions() else HtmlAdPolicy.dimensions(width, height)
+    val messageId = remember(html, dark, dimensions, clickUrl, fill, floating) { UUID.randomUUID().toString() }
     val currentMessageId by rememberUpdatedState(messageId)
+    val currentOnHeightChange by rememberUpdatedState(onHeightChange)
     var webView by remember { mutableStateOf<WebView?>(null) }
-    var measuredHeight by remember { mutableFloatStateOf(72f) }
+    // A floating unit starts 1dp tall: it needs a laid-out viewport before it can be measured.
+    val initialHeight = if (floating) 1f else 72f
+    var measuredHeight by remember { mutableFloatStateOf(initialHeight) }
+    LaunchedEffect(measuredHeight) { currentOnHeightChange?.invoke(measuredHeight) }
     val runtime = remember(context) { context.assets.open("html-ad-runtime.js").bufferedReader().use { it.readText() } }
     val document =
-        remember(html, dark, dimensions, runtime, messageId, clickUrl, fill) {
+        remember(html, dark, dimensions, runtime, messageId, clickUrl, fill, floating) {
             val color = if (dark) "#F1ECE3" else "#1B1B1A"
             val target = JSONObject.quote(clickUrl.trim()).replace("<", "\\u003c")
             val sizing =
@@ -79,7 +90,7 @@ fun HtmlAd(
             <style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;color:$color;overflow:hidden}
             #hw-ad-content{display:flow-root;position:relative;transform-origin:top left;$sizing}
             img,video,iframe,ins{max-width:100%}iframe{border:0}a{color:#ffb59f}</style>
-            <script>window.__htmlAd={id:'$messageId',width:${dimensions.width},height:${dimensions.height},clickUrl:$target,fill:${if (fill) "true" else "false"}};$runtime</script>
+            <script>window.__htmlAd={id:'$messageId',width:${dimensions.width},height:${dimensions.height},clickUrl:$target,fill:${if (fill) "true" else "false"},floating:${if (floating) "true" else "false"}};$runtime</script>
             </head><body><div id="hw-ad-content">$html</div></body></html>
             """.trimIndent()
         }
@@ -98,7 +109,7 @@ fun HtmlAd(
                 1f
             }
         val displayWidth = if (fixed) minOf(maxWidth, dimensions.width.dp * scale) else maxWidth
-        val fillParent = fill || (!fixed && boundedHeight)
+        val fillParent = !floating && (fill || (!fixed && boundedHeight))
         val displayHeight =
             if (fixed) {
                 dimensions.height.dp * scale
@@ -138,7 +149,7 @@ fun HtmlAd(
                         settings.javaScriptCanOpenWindowsAutomatically = false
                         settings.setSupportMultipleWindows(false)
                         addJavascriptInterface(
-                            HtmlAdSizeBridge { id, next ->
+                            HtmlAdSizeBridge(allowZero = floating) { id, next ->
                                 post { if (webView === this && id == currentMessageId) measuredHeight = next }
                             },
                             "HtmlAdBridge",
@@ -173,7 +184,7 @@ fun HtmlAd(
                 },
                 update = { view ->
                     if (view.tag != document) {
-                        measuredHeight = 72f
+                        measuredHeight = initialHeight
                         view.tag = document
                         val frameUrl = "${MediaUrlNormalizer.origin}/ads/html"
                         view.loadDataWithBaseURL(frameUrl, document, "text/html", "utf-8", frameUrl)

@@ -60,6 +60,15 @@ const bundle = await build({
 const css = await postcss([tailwindcss(join(repository, 'tailwind.config.js'))])
   .process(await readFile(join(repository, 'app/globals.css'), 'utf8'), { from: join(repository, 'app/globals.css') });
 let origin;
+// Behaves like a 悬浮 alliance unit: a hidden <ins> that a script later pins to the viewport bottom
+// (position:fixed; bottom:0) with an absolutely positioned 129px banner and a close button.
+const FLOATING_CREATIVE = `<ins id="float-unit" style="display:none!important"></ins><script>setTimeout(function () {
+  var unit = document.getElementById('float-unit');
+  unit.style.cssText = 'display:block;width:100%;position:fixed;left:0;bottom:0;z-index:2147483647';
+  unit.innerHTML = '<div style="width:100%;position:absolute;bottom:0"><div id="banner" style="height:129px;background:#147d72"></div>'
+    + '<div id="close" style="position:absolute;right:6px;top:6px;width:20px;height:20px;background:#666">X</div></div>';
+  document.getElementById('close').onclick = function () { unit.style.display = 'none'; };
+}, 120);</script>`;
 const requests = [];
 const beacon = await sharp({ create: { width: 1, height: 1, channels: 3, background: '#fff' } }).png().toBuffer();
 const runtime = await readFile(join(repository, 'mobile/android/app/src/main/assets/html-ad-runtime.js'), 'utf8');
@@ -89,6 +98,13 @@ const server = createServer((request, response) => {
       iframe.src = location.protocol + '//' + location.host + '/embedded';
       document.body.appendChild(iframe);
     })();`);
+  } else if (path === '/floating-ad') {
+    const mid = new URL(request.url, origin).searchParams.get('mid') || 'ad';
+    const config = JSON.stringify({ id: mid, width: 0, height: 0, clickUrl: '', fill: false, floating: true });
+    response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(`<!DOCTYPE html><html><head>
+<meta charset="utf-8"/><style>html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden}#hw-ad-content{display:flow-root;position:relative;transform-origin:top left;width:100%;height:100%;min-height:0}</style>
+<script>window.__htmlAd=${config};${runtime}</script></head>
+<body><div id="hw-ad-content">${FLOATING_CREATIVE}</div></body></html>`);
   } else if (path === '/alliance-ad') {
     const mid = new URL(request.url, origin).searchParams.get('mid') || 'ad';
     const config = JSON.stringify({ id: mid, width: 300, height: 250, clickUrl: '' });
@@ -302,8 +318,21 @@ try {
     await popup.waitForURL(`${origin}/landing`);
     await popup.close();
   }
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const floating of [{ html: FLOATING_CREATIVE }, { html: '', documentSrc: '/floating-ad' }]) {
+    frame = await render({ ...floating, floating: true });
+    await heightIs(129);
+    const placed = await frame.evaluate(() => {
+      const banner = document.getElementById('banner').getBoundingClientRect();
+      return { top: banner.top, bottom: banner.bottom, viewport: innerHeight, transform: getComputedStyle(document.getElementById('hw-ad-content')).transform };
+    });
+    assert.equal(placed.transform, 'none', 'fixed units must anchor to the frame viewport, not a transformed box');
+    assert.ok(placed.top >= -0.5 && placed.bottom <= placed.viewport + 0.5, `the floating banner is fully inside its frame: ${JSON.stringify(placed)}`);
+    await frame.locator('#close').click();
+    await heightIs(0);
+  }
   assert.deepEqual(errors, []);
-  console.log(`HTML ads browser checks passed: desktop/mobile sizes, parser and async nested scripts, source isolation, resizing, embedded pixels, feed/player lifecycle and click URLs. Screenshots: ${artifacts}`);
+  console.log(`HTML ads browser checks passed: desktop/mobile sizes, parser and async nested scripts, source isolation, resizing, embedded pixels, feed/player lifecycle, click URLs and floating units. Screenshots: ${artifacts}`);
 } finally {
   if (browser) await browser.close();
   server.closeAllConnections();
