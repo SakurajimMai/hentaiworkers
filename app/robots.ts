@@ -12,7 +12,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         disallow: [
-          '/admin',
           '/api',
           '/ads/',
           '/search',
@@ -29,7 +28,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: ['GPTBot', 'ChatGPT-User', 'ClaudeBot', 'PerplexityBot', 'Google-Extended'],
         allow: ['/', '/browse', '/watch', '/manga', '/llms.txt'],
-        disallow: ['/admin', '/api', '/ads/', '/search', '/login', '/register', '/history', '/favorites', '/account'],
+        disallow: ['/api', '/ads/', '/search', '/login', '/register', '/history', '/favorites', '/account'],
       },
     ],
     // Index file; the chunked section files live under /sitemaps/*.xml.

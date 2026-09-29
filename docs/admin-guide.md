@@ -1,7 +1,8 @@
 # 后台管理手册
 
-后台地址为 `/admin`，登录页为 `/admin/login`。只有
-`role=admin` 且 `is_active=1` 的用户可以访问。
+管理员和普通用户一样在前台 `/login` 登录，登录后从顶部导航或「我的账号」进入后台 `/admin`。
+只有 `role=admin` 且 `is_active=1` 的用户可以访问。后台没有单独的登录页：未以管理员身份
+登录时，`/admin` 下的所有地址都和不存在的页面一样返回 404，`robots.txt` 也不列出它。
 
 ## 1. 首次登录
 
@@ -238,7 +239,7 @@ ABI 选择见 [移动端文档](./mobile.md)。
 | 项目 | 地址 / 位置 | 说明 |
 |------|-------------|------|
 | 站点地图索引 | `{SITE_URL}/sitemap.xml` | 索引文件，指向 `/sitemaps/pages.xml`、`animes-N.xml`、`mangas-N.xml`、`tags-N.xml`、`manga-tags-N.xml`；每个文件最多 10,000 条，详情页附带封面图片 |
-| robots | `{SITE_URL}/robots.txt` | 屏蔽后台、API、广告文档、搜索结果和账号页；声明站点地图 |
+| robots | `{SITE_URL}/robots.txt` | 屏蔽 API、广告文档、搜索结果和账号页（不列出后台，后台对外返回 404）；声明站点地图 |
 | 验证标签 | 系统设置 → 全局 Meta | 导入 `google-site-verification`、`msvalidate.01`（Bing）等 |
 | IndexNow | 系统设置 → 搜索引擎收录 | 填写密钥后，发布漫画、编辑或上下架里番/漫画时自动通知 Bing（Edge）、Yandex 等 |
 

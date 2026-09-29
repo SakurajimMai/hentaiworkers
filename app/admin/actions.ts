@@ -34,7 +34,7 @@ import { normalizeMangaTagQuery, normalizeMangaTags } from '@/lib/manga-tags';
 
 function mapAuthRedirect(error: unknown, fallback: string): never {
   if (error instanceof AppError) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     if (error.details?.field === 'current') redirect('/admin/account?error=current');
     if (error.details?.field === 'next' || error.message.includes('8')) {
       redirect('/admin/account?error=short');
@@ -43,23 +43,9 @@ function mapAuthRedirect(error: unknown, fallback: string): never {
   redirect(fallback);
 }
 
-export async function actionLogin(formData: FormData): Promise<void> {
-  const username = String(formData.get('username') || '').trim();
-  const password = String(formData.get('password') || '');
-  try {
-    const user = await getIdentityService().login(username, password);
-    if (!user || user.role !== 'admin') {
-      redirect('/admin/login?error=1');
-    }
-    redirect('/admin');
-  } catch {
-    redirect('/admin/login?error=1');
-  }
-}
-
 export async function actionLogout(): Promise<void> {
   await getIdentityService().logout();
-  redirect('/admin/login');
+  redirect('/');
 }
 
 export async function actionChangePassword(formData: FormData): Promise<void> {
@@ -75,7 +61,7 @@ export async function actionChangePassword(formData: FormData): Promise<void> {
   try {
     const admin = await getIdentityService().requireAdmin();
     await getIdentityService().changePassword(admin.id, current, next);
-    redirect('/admin/login?ok=password');
+    redirect('/login?ok=password');
   } catch (error) {
     mapAuthRedirect(error, '/admin/account?error=1');
   }
@@ -114,7 +100,7 @@ export async function actionSaveAnime(formData: FormData): Promise<void> {
       redirect('/admin/animes?error=required');
     }
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     throw error;
   }
@@ -135,7 +121,7 @@ export async function actionDeleteAnime(formData: FormData): Promise<void> {
       redirect('/admin/animes?error=id');
     }
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     throw error;
   }
@@ -154,7 +140,7 @@ export async function actionToggleAnime(formData: FormData): Promise<void> {
     redirect('/admin/animes');
   } catch (error) {
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     throw error;
   }
@@ -189,7 +175,7 @@ export async function actionBatchAnimes(formData: FormData): Promise<void> {
     after(() => notifyIndexNow([...ids.map((id) => `/watch/${id}`), '/', '/browse']));
     redirect(`/admin/animes?ok=batch_${operation}&n=${ids.length}`);
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -224,7 +210,7 @@ export async function actionSaveManga(formData: FormData): Promise<void> {
     if (error instanceof AppError && error.code === 'RESULT_CONFLICT') {
       redirect(`/admin/mangas/${id}?error=slug`);
     }
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -241,7 +227,7 @@ export async function actionToggleManga(formData: FormData): Promise<void> {
     after(() => notifyIndexNow(mangaIndexNowPaths(id)));
     redirect('/admin/mangas?ok=manga_updated');
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -256,7 +242,7 @@ export async function actionDeleteManga(formData: FormData): Promise<void> {
     after(() => notifyIndexNow(mangaIndexNowPaths(id)));
     redirect('/admin/mangas?ok=deleted');
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -289,7 +275,7 @@ export async function actionDeleteMangaChapter(formData: FormData): Promise<void
     after(() => notifyIndexNow(mangaIndexNowPaths(mangaId)));
     redirect(mangaAdminReturnTo(formData, mangaId, 'ok=chapter_deleted'));
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -306,7 +292,7 @@ export async function actionDeleteMangaPage(formData: FormData): Promise<void> {
     after(() => notifyIndexNow(mangaIndexNowPaths(mangaId)));
     redirect(mangaAdminReturnTo(formData, mangaId, 'ok=page_deleted'));
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -325,7 +311,7 @@ export async function actionSaveMangaPage(formData: FormData): Promise<void> {
     if (error instanceof AppError && error.code === 'RESULT_INVALID') {
       redirect(mangaAdminReturnTo(formData, mangaId, 'error=page_url'));
     }
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -357,7 +343,7 @@ export async function actionSaveMangaPageUrls(formData: FormData): Promise<void>
     if (error instanceof AppError && error.code === 'RESULT_INVALID') {
       redirect(mangaAdminReturnTo(formData, mangaId, 'error=page_url'));
     }
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -374,7 +360,7 @@ export async function actionToggleMangaChapter(formData: FormData): Promise<void
     after(() => notifyIndexNow(mangaIndexNowPaths(mangaId)));
     redirect(mangaAdminReturnTo(formData, mangaId, 'ok=chapter_updated'));
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -397,7 +383,7 @@ export async function actionSaveTag(formData: FormData): Promise<void> {
       redirect('/admin/tags?error=name');
     }
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     throw error;
   }
@@ -418,7 +404,7 @@ export async function actionDeleteTag(formData: FormData): Promise<void> {
       redirect(`/admin/tags?error=linked&count=${count}`);
     }
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     throw error;
   }
@@ -450,7 +436,7 @@ export async function actionAddMangaTag(formData: FormData): Promise<void> {
     after(() => notifyIndexNow(mangaTagIndexNowPaths(name)));
     redirect(`/admin/manga-tags?ok=added&tag=${encodeURIComponent(name)}`);
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -473,7 +459,7 @@ export async function actionRenameMangaTag(formData: FormData): Promise<void> {
     if (error instanceof AppError && error.code === 'RESULT_INVALID') {
       redirect('/admin/manga-tags?error=name');
     }
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -489,7 +475,7 @@ export async function actionDeleteMangaTag(formData: FormData): Promise<void> {
     after(() => notifyIndexNow(mangaTagIndexNowPaths(name)));
     redirect(`/admin/manga-tags?ok=deleted&n=${affected}&tag=${encodeURIComponent(name)}`);
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     throw error;
   }
 }
@@ -498,7 +484,7 @@ export async function actionDeleteUser(formData: FormData): Promise<void> {
   try {
     await getIdentityService().deleteUser(Number(formData.get('id')));
   } catch (error) {
-    if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+    if (isAuthRequiredError(error)) redirect('/login');
     if (error instanceof AppError) redirect('/admin/users?error=delete');
     throw error;
   }
@@ -543,7 +529,7 @@ export async function actionSaveUser(formData: FormData): Promise<void> {
       redirect('/admin/users?error=exists');
     }
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     throw error;
   }
@@ -627,7 +613,7 @@ export async function actionSaveSystemSettings(formData: FormData): Promise<void
     redirect('/admin/settings?ok=1');
   } catch (error) {
     if (error instanceof AppError) {
-      if (isAuthRequiredError(error)) redirect('/admin/login?error=1');
+      if (isAuthRequiredError(error)) redirect('/login');
       if (error.message.includes('SMTP')) redirect('/admin/settings?error=verify_smtp');
       if (error.details?.field === 'siteSeo') redirect('/admin/settings?error=seo');
       if (error.details?.field === 'siteMetaTags') redirect('/admin/settings?error=meta');
@@ -648,7 +634,7 @@ export async function actionSendSmtpTest(formData: FormData): Promise<void> {
     redirect('/admin/settings?ok=smtp');
   } catch (error) {
     if (isAuthRequiredError(error)) {
-      redirect('/admin/login?error=1');
+      redirect('/login');
     }
     if (error && typeof error === 'object' && 'digest' in error) throw error;
     redirect('/admin/settings?error=smtp');

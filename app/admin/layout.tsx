@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { actionLogout } from './actions';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -8,18 +9,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     getSession(),
     getSiteSeo().catch(() => ({ title: 'AnimeStream' })),
   ]);
-  const isAuthed = session.isLoggedIn && session.role === 'admin';
-
-  if (!isAuthed) {
-    return (
-      <div className="min-h-dvh bg-background text-foreground">
-        <a href="#admin-main" className="skip-link">
-          跳到主要内容
-        </a>
-        <div id="admin-main">{children}</div>
-      </div>
-    );
-  }
+  // The middleware already answers 404 without an admin cookie; never render the console shell for
+  // anyone else. Pages still verify the account against the database with requireAdmin.
+  if (!session.isLoggedIn || session.role !== 'admin') notFound();
 
   return (
     <div className="min-h-dvh bg-background text-foreground">

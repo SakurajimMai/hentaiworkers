@@ -20,10 +20,6 @@ export async function requireAdmin(): Promise<UserRecord> {
   return getIdentityService().requireAdmin();
 }
 
-export async function loginUser(username: string, password: string) {
-  return getIdentityService().login(username, password);
-}
-
 export async function loginPublicUser(emailOrUsername: string, password: string) {
   return getIdentityService().loginPublic(emailOrUsername, password);
 }

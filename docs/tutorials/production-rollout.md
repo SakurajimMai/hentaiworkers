@@ -223,7 +223,7 @@ unset ADMIN_BOOTSTRAP_USER ADMIN_BOOTSTRAP_PASSWORD
 
 密码不得使用常见密码或包含 `change-me`、`replace-with`、
 `admin123`、`password`、`example` 等占位词。已有管理员时 seed 会跳过。
-登录后在 `/admin/account` 修改密码。后台操作见
+在前台 `/login` 登录后，到 `/admin/account` 修改密码。后台操作见
 [后台管理手册](../admin-guide.md)。
 
 ## 8. 配置 HTTPS 反向代理

@@ -147,7 +147,7 @@ unset ADMIN_BOOTSTRAP_USER ADMIN_BOOTSTRAP_PASSWORD
 
 用户名必须是邮箱。密码不能包含 `change-me`、`replace-with`、
 `admin123`、`password` 或 `example` 等占位词。已有管理员时命令会跳过。
-完成后登录 `/admin/account` 修改密码。
+完成后在 `/login` 登录，再到 `/admin/account` 修改密码。
 
 ## 6. 检查命令
 
