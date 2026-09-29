@@ -23,12 +23,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -323,75 +320,41 @@ fun FeedAdCard(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = InkRaised),
-        shape = RoundedCornerShape(6.dp),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    ad.name.ifBlank { "推广" },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                if (ad.href.isNotBlank()) {
-                    IconButton(
-                        onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ad.href))) } },
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(Icons.Default.OpenInBrowser, contentDescription = "打开广告链接")
-                    }
-                }
+    val openLink: (() -> Unit)? =
+        ad.href.takeIf { it.isNotBlank() }?.let { href ->
+            { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(href))) } }
+        }
+    // Like the web card: a bare poster cell. The slot name (信息流广告 N) is an admin label and is never shown.
+    val cell = modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp))
+    val clickable = if (openLink != null) Modifier.clickable(onClick = openLink) else Modifier
+    val fixed = HtmlAdPolicy.dimensions(ad.width, ad.height).width > 0
+    val imageUrl = remember(ad.html) { FeedAdCreative.imageUrl(ad.html) }
+    when {
+        ad.html.isBlank() -> {
+            // Match the web placeholder: an empty slot still reserves one poster cell.
+            Box(cell.background(InkRaised).then(clickable), contentAlignment = Alignment.Center) {
+                Text("广告位招租", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            val fixed = HtmlAdPolicy.dimensions(ad.width, ad.height).width > 0
-            val imageUrl = remember(ad.html) { FeedAdCreative.imageUrl(ad.html) }
-            when {
-                ad.html.isBlank() -> {
-                    // Match the web placeholder: an empty slot still reserves one poster cell.
-                    Box(
-                        Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)).background(InkRaised),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("广告位招租", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                imageUrl != null -> {
-                    // A picture goes through the loader that already fetches every poster, and is
-                    // letterboxed in the cell whether or not the slot carries pixel dimensions.
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .then(
-                                if (ad.href.isBlank()) {
-                                    Modifier
-                                } else {
-                                    Modifier.clickable {
-                                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ad.href))) }
-                                    }
-                                },
-                            ),
-                    ) {
-                        RemoteImage(
-                            url = imageUrl,
-                            contentDescription = ad.name.ifBlank { "广告" },
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit,
-                        )
-                    }
-                }
-                else -> {
-                    Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
-                        if (fixed) {
-                            // A sized creative is letterboxed inside the poster cell; never crop it.
-                            HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), width = ad.width, height = ad.height, contain = true)
-                        } else {
-                            HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), fill = true)
-                        }
-                    }
+        }
+        imageUrl != null -> {
+            // A picture goes through the loader that already fetches every poster, and is
+            // letterboxed in the cell whether or not the slot carries pixel dimensions.
+            Box(cell.background(InkRaised).then(clickable)) {
+                RemoteImage(
+                    url = imageUrl,
+                    contentDescription = "广告",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        }
+        else -> {
+            Box(cell) {
+                if (fixed) {
+                    // A sized creative is letterboxed inside the poster cell; never crop it.
+                    HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), width = ad.width, height = ad.height, contain = true)
+                } else {
+                    HtmlAd(ad.html, modifier = Modifier.fillMaxSize(), fill = true)
                 }
             }
         }
