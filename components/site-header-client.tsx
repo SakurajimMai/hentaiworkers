@@ -229,7 +229,7 @@ export function SiteHeaderClient({
             <div className="md:hidden">
               <button
                 type="button"
-                className="fixed inset-0 z-[80] bg-ink/40 backdrop-blur-sm transition-opacity"
+                className="fixed inset-0 z-[80] bg-scrim/40 backdrop-blur-sm transition-opacity"
                 aria-label="关闭菜单"
                 onClick={() => setMenuOpen(false)}
               />

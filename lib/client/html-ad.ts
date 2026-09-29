@@ -53,7 +53,7 @@ export function parseHtmlAdSizeMessage(
 
 /** ArtPlayer inserts HTML strings; an iframe gives embedded scripts a real document. */
 export function buildPlayerHtmlAd(html: string, clickUrl = '', documentSrc = ''): string {
-  const attrs = `title="广告" sandbox="${HTML_AD_SANDBOX}" referrerpolicy="no-referrer-when-downgrade" scrolling="no" src="about:blank" style="display:block;width:100%;height:100%;border:0;background:transparent"`;
+  const attrs = `title="广告" sandbox="${HTML_AD_SANDBOX}" referrerpolicy="no-referrer-when-downgrade" scrolling="no" src="about:blank" style="display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:normal"`;
   if (documentSrc.trim()) {
     const src = htmlAdDocumentUrl(documentSrc.trim(), 'player-ad');
     return `<iframe ${attrs} data-html-ad-src="${escapeHtmlAttr(src)}"></iframe>`;

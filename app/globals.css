@@ -46,6 +46,12 @@
     --reader-chrome: 40 22% 98%;
     --reader-image-filter: none;
     --grain-opacity: 0.035;
+    /* Overlays on artwork and video (gradients, badges, arrows, dialog backdrops) stay dark in both
+       themes: --ink turns light at night, and an ink scrim then washes images out and hides the
+       white text on it. Deliberately not overridden in the dark theme. */
+    --scrim: 30 6% 10%;
+    --scrim-foreground: 40 18% 96.5%;
+    --skeleton-shine: 0 0% 100% / 0.45;
   }
 
   :root[data-theme="dark"] {
@@ -82,6 +88,9 @@
     --reader-chrome: 240 8% 8%;
     --reader-image-filter: brightness(0.86) saturate(0.94);
     --grain-opacity: 0.055;
+    --destructive: 4 62% 64%;
+    --destructive-foreground: 240 7% 8%;
+    --skeleton-shine: 0 0% 100% / 0.06;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -117,6 +126,9 @@
       --reader-chrome: 240 8% 8%;
       --reader-image-filter: brightness(0.86) saturate(0.94);
       --grain-opacity: 0.055;
+      --destructive: 4 62% 64%;
+      --destructive-foreground: 240 7% 8%;
+      --skeleton-shine: 0 0% 100% / 0.06;
     }
   }
 
@@ -680,7 +692,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.45),
+      hsl(var(--skeleton-shine)),
       transparent
     );
     animation: shimmer 1.6s infinite;

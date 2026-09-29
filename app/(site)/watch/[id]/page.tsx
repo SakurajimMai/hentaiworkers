@@ -128,7 +128,7 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
           返回里番馆
         </HistoryBackLink>
 
-        <div className="overflow-hidden rounded-2xl border border-border bg-ink shadow-ink">
+        <div className="overflow-hidden rounded-2xl border border-border bg-scrim shadow-ink">
           <AspectRatio ratio={16 / 9}>
             <WatchPlayer
               animeId={id}

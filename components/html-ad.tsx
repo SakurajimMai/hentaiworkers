@@ -136,8 +136,12 @@ export function HtmlAd({
       sandbox={HTML_AD_SANDBOX}
       referrerPolicy="no-referrer-when-downgrade"
       scrolling="no"
-      style={
-        fixed
+      // The ad document never declares a color scheme. If the frame inherited the dark page scheme,
+      // browsers would paint its canvas opaque white, so every uncovered pixel of a creative
+      // (letterboxing, transparent PNGs, a closed floating unit) became a white box at night.
+      style={{
+        colorScheme: 'normal',
+        ...(fixed
           ? {
               position: 'absolute',
               top: 0,
@@ -172,8 +176,8 @@ export function HtmlAd({
                 border: 0,
                 display: 'block',
                 background: 'transparent',
-              }
-      }
+              }),
+      }}
     />
   );
 

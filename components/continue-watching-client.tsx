@@ -45,8 +45,8 @@ function ProgressCard({
           className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           variant="poster"
         />
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-ink/25">
-          <div className="h-full bg-background" style={{ width: `${pct}%` }} />
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-scrim/25">
+          <div className="h-full bg-scrim-foreground" style={{ width: `${pct}%` }} />
         </div>
       </div>
       <div>

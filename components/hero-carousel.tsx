@@ -68,7 +68,7 @@ export function HeroCarousel({
 
   return (
     <div
-      className="hero-carousel relative w-full overflow-hidden rounded-2xl border border-border bg-ink shadow-ink sm:rounded-3xl"
+      className="hero-carousel relative w-full overflow-hidden rounded-2xl border border-border bg-scrim shadow-ink sm:rounded-3xl"
       role="region"
       aria-roledescription="carousel"
       aria-label="精选作品"
@@ -121,7 +121,7 @@ export function HeroCarousel({
                 />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/25 to-ink/20 sm:bg-gradient-to-r sm:from-ink/85 sm:via-ink/48 sm:to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-scrim/80 via-scrim/25 to-scrim/20 sm:bg-gradient-to-r sm:from-scrim/85 sm:via-scrim/48 sm:to-transparent" />
             <div className="relative z-10 flex h-full min-h-0 items-end">
               <div className="w-full max-w-lg min-w-0 overflow-hidden px-4 pb-9 sm:px-10 sm:pb-14">
                 <div className="mb-2.5 hidden sm:inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-meta text-[11px] normal-case tracking-normal text-white/90 backdrop-blur-md border border-white/10">
@@ -175,7 +175,7 @@ export function HeroCarousel({
             type="button"
             aria-label="上一张"
             onClick={() => go(active - 1)}
-            className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
+            className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-scrim/50 text-white backdrop-blur-md transition-all hover:bg-scrim/75 hover:scale-105 active:scale-95 sm:grid cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
           >
             <IconChevronLeft size={18} />
           </button>
@@ -183,11 +183,11 @@ export function HeroCarousel({
             type="button"
             aria-label="下一张"
             onClick={() => go(active + 1)}
-            className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-ink/50 text-white backdrop-blur-md transition-all hover:bg-ink/75 hover:scale-105 active:scale-95 sm:grid cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
+            className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-white/20 bg-scrim/50 text-white backdrop-blur-md transition-all hover:bg-scrim/75 hover:scale-105 active:scale-95 sm:grid cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
           >
             <IconChevronRight size={18} />
           </button>
-          <div className="absolute bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100%-1rem)] flex-wrap -translate-x-1/2 items-center justify-center rounded-full bg-ink/40 px-1 backdrop-blur-sm sm:bottom-5 sm:left-auto sm:right-5 sm:translate-x-0">
+          <div className="absolute bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100%-1rem)] flex-wrap -translate-x-1/2 items-center justify-center rounded-full bg-scrim/40 px-1 backdrop-blur-sm sm:bottom-5 sm:left-auto sm:right-5 sm:translate-x-0">
             {items.map((item, idx) => (
               // The dot stays 8px; the button around it carries the 24px target the pointer needs.
               <button

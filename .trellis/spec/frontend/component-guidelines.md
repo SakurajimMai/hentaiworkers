@@ -71,6 +71,13 @@ Questions to answer:
 - Placeholders take `--muted-foreground` from the base layer. Preflight's own rule is
   `input::placeholder`, so an override needs the same selector to win; a bare `::placeholder` does
   not. Do not thin the placeholder with an alpha: 75% of the muted token falls to 3.1:1.
+- `--ink` is the text colour and turns light in the dark theme. Anything laid over artwork or
+  video (gradients, badges, carousel arrows/dots, player canvas) and dialog/menu backdrops use
+  `scrim` / `scrim-foreground`, which stay dark in both themes; an `ink` overlay becomes a white fog
+  that hides the white text on it at night. Inverted controls (`bg-ink text-background`) stay on ink.
+- The dark palette is declared twice (chosen theme and system theme); keep both blocks identical.
+  Ad iframes set `color-scheme: normal`: a frame inheriting the dark scheme gets an opaque white
+  canvas behind every uncovered pixel of the creative. `tests/client/theme-tokens.test.ts` guards all three.
 - Controls meet the 24×24 CSS px web target. Keep a small visual (carousel dot, inline text link)
   and give the control around it `min-h-6`/`h-6 w-6` rather than enlarging the glyph. Quiet text
   links take `.link-soft`, which carries the target and the hover colour.

@@ -35,8 +35,8 @@ export function MangaCard({
             loading="lazy"
           />
         </AspectRatio>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-90" />
-        <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-ink/75 px-2.5 py-0.5 font-meta text-[10px] normal-case tracking-normal text-white shadow-sm backdrop-blur-md">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-scrim/60 via-transparent to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-90" />
+        <span className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-scrim/75 px-2.5 py-0.5 font-meta text-[10px] normal-case tracking-normal text-white shadow-sm backdrop-blur-md">
           <span className="tabular font-medium">P{manga.pageCount != null && manga.pageCount > 0 ? manga.pageCount : '—'}</span>
         </span>
       </div>

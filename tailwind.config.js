@@ -52,6 +52,11 @@ const tailwindConfig = {
           DEFAULT: 'hsl(var(--ink))',
           soft: 'hsl(var(--ink-soft))',
         },
+        // Dark in both themes: overlays on artwork/video and dialog backdrops (see --scrim).
+        scrim: {
+          DEFAULT: 'hsl(var(--scrim))',
+          foreground: 'hsl(var(--scrim-foreground))',
+        },
         surface: {
           DEFAULT: 'hsl(var(--surface))',
           2: 'hsl(var(--surface-2))',
