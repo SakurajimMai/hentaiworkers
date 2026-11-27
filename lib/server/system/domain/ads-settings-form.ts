@@ -1,10 +1,24 @@
-import { MAX_FEED_ADS, type FeedAdSlot } from './settings';
+import { BANNER_AD_PLACEMENTS, type BannerAdPlacement } from '@/lib/html-ad-document';
+import { MAX_FEED_ADS, type BannerAdSlot, type FeedAdSlot } from './settings';
 import { normalizeAdDimensions } from '@/lib/ad-dimensions';
 
 /**
- * Pure admin form parser for native feed + manga-reader ads.
+ * Pure admin form parser for native feed + manga-reader + banner/script/smartlink ads.
  */
 export function parseAdsSettingsFromForm(formData: FormData) {
+  const banner = (suffix: 'Home' | 'Watch' | 'Manga'): BannerAdSlot => ({
+    enabled: formData.get(`adsBanner${suffix}Enabled`) === '1',
+    desktopHtml: String(formData.get(`adsBanner${suffix}DesktopHtml`) || '').slice(0, 20000),
+    mobileHtml: String(formData.get(`adsBanner${suffix}MobileHtml`) || '').slice(0, 20000),
+  });
+
+  const banners: Record<BannerAdPlacement, BannerAdSlot> = {
+    home: banner('Home'),
+    watch: banner('Watch'),
+    manga: banner('Manga'),
+  };
+  void BANNER_AD_PLACEMENTS;
+
   return {
     feedSlots: parseFeedSlotsFromForm(formData),
     reader: {
@@ -28,6 +42,21 @@ export function parseAdsSettingsFromForm(formData: FormData) {
         interval: 5,
         floating: formData.get('adsReaderBottomFloating') === '1',
       },
+    },
+    banners,
+    scripts: {
+      socialBar: {
+        enabled: formData.get('adsSocialBarEnabled') === '1',
+        html: String(formData.get('adsSocialBarHtml') || '').slice(0, 20000),
+      },
+      popunder: {
+        enabled: formData.get('adsPopunderEnabled') === '1',
+        html: String(formData.get('adsPopunderHtml') || '').slice(0, 20000),
+      },
+    },
+    smartlink: {
+      enabled: formData.get('adsSmartlinkEnabled') === '1',
+      url: String(formData.get('adsSmartlinkUrl') || '').trim().slice(0, 1000),
     },
   };
 }
@@ -135,4 +164,18 @@ export function interleaveFeedAds<T>(
     slots.push({ type: 'ad', key: `ad-${adIndex}-${seen}`, ad, adIndex });
   });
   return slots;
+}
+
+export function withSmartlinkFallback(
+  slots: readonly FeedAdSlot[],
+  smartlinkUrl: string,
+): FeedAdSlot[] {
+  const url = smartlinkUrl.trim();
+  if (!url) return slots.map((slot) => ({ ...slot }));
+  return slots.map((slot) => {
+    if (!slot.html.trim() && !slot.href.trim()) {
+      return { ...slot, href: url };
+    }
+    return { ...slot };
+  });
 }

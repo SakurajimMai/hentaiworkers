@@ -1,6 +1,11 @@
 import { resolveAdDimensions } from '@/lib/ad-dimensions';
 import { buildHtmlAdSrcDoc } from '@/lib/client/html-ad';
-import { parseHtmlAdDocumentRef, sanitizeHtmlAdMessageId } from '@/lib/html-ad-document';
+import {
+  parseHtmlAdDocumentRef,
+  sanitizeHtmlAdMessageId,
+  type BannerAdPlacement,
+  type BannerAdVariant,
+} from '@/lib/html-ad-document';
 import type { PublicAdsConfig } from './settings';
 
 export function buildPublicHtmlAdDocument(
@@ -26,7 +31,13 @@ export function buildPublicHtmlAdDocument(
       ? buildHtmlAdSrcDoc(slot.html, mid, {}, '', false, true)
       : buildHtmlAdSrcDoc(slot.html, mid, resolveAdDimensions(slot));
   }
+  if (ref.kind === 'banner') {
+    const [placement, variant] = ref.id.split('-') as [BannerAdPlacement, BannerAdVariant];
+    const html = ads.banners[placement]?.[`${variant}Html`] ?? '';
+    if (!html.trim()) return null;
+    return buildHtmlAdSrcDoc(html, mid, resolveAdDimensions({ html }));
+  }
   const ad = ref.id === 'preroll' ? ads.player.preRollAd : ads.player.pauseAd;
   if (!ad.enabled || !ad.html.trim()) return null;
-  return buildHtmlAdSrcDoc(ad.html, mid, {}, ad.clickUrl);
+  return buildHtmlAdSrcDoc(ad.html, mid, {}, ad.clickUrl.trim() || ads.smartlinkUrl);
 }

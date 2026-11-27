@@ -640,3 +640,36 @@ export async function actionSendSmtpTest(formData: FormData): Promise<void> {
     redirect('/admin/settings?error=smtp');
   }
 }
+
+export async function actionSyncAdsterra(formData: FormData): Promise<void> {
+  try {
+    await getIdentityService().requireAdmin();
+    const { getSystemSettingsService } = await import('@/lib/server/system');
+    const apiKey = String(formData.get('adsterraApiKey') || '') || undefined;
+    const result = await getSystemSettingsService().syncAdsterra({ apiKey });
+    revalidateTag(SITE_META_CACHE_TAG);
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/settings');
+    revalidatePath('/');
+    revalidatePath('/login');
+    revalidatePath('/register');
+    revalidatePath('/watch');
+    revalidatePath('/browse');
+    revalidatePath('/manga');
+    redirect(`/admin/settings?ok=adsterra&n=${result.placements}#ads`);
+  } catch (error) {
+    if (isAuthRequiredError(error)) {
+      redirect('/login');
+    }
+    if (error && typeof error === 'object' && 'digest' in error) throw error;
+    if (error instanceof AppError) {
+      if (error.details?.field === 'adsterraApiKey') {
+        redirect('/admin/settings?error=adsterra_key#ads');
+      }
+      if (error.details?.field === 'adsterra' && error.details?.reason === 'unauthorized') {
+        redirect('/admin/settings?error=adsterra_auth#ads');
+      }
+    }
+    redirect('/admin/settings?error=adsterra#ads');
+  }
+}

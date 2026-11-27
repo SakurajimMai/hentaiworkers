@@ -3,8 +3,13 @@ import test from 'node:test';
 import {
   interleaveFeedAds,
   parseAdsSettingsFromForm,
+  withSmartlinkFallback,
 } from '../../lib/server/system/domain/ads-settings-form';
-import { parseSystemSettings, toPublicAdsConfig } from '../../lib/server/system/domain/settings';
+import {
+  parseSystemSettings,
+  toPublicAdsConfig,
+  toPublicPlayerConfig,
+} from '../../lib/server/system/domain/settings';
 import { buildPublicHtmlAdDocument } from '../../lib/server/system/domain/html-ad-slot-document';
 
 function form(entries: Record<string, string>): FormData {
@@ -232,4 +237,125 @@ test('a floating bottom reader slot survives the public config and gets a floati
   assert.ok(inline);
   assert.match(inline, /"floating":false/);
   assert.match(inline, /width:320px;height:50px/);
+});
+
+test('parseAdsSettingsFromForm parses banners, global scripts and smartlink fields', () => {
+  const parsed = parseAdsSettingsFromForm(
+    form({
+      adsBannerHomeEnabled: '1',
+      adsBannerHomeDesktopHtml: '<div>home-d</div>',
+      adsBannerHomeMobileHtml: '<div>home-m</div>',
+      adsBannerWatchEnabled: '1',
+      adsBannerWatchDesktopHtml: '<div>watch-d</div>',
+      adsBannerMangaMobileHtml: '<div>manga-m</div>',
+      adsSocialBarEnabled: '1',
+      adsSocialBarHtml: '<script src="https://ads.example/sb.js"></script>',
+      adsPopunderHtml: '<script src="https://ads.example/pop.js"></script>',
+      adsSmartlinkEnabled: '1',
+      adsSmartlinkUrl: '  https://smart.example/go  ',
+    }),
+  );
+
+  assert.equal(parsed.banners.home.enabled, true);
+  assert.equal(parsed.banners.home.desktopHtml, '<div>home-d</div>');
+  assert.equal(parsed.banners.home.mobileHtml, '<div>home-m</div>');
+  assert.equal(parsed.banners.watch.enabled, true);
+  assert.equal(parsed.banners.watch.desktopHtml, '<div>watch-d</div>');
+  assert.equal(parsed.banners.watch.mobileHtml, '');
+  assert.equal(parsed.banners.manga.enabled, false);
+  assert.equal(parsed.banners.manga.mobileHtml, '<div>manga-m</div>');
+  assert.equal(parsed.scripts.socialBar.enabled, true);
+  assert.equal(parsed.scripts.socialBar.html, '<script src="https://ads.example/sb.js"></script>');
+  assert.equal(parsed.scripts.popunder.enabled, false);
+  assert.equal(parsed.scripts.popunder.html, '<script src="https://ads.example/pop.js"></script>');
+  assert.equal(parsed.smartlink.enabled, true);
+  assert.equal(parsed.smartlink.url, 'https://smart.example/go');
+});
+
+test('withSmartlinkFallback fills only empty placeholder slots', () => {
+  const slots = [
+    { enabled: true, name: 'placeholder', interval: 5, href: '', html: '' },
+    { enabled: true, name: 'explicit-href', interval: 5, href: 'https://explicit.example', html: '' },
+    { enabled: true, name: 'html-slot', interval: 5, href: '', html: '<div>ad</div>' },
+  ];
+
+  assert.deepEqual(withSmartlinkFallback(slots, ''), slots);
+  assert.deepEqual(
+    withSmartlinkFallback(slots, '  https://smart.example/go  ').map((slot) => slot.href),
+    ['https://smart.example/go', 'https://explicit.example', ''],
+  );
+});
+
+test('toPublicAdsConfig shares single-variant banners, hides disabled scripts and validates smartlink', () => {
+  const pub = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: {
+        banners: {
+          home: { enabled: true, desktopHtml: '<div>desktop-only</div>', mobileHtml: '' },
+          watch: { enabled: true, desktopHtml: '', mobileHtml: '<div>mobile-only</div>' },
+          manga: { enabled: false, desktopHtml: '<div>off</div>', mobileHtml: '<div>off-m</div>' },
+        },
+        scripts: {
+          socialBar: { enabled: true, html: '<script src="https://ads.example/sb.js"></script>' },
+          popunder: { enabled: false, html: '<script src="https://ads.example/pop.js"></script>' },
+        },
+        smartlink: { enabled: true, url: '  https://smart.example/direct  ' },
+      },
+    }),
+  );
+
+  assert.deepEqual(pub.banners.home, {
+    desktopHtml: '<div>desktop-only</div>',
+    mobileHtml: '<div>desktop-only</div>',
+  });
+  assert.deepEqual(pub.banners.watch, {
+    desktopHtml: '<div>mobile-only</div>',
+    mobileHtml: '<div>mobile-only</div>',
+  });
+  assert.deepEqual(pub.banners.manga, { desktopHtml: '', mobileHtml: '' });
+  assert.equal(pub.scripts.socialBar, '<script src="https://ads.example/sb.js"></script>');
+  assert.equal(pub.scripts.popunder, '');
+  assert.equal(pub.smartlinkUrl, 'https://smart.example/direct');
+
+  const invalidSmartlink = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: { smartlink: { enabled: true, url: 'javascript:alert(1)' } },
+    }),
+  );
+  assert.equal(invalidSmartlink.smartlinkUrl, '');
+
+  const disabledSmartlink = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: { smartlink: { enabled: false, url: 'https://smart.example/direct' } },
+    }),
+  );
+  assert.equal(disabledSmartlink.smartlinkUrl, '');
+});
+
+test('toPublicPlayerConfig uses smartlink as clickUrl fallback without overriding explicit URLs', () => {
+  const withFallback = toPublicPlayerConfig(
+    parseSystemSettings({
+      ads: { smartlink: { enabled: true, url: 'https://smart.example/go' } },
+      player: {
+        preRollAd: { enabled: true, imageUrl: 'https://cdn.example/pre.jpg', clickUrl: '' },
+        pauseAd: {
+          enabled: true,
+          imageUrl: 'https://cdn.example/pause.jpg',
+          clickUrl: 'https://explicit.example/landing',
+        },
+      },
+    }),
+  );
+  assert.equal(withFallback.preRollAd.clickUrl, 'https://smart.example/go');
+  assert.equal(withFallback.pauseAd.clickUrl, 'https://explicit.example/landing');
+
+  const withoutSmartlink = toPublicPlayerConfig(
+    parseSystemSettings({
+      ads: { smartlink: { enabled: false, url: 'https://smart.example/go' } },
+      player: {
+        preRollAd: { enabled: true, imageUrl: 'https://cdn.example/pre.jpg', clickUrl: '' },
+      },
+    }),
+  );
+  assert.equal(withoutSmartlink.preRollAd.clickUrl, '');
 });

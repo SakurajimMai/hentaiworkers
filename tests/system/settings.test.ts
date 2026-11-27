@@ -706,3 +706,75 @@ test('stored settings from before the switch existed parse with direct images of
   assert.equal(legacy.manga.directImages, false);
   assert.deepEqual(legacy.manga.curatedTags, ['纯爱']);
 });
+
+test('syncAdsterra encrypts apiKey, saves placements, auto-fills empty smartlink and keeps existing smartlink/failure clean', async () => {
+  const okFetch: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith('/domains.json')) {
+      return new Response(JSON.stringify({ items: [{ id: 10, title: 'example.com' }] }), {
+        status: 200,
+      });
+    }
+    return new Response(
+      JSON.stringify({
+        items: [
+          { id: 100, domain_id: 10, title: '728x90_1' },
+          {
+            id: 101,
+            domain_id: 10,
+            title: 'Smartlink_1',
+            direct_url: 'https://smart.example/matched',
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+  };
+
+  const { service, settings } = buildService(okFetch);
+  const res = await service.syncAdsterra({ apiKey: 'test-key' });
+  assert.equal(res.placements, 2);
+  assert.equal(res.smartlinkUrl, 'https://smart.example/matched');
+
+  const stored = settings.data!;
+  assert.ok(stored.ads.adsterra.apiKey);
+  assert.notEqual(JSON.stringify(stored.ads.adsterra.apiKey), 'test-key');
+  assert.equal(stored.ads.smartlink.enabled, true);
+  assert.equal(stored.ads.smartlink.url, 'https://smart.example/matched');
+  assert.equal(stored.ads.adsterra.placements.length, 2);
+  assert.ok(stored.ads.adsterra.syncedAt);
+
+  const view = await service.getAdminView();
+  assert.equal(view.ads.adsterra.apiKeyConfigured, true);
+  assert.equal('apiKey' in view.ads.adsterra, false);
+  assert.equal(view.ads.adsterra.placements.length, 2);
+
+  // Subsequent sync without re-entering apiKey reuses the encrypted key, and preserves non-empty smartlink.
+  await service.update({
+    ads: {
+      smartlink: { enabled: false, url: 'https://manual.example/keep' },
+      banners: { home: { enabled: true, desktopHtml: '<div>home</div>' } },
+      scripts: { socialBar: { enabled: true, html: '<script></script>' } },
+    },
+  });
+  const afterUpdate = await service.getAdminView();
+  assert.equal(afterUpdate.ads.adsterra.apiKeyConfigured, true);
+  assert.equal(afterUpdate.ads.adsterra.placements.length, 2);
+  assert.equal(afterUpdate.ads.banners.home.desktopHtml, '<div>home</div>');
+  assert.equal(afterUpdate.ads.scripts.socialBar.enabled, true);
+
+  const secondSync = await service.syncAdsterra({});
+  assert.equal(secondSync.smartlinkUrl, 'https://manual.example/keep');
+  assert.equal(settings.data!.ads.smartlink.enabled, false);
+
+  // Failing sync does not overwrite saved key, syncedAt, placements or smartlink.
+  const failing = buildService(async () => new Response('{}', { status: 401 }));
+  await assert.rejects(
+    () => failing.service.syncAdsterra({ apiKey: 'test-key' }),
+    (error: unknown) =>
+      error instanceof AppError &&
+      error.details?.field === 'adsterra' &&
+      error.details?.reason === 'unauthorized',
+  );
+  assert.equal(failing.settings.data, null);
+});

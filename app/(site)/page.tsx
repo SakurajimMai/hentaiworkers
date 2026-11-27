@@ -3,6 +3,7 @@ import { siteSeoTitle } from '@/lib/site-seo';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { AnimeCard } from '@/components/AnimeCard';
+import { BannerAd } from '@/components/banner-ad';
 import { FeedAdCard } from '@/components/feed-ad-card';
 import { GuestContinueWatching } from '@/components/continue-watching-client';
 import { HeroCarousel, type HeroItem } from '@/components/hero-carousel';
@@ -18,8 +19,15 @@ import {
   getWatchProgressService,
 } from '@/lib/server/identity';
 import { getSystemSettingsService } from '@/lib/server/system';
-import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
-import { effectiveHeroSlides, type FeedAdSlot } from '@/lib/server/system/domain/settings';
+import {
+  interleaveFeedAds,
+  withSmartlinkFallback,
+} from '@/lib/server/system/domain/ads-settings-form';
+import {
+  effectiveHeroSlides,
+  toPublicAdsConfig,
+  type FeedAdSlot,
+} from '@/lib/server/system/domain/settings';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { StructuredData } from '@/components/structured-data';
 import { resolveSiteUrl } from '@/lib/site-url';
@@ -49,6 +57,7 @@ export default async function HomePage() {
   let loggedIn = false;
   let error: string | null = null;
   let feedSlots: FeedAdSlot[] = [];
+  let homeBanner = { desktopHtml: '', mobileHtml: '' };
 
   try {
     const user = await getIdentityService().getCurrentUser();
@@ -69,7 +78,9 @@ export default async function HomePage() {
     latest = lat.data;
     mangas = mangaData;
     heroIntervalSeconds = system.hero.intervalSeconds;
-    feedSlots = system.ads.feedSlots.filter((slot) => slot.enabled);
+    const publicAds = toPublicAdsConfig(system);
+    feedSlots = withSmartlinkFallback(publicAds.feedSlots, publicAds.smartlinkUrl);
+    homeBanner = publicAds.banners.home;
     continueWatching = progress.filter((p) => !p.completed && p.positionSeconds > 5);
     const completedIds = progress.filter((p) => p.completed).map((p) => p.animeId);
     const favorites = favoritesPage?.items ?? [];
@@ -180,6 +191,12 @@ export default async function HomePage() {
         {hero.length > 0 && (
           <HeroCarousel intervalSeconds={heroIntervalSeconds} items={hero} />
         )}
+
+        <BannerAd
+          placement="home"
+          desktopHtml={homeBanner.desktopHtml}
+          mobileHtml={homeBanner.mobileHtml}
+        />
 
         {loggedIn && continueWatching.length > 0 && (
           <HorizontalCarousel title="继续观看" viewAllHref="/history">

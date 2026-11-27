@@ -12,6 +12,7 @@ import { resolveSiteUrl } from '@/lib/site-url';
 import {
   actionSaveSystemSettings,
   actionSendSmtpTest,
+  actionSyncAdsterra,
 } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminSystemSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; error?: string; reason?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; reason?: string; n?: string }>;
 }) {
   await requireAdmin();
   const sp = await searchParams;
@@ -86,6 +87,20 @@ export default async function AdminSystemSettingsPage({
         <div className="notice-error">
           开启邮箱验证前须先启用并配置 SMTP
         </div>
+      )}
+      {sp.ok === 'adsterra' && (
+        <div className="notice-success">
+          已同步 Adsterra{sp.n ? `：${sp.n} 个广告位` : ''}
+        </div>
+      )}
+      {sp.error === 'adsterra_key' && (
+        <div role="alert" className="notice-error">请先填写 Adsterra API Key</div>
+      )}
+      {sp.error === 'adsterra_auth' && (
+        <div role="alert" className="notice-error">Adsterra API Key 无效或无权限</div>
+      )}
+      {sp.error === 'adsterra' && (
+        <div role="alert" className="notice-error">无法连接 Adsterra API，请稍后重试</div>
       )}
 
       <ValidatedForm id="system-settings-form" action={actionSaveSystemSettings} className="space-y-6">
@@ -551,16 +566,196 @@ export default async function AdminSystemSettingsPage({
           <div>
             <h2 className="font-ui text-sm font-semibold">广告位</h2>
             <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
-              信息流可配置多条广告，每条单独开关、单独设置「每隔 x 张卡片」。
-              图片或固定像素的联盟素材请在「广告尺寸」填写与素材一致的宽高（如 300×250、300×450）：
-              「信息流卡片」会把它完整放进海报格并居中。尺寸留「自动」只适合会自适应容器的 Native / 响应式代码。
-              阅读页只在章节顶部和底部放广告，不会插入到漫画页中间。
-              这里保存后，网站（含手机浏览器）和 Android App 会使用同一套广告。
+              在此配置 Adsterra 同步、Smartlink 兜底跳转、全站脚本广告（Social Bar / Popunder）、页面横幅（首页 / 播放页 / 漫画详情页）、信息流卡片与漫画阅读页上下广告位。
+              信息流与阅读页上下广告位在网站和 Android App 共用；Adsterra Smartlink、全站脚本与页面横幅仅网页端（含手机浏览器）生效。
             </p>
           </div>
 
           <div className="space-y-3 border-t border-border pt-4">
+            <h3 className="font-ui text-[13px] font-semibold">Adsterra 账号</h3>
+            <p className="font-ui text-[12px] text-soft leading-relaxed">
+              API 只提供广告位列表和 Smartlink 直链；横幅、Native、Social Bar、Popunder 代码要到 Adsterra 后台 Websites → Get code 复制后粘贴到下方。
+            </p>
+            <div className="rounded-xl border border-border bg-surface-2 p-3.5 space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="block flex-1 font-meta text-[12px]">
+                  API Key{view.ads.adsterra.apiKeyConfigured ? '（已配置，留空不改）' : ''}
+                  <input
+                    name="adsterraApiKey"
+                    form="adsterra-sync-form"
+                    type="password"
+                    className="admin-input mt-1 font-mono text-[12px]"
+                    autoComplete="new-password"
+                    placeholder={view.ads.adsterra.apiKeyConfigured ? '••••••••' : '粘贴 Adsterra Publisher API Key'}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  form="adsterra-sync-form"
+                  className="btn-ghost shrink-0"
+                >
+                  同步广告位与 Smartlink
+                </button>
+              </div>
+              {view.ads.adsterra.syncedAt ? (
+                <p className="font-ui text-[12px] text-soft">
+                  最近同步：<span className="font-mono">{view.ads.adsterra.syncedAt}</span>
+                </p>
+              ) : null}
+              {view.ads.adsterra.placements.length > 0 ? (
+                <ul className="space-y-1.5 border-t border-border pt-3">
+                  {view.ads.adsterra.placements.map((placement) => (
+                    <li
+                      key={placement.id}
+                      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-ui text-[12px] text-ink"
+                    >
+                      <span className="font-medium">{placement.title}</span>
+                      {placement.domain ? (
+                        <span className="font-mono text-[11px] text-soft">· {placement.domain}</span>
+                      ) : null}
+                      {placement.directUrl ? (
+                        <span className="font-mono text-[11px] text-accent break-all">
+                          · {placement.directUrl}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <h3 className="font-ui text-[13px] font-semibold">Smartlink 直链</h3>
+            <p className="font-ui text-[12px] text-soft leading-relaxed">
+              两处兜底用途：（1）播放器片头广告、暂停广告未填「点击跳转 URL」时自动跳转到此直链；（2）信息流中 HTML 与默认跳转链接都为空的「广告位招租」卡片点击后跳转到此直链。仅网页端生效。
+            </p>
+            <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
+              <label className="field-check text-sm">
+                <input
+                  type="checkbox"
+                  name="adsSmartlinkEnabled"
+                  value="1"
+                  defaultChecked={view.ads.smartlink.enabled}
+                />
+                启用 Smartlink 兜底跳转
+              </label>
+              <label className="block font-meta text-[12px]">
+                Smartlink URL
+                <input
+                  name="adsSmartlinkUrl"
+                  className="admin-input mt-1 font-mono text-[12px]"
+                  defaultValue={view.ads.smartlink.url}
+                  placeholder="https://..."
+                  maxLength={1000}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <h3 className="font-ui text-[13px] font-semibold">全站脚本广告</h3>
+            <p className="font-ui text-[12px] text-soft leading-relaxed">
+              加载于全站前台页面（含漫画阅读页）；后台、登录、注册、找回/重置密码与邮箱验证页不加载。仅网页端生效；仅支持异步 &lt;script&gt; 注入，不支持含 document.write 的旧式代码。
+            </p>
+            <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
+              <label className="field-check text-sm">
+                <input
+                  type="checkbox"
+                  name="adsSocialBarEnabled"
+                  value="1"
+                  defaultChecked={view.ads.scripts.socialBar.enabled}
+                />
+                启用 Social Bar
+              </label>
+              <label className="block font-meta text-[12px]">
+                Social Bar 代码
+                <textarea
+                  name="adsSocialBarHtml"
+                  rows={4}
+                  className="admin-input mt-1 font-mono text-[12px]"
+                  defaultValue={view.ads.scripts.socialBar.html}
+                  placeholder={'<script src="https://..."></script>'}
+                />
+              </label>
+            </div>
+            <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
+              <label className="field-check text-sm">
+                <input
+                  type="checkbox"
+                  name="adsPopunderEnabled"
+                  value="1"
+                  defaultChecked={view.ads.scripts.popunder.enabled}
+                />
+                启用 Popunder
+              </label>
+              <label className="block font-meta text-[12px]">
+                Popunder 代码
+                <textarea
+                  name="adsPopunderHtml"
+                  rows={4}
+                  className="admin-input mt-1 font-mono text-[12px]"
+                  defaultValue={view.ads.scripts.popunder.html}
+                  placeholder={'<script src="https://..."></script>'}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-border pt-4">
+            <div>
+              <h3 className="font-ui text-[13px] font-semibold">横幅广告</h3>
+              <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
+                屏宽 ≥768px 显示电脑端代码，&lt;768px 显示手机端代码；只填一端时电脑端与手机端共用。尺寸会从代码中的 atOptions 自动识别。仅网页端（含手机浏览器）生效。
+              </p>
+            </div>
+            {([
+              { key: 'home', suffix: 'Home', label: '首页（幻灯片下方）' },
+              { key: 'watch', suffix: 'Watch', label: '播放页（播放器下方）' },
+              { key: 'manga', suffix: 'Manga', label: '漫画详情页' },
+            ] as const).map(({ key, suffix, label }) => (
+              <div key={key} className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
+                <label className="field-check text-sm">
+                  <input
+                    type="checkbox"
+                    name={`adsBanner${suffix}Enabled`}
+                    value="1"
+                    defaultChecked={view.ads.banners[key].enabled}
+                  />
+                  {label}
+                </label>
+                <label className="block font-meta text-[12px]">
+                  电脑端代码（≥768px，建议 728×90）
+                  <textarea
+                    name={`adsBanner${suffix}DesktopHtml`}
+                    rows={4}
+                    className="admin-input mt-1 font-mono text-[12px]"
+                    defaultValue={view.ads.banners[key].desktopHtml}
+                    placeholder={'<script>/* 728x90 联盟代码 */</script>'}
+                  />
+                </label>
+                <label className="block font-meta text-[12px]">
+                  手机端代码（&lt;768px，建议 320×50）
+                  <textarea
+                    name={`adsBanner${suffix}MobileHtml`}
+                    rows={4}
+                    className="admin-input mt-1 font-mono text-[12px]"
+                    defaultValue={view.ads.banners[key].mobileHtml}
+                    placeholder={'<script>/* 320x50 联盟代码 */</script>'}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
             <h3 className="font-ui text-[13px] font-semibold">信息流广告</h3>
+            <p className="font-ui text-[12px] text-soft leading-relaxed">
+              信息流可配置多条广告，每条单独开关、单独设置「每隔 x 张卡片」。
+              图片或固定像素的联盟素材请在「广告尺寸」填写与素材一致的宽高（如 300×250、300×450）：
+              「信息流卡片」会把它完整放进海报格并居中。尺寸留「自动」只适合会自适应容器的 Native / 响应式代码。
+              这里保存后，网站（含手机浏览器）和 Android App 会使用同一套信息流与阅读页上下广告配置。
+            </p>
             <AdsFeedSlotsEditor initialSlots={[...view.ads.feedSlots]} />
           </div>
 
@@ -721,6 +916,8 @@ SITE_PUBLISH_SECRET=与上方相同的密钥`}</pre>
           保存全部设置
         </button>
       </ValidatedForm>
+
+      <form id="adsterra-sync-form" action={actionSyncAdsterra} />
 
       <ValidatedForm action={actionSendSmtpTest} className="surface-card p-5 space-y-3 max-w-lg">
         <h2 className="font-ui text-sm font-semibold">发送 SMTP 测试邮件</h2>

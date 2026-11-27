@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { after } from 'next/server';
 import { AnimeCard } from '@/components/AnimeCard';
+import { BannerAd } from '@/components/banner-ad';
 import { FavoriteButton } from '@/components/favorite-button';
 import { HistoryBackLink } from '@/components/history-back-link';
 import { IconArrowLeft, IconCalendar, IconEye } from '@/components/icons';
@@ -70,11 +71,12 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
   after(recordAnimeView(id));
 
   const user = await getIdentityService().getCurrentUser();
-  const [similar, favorited, progress, playerConfig] = await Promise.all([
+  const [similar, favorited, progress, playerConfig, adsConfig] = await Promise.all([
     getSimilarAnimes(id),
     getFavoritesService().isFavorite(id),
     user ? getWatchProgressService().getMine(id) : Promise.resolve(null),
     getSystemSettingsService().getPublicPlayerConfig(),
+    getSystemSettingsService().getPublicAdsConfig(),
   ]);
   const fanartList = anime.fanart
     ? anime.fanart.split(',').map((u) => u.trim()).filter(Boolean)
@@ -133,7 +135,6 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
             <WatchPlayer
               animeId={id}
               videoUrl={anime.videoUrl}
-              poster={anime.cover}
               title={anime.title}
               cover={anime.cover}
               initialPositionSeconds={progress?.positionSeconds ?? 0}
@@ -154,6 +155,13 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
             · 打开后将自动续播
           </p>
         )}
+
+        <BannerAd
+          placement="watch"
+          desktopHtml={adsConfig.banners.watch.desktopHtml}
+          mobileHtml={adsConfig.banners.watch.mobileHtml}
+          className="mt-5"
+        />
 
         <div className="mt-6 sm:mt-8 grid lg:grid-cols-3 gap-8 lg:gap-10">
           <div className="lg:col-span-2 space-y-8">

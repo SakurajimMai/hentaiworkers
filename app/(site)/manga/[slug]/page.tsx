@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { MangaCard } from '@/components/MangaCard';
+import { BannerAd } from '@/components/banner-ad';
 import { getManga, isMangaEnabled, listMangas } from '@/lib/manga-client';
 import { findMangaCatalogPage } from '@/lib/manga-service';
 import { buildMangaListHref } from '@/components/manga-pagination';
@@ -14,6 +15,7 @@ import { StructuredData } from '@/components/structured-data';
 import { breadcrumbJsonLd, isoDate, pageOpenGraph, siteOrigin } from '@/lib/seo';
 import { getIdentityService } from '@/lib/server/identity';
 import { isMangaFavorite } from '@/lib/server/manga-favorites';
+import { getSystemSettingsService } from '@/lib/server/system';
 import { MangaFavoriteButton } from '@/components/manga-favorite-button';
 
 export const revalidate = 60;
@@ -78,7 +80,10 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
   const catalogHref = buildMangaListHref(await findMangaCatalogPage(manga.id));
   const firstChapter = manga.chapters[0]?.number;
   const user = await getIdentityService().getCurrentUser();
-  const favorited = user ? await isMangaFavorite(manga.id) : false;
+  const [favorited, adsConfig] = await Promise.all([
+    user ? isMangaFavorite(manga.id) : Promise.resolve(false),
+    getSystemSettingsService().getPublicAdsConfig().catch(() => null),
+  ]);
   let recommendations: Awaited<ReturnType<typeof listMangas>>['data'] = [];
   try {
     const result = await listMangas({
@@ -203,6 +208,15 @@ export default async function MangaDetailPage({ params }: { params: Params }) {
           </div>
         </div>
       </div>
+
+      {adsConfig ? (
+        <BannerAd
+          placement="manga"
+          desktopHtml={adsConfig.banners.manga.desktopHtml}
+          mobileHtml={adsConfig.banners.manga.mobileHtml}
+          className="mt-10"
+        />
+      ) : null}
 
       {recommendations.length > 0 && (
         <section className="mt-14 border-t border-border pt-8 sm:mt-20 sm:pt-10">

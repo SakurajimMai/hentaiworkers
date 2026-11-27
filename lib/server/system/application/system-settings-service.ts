@@ -5,12 +5,17 @@ import type { SecretCipher } from '../../shared/secret-cipher';
 import { sha256Bytes } from '../../shared/hashing';
 import { AppError } from '../../shared/errors';
 import { createLogger } from '../../shared/logger';
+import type { BannerAdPlacement } from '@/lib/html-ad-document';
 import {
   defaultSystemSettings,
   isEmailAllowedByWhitelist,
   parseSystemSettings,
   toPublicAuthConfig,
+  type AdsterraPlacement,
+  type BannerAdSlot,
+  type GlobalAdScript,
   type PublicAuthConfig,
+  type SmartlinkSettings,
   type SystemSettings,
 } from '../domain/settings';
 import type {
@@ -18,13 +23,20 @@ import type {
   SystemSettingsRepository,
 } from '../ports/system-settings-repository';
 import {
+  decryptAdsterraApiKey,
   decryptMangaPublishSecret,
   decryptSmtpPassword,
   decryptTurnstileSecret,
+  encryptAdsterraApiKey,
   encryptMangaPublishSecret,
   encryptSmtpPassword,
   encryptTurnstileSecret,
 } from './secret-fields';
+import {
+  AdsterraApiError,
+  fetchAdsterraInventory,
+  pickAdsterraSmartlink,
+} from './adsterra';
 import { assertSmtpConfigured, sendSmtpMail, sendSmtpTest } from './mailer';
 import { assertTurnstileOk } from './turnstile';
 import { isValidEmail, normalizeEmail, type IdentityService } from '../../identity/application/identity-service';
@@ -61,7 +73,13 @@ export type SystemSettingsAdminView = Readonly<{
     curatedTags: ReadonlyArray<string>;
     directImages: boolean;
   }>;
-  ads: SystemSettings['ads'];
+  ads: Omit<SystemSettings['ads'], 'adsterra'> & Readonly<{
+    adsterra: Readonly<{
+      apiKeyConfigured: boolean;
+      syncedAt: string;
+      placements: ReadonlyArray<AdsterraPlacement>;
+    }>;
+  }>;
   hero: SystemSettings['hero'];
   site: SystemSettings['site'];
 }>;
@@ -97,14 +115,20 @@ export type SystemSettingsUpdateInput = Readonly<{
     curatedTags: string[];
     directImages: boolean;
   }>;
-  ads?: Partial<SystemSettings['ads']> & {
+  ads?: Readonly<{
     feedSlots?: SystemSettings['ads']['feedSlots'];
     reader?: Partial<SystemSettings['ads']['reader']> & {
       top?: Partial<SystemSettings['ads']['reader']['top']>;
       middle?: Partial<SystemSettings['ads']['reader']['middle']>;
       bottom?: Partial<SystemSettings['ads']['reader']['bottom']>;
     };
-  };
+    banners?: Partial<Record<BannerAdPlacement, Partial<BannerAdSlot>>>;
+    scripts?: {
+      socialBar?: Partial<GlobalAdScript>;
+      popunder?: Partial<GlobalAdScript>;
+    };
+    smartlink?: Partial<SmartlinkSettings>;
+  }>;
   hero?: Partial<SystemSettings['hero']>;
   site?: Omit<Partial<SystemSettings['site']>, 'seo'> & { seo?: Partial<SystemSettings['site']['seo']> };
 }>;
@@ -175,7 +199,18 @@ export class SystemSettingsService {
         curatedTags: s.manga.curatedTags,
         directImages: s.manga.directImages,
       },
-      ads: s.ads,
+      ads: {
+        feedSlots: s.ads.feedSlots,
+        reader: s.ads.reader,
+        banners: s.ads.banners,
+        scripts: s.ads.scripts,
+        smartlink: s.ads.smartlink,
+        adsterra: {
+          apiKeyConfigured: s.ads.adsterra.apiKey != null,
+          syncedAt: s.ads.adsterra.syncedAt,
+          placements: s.ads.adsterra.placements,
+        },
+      },
       hero: s.hero,
       site: s.site,
     };
@@ -293,6 +328,26 @@ export class SystemSettingsService {
             ...input.ads?.reader?.bottom,
           },
         },
+        banners: {
+          home: { ...current.ads.banners.home, ...input.ads?.banners?.home },
+          watch: { ...current.ads.banners.watch, ...input.ads?.banners?.watch },
+          manga: { ...current.ads.banners.manga, ...input.ads?.banners?.manga },
+        },
+        scripts: {
+          socialBar: {
+            ...current.ads.scripts.socialBar,
+            ...input.ads?.scripts?.socialBar,
+          },
+          popunder: {
+            ...current.ads.scripts.popunder,
+            ...input.ads?.scripts?.popunder,
+          },
+        },
+        smartlink: {
+          ...current.ads.smartlink,
+          ...input.ads?.smartlink,
+        },
+        adsterra: current.ads.adsterra,
       },
       hero: {
         ...current.hero,
@@ -327,6 +382,76 @@ export class SystemSettingsService {
       : null;
     const resolved = assertSmtpConfigured(settings.smtp, password);
     await sendSmtpTest(resolved, to.trim(), settings.site.seo.title || 'AnimeStream');
+  }
+
+  async syncAdsterra(
+    input: { apiKey?: string } = {},
+  ): Promise<{ placements: number; smartlinkUrl: string }> {
+    const current = await this.getSettings();
+    const encryptedKey = mergeEncryptedSecret(
+      current.ads.adsterra.apiKey,
+      input.apiKey,
+      (plain) => encryptAdsterraApiKey(this.cipher, plain),
+    );
+    if (!encryptedKey) {
+      throw new AppError('CONFIG_INVALID', '请先填写 Adsterra API Key', 400, false, {
+        field: 'adsterraApiKey',
+      });
+    }
+
+    const plainKey = decryptAdsterraApiKey(this.cipher, encryptedKey);
+    let placements: AdsterraPlacement[];
+    try {
+      placements = await fetchAdsterraInventory(plainKey, {
+        fetchImpl: this.options?.fetchImpl,
+      });
+    } catch (error) {
+      if (error instanceof AdsterraApiError) {
+        if (error.reason === 'unauthorized') {
+          throw new AppError('SECRET_REVOKED', 'Adsterra API Key 无效或无权限', 401, false, {
+            field: 'adsterra',
+            reason: error.reason,
+          });
+        }
+        throw new AppError('RESULT_INVALID', '无法连接 Adsterra API，请稍后重试', 502, true, {
+          field: 'adsterra',
+          reason: error.reason,
+        });
+      }
+      throw error;
+    }
+
+    let siteHost = '';
+    try {
+      siteHost = new URL(resolveSiteUrl(this.options?.siteUrl)).hostname;
+    } catch {
+      siteHost = '';
+    }
+
+    const pickedSmartlink = pickAdsterraSmartlink(placements, siteHost);
+    const shouldAutofillSmartlink =
+      !current.ads.smartlink.url.trim() && Boolean(pickedSmartlink);
+
+    const next = parseSystemSettings({
+      ...current,
+      ads: {
+        ...current.ads,
+        smartlink: shouldAutofillSmartlink
+          ? { enabled: true, url: pickedSmartlink }
+          : current.ads.smartlink,
+        adsterra: {
+          apiKey: encryptedKey,
+          syncedAt: new Date().toISOString(),
+          placements,
+        },
+      },
+    });
+
+    await this.repo.save(next);
+    return {
+      placements: placements.length,
+      smartlinkUrl: next.ads.smartlink.url,
+    };
   }
 
   /** Whether public manga pages are enabled (no secret exposed). */

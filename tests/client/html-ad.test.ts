@@ -9,7 +9,13 @@ import {
   buildPlayerHtmlAd,
   parseHtmlAdSizeMessage,
 } from '../../lib/client/html-ad';
-import { htmlAdDocumentPath, htmlAdDocumentUrl, parseHtmlAdDocumentRef } from '../../lib/html-ad-document';
+import {
+  BANNER_AD_DOCUMENT_IDS,
+  bannerAdDocumentId,
+  htmlAdDocumentPath,
+  htmlAdDocumentUrl,
+  parseHtmlAdDocumentRef,
+} from '../../lib/html-ad-document';
 import { buildPublicHtmlAdDocument } from '../../lib/server/system/domain/html-ad-slot-document';
 import { parseSystemSettings, toPublicAdsConfig } from '../../lib/server/system/domain/settings';
 
@@ -186,4 +192,49 @@ test('player html ads can load a same-origin document instead of srcdoc', () => 
   assert.match(framed, /data-html-ad-src="\/ads\/html\/player\/preroll\?mid=player-ad"/);
   assert.doesNotMatch(framed, /<b>ad<\/b>/);
   assert.match(buildPlayerHtmlAd('<b>ad</b>'), /<b>ad<\/b>/);
+});
+
+test('banner ad document refs and html documents resolve desktop/mobile variants', () => {
+  assert.equal(bannerAdDocumentId('home', 'desktop'), 'home-desktop');
+  assert.equal(htmlAdDocumentPath({ kind: 'banner', id: 'watch-mobile' }), '/ads/html/banner/watch-mobile');
+  for (const id of BANNER_AD_DOCUMENT_IDS) {
+    assert.deepEqual(parseHtmlAdDocumentRef(['banner', id]), { kind: 'banner', id });
+  }
+  assert.equal(parseHtmlAdDocumentRef(['banner', 'home']), null);
+  assert.equal(parseHtmlAdDocumentRef(['banner', 'browse-desktop']), null);
+  assert.equal(parseHtmlAdDocumentRef(['banner', 'home-desktop', 'extra']), null);
+
+  const ads = toPublicAdsConfig(
+    parseSystemSettings({
+      ads: {
+        banners: {
+          home: {
+            enabled: true,
+            desktopHtml: `<script>atOptions = { 'width': 728, 'height': 90 };</script>`,
+            mobileHtml: '',
+          },
+          watch: {
+            enabled: false,
+            desktopHtml: '<div>disabled</div>',
+            mobileHtml: '<div>disabled-m</div>',
+          },
+        },
+        smartlink: { enabled: true, url: 'https://smart.example/fallback' },
+      },
+      player: {
+        preRollAd: { enabled: true, html: '<div>preroll</div>', clickUrl: '' },
+      },
+    }),
+  );
+
+  const desktopDoc = buildPublicHtmlAdDocument(ads, ['banner', 'home-desktop'], 'b1');
+  assert.match(String(desktopDoc), /atOptions/);
+  assert.match(String(desktopDoc), /width:728px/);
+  const mobileFallbackDoc = buildPublicHtmlAdDocument(ads, ['banner', 'home-mobile'], 'b2');
+  assert.match(String(mobileFallbackDoc), /atOptions/);
+  assert.equal(buildPublicHtmlAdDocument(ads, ['banner', 'watch-desktop'], 'b3'), null);
+  assert.equal(buildPublicHtmlAdDocument(ads, ['banner', 'manga-mobile'], 'b4'), null);
+
+  const playerDoc = buildPublicHtmlAdDocument(ads, ['player', 'preroll'], 'p1');
+  assert.match(String(playerDoc), /https:\/\/smart\.example\/fallback/);
 });

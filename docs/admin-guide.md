@@ -190,9 +190,36 @@ ABI 选择见 [移动端文档](./mobile.md)。
 - 片头广告与暂停广告。
 - 首页/目录信息流卡片。
 - 漫画阅读页顶部和底部广告位。公开配置中的 `middle` 兼容字段当前固定禁用，后台不提供中部广告设置。
+- 页面横幅（首页幻灯片下方、播放页播放器下方、漫画详情页）、全站脚本广告（Social Bar / Popunder）和 Smartlink 兜底跳转（仅网页端生效）。
 
-信息流和阅读广告可保存完整 HTML、iframe 或联盟脚本，包括 `document.write` 和异步外部脚本。
+信息流、横幅和阅读广告可保存完整 HTML、iframe 或联盟脚本，包括 `document.write` 和异步外部脚本。
 片头、暂停广告的 HTML 也在独立文档中运行脚本。广告位不会授予脚本访问网站父页面的权限。
+
+#### Adsterra 账号与同步
+
+- 在「系统设置 → 广告位 → Adsterra 账号」填写 Adsterra Publisher API Key 并点击「同步广告位与 Smartlink」。
+- API Key 使用应用密钥加密存储，保存后不会明文回显。
+- Adsterra Publisher API 仅返回域名与广告位列表及 Smartlink 直链，**不返回**横幅、Native、Social Bar、Popunder 的嵌入代码；这些代码需到 Adsterra 后台 `Websites → Get code` 复制并粘贴到对应配置区。
+- 同步时若当前「Smartlink 直链」为空且账号下存在可用 Smartlink，系统会自动填入并启用（优先匹配站点域名）；已有自定义地址时不会覆盖。
+
+#### Smartlink 直链（仅网页端）
+
+- 启用并填写 Smartlink URL 后，用于两处兜底跳转：
+  1. 播放器片头广告、暂停广告未填「点击跳转 URL」时自动跳转到该地址（已填写的显式跳转地址优先）。
+  2. 信息流中 HTML 与默认跳转链接都为空的「广告位招租」卡片点击后跳转到该地址。
+- 仅网页端（含手机浏览器）生效，不影响 Android App 接口。
+
+#### 全站脚本广告（仅网页端）
+
+- 支持 **Social Bar** 和 **Popunder** 两个独立开关与代码输入框。
+- 加载于全站前台页面（含漫画阅读页）；`/admin`、`/login`、`/register`、`/forgot-password`、`/reset-password` 与 `/verify-email` 页面不会加载。
+- 通过客户端 `createContextualFragment` 注入顶层文档；仅支持标准异步 `<script>` 标签，不支持依赖 `document.write` 的旧式脚本。仅网页端生效。
+
+#### 横幅广告（仅网页端）
+
+- 提供三个位置：首页（幻灯片下方）、播放页（播放器下方）、漫画详情页（简介区与推荐之间）。
+- 每个位置支持「电脑端代码（≥768px，建议 728×90）」和「手机端代码（<768px，建议 320×50）」；只填一端时两端共用同一段代码。
+- 尺寸会从代码中的 `atOptions` 或标签宽高属性自动识别，仅挂载匹配当前屏宽的那一个版本，仅网页端（含手机浏览器）生效。
 
 #### 信息流广告：尺寸必须与素材一致
 

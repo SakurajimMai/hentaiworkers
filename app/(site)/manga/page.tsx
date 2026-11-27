@@ -12,7 +12,10 @@ import { buildMangaListHref } from '@/components/manga-pagination';
 import { StructuredData } from '@/components/structured-data';
 import { FeedAdCard } from '@/components/feed-ad-card';
 import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
-import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
+import {
+  interleaveFeedAds,
+  withSmartlinkFallback,
+} from '@/lib/server/system/domain/ads-settings-form';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
 
@@ -232,7 +235,8 @@ async function MangaCatalogGrid({
   }>;
   pagination: ReactNode;
 }) {
-  const ads = (await getSystemSettingsService().getPublicAdsConfig()).feedSlots;
+  const publicAds = await getSystemSettingsService().getPublicAdsConfig();
+  const ads = withSmartlinkFallback(publicAds.feedSlots, publicAds.smartlinkUrl);
   const slots = interleaveFeedAds(items, ads, (item) => String(item.id));
 
   return (

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GlobalAdScripts } from '@/components/global-ad-scripts';
 import { SiteHeader } from '@/components/site-header';
 import { WatchProgressMergeOnLogin } from '@/components/watch-progress-merge';
 import { getIdentityService } from '@/lib/server/identity';
@@ -14,6 +15,11 @@ const emptySite = {
   telegramLabel: 'Telegram',
 } as const;
 
+const emptyAdScripts = {
+  socialBar: '',
+  popunder: '',
+} as const;
+
 async function readPublicSiteConfig() {
   try {
     return await getSystemSettingsService().getPublicSiteConfig();
@@ -22,11 +28,20 @@ async function readPublicSiteConfig() {
   }
 }
 
+async function readPublicAdScripts() {
+  try {
+    return (await getSystemSettingsService().getPublicAdsConfig()).scripts;
+  } catch {
+    return emptyAdScripts;
+  }
+}
+
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const [user, site, seo] = await Promise.all([
+  const [user, site, seo, adScripts] = await Promise.all([
     getIdentityService().getCurrentUser(),
     readPublicSiteConfig(),
     getSiteSeo(),
+    readPublicAdScripts(),
   ]);
   const siteTitle = seo.title || 'AnimeStream';
 
@@ -149,6 +164,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           </div>
         </div>
       </footer>
+      <GlobalAdScripts socialBar={adScripts.socialBar} popunder={adScripts.popunder} />
     </div>
   );
 }

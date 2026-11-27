@@ -4,6 +4,7 @@ import type { EncryptedField } from '../domain/settings';
 const AAD_SMTP = 'system:smtp:password';
 const AAD_TURNSTILE = 'system:turnstile:secret';
 const AAD_MANGA_PUBLISH = 'system:manga:publish_secret';
+const AAD_ADSTERRA = 'system:ads:adsterra_api_key';
 
 export function encryptSecretField(
   cipher: SecretCipher,
@@ -58,4 +59,12 @@ export function encryptMangaPublishSecret(cipher: SecretCipher, plaintext: strin
 
 export function decryptMangaPublishSecret(cipher: SecretCipher, field: EncryptedField): string {
   return decryptSecretField(cipher, field, AAD_MANGA_PUBLISH);
+}
+
+export function encryptAdsterraApiKey(cipher: SecretCipher, plaintext: string): EncryptedField {
+  return encryptSecretField(cipher, plaintext, AAD_ADSTERRA);
+}
+
+export function decryptAdsterraApiKey(cipher: SecretCipher, field: EncryptedField): string {
+  return decryptSecretField(cipher, field, AAD_ADSTERRA);
 }

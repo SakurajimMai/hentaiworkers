@@ -786,6 +786,19 @@
   .reader-ad-floating iframe {
     pointer-events: auto;
   }
+  .site-banner-ad {
+    width: min(970px, 100%);
+    margin-inline: auto;
+    overflow: hidden;
+  }
+  .site-banner-ad-reserved {
+    height: 50px;
+  }
+  @media (min-width: 768px) {
+    .site-banner-ad-reserved {
+      height: 90px;
+    }
+  }
 
   .manga-card-title {
     display: -webkit-box !important;

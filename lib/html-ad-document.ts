@@ -1,11 +1,33 @@
 export const HTML_AD_DOCUMENT_BASE = '/ads/html';
 
-export type HtmlAdDocumentKind = 'feed' | 'reader' | 'player';
+export const BANNER_AD_PLACEMENTS = ['home', 'watch', 'manga'] as const;
+export type BannerAdPlacement = (typeof BANNER_AD_PLACEMENTS)[number];
+export type BannerAdVariant = 'desktop' | 'mobile';
+
+export const BANNER_AD_DOCUMENT_IDS = [
+  'home-desktop',
+  'home-mobile',
+  'watch-desktop',
+  'watch-mobile',
+  'manga-desktop',
+  'manga-mobile',
+] as const;
+export type BannerAdDocumentId = (typeof BANNER_AD_DOCUMENT_IDS)[number];
+
+export type HtmlAdDocumentKind = 'feed' | 'reader' | 'player' | 'banner';
 
 export type HtmlAdDocumentRef =
   | { kind: 'feed'; id: number }
   | { kind: 'reader'; id: 'top' | 'bottom' }
-  | { kind: 'player'; id: 'preroll' | 'pause' };
+  | { kind: 'player'; id: 'preroll' | 'pause' }
+  | { kind: 'banner'; id: BannerAdDocumentId };
+
+export function bannerAdDocumentId(
+  placement: BannerAdPlacement,
+  variant: BannerAdVariant,
+): BannerAdDocumentId {
+  return `${placement}-${variant}`;
+}
 
 export function sanitizeHtmlAdMessageId(raw: string | null | undefined): string {
   const trimmed = String(raw || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
@@ -38,5 +60,8 @@ export function parseHtmlAdDocumentRef(parts: readonly string[]): HtmlAdDocument
   }
   if (kind === 'reader' && (id === 'top' || id === 'bottom')) return { kind: 'reader', id };
   if (kind === 'player' && (id === 'preroll' || id === 'pause')) return { kind: 'player', id };
+  if (kind === 'banner' && (BANNER_AD_DOCUMENT_IDS as readonly string[]).includes(id)) {
+    return { kind: 'banner', id: id as BannerAdDocumentId };
+  }
   return null;
 }

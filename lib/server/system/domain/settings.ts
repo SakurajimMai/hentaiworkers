@@ -1,6 +1,7 @@
 import { siteSeoSchema } from '@/lib/site-seo';
 import { z } from 'zod';
 import { MAX_AD_HEIGHT, MAX_AD_WIDTH, resolveAdDimensions } from '@/lib/ad-dimensions';
+import type { BannerAdPlacement } from '@/lib/html-ad-document';
 import { siteMetaTagsSchema } from '@/lib/site-meta';
 
 /** Encrypted blob stored in JSON (AES-GCM via app keyring). */
@@ -155,6 +156,38 @@ export const readerAdSlotSchema = z.object({
   floating: z.boolean().default(false),
 });
 
+/** Responsive banner slot (desktop >=768px / mobile <768px). */
+export const bannerAdSlotSchema = z.object({
+  enabled: z.boolean().default(false),
+  desktopHtml: z.string().max(20000).default(''),
+  mobileHtml: z.string().max(20000).default(''),
+});
+
+/** Top-level script injection (Social Bar / Popunder). */
+export const globalAdScriptSchema = z.object({
+  enabled: z.boolean().default(false),
+  html: z.string().max(20000).default(''),
+});
+
+/** Adsterra Smartlink direct URL fallback. */
+export const smartlinkSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().max(1000).default(''),
+});
+
+export const adsterraPlacementSchema = z.object({
+  id: z.number().int(),
+  title: z.string().max(200).default(''),
+  domain: z.string().max(255).default(''),
+  directUrl: z.string().max(1000).default(''),
+});
+
+export const adsterraSettingsSchema = z.object({
+  apiKey: encryptedFieldSchema.nullable().default(null),
+  syncedAt: z.string().max(40).default(''),
+  placements: z.array(adsterraPlacementSchema).max(200).default([]),
+});
+
 export const adsSettingsSchema = z.object({
   feedSlots: z.array(feedAdSlotSchema).max(MAX_FEED_ADS).default([
     { enabled: true, name: '信息流广告 1', interval: 5, href: '', html: '' },
@@ -166,6 +199,21 @@ export const adsSettingsSchema = z.object({
       bottom: readerAdSlotSchema.default({}),
     })
     .default({}),
+  banners: z
+    .object({
+      home: bannerAdSlotSchema.default({}),
+      watch: bannerAdSlotSchema.default({}),
+      manga: bannerAdSlotSchema.default({}),
+    })
+    .default({}),
+  scripts: z
+    .object({
+      socialBar: globalAdScriptSchema.default({}),
+      popunder: globalAdScriptSchema.default({}),
+    })
+    .default({}),
+  smartlink: smartlinkSettingsSchema.default({}),
+  adsterra: adsterraSettingsSchema.default({}),
 });
 
 export function migrateAdsSettings(raw: unknown): unknown {
@@ -269,9 +317,25 @@ export type MangaSettings = z.infer<typeof mangaSettingsSchema>;
 export type AdsSettings = z.infer<typeof adsSettingsSchema>;
 export type FeedAdSlot = z.infer<typeof feedAdSlotSchema>;
 export type ReaderAdSlot = z.infer<typeof readerAdSlotSchema>;
+export type BannerAdSlot = z.infer<typeof bannerAdSlotSchema>;
+export type GlobalAdScript = z.infer<typeof globalAdScriptSchema>;
+export type SmartlinkSettings = z.infer<typeof smartlinkSettingsSchema>;
+export type AdsterraPlacement = z.infer<typeof adsterraPlacementSchema>;
+export type AdsterraSettings = z.infer<typeof adsterraSettingsSchema>;
 export type HeroSettings = z.infer<typeof heroSettingsSchema>;
 export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 export type SystemSettings = z.infer<typeof systemSettingsSchema>;
+
+export type PublicBannerAd = Readonly<{
+  desktopHtml: string;
+  mobileHtml: string;
+}>;
+
+export function publicSmartlinkUrl(settings: Pick<SystemSettings, 'ads'>): string {
+  if (!settings.ads.smartlink.enabled) return '';
+  const url = settings.ads.smartlink.url.trim();
+  return /^https?:\/\//i.test(url) ? url : '';
+}
 
 export type PublicAdsConfig = Readonly<{
   feedSlots: ReadonlyArray<FeedAdSlot>;
@@ -280,6 +344,12 @@ export type PublicAdsConfig = Readonly<{
     preRollAd: PlayerSettings['preRollAd'];
     pauseAd: PlayerSettings['pauseAd'];
   }>;
+  banners: Record<BannerAdPlacement, PublicBannerAd>;
+  scripts: Readonly<{
+    socialBar: string;
+    popunder: string;
+  }>;
+  smartlinkUrl: string;
 }>;
 
 function publicFeedSlot(slot: FeedAdSlot): FeedAdSlot {
@@ -291,6 +361,18 @@ function publicReaderSlot(slot: ReaderAdSlot): ReaderAdSlot {
     return { ...slot, enabled: false, html: '' };
   }
   return { ...slot, ...resolveAdDimensions(slot) };
+}
+
+function publicBannerSlot(slot: BannerAdSlot): PublicBannerAd {
+  if (!slot.enabled) {
+    return { desktopHtml: '', mobileHtml: '' };
+  }
+  const desktop = slot.desktopHtml.trim();
+  const mobile = slot.mobileHtml.trim();
+  return {
+    desktopHtml: desktop || mobile,
+    mobileHtml: mobile || desktop,
+  };
 }
 
 export function toPublicAdsConfig(settings: SystemSettings): PublicAdsConfig {
@@ -306,6 +388,16 @@ export function toPublicAdsConfig(settings: SystemSettings): PublicAdsConfig {
       preRollAd: settings.player.preRollAd,
       pauseAd: settings.player.pauseAd,
     },
+    banners: {
+      home: publicBannerSlot(settings.ads.banners.home),
+      watch: publicBannerSlot(settings.ads.banners.watch),
+      manga: publicBannerSlot(settings.ads.banners.manga),
+    },
+    scripts: {
+      socialBar: settings.ads.scripts.socialBar.enabled ? settings.ads.scripts.socialBar.html : '',
+      popunder: settings.ads.scripts.popunder.enabled ? settings.ads.scripts.popunder.html : '',
+    },
+    smartlinkUrl: publicSmartlinkUrl(settings),
   };
 }
 
@@ -346,7 +438,19 @@ export function toPublicSiteConfig(settings: SystemSettings): PublicSiteConfig {
 export type PublicPlayerConfig = Readonly<PlayerSettings>;
 
 export function toPublicPlayerConfig(settings: SystemSettings): PublicPlayerConfig {
-  return settings.player;
+  const smartlink = publicSmartlinkUrl(settings);
+  if (!smartlink) return settings.player;
+  return {
+    ...settings.player,
+    preRollAd: {
+      ...settings.player.preRollAd,
+      clickUrl: settings.player.preRollAd.clickUrl.trim() || smartlink,
+    },
+    pauseAd: {
+      ...settings.player.pauseAd,
+      clickUrl: settings.player.pauseAd.clickUrl.trim() || smartlink,
+    },
+  };
 }
 
 export const SYSTEM_SETTINGS_KEY = 'system' as const;

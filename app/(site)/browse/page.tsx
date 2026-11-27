@@ -9,7 +9,10 @@ import { Pagination } from '@/components/pagination';
 import { BROWSE_CATALOG_PAGE_SIZE, listAnimes, listTags, type SortType } from '@/lib/anime-service';
 import { StructuredData } from '@/components/structured-data';
 import { followOnlyRobots, indexableRobots, pageOpenGraph, siteOrigin } from '@/lib/seo';
-import { interleaveFeedAds } from '@/lib/server/system/domain/ads-settings-form';
+import {
+  interleaveFeedAds,
+  withSmartlinkFallback,
+} from '@/lib/server/system/domain/ads-settings-form';
 import { htmlAdDocumentPath } from '@/lib/html-ad-document';
 import { getSystemSettingsService } from '@/lib/server/system';
 
@@ -150,8 +153,11 @@ export default async function BrowsePage({
     return s ? `/browse?${s}` : '/browse';
   };
 
-  const feedSlots = data && data.data.length > 0
-    ? (await getSystemSettingsService().getPublicAdsConfig()).feedSlots
+  const adsConfig = data && data.data.length > 0
+    ? await getSystemSettingsService().getPublicAdsConfig()
+    : null;
+  const feedSlots = adsConfig
+    ? withSmartlinkFallback(adsConfig.feedSlots, adsConfig.smartlinkUrl)
     : [];
   const slots = data
     ? interleaveFeedAds(data.data, feedSlots, (item) => String(item.id))
