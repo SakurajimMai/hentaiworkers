@@ -47,6 +47,8 @@ import de.ixacg.animestream.data.repository.AdsRepository
 import de.ixacg.animestream.data.repository.FeedEntry
 import de.ixacg.animestream.ui.AnimeStreamViewModel
 import de.ixacg.animestream.ui.components.AnimePosterCard
+import de.ixacg.animestream.ui.components.BannerAdPolicy
+import de.ixacg.animestream.ui.components.BannerAdSlot
 import de.ixacg.animestream.ui.components.CatalogSearch
 import de.ixacg.animestream.ui.components.FeedAdCard
 import de.ixacg.animestream.ui.components.InlineRetryMessage
@@ -117,6 +119,11 @@ fun HomeScreen(
                         message = inlineError,
                         onRetry = { viewModel.refreshHome() },
                     )
+                }
+            }
+            if (BannerAdPolicy.hasCreative(ads.config.banners.home)) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "home-banner") {
+                    BannerAdSlot(ads.config.banners.home)
                 }
             }
             if (!content?.mangas.isNullOrEmpty()) {

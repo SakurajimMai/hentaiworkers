@@ -206,10 +206,29 @@ data class PlayerAds(
 )
 
 @Serializable
+data class BannerAd(
+    val desktopHtml: String = "",
+    val desktopWidth: Int = 0,
+    val desktopHeight: Int = 0,
+    val mobileHtml: String = "",
+    val mobileWidth: Int = 0,
+    val mobileHeight: Int = 0,
+)
+
+@Serializable
+data class BannerAds(
+    val home: BannerAd = BannerAd(),
+    val watch: BannerAd = BannerAd(),
+    val manga: BannerAd = BannerAd(),
+)
+
+@Serializable
 data class PublicAdsConfig(
     val feedSlots: List<FeedAdSlot> = emptyList(),
     val reader: ReaderAds = ReaderAds(),
     val player: PlayerAds = PlayerAds(),
+    val banners: BannerAds = BannerAds(),
+    val smartlinkUrl: String = "",
 ) {
     companion object {
         val Empty = PublicAdsConfig()

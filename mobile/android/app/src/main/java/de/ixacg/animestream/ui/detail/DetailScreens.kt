@@ -52,6 +52,8 @@ import de.ixacg.animestream.core.model.MangaSummary
 import de.ixacg.animestream.core.model.Tag
 import de.ixacg.animestream.ui.AnimeStreamViewModel
 import de.ixacg.animestream.ui.components.AnimePosterCard
+import de.ixacg.animestream.ui.components.BannerAdPolicy
+import de.ixacg.animestream.ui.components.BannerAdSlot
 import de.ixacg.animestream.ui.components.MangaPosterCard
 import de.ixacg.animestream.ui.components.RemoteImage
 import de.ixacg.animestream.ui.components.ScreenHeader
@@ -69,9 +71,11 @@ fun AnimeDetailScreen(
     onTag: (Tag) -> Unit,
 ) {
     val state by viewModel.animeDetail.collectAsStateWithLifecycle()
+    val ads by viewModel.adsState.collectAsStateWithLifecycle()
     var lightboxUrl by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     LaunchedEffect(animeId) { viewModel.loadAnimeDetail(animeId) }
+    LaunchedEffect(Unit) { viewModel.ensureAdsLoaded() }
     val content = state.value?.takeIf { it.anime.id == animeId }
     if (
         statePane(
@@ -143,6 +147,11 @@ fun AnimeDetailScreen(
                         Text(if (anime.videoUrl.isNullOrBlank()) "暂无片源" else "播放")
                     }
                 }
+            }
+        }
+        if (BannerAdPolicy.hasCreative(ads.config.banners.watch)) {
+            item(key = "anime-banner") {
+                BannerAdSlot(ads.config.banners.watch, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             }
         }
         if (anime.tags.isNotEmpty()) {
@@ -229,8 +238,10 @@ fun MangaDetailScreen(
     onTag: (String) -> Unit,
 ) {
     val state by viewModel.mangaDetail.collectAsStateWithLifecycle()
+    val ads by viewModel.adsState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     LaunchedEffect(mangaId) { viewModel.loadMangaDetail(mangaId) }
+    LaunchedEffect(Unit) { viewModel.ensureAdsLoaded() }
     val content = state.value?.takeIf { it.manga.id == mangaId }
     if (
         statePane(
@@ -301,6 +312,11 @@ fun MangaDetailScreen(
                         Text(if (manga.chapters.isEmpty()) "暂无章节" else "开始阅读")
                     }
                 }
+            }
+        }
+        if (BannerAdPolicy.hasCreative(ads.config.banners.manga)) {
+            item(key = "manga-banner") {
+                BannerAdSlot(ads.config.banners.manga, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             }
         }
         if (manga.tags.isNotEmpty()) {

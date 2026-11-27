@@ -567,7 +567,7 @@ export default async function AdminSystemSettingsPage({
             <h2 className="font-ui text-sm font-semibold">广告位</h2>
             <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
               在此配置 Adsterra 同步、Smartlink 兜底跳转、全站脚本广告（Social Bar / Popunder）、页面横幅（首页 / 播放页 / 漫画详情页）、信息流卡片与漫画阅读页上下广告位。
-              信息流与阅读页上下广告位在网站和 Android App 共用；Adsterra Smartlink、全站脚本与页面横幅仅网页端（含手机浏览器）生效。
+              信息流与阅读页上下广告位在网站和 Android App 共用；Smartlink 兜底与页面横幅在网页端与支持新版的 Android App 共用；全站脚本（Social Bar / Popunder）仅网页端生效。
             </p>
           </div>
 
@@ -628,7 +628,7 @@ export default async function AdminSystemSettingsPage({
           <div className="space-y-3 border-t border-border pt-4">
             <h3 className="font-ui text-[13px] font-semibold">Smartlink 直链</h3>
             <p className="font-ui text-[12px] text-soft leading-relaxed">
-              两处兜底用途：（1）播放器片头广告、暂停广告未填「点击跳转 URL」时自动跳转到此直链；（2）信息流中 HTML 与默认跳转链接都为空的「广告位招租」卡片点击后跳转到此直链。仅网页端生效。
+              两处兜底用途：（1）播放器片头广告、暂停广告未填「点击跳转 URL」时自动跳转到此直链；（2）信息流中 HTML 与默认跳转链接都为空的「广告位招租」卡片点击后跳转到此直链。网页与 Android App 共用。
             </p>
             <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">
               <label className="field-check text-sm">
@@ -706,12 +706,12 @@ export default async function AdminSystemSettingsPage({
             <div>
               <h3 className="font-ui text-[13px] font-semibold">横幅广告</h3>
               <p className="mt-1 font-ui text-[12px] text-soft leading-relaxed">
-                屏宽 ≥768px 显示电脑端代码，&lt;768px 显示手机端代码；只填一端时电脑端与手机端共用。尺寸会从代码中的 atOptions 自动识别。仅网页端（含手机浏览器）生效。
+                屏宽 ≥768px/768dp 显示电脑端代码，&lt;768px/768dp 显示手机端代码；只填一端时两端共用。尺寸会从代码中的 atOptions 自动识别。网页与新版 Android App 共用。
               </p>
             </div>
             {([
               { key: 'home', suffix: 'Home', label: '首页（幻灯片下方）' },
-              { key: 'watch', suffix: 'Watch', label: '播放页（播放器下方）' },
+              { key: 'watch', suffix: 'Watch', label: '播放页（播放器下方）/ App 作品详情页' },
               { key: 'manga', suffix: 'Manga', label: '漫画详情页' },
             ] as const).map(({ key, suffix, label }) => (
               <div key={key} className="space-y-3 rounded-xl border border-border bg-surface-2 p-3.5">

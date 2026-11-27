@@ -639,7 +639,15 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
       'tags',
     ],
     AnimeSimilarItem: ['id', 'title', 'cover', 'fanart', 'viewCount'],
-    PublicAdsConfig: ['feedSlots', 'reader', 'player'],
+    PublicAdsConfig: ['feedSlots', 'reader', 'player', 'banners', 'smartlinkUrl'],
+    PublicBannerAd: [
+      'desktopHtml',
+      'desktopWidth',
+      'desktopHeight',
+      'mobileHtml',
+      'mobileWidth',
+      'mobileHeight',
+    ],
     PublicFeedAdSlot: ['enabled', 'name', 'interval', 'href', 'html'],
     PublicReaderAdSlot: ['enabled', 'html', 'interval'],
     PublicPlayerPreRollAd: [
@@ -685,6 +693,7 @@ test('黄金 fixtures 与结构化 OpenAPI required 声明一致', () => {
   assertOwnKeys(adsFixture.reader.top, required.PublicReaderAdSlot);
   assertOwnKeys(adsFixture.player.preRollAd, required.PublicPlayerPreRollAd);
   assertOwnKeys(adsFixture.player.pauseAd, required.PublicPlayerPauseAd);
+  assertOwnKeys(adsFixture.banners.home, required.PublicBannerAd);
   assertOwnKeys(androidUpdateFixture, required.AndroidUpdateManifest);
   for (const apk of Object.values(androidUpdateFixture.apks)) {
     assertOwnKeys(apk, required.AndroidUpdateAsset);

@@ -581,9 +581,34 @@ components:
         muted:
           type: boolean
 
+    PublicBannerAd:
+      type: object
+      required: [desktopHtml, desktopWidth, desktopHeight, mobileHtml, mobileWidth, mobileHeight]
+      properties:
+        desktopHtml:
+          type: string
+        desktopWidth:
+          type: integer
+          minimum: 0
+          maximum: 1920
+        desktopHeight:
+          type: integer
+          minimum: 0
+          maximum: 600
+        mobileHtml:
+          type: string
+        mobileWidth:
+          type: integer
+          minimum: 0
+          maximum: 1920
+        mobileHeight:
+          type: integer
+          minimum: 0
+          maximum: 600
+
     PublicAdsConfig:
       type: object
-      required: [feedSlots, reader, player]
+      required: [feedSlots, reader, player, banners, smartlinkUrl]
       properties:
         feedSlots:
           type: array
@@ -607,6 +632,19 @@ components:
               $ref: "#/components/schemas/PublicPlayerPreRollAd"
             pauseAd:
               $ref: "#/components/schemas/PublicPlayerPauseAd"
+        banners:
+          type: object
+          required: [home, watch, manga]
+          properties:
+            home:
+              $ref: "#/components/schemas/PublicBannerAd"
+            watch:
+              $ref: "#/components/schemas/PublicBannerAd"
+            manga:
+              $ref: "#/components/schemas/PublicBannerAd"
+        smartlinkUrl:
+          type: string
+          description: 已启用的 Smartlink；为空表示未启用。feedSlots 与播放器 clickUrl 的兜底已在服务端应用
 
     AndroidUpdateAsset:
       type: object

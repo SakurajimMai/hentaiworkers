@@ -159,6 +159,15 @@ export type PublicPlayerPauseAd = {
   muted: boolean;
 };
 
+export type PublicBannerAd = {
+  desktopHtml: string;
+  desktopWidth: number;
+  desktopHeight: number;
+  mobileHtml: string;
+  mobileWidth: number;
+  mobileHeight: number;
+};
+
 export type PublicAdsConfig = {
   feedSlots: PublicFeedAdSlot[];
   reader: {
@@ -170,6 +179,12 @@ export type PublicAdsConfig = {
     preRollAd: PublicPlayerPreRollAd;
     pauseAd: PublicPlayerPauseAd;
   };
+  banners: {
+    home: PublicBannerAd;
+    watch: PublicBannerAd;
+    manga: PublicBannerAd;
+  };
+  smartlinkUrl: string;
 };
 
 export interface PublicAnimeService {

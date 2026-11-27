@@ -58,9 +58,12 @@
   `lib/client/global-ad-scripts.ts` (`/admin`, `/login`, `/register`, `/forgot-password`,
   `/reset-password`, `/verify-email`). Scripts already injected before a client-side transition to
   an excluded route cannot be unexecuted.
-- `smartlinkUrl`, `banners`, and `scripts` are web-only (`app/api/ads/route.ts` and
-  `lib/public-api-types.ts` stay unchanged for Android). Adsterra Publisher API keys are stored
-  encrypted under AAD `system:ads:adsterra_api_key`.
+- Global ad scripts (`scripts`) remain web-only. `banners` (including server-resolved
+  `desktopWidth`/`desktopHeight`/`mobileWidth`/`mobileHeight`) and `smartlinkUrl` are served to
+  Android via `/api/ads`; server-side `toPublicApiAdsConfig` applies Smartlink fallback to empty
+  `feedSlots` placeholders and empty player `clickUrl` fields, keeping `lib/public-api-types.ts`
+  and `docs/api/openapi.yaml` aligned. Adsterra Publisher API keys are stored encrypted under AAD
+  `system:ads:adsterra_api_key`.
 - Run `npm run test:ads:browser` and `npm run test:meta:browser` when changing these contracts.
   Inspect screenshots and verify mobile/desktop field geometry as well as HTML assertions.
 

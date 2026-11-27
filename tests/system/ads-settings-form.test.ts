@@ -306,13 +306,28 @@ test('toPublicAdsConfig shares single-variant banners, hides disabled scripts an
 
   assert.deepEqual(pub.banners.home, {
     desktopHtml: '<div>desktop-only</div>',
+    desktopWidth: 0,
+    desktopHeight: 0,
     mobileHtml: '<div>desktop-only</div>',
+    mobileWidth: 0,
+    mobileHeight: 0,
   });
   assert.deepEqual(pub.banners.watch, {
     desktopHtml: '<div>mobile-only</div>',
+    desktopWidth: 0,
+    desktopHeight: 0,
     mobileHtml: '<div>mobile-only</div>',
+    mobileWidth: 0,
+    mobileHeight: 0,
   });
-  assert.deepEqual(pub.banners.manga, { desktopHtml: '', mobileHtml: '' });
+  assert.deepEqual(pub.banners.manga, {
+    desktopHtml: '',
+    desktopWidth: 0,
+    desktopHeight: 0,
+    mobileHtml: '',
+    mobileWidth: 0,
+    mobileHeight: 0,
+  });
   assert.equal(pub.scripts.socialBar, '<script src="https://ads.example/sb.js"></script>');
   assert.equal(pub.scripts.popunder, '');
   assert.equal(pub.smartlinkUrl, 'https://smart.example/direct');

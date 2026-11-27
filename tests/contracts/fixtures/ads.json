@@ -9,8 +9,8 @@
     }
   ],
   "reader": {
-    "top": { "enabled": false, "html": "", "interval": 5 },
-    "middle": { "enabled": false, "html": "", "interval": 5 },
+    "top": { "enabled": false, "html": "", "interval": 5, "floating": false },
+    "middle": { "enabled": false, "html": "", "interval": 5, "floating": false },
     "bottom": { "enabled": false, "html": "", "interval": 5, "floating": false }
   },
   "player": {
@@ -32,5 +32,32 @@
       "clickUrl": "",
       "muted": true
     }
-  }
+  },
+  "banners": {
+    "home": {
+      "desktopHtml": "",
+      "desktopWidth": 0,
+      "desktopHeight": 0,
+      "mobileHtml": "",
+      "mobileWidth": 0,
+      "mobileHeight": 0
+    },
+    "watch": {
+      "desktopHtml": "",
+      "desktopWidth": 0,
+      "desktopHeight": 0,
+      "mobileHtml": "",
+      "mobileWidth": 0,
+      "mobileHeight": 0
+    },
+    "manga": {
+      "desktopHtml": "",
+      "desktopWidth": 0,
+      "desktopHeight": 0,
+      "mobileHtml": "",
+      "mobileWidth": 0,
+      "mobileHeight": 0
+    }
+  },
+  "smartlinkUrl": ""
 }

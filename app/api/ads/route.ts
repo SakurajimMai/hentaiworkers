@@ -6,20 +6,15 @@ import {
 } from './handler';
 import type { PublicAdsConfig } from '@/lib/public-api-types';
 import { createPublicReadCache } from '@/lib/server/shared/stale-read-cache';
+import { toPublicApiAdsConfig } from '@/lib/server/system/domain/public-api-ads';
 
 export const dynamic = 'force-dynamic';
 
 const loadAdsService: AdsSettingsServiceLoader = async () => {
   const { getSystemSettingsService } = await import('@/lib/server/system');
   return {
-    getPublicAdsConfig: async () => {
-      const ads = await getSystemSettingsService().getPublicAdsConfig();
-      return {
-        feedSlots: [...ads.feedSlots],
-        reader: ads.reader,
-        player: ads.player,
-      };
-    },
+    getPublicAdsConfig: async () =>
+      toPublicApiAdsConfig(await getSystemSettingsService().getPublicAdsConfig()),
   };
 };
 

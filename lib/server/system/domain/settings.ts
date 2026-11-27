@@ -328,7 +328,11 @@ export type SystemSettings = z.infer<typeof systemSettingsSchema>;
 
 export type PublicBannerAd = Readonly<{
   desktopHtml: string;
+  desktopWidth: number;
+  desktopHeight: number;
   mobileHtml: string;
+  mobileWidth: number;
+  mobileHeight: number;
 }>;
 
 export function publicSmartlinkUrl(settings: Pick<SystemSettings, 'ads'>): string {
@@ -365,13 +369,28 @@ function publicReaderSlot(slot: ReaderAdSlot): ReaderAdSlot {
 
 function publicBannerSlot(slot: BannerAdSlot): PublicBannerAd {
   if (!slot.enabled) {
-    return { desktopHtml: '', mobileHtml: '' };
+    return {
+      desktopHtml: '',
+      desktopWidth: 0,
+      desktopHeight: 0,
+      mobileHtml: '',
+      mobileWidth: 0,
+      mobileHeight: 0,
+    };
   }
   const desktop = slot.desktopHtml.trim();
   const mobile = slot.mobileHtml.trim();
+  const desktopHtml = desktop || mobile;
+  const mobileHtml = mobile || desktop;
+  const desktopSize = desktopHtml ? resolveAdDimensions({ html: desktopHtml }) : { width: 0, height: 0 };
+  const mobileSize = mobileHtml ? resolveAdDimensions({ html: mobileHtml }) : { width: 0, height: 0 };
   return {
-    desktopHtml: desktop || mobile,
-    mobileHtml: mobile || desktop,
+    desktopHtml,
+    desktopWidth: desktopSize.width,
+    desktopHeight: desktopSize.height,
+    mobileHtml,
+    mobileWidth: mobileSize.width,
+    mobileHeight: mobileSize.height,
   };
 }
 

@@ -181,6 +181,11 @@ scope, Docker image, production Compose services, and server-private imports.
   poster-sized placeholder. Fixed creatives measure the WebView at native CSS pixels through an
   explicit layout modifier that reports the scaled footprint; `requiredSize` + `graphicsLayer`
   centres the oversized view before scaling and shifts narrow banners out of their box.
+- Page banners (`banners.home`, `banners.watch`, `banners.manga`) render in `HomeScreen`,
+  `AnimeDetailScreen` (`watch`), and `MangaDetailScreen` (`manga`) via `BannerAdSlot` and
+  `BannerAdPolicy` (`DESKTOP_MIN_WIDTH_DP = 768`), selecting desktop or mobile creative (falling back
+  to the other variant when one is empty) and collapsing completely when both are blank. Smartlink
+  fallback for feed placeholders and player `clickUrl` is applied server-side in `/api/ads`.
 
 ## 4. Build And Verification Boundary
 

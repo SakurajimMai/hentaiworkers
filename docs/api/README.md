@@ -99,7 +99,7 @@ GET /api/health
 GET /api/ads
 ```
 
-返回启用的内容流广告位、阅读器广告位和播放器广告配置，不包含管理密钥：
+返回启用的内容流广告位、阅读器广告位、播放器广告配置、页面横幅和 Smartlink 地址，不包含管理密钥和全站脚本：
 
 ```json
 {
@@ -128,11 +128,21 @@ GET /api/ads
       "clickUrl": "",
       "muted": true
     }
-  }
+  },
+  "banners": {
+    "home": { "desktopHtml": "", "desktopWidth": 0, "desktopHeight": 0, "mobileHtml": "", "mobileWidth": 0, "mobileHeight": 0 },
+    "watch": { "desktopHtml": "", "desktopWidth": 0, "desktopHeight": 0, "mobileHtml": "", "mobileWidth": 0, "mobileHeight": 0 },
+    "manga": { "desktopHtml": "", "desktopWidth": 0, "desktopHeight": 0, "mobileHtml": "", "mobileWidth": 0, "mobileHeight": 0 }
+  },
+  "smartlinkUrl": ""
 }
 ```
 
 接口允许公共读缓存；客户端仍应处理 `500`，并在广告配置不可用时继续显示核心内容。
+
+`banners.{home,watch,manga}` 分别对应首页、播放/作品详情页、漫画详情页横幅；若只配置了一端代码，服务端会自动共用。
+`desktopWidth`/`desktopHeight`/`mobileWidth`/`mobileHeight` 已在服务端根据 `atOptions` 或标签宽高推断好，客户端无需解析 HTML；Android 端按 `768dp` 断点择一展示。
+`smartlinkUrl` 为已启用的 Smartlink 直链（未启用时为空串），且 Smartlink 对 `feedSlots` 空白招租卡 `href` 与播放器空 `clickUrl` 的兜底已在服务端应用（旧版本 APK 同样受益）。全站脚本（Social Bar / Popunder）仅在网页端使用，不通过本接口下发。
 
 `feedSlots[]` 和 `reader.top` / `reader.bottom` 还支持可选的 `width`、`height`，
 单位为创意的 CSS 像素。管理员留「自动」但 HTML 含 `atOptions`、`<iframe width height>` 或
