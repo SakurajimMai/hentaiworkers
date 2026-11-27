@@ -491,7 +491,7 @@ export function ArtPlayer({
       art = new ArtplayerCtor({
         container,
         url: mediaUrl,
-        poster: poster || undefined,
+        poster: poster || '',
         // Stable id powers built-in autoPlayback memory across sessions.
         id: id || mediaUrl,
         theme: effectiveTheme,
@@ -572,6 +572,21 @@ export function ArtPlayer({
       // Track pre-roll lifecycle so pause ads never cover the ad plugin.
       // Local non-null alias: art is constructed above and only nulled on cancel/destroy.
       const player = art;
+      // With preload=none, loadstart can fire without fetching media or reaching
+      // canplay. Keep the paused player actionable instead of spinning forever.
+      const showPausedPlayback = () => {
+        if (cancelled || player.isDestroy || preRollActive) return;
+        if (player.video.paused && !player.video.seeking && !player.video.error) {
+          player.loading.show = false;
+          player.mask.show = true;
+          player.controls.show = true;
+        }
+      };
+      player.on('video:loadstart', showPausedPlayback);
+      player.on('video:suspend', showPausedPlayback);
+      player.on('video:loadedmetadata', showPausedPlayback);
+      player.on('video:pause', showPausedPlayback);
+      showPausedPlayback();
       const clearPreRollIfIdle = () => {
         if (cancelled || player.isDestroy) return;
         const visible = isPreRollAdsDomVisible(player);
